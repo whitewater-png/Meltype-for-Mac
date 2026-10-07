@@ -1,0 +1,44 @@
+name: 不具合の報告
+description: 動かない・おかしな動きをする
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ご報告ありがとうございます。**パスワード・個人的な文章・見られて困るログは、書かないでください。**
+        (この Issue は誰でも読める公開の場所です)
+  - type: input
+    id: app
+    attributes:
+      label: どのアプリで
+      placeholder: "TextEdit / Safari / VS Code など"
+    validations:
+      required: true
+  - type: textarea
+    id: typed
+    attributes:
+      label: 何と打って
+      placeholder: "例: kyouhagoogle と打って Enter"
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: どうなったか (期待した結果も)
+      placeholder: "例: 「今日はごおｇぇ」になった (期待: 今日はgoogle)"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "macOS 26.x / Apple シリコン"
+  - type: input
+    id: version
+    attributes:
+      label: Meltype の版
+      placeholder: "1.0.1"
+  - type: textarea
+    id: environment
+    attributes:
+      label: 実行環境 (メニューの「不具合の報告・提案…」から開くと自動で入ります)

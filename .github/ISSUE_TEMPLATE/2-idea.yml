@@ -1,0 +1,11 @@
+name: 提案・要望
+description: こうなると良い、という提案
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: 提案の内容
+      description: 困っていること、どうなると嬉しいかを書いてください。
+    validations:
+      required: true

@@ -141,7 +141,7 @@ Meltype は打った内容をネットワークに送りません。変換・学
 ## ライセンス
 
 Meltype は **GNU General Public License v3.0** ([LICENSE](LICENSE)) で公開されています。本リポジトリも同じ条件で、改造版もソースを公開する条件で自由に使えます。
-GPL v3 の条件で使えない場合は、本家の作者にご相談ください。貢献の方法と貢献者ライセンス同意 (CLA) は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+GPL v3 の条件で使えない場合は、本家の作者にご相談ください。貢献の方法は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
 使っているライブラリのライセンスは [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) にあります。
 

@@ -11,6 +11,9 @@ public static class ProjectInfo
 {
     public const string SourceUrl = "https://github.com/yksr-melt/Meltype";
 
+    /// <summary>Mac 版のリポジトリ。Mac 版の不具合は本家ではなく、こちらの Issue で受け付ける。</summary>
+    public const string MacSourceUrl = "https://github.com/whitewater-png/Meltype-for-Mac";
+
     /// <summary>
     /// 不具合報告のフォーム (Google フォームの「事前入力した URL」。OS に Windows 11、版に 0.0.0、実行環境に ENV を入れて作ったもの)。
     /// 空なら GitHub の Issue の画面を開く。作り方は tools/report-form/README.md。
@@ -30,6 +33,10 @@ public static class ProjectInfo
     /// </summary>
     public static string ReportUrl(string os, string version, string environment)
     {
+        // Mac 版は、Mac 版のリポジトリの不具合報告 (.github/ISSUE_TEMPLATE/1-bug.yml) を、OS・版・実行環境を入れた状態で開く
+        if (os.StartsWith("Mac", StringComparison.Ordinal))
+            return $"{MacSourceUrl}/issues/new?template=1-bug.yml&os={Uri.EscapeDataString(os)}" +
+                   $"&version={Uri.EscapeDataString(version)}&environment={Uri.EscapeDataString(environment)}";
         if (ReportForm.Length == 0) return $"{SourceUrl}/issues/new/choose";
         return ReportForm
             .Replace("=Windows+11", "=" + Uri.EscapeDataString(os))
