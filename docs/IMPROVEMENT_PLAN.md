@@ -767,3 +767,38 @@ Core の 1 キーあたり (ms)。「末尾」は最後の 10% のキー (一番
 **対象の単位の全体**: 既存 (mmol kcal mhz ghz khz kwh mah mol min sec rem dpi ppi fps bpm rpm mph kph mm cm km nm um mg kg ml dl ms ns hz kb mb gb tb px pt em wh) + 追加 (cc pp ppm ppb cal)。l g t m w v kw db ft lb bps など、ローマ字として読めない単位は元から英字のまま。ma ka ki a in oz は日本語の音節と同じ綴りなので入れない。
 
 **既知の制限 (対応しない)**: `5w` + `wo` (5wwo) は ww が笑いの w と同じ扱いで「5っを」になる。`5dpide` は dpi の直後の `de` で英字のまま残る (既存の挙動)。確定前 (打ちかけ) の画面は、単位が打ち終わる前は「50っc」のまま見え、次の文字か確定で「50cc」になる (mm と同じ。次に母音が来る可能性があるため待つ)。
+
+---
+
+## 追加項目 P19 (専門用語集の同梱)
+
+**目的**: 分野ごとの専門用語 (数千〜数万語) を、アプリに同梱して変換・予測変換に使えるようにする。**語そのものは作らない**。仕組み・検査ツール・手引き・空の雛形だけを置いた。配布はアプリの更新のみ。
+
+**使い方**: `dictionaries/terms-<分野>.txt` を置いてビルドするだけ (Core.csproj の `dictionaries/*.txt` のグロブで埋め込まれ、`terms-` で始まるものを全部読む。コード変更なし)。形式は「読み<Tab>語<Tab>注記(任意)」。詳しくは `docs/DICTIONARY.md`。
+
+**設計**
+- `Composition/TermDictionary.cs` (新規): 読み込みと索引。読みが `ForcedMinReadingLength = 4` 以上は強制型 (`Dictionary` で読み → 語、先頭の 1 文字ごとの最大長で照合を絞り、`AlternateLookup<ReadOnlySpan<char>>` で文字列を作らずに引く)、3 以下は候補追加型 (読み → 語。助詞付きは `CandidateDictionary.Endings` を共用)。予測用に、読みの昇順に並べた配列 + 二分探索で前方一致 (一致は先頭から最大 64 件だけ数える)。読みはカタカナ → ひらがな、全角英数 → 半角、大文字 → 小文字にそろえる。不正な行 (読み 2 文字未満・100 超、語が空・100 超、タブなし) は飛ばして `Skipped` に数える。不変なので、読む側にロックは要らない。
+- `UserDictionary`: `_terms` を持つ (ユーザー辞書の `_builtIn` と同じく保存・表示 (`Words`)・書き出しに出ない)。`Split` は同じ長さならユーザー辞書・組み込み語句が先、より長ければ専門用語が勝つ (最長一致)。`Lookup` はユーザー辞書の後ろに強制型の同じ読みを足す。`LookupTermCandidates` (候補追加型)、`PredictTerms` (予測)、`LoadTerms(IEnumerable<string>)` (テスト用の入口。`Version` を進めてキャッシュを捨てる)。同梱は `TermDictionary.Embedded` (プロセスで 1 つ。複数のユーザー辞書インスタンスで共有)。`builtIn: false` のときは使わない。
+- `CompositionController`: `JapaneseCandidates` で候補追加型を (エンジンの単独変換の次に) 足し、`CollectPredictions` を ユーザー辞書 → 専門用語集 → エンジン → 履歴 の順にした。
+- `DictionarySource.ReadEmbeddedWithPrefix`: 埋め込みの `terms-*.txt` を名前順に全部読む。
+- `tools/check-terms.mjs` (検査。`--self-test` で自己テスト 20 件)。`check-dictionaries.mjs` は `terms-*.txt` を対象外にした。
+- FFI は変えていない (`AbiVersion` はそのまま)。語が 0 件のときの結果は旧版と同じ (`Terms_EmptyMeansSameAsBefore`)。
+
+**測定 (合成 5 万語・読み 3〜12 文字、`Terms_FiftyThousandWords_StayFast`)**: 読み込みと索引作成 約 50〜60 ms、メモリ増 約 13 MB、Split 約 5 µs (語 0 件は 1 µs 未満)、予測 約 1 µs、実キー入力 (ライブ変換 + 予測) 1 キー平均 0.108 ms (語 0 件 0.104 ms)。
+
+**変更ファイル**: `src/Meltype.Core/Composition/TermDictionary.cs` (新規)、`UserDictionary.cs`、`CandidateDictionary.cs` (`Endings` を internal に)、`CompositionController.cs`、`Detection/WordList.cs`、`src/Meltype.Core.Tests/TermDictionaryTests.cs` (新規、10 件)、`dictionaries/terms-template.txt` (新規)、`tools/check-terms.mjs` (新規)、`tools/check-dictionaries.mjs`、`docs/DICTIONARY.md` (新規)、`CONTRIBUTING.md`、`THIRD-PARTY-NOTICES.md`。
+
+**既知の制限 (対応しない)**
+- 強制型は読みの一致だけで、文脈は見ない (同じ読みの別の語は、候補から選び直す)。同じ読みの専門用語が複数あるとき、先頭はファイルの先に書いた語。
+- 候補追加型は候補の先頭にならない (確実に先頭にしたい語は、ユーザー辞書に登録する)。
+- 候補追加型の助詞付き (すうを → 数を) は、既存の候補辞書と同じ決まった助詞だけ。
+- 語を足したら、アプリの再ビルドが要る (利用者の手元で語を足す仕組みではない)。
+- 予測は読みの前方一致の先頭 64 件までを数えるので、短い読み (1〜2 文字) では、読みの昇順で後ろの語は出ない。
+- 同じ読み・同じ語は、複数ファイルにまたがっても 1 つにまとめる。
+
+### P19 査読後の修正
+
+- `tools/check-terms.mjs`: パスに空白・日本語があると、直接実行の判定が偽になり何も検査せず exit 0 になる問題を修正 (`fileURLToPath` と、`argv[1]` との実パス比較に変更。root の算出も同様)。空白・日本語を含むフォルダーにコピーして、不正ファイルが exit 1、`--self-test` が出力を出すことを確認。
+- 引数で指定したファイルが存在しないときは、エラー (exit 1) にした (自己テストを追加)。
+- 読みがちょうど 4 文字 (強制型の最短) の語を、件数と先頭 5 件つきの情報で出す (日常語の巻き込みへの注意)。出典・ライセンスが雛形の「(例: …)」のまま語が 1 つ以上あるときは警告 (自己テスト計 23 件)。
+- `docs/DICTIONARY.md`: 4〜5 文字の読みは一般語と重なりやすい旨、強制型は辞書提案の「登録済み」判定に含まれ候補追加型は含まれない旨を追記。

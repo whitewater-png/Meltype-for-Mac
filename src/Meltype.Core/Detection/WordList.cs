@@ -58,6 +58,20 @@ public static class DictionarySource
         return reader.ReadToEnd();
     }
 
+    /// <summary>名前が prefix で始まる埋め込みの辞書 (dictionaries/terms-*.txt など) の中身を、名前の昇順で全部返す。ファイルを足すだけで読まれる。</summary>
+    public static IEnumerable<string> ReadEmbeddedWithPrefix(string prefix)
+    {
+        var assembly = typeof(DictionarySource).Assembly;
+        var head = "Meltype.dictionaries." + prefix;
+        foreach (var name in assembly.GetManifestResourceNames().Where(n => n.StartsWith(head, StringComparison.Ordinal) && n.EndsWith(".txt", StringComparison.Ordinal)).Order(StringComparer.Ordinal))
+        {
+            using var stream = assembly.GetManifestResourceStream(name);
+            if (stream is null) continue;
+            using var reader = new StreamReader(stream);
+            yield return reader.ReadToEnd();
+        }
+    }
+
     public static IEnumerable<string> Load(string name, string? userDirectory)
     {
         foreach (var word in WordList.ParseWords(ReadEmbedded(name))) yield return word;

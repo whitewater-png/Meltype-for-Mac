@@ -9,6 +9,14 @@ Meltype のソースコード (このリポジトリ) には、他者の著作�
 | .NET ランタイム (Microsoft.NETCore.App, Microsoft.WindowsDesktop.App) | MIT License | `app\dotnet\` (ライセンス: `app\dotnet\LICENSE.txt`、同梱部品の通知: `app\dotnet\ThirdPartyNotices.txt`) |
 | [Mozc](https://github.com/google/mozc) の変換エンジンと辞書 (`meltype_mozc_helper.exe`。Meltype 用の小さな入出力部分 `native/mozc/meltype_mozc_helper.cc` を足してビルドしたもの) | Mozc: BSD-3-Clause (Copyright Google Inc.)。辞書: IPAdic (NAIST)・ICOT・沖縄辞書 のライセンス。組み込みのライブラリ: Abseil (Apache-2.0)・Protocol Buffers (BSD-3-Clause)・Japanese Usage Dictionary など | `app\mozc\` (ライセンス: `app\mozc\MOZC-LICENSE.txt`、辞書とライブラリの全文: `app\mozc\MOZC-CREDITS.html`。Qt は使っていない) |
 
+## 専門用語集 (`dictionaries/terms-*.txt`)
+
+分野ごとの専門用語集を同梱するときは、ここに 1 ファイル 1 行で出典とライセンスを書く (作り方は [docs/DICTIONARY.md](docs/DICTIONARY.md))。現時点では語を同梱していない (雛形 `terms-template.txt` だけ)。
+
+| ファイル | 出典 | ライセンス |
+| --- | --- | --- |
+| (なし) | | |
+
 ## Mac 版 (mac/) がビルド時に取り込むもの
 
 | 部品 | ライセンス | 使い方 |

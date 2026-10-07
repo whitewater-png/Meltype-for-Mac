@@ -1426,6 +1426,8 @@ public sealed class CompositionController
         var candidates = Distinct(inContext);
         foreach (var word in _options.UserDictionary?.Lookup(reading) ?? []) if (!candidates.Contains(word)) candidates.Add(word);
         if (Convert(reading) is var standalone && !candidates.Contains(standalone)) candidates.Add(standalone);
+        // 専門用語集の読みの短い語 (候補追加型) は、候補に足すだけ (強制しない)。
+        foreach (var term in _options.UserDictionary?.LookupTermCandidates(reading) ?? []) if (!candidates.Contains(term)) candidates.Add(term);
         foreach (var extra in _options.Candidates?.Lookup(reading) ?? [])
         {
             if (!candidates.Contains(extra)) candidates.Add(extra);
@@ -1995,7 +1997,7 @@ public sealed class CompositionController
     }
 
     /// <summary>
-    /// 予測候補を、ユーザー辞書 → 変換エンジン → 変換履歴の順に集める (重複と、読みそのままのひらがなは除く。最大 8 個)。
+    /// 予測候補を、ユーザー辞書 → 専門用語集 → 変換エンジン → 変換履歴の順に集める (重複と、読みそのままのひらがなは除く。最大 8 個)。
     /// 出どころの順は崩さず、同じ出どころの中を使用頻度 (回数が多い・最近使った) の順にする。
     /// ユーザー辞書とエンジンの予測は、履歴に使用実績のある語を上に引き上げ (実績の無い語は元の順のまま)、
     /// 履歴由来の予測は頻度スコア順 (ConversionHistory.StartingWith) で並ぶ。
@@ -2010,6 +2012,10 @@ public sealed class CompositionController
             if (_options.UserDictionary is { } dictionary)
             {
                 foreach (var word in dictionary.Words.Where(w => w.Reading.StartsWith(reading, StringComparison.Ordinal)).Select(w => w.Word).OrderByDescending(Used)) yield return word;
+            }
+            if (_options.UserDictionary is { } termSource)
+            {
+                foreach (var word in termSource.PredictTerms(reading).OrderByDescending(Used)) yield return word;
             }
             if (reading.Length <= MaxPredictionReadingLength && _options.Predictions?.Invoke(reading) is { } engine)
             {

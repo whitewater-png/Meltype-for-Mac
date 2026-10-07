@@ -72,6 +72,7 @@ const report = [];
 for (const file of files) {
   const full = path.join(root, file);
   if (!fs.existsSync(full)) continue; // 消した辞書
+  if (file.startsWith('terms-')) continue; // 専門用語集は tools/check-terms.mjs で確かめる
   const format = formats[file];
   const text = fs.readFileSync(full, 'utf8');
   if (text.charCodeAt(0) === 0xfeff) { report.push(`::warning file=dictionaries/${file}::先頭に BOM がある`); warnings++; }

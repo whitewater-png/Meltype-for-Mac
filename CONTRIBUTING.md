@@ -21,6 +21,7 @@ Meltype for Mac への不具合の報告・辞書の追加・改善の提案を�
 `dictionaries/` の辞書 (英単語・固有名詞・同音異義語の候補・文脈の手がかり) への追加は、Pull Request か Issue でお送りください。
 市販の IME (ATOK・Microsoft IME など) や、ライセンスが合わない辞書の内容を写したものは取り込めません。
 大きな辞書を作るときは、元にしたデータとライセンスを書き、作るためのスクリプト (`tools/`) も一緒に送ってください。
+分野ごとの専門用語集 (`dictionaries/terms-<分野>.txt`) の作り方・形式・検査 (`node tools/check-terms.mjs`)・出典とライセンスの扱いは、[専門用語集の手引き](docs/DICTIONARY.md) を見てください。
 
 ## コードの貢献 (Pull Request)
 

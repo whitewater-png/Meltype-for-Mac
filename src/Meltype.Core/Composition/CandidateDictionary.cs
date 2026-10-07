@@ -95,7 +95,7 @@ public sealed class CandidateDictionary
     /// 残りはかなのまま付ける (箸を / 端を)。
     /// </summary>
     // 語の後ろに付いていてよい助詞・「だ」など
-    private static readonly HashSet<string> Endings =
+    internal static readonly HashSet<string> Endings =
         ["", "を", "が", "は", "に", "で", "と", "も", "へ", "の", "や", "な", "だ", "です", "から", "まで", "より", "って", "とか", "さ", "ね", "よ"];
 
     public IReadOnlyList<string> Lookup(string reading)

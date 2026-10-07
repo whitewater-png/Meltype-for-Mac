@@ -38,6 +38,9 @@ public sealed class UserDictionary
     // 同梱の語句 (dictionaries/phrases.txt)。変換エンジンが苦手な語句を補う。ユーザーの登録より後回しで、保存も表示もしない。
     private readonly List<UserWord> _builtIn = [];
     private Dictionary<string, List<string>> _byReading = new(StringComparer.Ordinal);
+    private Dictionary<string, List<string>>.AlternateLookup<ReadOnlySpan<char>> _byReadingLookup;
+    // 専門用語集 (dictionaries/terms-*.txt)。ユーザー辞書の後・変換エンジンの前。保存も表示もしない。差し替えは参照ごと (読む側は止めない)。
+    private TermDictionary _terms = TermDictionary.Empty;
     private int _maxReadingLength;
 
     // パスごとの共有インスタンス。セッションごとに別インスタンスだと、登録が他セッションに見えず、
@@ -62,7 +65,11 @@ public sealed class UserDictionary
     public UserDictionary(string? path, bool builtIn = true)
     {
         _path = path;
-        if (builtIn) Parse(Detection.DictionarySource.ReadEmbedded("phrases.txt").Split('\n'), _builtIn);
+        if (builtIn)
+        {
+            Parse(Detection.DictionarySource.ReadEmbedded("phrases.txt").Split('\n'), _builtIn);
+            _terms = TermDictionary.Embedded;
+        }
         try
         {
             if (path is not null && File.Exists(path) && Config.SafeFile.ReadAllText(path) is { } text) Parse(text.Split('\n'), _words);
@@ -93,6 +100,30 @@ public sealed class UserDictionary
     public int Count => _words.Count;
 
     public IReadOnlyList<UserWord> Words => _words;
+
+    /// <summary>専門用語集の語数 (強制型 + 候補追加型)。ユーザー辞書の Count・Words には含めない。</summary>
+    public int TermCount => _terms.Count;
+
+    /// <summary>
+    /// 専門用語集を、渡したテキスト (terms-*.txt の中身) で置き換える。同梱の読み込みはコンストラクターが済ませるので、
+    /// これは主にテスト用の入口。不正な行は飛ばす。変換結果のキャッシュを捨てるため Version を進める。
+    /// </summary>
+    public TermDictionary LoadTerms(IEnumerable<string> texts)
+    {
+        var terms = TermDictionary.Parse(texts);
+        lock (_gate)
+        {
+            _terms = terms;
+            Version++;
+        }
+        return terms;
+    }
+
+    /// <summary>候補追加型の専門用語 (読みが短い語)。変換候補に足すだけで、文節の区切りは変えない。</summary>
+    public IReadOnlyList<string> LookupTermCandidates(string reading) => _terms.LookupCandidates(reading);
+
+    /// <summary>読みが reading で始まる専門用語 (予測変換用。強制型・候補追加型の両方)。</summary>
+    public IEnumerable<string> PredictTerms(string reading) => _terms.StartingWith(reading);
 
     /// <summary>登録する。同じ読み・同じ単語が既にあれば何もしない。登録できなければ理由を返す。</summary>
     public string? Add(string reading, string word)
@@ -136,8 +167,16 @@ public sealed class UserDictionary
     }
 
     /// <summary>読みに登録されている単語 (新しく登録したものが先)。</summary>
-    public IReadOnlyList<string> Lookup(string reading) =>
-        _byReading.TryGetValue(reading, out var words) ? words : [];
+    public IReadOnlyList<string> Lookup(string reading)
+    {
+        var words = _byReading.TryGetValue(reading, out var own) ? own : null;
+        // 読みがちょうど同じ強制型の専門用語は、ユーザー辞書・組み込み語句の後ろに足す (重複は除く)。
+        var terms = _terms.LookupForced(reading);
+        if (terms.Count == 0) return words ?? [];
+        var merged = words is null ? [] : new List<string>(words);
+        foreach (var term in terms) if (!merged.Contains(term)) merged.Add(term);
+        return merged;
+    }
 
     /// <summary>
     /// かなを、登録した読みの部分とそれ以外に分ける。先頭から見て、その位置から始まる最も長い登録済みの読みを取る。
@@ -145,34 +184,47 @@ public sealed class UserDictionary
     /// </summary>
     public List<(string Reading, string? Word)>? Split(string kana)
     {
-        if (_byReading.Count == 0 || kana.Length < MinReadingLength) return null;
+        var terms = _terms;
+        if ((_byReading.Count == 0 && terms.ForcedCount == 0) || kana.Length < MinReadingLength) return null;
         var pieces = new List<(string Reading, string? Word)>();
         var plain = new StringBuilder();
         var found = false;
         var i = 0;
         while (i < kana.Length)
         {
-            string? matched = null;
-            for (var length = Math.Min(_maxReadingLength, kana.Length - i); length >= MinReadingLength; length--)
+            // その位置から始まる最も長い読み。同じ長さならユーザー辞書・組み込み語句が先。文字列は作らずに引く。
+            var termMax = terms.MaxForcedLengthAt(kana, i);
+            var matchedLength = 0;
+            string? matchedWord = null;
+            for (var length = Math.Min(Math.Max(_maxReadingLength, termMax), kana.Length - i); length >= MinReadingLength; length--)
             {
-                if (_byReading.ContainsKey(kana.Substring(i, length)))
+                var span = kana.AsSpan(i, length);
+                if (length <= _maxReadingLength && _byReadingLookup.TryGetValue(span, out var own))
                 {
-                    matched = kana.Substring(i, length);
+                    matchedLength = length;
+                    matchedWord = own[0];
+                    break;
+                }
+                if (length <= termMax && terms.TryGetForced(span, out var forced))
+                {
+                    matchedLength = length;
+                    matchedWord = forced[0];
                     break;
                 }
             }
-            if (matched is null)
+            if (matchedWord is null)
             {
                 plain.Append(kana[i]);
                 i++;
                 continue;
             }
+            var matched = kana.Substring(i, matchedLength);
             if (plain.Length > 0)
             {
                 pieces.Add((plain.ToString(), null));
                 plain.Clear();
             }
-            pieces.Add((matched, _byReading[matched][0]));
+            pieces.Add((matched, matchedWord));
             found = true;
             i += matched.Length;
         }
@@ -197,6 +249,7 @@ public sealed class UserDictionary
             if (!list.Contains(word.Word)) list.Add(word.Word);
         }
         _byReading = byReading;
+        _byReadingLookup = byReading.GetAlternateLookup<ReadOnlySpan<char>>();
         _maxReadingLength = byReading.Count == 0 ? 0 : byReading.Keys.Max(k => k.Length);
     }
 
