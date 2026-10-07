@@ -506,6 +506,82 @@ internal static class LanguageLearningTests
 
 
     [Test]
+    public static void UnitsAfterNumbers_DoubledConsonant()
+    {
+        // 50ccgentuki が 50っc原付 になっていた (cc が っ + c になる)。数字 (半角) の直後の cc・pp・ppm・ppb・cal は英字のまま
+        foreach (var (typed, expected) in new[]
+        {
+            ("50ccgentuki", "50ccげんつき"), ("50cc", "50cc"), ("50ccno", "50ccの"), ("50ccdesu", "50ccです"), ("50ccwo", "50ccを"),
+            ("50ccha", "50ccは"), ("kyouha50ccnobaiku", "きょうは50ccのばいく"), ("50CCno", "50CCの"), ("5ppm", "5ppm"), ("5ppb", "5ppb"),
+            ("5ppno", "5ppの"), ("5calde", "5calで"), ("100mm", "100mm"), ("3kg", "3kg"), ("2ml", "2ml"), ("5km", "5km"), ("10gb", "10gb"),
+            // 数字の直後でも、日本語のローマ字として自然な列は今までどおり
+            ("5ppu", "5っぷ"), ("5ppo", "5っぽ"), ("50ccaga", "50っかが"), ("3ma", "3ま"), ("2ka", "2か"), ("5ki", "5き"), ("4tt", "4っt"), ("5ss", "5っs"),
+            // 数字の直後でなければ今までどおり (っ + 子音)
+            ("cc", "っc"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void UnitsAfterNumbers_DoubledConsonant_EditingKeys()
+    {
+        // Backspace で戻す: 50ccg → Backspace → 50cc (続けて no を打てる)
+        var k = new CompositionTests.Keyboard();
+        k.Type("50ccg");
+        Assert.Equal("50ccg", k.Showing, "打ちかけの g");
+        k.Press(VirtualKeys.Back);
+        k.Type("no\n");
+        Assert.Equal("50ccの", k.Host.Document, "Backspace のあと続けて打てる");
+
+        k = new CompositionTests.Keyboard();
+        k.Type("50ccno");
+        k.Press(VirtualKeys.Back);
+        k.Type("\n");
+        Assert.Equal("50cc", k.Host.Document, "の を消すと 50cc");
+        k = new CompositionTests.Keyboard();
+        k.Type("50ccno");
+        k.Press(VirtualKeys.Back);
+        k.Press(VirtualKeys.Back);
+        k.Type("c\n");
+        Assert.Equal("50cc", k.Host.Document, "の と c を消して c を打ち直しても 50cc");
+
+        // F10 / F6 / F7 (半角英字・ひらがな・カタカナ)
+        k = new CompositionTests.Keyboard();
+        k.Type("50ccno");
+        k.Press(VirtualKeys.F10);
+        Assert.Equal("50ccno", k.Showing, "F10 は打った英字");
+        k.Type("\n");
+        Assert.Equal("50ccno", k.Host.Document);
+        k = new CompositionTests.Keyboard();
+        k.Type("50ccno");
+        k.Press(VirtualKeys.F6);
+        Assert.Equal("50ccの", k.Showing, "F6 はひらがな (cc は英字のまま)");
+        k = new CompositionTests.Keyboard();
+        k.Type("50ccno");
+        k.Press(VirtualKeys.F7);
+        Assert.Equal("50ccノ", k.Showing, "F7 はカタカナ");
+
+        // Space で変換 (表示に 50cc がそのまま残る)
+        k = new CompositionTests.Keyboard();
+        k.Type("50ccgentuki ");
+        Assert.True(k.Host.View!.Converting, "Space で変換に入る");
+        Assert.True(k.Host.View!.Text.StartsWith("50cc", StringComparison.Ordinal), "変換中の表示も 50cc: " + k.Host.View!.Text);
+    }
+
+    [Test]
+    public static void UnitsAfterNumbers_FullWidthDigits_Unchanged()
+    {
+        // 全角数字の直後は対象外 (今までどおり)。単位の規則は半角数字の直後だけ
+        var text = new Meltype.Composition.CompositionText(CompositionTests.Detector);
+        foreach (var c in "５０cc") text.Append(c);
+        Assert.Equal("５０っc", text.Display(final: true), "全角数字の直後は今までどおり");
+    }
+
+    [Test]
     public static void TesterReports_20261003()
     {
         // テスターの報告 (2026-10-03): これあれか、開きの記号の全角、Ah!、swingin'、a / u / r

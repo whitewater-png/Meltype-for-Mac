@@ -751,3 +751,19 @@ Core の 1 キーあたり (ms)。「末尾」は最後の 10% のキー (一番
 - 周辺文脈のコールバックが固定したあとに届くと、その分は文脈に反映されない。
 - 保存は設定を読み直して書き直すので、config.json の未知のキー・コメントは残らない。
 - 保存はロックの中でファイルを書くので、遅いディスクでは切り替えが一瞬待つ。
+
+---
+
+## 追加項目 P18 (数字の直後の単位)
+
+**不具合**: `50ccgentuki` が「50っc原付」になる (期待は「50cc原付」)。
+
+**原因**: ローマ字の「同じ子音 2 つ = っ + 子音」(`CompositionText.Normalize` / `Romaji.AnalyzeFragment`) が cc に効き、`cc` が「っ」+ `c` の単位になる。英語判定 (`CompositionDetector`) に着く前の段階で決まるため、辞書 (`dictionaries/*.txt` / `WordList`) に cc を登録しても直らない (cc は 2 文字の略語で、数字の直後以外では日本語の列 accno 等と区別できず、辞書は文脈 = 数字の直後を見ない)。**結論: 辞書の登録だけでは足りない。判定規則が要る。**
+すでに `UnitsAfterNumbers` (`SplitUnitAfterNumber` / `UnitWords`) があり、mm・min・kg などは数字の直後で英字のままにしていた。cc・pp 系が一覧に無かっただけ。
+
+**修正**: `CompositionText.UnitWords` に `ppm` `ppb` `cal` `pp` `cc` を追加 (最小の変更)。加えて cc・pp は、後ろに母音 (a i u e o) が続くなら今までどおり (50ccaga → 50っかが、5ppu → 5っぷ)。後ろが h・y・w (50ccは・50ccや・50ccを) は単位 + 助詞を優先する。数字は半角のみ (全角数字は今までどおり)。
+変更ファイル: `src/Meltype.Core/Composition/CompositionText.cs`、テスト `src/Meltype.Core.Tests/FeedbackTests.cs` (`UnitsAfterNumbers_DoubledConsonant` ほか 2 件)。
+
+**対象の単位の全体**: 既存 (mmol kcal mhz ghz khz kwh mah mol min sec rem dpi ppi fps bpm rpm mph kph mm cm km nm um mg kg ml dl ms ns hz kb mb gb tb px pt em wh) + 追加 (cc pp ppm ppb cal)。l g t m w v kw db ft lb bps など、ローマ字として読めない単位は元から英字のまま。ma ka ki a in oz は日本語の音節と同じ綴りなので入れない。
+
+**既知の制限 (対応しない)**: `5w` + `wo` (5wwo) は ww が笑いの w と同じ扱いで「5っを」になる。`5dpide` は dpi の直後の `de` で英字のまま残る (既存の挙動)。確定前 (打ちかけ) の画面は、単位が打ち終わる前は「50っc」のまま見え、次の文字か確定で「50cc」になる (mm と同じ。次に母音が来る可能性があるため待つ)。

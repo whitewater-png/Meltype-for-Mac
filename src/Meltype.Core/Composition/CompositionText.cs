@@ -311,11 +311,14 @@ public sealed class CompositionText
     /// 数字のすぐ後ろの単位 (10mm、5min、3mol)。ローマ字として読める綴りでも英字のままにする
     /// (10mmで が 10っまで、5min が 5みん になっていた)。ローマ字として読めない単位 (kg、cm、px) は今までどおり英字になる。
     /// 数字の後ろでよく打つ日本語 (人 nin、個 ko、回 kai、万 man、度 do、時 ji) と同じ綴りの単位は入れない。
+    /// cc (50cc 原付)・pp・ppm・ppb は、同じ子音を 2 つ打つと っ + 子音 になるので、これが無いと 50cc が 50っc になっていた。
+    /// 数字 (半角) の直後だけに効く。cc・pp は後ろに母音が続くなら、っか・っぷ のローマ字かもしれないので今までどおり (単位にしない)。
+    /// 後ろが h・y・w (50ccは・50ccや・50ccを) は、単位 + 助詞を優先する。
     /// </summary>
     private static readonly string[] UnitWords =
     [
         "mmol", "kcal", "mhz", "ghz", "khz", "kwh", "mah", "mol", "min", "sec", "rem", "dpi", "ppi", "fps", "bpm", "rpm", "mph", "kph",
-        "mm", "cm", "km", "nm", "um", "mg", "kg", "ml", "dl", "ms", "ns", "hz", "kb", "mb", "gb", "tb", "px", "pt", "em", "wh",
+        "ppm", "ppb", "cal", "pp", "cc", "mm", "cm", "km", "nm", "um", "mg", "kg", "ml", "dl", "ms", "ns", "hz", "kb", "mb", "gb", "tb", "px", "pt", "em", "wh",
     ];
 
     /// <summary>
@@ -339,6 +342,7 @@ public sealed class CompositionText
             // ただし単位の最後の文字の前までがローマ字として読めない (51km|ijou の k) なら、母音とつなげても読めないので単位 (51km以上)
             if (lower.Length > unit.Length && lower[unit.Length] is 'a' or 'i' or 'u' or 'e' or 'o' &&
                 _detector.Romaji.Analyze(lower[..(unit.Length - 1)]) is { IsValid: true, Partial: "" }) return;
+            if (lower.Length > unit.Length && unit is "cc" or "pp" && lower[unit.Length] is 'a' or 'i' or 'u' or 'e' or 'o') return;
             _units.RemoveRange(digit + 1, _units.Count - digit - 1);
             foreach (var letter in run[..unit.Length]) _units.Add(new CompositionUnit(letter.ToString(), letter.ToString()));
             _pending.Clear();
