@@ -70,12 +70,15 @@ cd mac && ./build.sh && ./make-pkg.sh   # dist/Meltype-mac-<version>.pkg がで�
 
 ## アンインストール
 
+zip の **`Uninstall Meltype.command`** のダブルクリック、またはターミナルで次を実行します (手順の詳細・消すもの・手で消す方法は、トップの [README.md](../README.md) の「アンインストール」を見てください)。
+
 ```bash
-bash uninstall.sh      # zip の「Uninstall Meltype.command」のダブルクリックでも同じ
+bash uninstall.sh                          # 対話式
+bash uninstall.sh --yes                    # 確認なしでアプリを削除 (設定・学習データは残す)
+bash uninstall.sh --yes --remove-data      # 設定・学習データ・ユーザー辞書も削除 (辞書はデスクトップにバックアップ)
 ```
 
-入力ソースを外して `~/Library/Input Methods/Meltype.app` を削除します。設定・学習データ・ユーザー辞書 (`~/Library/Application Support/Meltype`) は、聞かれたときに残すか消すかを選べます
-(消すときは、ユーザー辞書をデスクトップにバックアップします。`--yes` で確認を省略、`--remove-data` / `--keep-data` でデータの扱いを指定)。
+入力ソースを外して `~/Library/Input Methods/Meltype.app` を削除します。設定・学習データ・ユーザー辞書 (`~/Library/Application Support/Meltype`) は、聞かれたときに残すか消すかを選べます。
 そのあと、いったんログアウトしてログインし直してください。
 
 ## 使い方
