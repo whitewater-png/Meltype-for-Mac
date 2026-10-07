@@ -4,9 +4,9 @@
 namespace Meltype.Composition;
 
 /// <summary>
-/// 専門用語集 (dictionaries/terms-*.txt、アプリに同梱する)。1 行に「読み[Tab]語[Tab]注記(任意)」。# で始まる行と空行はコメント。
-/// 読みが ForcedMinReadingLength 文字以上の語は「強制型」(ユーザー辞書の組み込み語句と同じ。変換する読みの中に含まれていれば、
-/// その部分を語にする)、それより短い語は「候補追加型」(変換候補に足すだけ。日常語の途中に現れる短い読みを巻き込まないため)。
+/// 専門用語集 (dictionaries/terms-*.txt、アプリに同梱する。分野ごとに有効/無効を切り替える: TermDomains)。1 行に「読み[Tab]語[Tab]注記(任意)」。# で始まる行と空行はコメント。
+/// 読みが ForcedMinReadingLength 文字以上で、語が ASCII だけではない語は「強制型」(ユーザー辞書の組み込み語句と同じ。変換する読みの中に含まれていれば、
+/// その部分を語にする)、それより短い語と、語が ASCII だけ (英単語など。日常語を英語に置き換えないため) の語は「候補追加型」(変換候補に足すだけ。日常語の途中に現れる短い読みを巻き込まないため)。
 /// 数万語でも起動が重くならないよう、読み込み後は変更しない配列と辞書にして、探す側は文字列を作らずに引く。
 /// ユーザー辞書の保存・表示・書き出しには混ぜない (UserDictionary が持つだけ)。
 /// </summary>
@@ -19,22 +19,6 @@ public sealed class TermDictionary
     internal const int PredictionScanLimit = 64;
 
     public static readonly TermDictionary Empty = new([], [], [], 0);
-
-    /// <summary>同梱の terms-*.txt を全部読んだもの (プロセスで 1 つ。最初に使うときに読む)。</summary>
-    public static TermDictionary Embedded => EmbeddedLazy.Value;
-
-    private static readonly Lazy<TermDictionary> EmbeddedLazy = new(() =>
-    {
-        try
-        {
-            return Parse(Detection.DictionarySource.ReadEmbeddedWithPrefix("terms-"));
-        }
-        catch (Exception ex)
-        {
-            Diagnostics.Log.Warn($"専門用語集を読めませんでした: {ex.Message}");
-            return Empty;
-        }
-    });
 
     // 強制型: 読み → 語 (ファイル順)。探すときは ReadOnlySpan<char> のまま引く。
     private readonly Dictionary<string, string[]> _forced;
@@ -112,7 +96,9 @@ public sealed class TermDictionary
                 // 読みは同じ文字列を共有する (同じ読みの語が多いので、メモリを節約する)
                 if (!intern.TryGetValue(reading, out var shared)) intern[reading] = shared = reading;
                 if (!seen.Add((shared, word))) continue;
-                var target = shared.Length >= ForcedMinReadingLength ? forced : candidates;
+                // 語が ASCII だけ (英数字・記号) のときは、読みが長くても強制型にしない。強制すると、日常語を英単語に置き換えてしまう
+                // (例: IT 用語の「あいこん→icon」「くりっく→click」で、「あいこんをくりっく」が「icon|を|click」になる)。候補には出る。
+                var target = shared.Length >= ForcedMinReadingLength && !IsAscii(word) ? forced : candidates;
                 if (!target.TryGetValue(shared, out var list)) target[shared] = list = [];
                 list.Add(word);
                 all.Add((shared, word));
@@ -123,6 +109,9 @@ public sealed class TermDictionary
             candidates.ToDictionary(p => p.Key, p => p.Value.ToArray(), StringComparer.Ordinal),
             all, skipped);
     }
+
+    /// <summary>語が ASCII の文字 (英数字・記号・空白) だけか。</summary>
+    internal static bool IsAscii(string word) => word.AsSpan().IndexOfAnyExceptInRange('\0', '\u007f') < 0;
 
     /// <summary>1 行を読み・語に分ける。UserDictionary.Validate に合わない行・欄が足りない行は false。</summary>
     internal static bool TryParseLine(ReadOnlySpan<char> line, out string reading, out string word)

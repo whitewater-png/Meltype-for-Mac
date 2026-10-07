@@ -18,7 +18,7 @@ public sealed class LanguageMemory
     // 全消去 (メニュー) と入力中の学習が別スレッドになりうるので直列にする。
     private readonly object _gate = new();
 
-    private sealed class Entry
+    internal sealed class Entry
     {
         public bool English { get; set; }
         public DateTime Used { get; set; }
@@ -73,7 +73,7 @@ public sealed class LanguageMemory
         try
         {
             if (Config.SafeFile.ReadAllText(path) is not { } json) return;
-            var loaded = JsonSerializer.Deserialize<Dictionary<string, Entry>>(json);
+            var loaded = JsonSerializer.Deserialize(json, Config.LearningJsonContext.Default.LanguageEntries);
             if (loaded is not null) foreach (var (word, entry) in loaded) _entries[word] = entry;
         }
         catch (Exception ex)
@@ -199,7 +199,7 @@ public sealed class LanguageMemory
         if (_path is null) return;
         try
         {
-            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_entries));
+            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_entries, Config.LearningJsonContext.Default.LanguageEntries));
         }
         catch (Exception ex)
         {

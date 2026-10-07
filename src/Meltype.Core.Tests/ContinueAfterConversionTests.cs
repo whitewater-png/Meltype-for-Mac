@@ -663,8 +663,11 @@ internal static class ContinueAfterConversionTests
         var exports = File.ReadAllText(Path.Combine(directory.FullName, "src", "Meltype.Mac.Native", "Exports.cs"));
         var swiftVersion = System.Text.RegularExpressions.Regex.Match(swift, @"expectedAbiVersion: Int32 = (\d+)").Groups[1].Value;
         var csharpVersion = System.Text.RegularExpressions.Regex.Match(exports, @"AbiVersion = (\d+);").Groups[1].Value;
-        Assert.Equal("4", swiftVersion, "Swift 側");
-        Assert.Equal("4", csharpVersion, "C# 側");
+        // 5: 専門用語集の分野の切り替え (meltype_term_domains / meltype_set_term_domain) を足した。値そのものは、FFI を変えるたびに上がるので、両者が同じことと下限だけ確かめる。
+        Assert.Equal(csharpVersion, swiftVersion, "C# と Swift の版数が同じ");
+        Assert.True(int.Parse(csharpVersion) >= 5, "専門用語集の FFI を足した版 (5) 以上");
+        Assert.True(exports.Contains("meltype_term_domains") && exports.Contains("meltype_set_term_domain"), "専門用語集の FFI の入口");
+        Assert.True(swift.Contains("meltype_term_domains") && swift.Contains("meltype_set_term_domain"), "専門用語集の Swift 側の呼び出し");
         Assert.True(exports.Contains("meltype_get_continue_after_conversion") && exports.Contains("meltype_set_continue_after_conversion"), "FFI の入口");
         Assert.True(swift.Contains("meltype_get_continue_after_conversion") && swift.Contains("meltype_set_continue_after_conversion"), "Swift 側の呼び出し");
     }

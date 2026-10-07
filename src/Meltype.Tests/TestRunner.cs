@@ -13,6 +13,8 @@ internal static class TestRunner
     public static int Main(string[] args)
     {
         TestSupport.WordChecker = Detection.WindowsSpellChecker.Shared;
+        // 専門用語集の分野の設定は、利用者の本物の config.json を読まない (有効な分野があると、ほかのテストの結果が変わる)
+        Composition.TermDomains.ConfigPath = () => Path.Combine(Path.GetTempPath(), "meltype-tests-no-config", "config.json");
         // dotnet run --project src/Meltype.Tests -- --convert きょうはいいてんきです
         // で、Microsoft IME の変換エンジン (MSIME.Japan) が使えるかを確かめる。
         // dotnet run --project src/Meltype.Tests -- --autocorrect teh recieve

@@ -14,8 +14,10 @@
     <AssemblyName>MeltypeNative</AssemblyName>
     <RootNamespace>Meltype.Mac</RootNamespace>
     <InvariantGlobalization>false</InvariantGlobalization>
-    <!-- 設定・学習データの JSON は型を見て読み書きする (System.Text.Json の reflection)。NativeAOT では既定で無効なので有効にし、
-         Meltype.Core の型を削らずに残す (削ると、設定を読めない・学習を保存できない)。 -->
+    <!-- 設定・学習データの JSON はソース生成 (SettingsJsonContext・LearningJsonContext・UserModelJsonContext) で読み書きする。
+         reflection だと NativeAOT で列挙型などが「metadata が無い」の例外になる (managed のテストでは見つからない)。
+         ここで reflection を有効にしているのは、ソース生成にしていない JSON が残っても動くようにするための保険。
+         JSON を足すときは、ソース生成にして、tools/check-mac-aot-settings.py で確かめる。 -->
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
   <ItemGroup>

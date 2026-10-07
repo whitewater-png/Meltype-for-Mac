@@ -123,6 +123,14 @@ public sealed class SettingsProfile
     public SettingsProfile Clone() => new() { Name = Name, Values = Values?.DeepClone() as JsonObject };
 }
 
+/// <summary>
+/// config.json の JSON の読み書きの設定 (ソース生成)。インデントあり・列挙型は名前の文字列・コメントと末尾のカンマを許す。
+/// 以前の reflection 版 (WriteIndented + JsonStringEnumConverter + ReadCommentHandling.Skip + AllowTrailingCommas) と同じ挙動。
+/// </summary>
+[JsonSourceGenerationOptions(WriteIndented = true, UseStringEnumConverter = true, ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true)]
+[JsonSerializable(typeof(Settings))]
+internal sealed partial class SettingsJsonContext : JsonSerializerContext;
+
 /// <summary>アプリの種類。アプリに合わせて、英語と日本語のどちらを基本にするかを変える。</summary>
 public enum AppProfile
 {
@@ -140,13 +148,9 @@ public enum AppProfile
 /// </summary>
 public sealed class Settings
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() },
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
-    };
+    // JSON の読み書きはソース生成 (SettingsJsonContext)。reflection だと、NativeAOT (Mac 版の libMeltypeNative) で
+    // 列挙型のプロパティ (InputMode など) が「metadata が無い」で例外になり、設定を保存できなかった。
+    private static readonly JsonSerializerOptions JsonOptions = SettingsJsonContext.Default.Options;
 
     [Category("1. 全般"), DisplayName("Meltype を有効にする")]
     public bool Enabled { get; set; } = true;
@@ -186,6 +190,10 @@ public sealed class Settings
     [Category("1. 全般"), DisplayName("変換エンジン"),
      Description("かな漢字変換に使うエンジン。「両方」は Mozc (Google 日本語入力のオープンソース版) で変換し、Mozc が使えないときは Microsoft IME で変換します。候補には両方の候補が出ます。")]
     public ConversionEngine ConversionEngine { get; set; } = ConversionEngine.Hybrid;
+
+    /// <summary>有効にした専門用語集の分野の ID (ai, civil, …)。既定は空 (すべて OFF)。Mac 版の入力メニュー「専門用語集」で切り替える。未知の ID は無視する。</summary>
+    [Browsable(false)]
+    public List<string> EnabledTermDomains { get; set; } = [];
 
     [Category("1. 全般"), DisplayName("英訳の候補"),
      Description("変換の候補の後ろに英訳も出します (複雑な → complex, complicated)。JMdict のよく使う語から。選んだ英訳は少しずつ前に出ます。")]
@@ -302,13 +310,13 @@ public sealed class Settings
     private static readonly HashSet<string> SharedKeys =
     [
         nameof(Profiles), nameof(ActiveProfile), nameof(SettingsVersion), nameof(WelcomeShown),
-        nameof(Enabled), nameof(JapaneseKeyboardOnly), nameof(FileLog), nameof(LogTypedText), nameof(AutoUpdate),
+        nameof(EnabledTermDomains), nameof(Enabled), nameof(JapaneseKeyboardOnly), nameof(FileLog), nameof(LogTypedText), nameof(AutoUpdate),
     ];
 
     /// <summary>今の設定の値のうち、プロファイルに入れるもの。</summary>
     public JsonObject ProfileValues()
     {
-        var values = JsonSerializer.SerializeToNode(this, JsonOptions)!.AsObject();
+        var values = JsonSerializer.SerializeToNode(this, SettingsJsonContext.Default.Settings)!.AsObject();
         foreach (var key in SharedKeys) values.Remove(key);
         return values;
     }
@@ -326,9 +334,9 @@ public sealed class Settings
         if (name == current.ActiveProfile || current.Profiles.FirstOrDefault(p => p.Name == name) is not { } target) return current;
         current.Profiles.First(p => p.Name == current.ActiveProfile).Values = current.ProfileValues();
         // 共通の項目は今の値のまま、プロファイルの項目だけを切り替え先の値にする
-        var merged = JsonSerializer.SerializeToNode(current, JsonOptions)!.AsObject();
+        var merged = JsonSerializer.SerializeToNode(current, SettingsJsonContext.Default.Settings)!.AsObject();
         foreach (var (key, value) in target.Values ?? []) merged[key] = value?.DeepClone();
-        var next = merged.Deserialize<Settings>(JsonOptions) ?? current;
+        var next = merged.Deserialize(SettingsJsonContext.Default.Settings) ?? current;
         next.ActiveProfile = name;
         return next.Normalize();
     }
@@ -399,12 +407,12 @@ public sealed class Settings
                 file["format"]?.GetValue<string>() != ProfileFileFormat || file["values"] is not JsonObject raw) return null;
             name = (file["name"]?.GetValue<string>() ?? "").Trim();
             // 既定の設定に、知っている項目だけを重ねてから読み直す (型の違う値はここで例外になる)
-            var merged = JsonSerializer.SerializeToNode(new Settings().Normalize(), JsonOptions)!.AsObject();
+            var merged = JsonSerializer.SerializeToNode(new Settings().Normalize(), SettingsJsonContext.Default.Settings)!.AsObject();
             foreach (var (key, value) in raw)
             {
                 if (merged.ContainsKey(key) && !SharedKeys.Contains(key)) merged[key] = value?.DeepClone();
             }
-            values = (merged.Deserialize<Settings>(JsonOptions) ?? new Settings()).Normalize().ProfileValues();
+            values = (merged.Deserialize(SettingsJsonContext.Default.Settings) ?? new Settings()).Normalize().ProfileValues();
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or NotSupportedException)
         {
@@ -606,7 +614,7 @@ public sealed class Settings
         {
             if (!File.Exists(path)) return new Settings();
             if (SafeFile.ReadAllText(path) is not { } json) return null;
-            var settings = JsonSerializer.Deserialize<Settings>(json, JsonOptions);
+            var settings = JsonSerializer.Deserialize(json, SettingsJsonContext.Default.Settings);
             if (settings is null) return null;
             if (!json.Contains(nameof(SettingsVersion))) settings.SettingsVersion = 1;
             settings.Migrate();
@@ -626,7 +634,7 @@ public sealed class Settings
             if (!File.Exists(path)) return new Settings();
             // 大きすぎる設定ファイルは読まず既定値で動く (元のファイルは触らない)。
             if (SafeFile.ReadAllText(path) is not { } json) return new Settings();
-            var settings = JsonSerializer.Deserialize<Settings>(json, JsonOptions) ?? new Settings();
+            var settings = JsonSerializer.Deserialize(json, SettingsJsonContext.Default.Settings) ?? new Settings();
             if (!json.Contains(nameof(SettingsVersion))) settings.SettingsVersion = 1;
             if (settings.Migrate()) settings.Save(path);
             return settings.Normalize();
@@ -641,10 +649,10 @@ public sealed class Settings
     }
 
     /// <summary>config.json と同じ形式の文字列 (変更があったかを比べるのに使う)。</summary>
-    public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
+    public string ToJson() => JsonSerializer.Serialize(this, SettingsJsonContext.Default.Settings);
 
     public void Save(string path)
     {
-        SafeFile.WriteAllText(path, JsonSerializer.Serialize(this, JsonOptions));
+        SafeFile.WriteAllText(path, JsonSerializer.Serialize(this, SettingsJsonContext.Default.Settings));
     }
 }

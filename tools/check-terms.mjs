@@ -6,10 +6,10 @@
 //   node tools/check-terms.mjs --self-test    … この検査自身の自己テスト
 // エラーがあれば終了コード 1。警告・情報は表示だけ (終了コードは 0)。
 // 読み込む側の決まり (src/Meltype.Core/Composition/TermDictionary.cs、UserDictionary.Validate) と、ここでの上乗せの決まり:
-//   エラー  先頭の `# 出典:` `# ライセンス:` の行が無い / 欄の数が 2〜3 でない / 読みがひらがな (ぁ-ゖ・ゔ・長音ー) だけでない
+//   エラー  先頭の `# 名称:` (入力メニュー「専門用語集」に出る分野の名前) `# 出典:` `# ライセンス:` の行が無い / 欄の数が 2〜3 でない / 読みがひらがな (ぁ-ゖ・ゔ・長音ー) だけでない
 //           (カタカナ・数字・英字・中点「・」・空白は不可) / 読みが 2 文字未満・100 文字超 / 語が空・100 文字超
 //   警告    同じ読み+語の重複 (読み込みでは 1 つにまとめられる) / 同じ読みに語が 20 を超える / 欄の前後に空白 / 先頭が長音の読み / 語が読みと同じ / BOM
-//   情報    読みが 3 文字以下の語は「候補追加型」(変換候補に足すだけ。強制しない) になる / 総語数・強制型の数
+//   情報    読みが 3 文字以下の語と、語が ASCII だけの語 (読みが長くても) は「候補追加型」(変換候補に足すだけ。強制しない) になる / 総語数・強制型の数
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,7 +28,7 @@ const readingChars = /^[ぁ-ゖゔー]+$/;
 export function checkText(text, seen = new Map(), readings = new Map()) {
   const problems = [];
   const add = (level, line, message) => problems.push({ level, line, message });
-  const stats = { words: 0, forced: 0, candidate: 0, skipped: 0, four: 0 };
+  const stats = { words: 0, forced: 0, candidate: 0, skipped: 0, four: 0, ascii: 0 };
   const fourSamples = [];
   let placeholder = false;
   if (text.charCodeAt(0) === 0xfeff) {
@@ -36,7 +36,7 @@ export function checkText(text, seen = new Map(), readings = new Map()) {
     text = text.slice(1);
   }
   let header = true; // 先頭のコメントの並び
-  let source = false, license = false;
+  let source = false, license = false, label = false;
   const lines = text.split('\n');
   lines.forEach((raw, i) => {
     const lineNo = i + 1;
@@ -44,9 +44,10 @@ export function checkText(text, seen = new Map(), readings = new Map()) {
     if (line.trim() === '' ) { return; }
     if (line.trimStart().startsWith('#')) {
       if (header) {
+        if (/^#\s*名称[:：]\s*\S/.test(line)) label = true;
         if (/^#\s*出典[:：]\s*\S/.test(line)) source = true;
         if (/^#\s*ライセンス[:：]\s*\S/.test(line)) license = true;
-        if (/^#\s*(出典|ライセンス)[:：].*[(（]例/.test(line)) placeholder = true;
+        if (/^#\s*(名称|出典|ライセンス)[:：].*[(（]例/.test(line)) placeholder = true;
       }
       return;
     }
@@ -79,14 +80,18 @@ export function checkText(text, seen = new Map(), readings = new Map()) {
     seen.set(key, `${lineNo} 行目`);
     readings.set(reading, (readings.get(reading) ?? 0) + 1);
     stats.words++;
-    if (reading.length >= FORCED_MIN_READING_LENGTH) stats.forced++; else stats.candidate++;
-    if (reading.length === FORCED_MIN_READING_LENGTH) { stats.four++; if (fourSamples.length < 5) fourSamples.push(`${reading}→${word}`); }
+    // 語が ASCII だけの語は、読みが長くても候補追加型 (TermDictionary.IsAscii と同じ。日常語を英単語に置き換えないため)
+    const ascii = /^[\x00-\x7f]+$/.test(word);
+    if (ascii && reading.length >= FORCED_MIN_READING_LENGTH) stats.ascii++;
+    if (reading.length >= FORCED_MIN_READING_LENGTH && !ascii) stats.forced++; else stats.candidate++;
+    if (reading.length === FORCED_MIN_READING_LENGTH && !ascii) { stats.four++; if (fourSamples.length < 5) fourSamples.push(`${reading}→${word}`); }
   });
+  if (!label) add('error', 1, '先頭のコメントに「# 名称: …」の行が無い (入力メニュー「専門用語集」に出る分野の名前。例: # 名称: 土木・建設)');
   if (!source) add('error', 1, '先頭のコメントに「# 出典: …」の行が無い (自作なら「# 出典: 自作」でよい)');
   if (!license) add('error', 1, '先頭のコメントに「# ライセンス: …」の行が無い (自作なら「# ライセンス: 自作」でよい)');
-  if (stats.candidate > 0) add('info', 0, `読みが ${FORCED_MIN_READING_LENGTH - 1} 文字以下の ${stats.candidate} 語は「候補追加型」になる (変換候補に足すだけで、強制しない)`);
+  if (stats.candidate > 0) add('info', 0, `読みが ${FORCED_MIN_READING_LENGTH - 1} 文字以下の ${stats.candidate - stats.ascii} 語と、語が ASCII だけの ${stats.ascii} 語 (読みが ${FORCED_MIN_READING_LENGTH} 文字以上でも) は「候補追加型」になる (変換候補に足すだけで、強制しない)`);
   if (stats.four > 0) add('info', 0, `読みがちょうど ${FORCED_MIN_READING_LENGTH} 文字 (強制型の最短) の語が ${stats.four} 語ある。日常語の途中に現れて巻き込む恐れがあるので注意 (例: ${fourSamples.join('、')})`);
-  if (placeholder && stats.words > 0) add('warning', 1, '出典・ライセンスの行が、雛形の「(例: …)」のまま (実際の内容に書き換える)');
+  if (placeholder && stats.words > 0) add('warning', 1, '名称・出典・ライセンスの行が、雛形の「(例: …)」のまま (実際の内容に書き換える)');
   return { problems, stats };
 }
 
@@ -120,19 +125,22 @@ function run(files) {
 }
 
 function selfTest() {
-  const header = '# 出典: 自作\n# ライセンス: 自作\n';
+  const header = '# 名称: テスト\n# 出典: 自作\n# ライセンス: 自作\n';
   const levels = (text, level) => checkText(text).problems.filter(p => p.level === level).map(p => p.message);
   const cases = [
     ['読みがちょうど 4 文字は情報', () => levels(header + 'こうけつ\t硬結\nぎょうれつしき\t行列式\n', 'info').some(m => m.includes('ちょうど 4 文字'))],
-    ['雛形の (例: が残り、語があれば警告', () => checkText('# 出典: (例: 自作)\n# ライセンス: 自作\nぎょうれつしき\t行列式\n').problems.some(p => p.level === 'warning' && p.message.includes('雛形'))],
-    ['雛形のままでも語 0 件なら警告なし', () => !checkText('# 出典: (例: 自作)\n# ライセンス: (例: 自作)\n').problems.some(p => p.level === 'warning')],
+    ['雛形の (例: が残り、語があれば警告', () => checkText('# 名称: テスト\n# 出典: (例: 自作)\n# ライセンス: 自作\nぎょうれつしき\t行列式\n').problems.some(p => p.level === 'warning' && p.message.includes('雛形'))],
+    ['雛形のままでも語 0 件なら警告なし', () => !checkText('# 名称: (例: 土木)\n# 出典: (例: 自作)\n# ライセンス: (例: 自作)\n').problems.some(p => p.level === 'warning')],
     ['正常な用語集はエラーなし', () => levels(header + 'ぎょうれつしき\t行列式\t数学\n', 'error').length === 0],
     ['統計 (強制型・候補追加型)', () => { const s = checkText(header + 'ぎょうれつしき\t行列式\nすう\t数\n').stats; return s.words === 2 && s.forced === 1 && s.candidate === 1; }],
+    ['語が ASCII だけなら読みが長くても候補追加型', () => { const s = checkText(header + 'あいこんをくりっく\ticon\nぎょうれつしき\t行列式\n').stats; return s.forced === 1 && s.candidate === 1 && s.ascii === 1; }],
     ['3 文字以下は候補追加型の情報', () => levels(header + 'すう\t数\n', 'info').some(m => m.includes('候補追加型'))],
-    ['出典が無いとエラー', () => levels('# ライセンス: 自作\nぎょうれつしき\t行列式\n', 'error').some(m => m.includes('出典'))],
-    ['ライセンスが無いとエラー', () => levels('# 出典: 自作\nぎょうれつしき\t行列式\n', 'error').some(m => m.includes('ライセンス'))],
-    ['出典の値が空だとエラー', () => levels('# 出典:\n# ライセンス: 自作\n', 'error').some(m => m.includes('出典'))],
-    ['語の後ろの出典は先頭と数えない', () => levels('# ライセンス: 自作\nぎょうれつしき\t行列式\n# 出典: 自作\n', 'error').some(m => m.includes('出典'))],
+    ['名称が無いとエラー', () => levels('# 出典: 自作\n# ライセンス: 自作\nぎょうれつしき\t行列式\n', 'error').some(m => m.includes('名称'))],
+    ['名称の値が空だとエラー', () => levels('# 名称:\n# 出典: 自作\n# ライセンス: 自作\n', 'error').some(m => m.includes('名称'))],
+    ['出典が無いとエラー', () => levels('# 名称: テスト\n# ライセンス: 自作\nぎょうれつしき\t行列式\n', 'error').some(m => m.includes('出典'))],
+    ['ライセンスが無いとエラー', () => levels('# 名称: テスト\n# 出典: 自作\nぎょうれつしき\t行列式\n', 'error').some(m => m.includes('ライセンス'))],
+    ['出典の値が空だとエラー', () => levels('# 名称: テスト\n# 出典:\n# ライセンス: 自作\n', 'error').some(m => m.includes('出典'))],
+    ['語の後ろの出典は先頭と数えない', () => levels('# 名称: テスト\n# ライセンス: 自作\nぎょうれつしき\t行列式\n# 出典: 自作\n', 'error').some(m => m.includes('出典'))],
     ['カタカナの読みはエラー', () => levels(header + 'ギョウレツ\t行列\n', 'error').some(m => m.includes('カタカナ'))],
     ['数字・英字・中点の読みはエラー', () => ['ぎょう1れつ', 'ぎょうAれつ', 'ぎょう・れつ'].every(r => levels(header + `${r}\t行列\n`, 'error').length === 1)],
     ['長音ーは許容', () => levels(header + 'こんぴゅーたー\tコンピューター\n', 'error').length === 0],

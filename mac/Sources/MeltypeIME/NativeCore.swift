@@ -33,6 +33,8 @@ private typealias AbiVersionFunction = @convention(c) () -> Int32
 private typealias ClearLearningFunction = @convention(c) () -> Int32
 private typealias GetFlagFunction = @convention(c) () -> Int32
 private typealias SetFlagFunction = @convention(c) (Int32) -> Int32
+private typealias TermDomainsFunction = @convention(c) () -> UnsafeMutablePointer<CChar>?
+private typealias SetTermDomainFunction = @convention(c) (UnsafePointer<CChar>?, Int32) -> Int32
 private typealias UpdateEvaluateFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 
 // ---- 本体から呼ばれる関数 (文字列は strdup したものを返し、本体が free する) ----
@@ -134,6 +136,14 @@ struct CompositionView: Decodable {
     let selectedPrediction: Int
 }
 
+/// 専門用語集の分野 (meltype_term_domains の 1 行)。
+struct TermDomain {
+    let id: String
+    let name: String
+    let count: Int
+    let enabled: Bool
+}
+
 /// 入力欄のアプリの種類 (meltype_set_app の戻り値)。
 enum AppKind: Int {
     case general = 0
@@ -149,7 +159,7 @@ final class NativeCore {
 
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion と必ず同じにする。
     /// 食い違う dylib (別の版が混ざった) を読むと関数の引数が合わずに落ちるので、食い違ったら初期化を止める。
-    static let expectedAbiVersion: Int32 = 4
+    static let expectedAbiVersion: Int32 = 5
 
     /// dylib の版数が expectedAbiVersion と合っているか (initialize で確かめる)。合わなければ入力を一切扱わない (キーはアプリに渡る)。
     private(set) var isCompatible = false
@@ -179,6 +189,8 @@ final class NativeCore {
     private let clearLearningFunction: ClearLearningFunction?
     private let getContinueAfterConversionFunction: GetFlagFunction?
     private let setContinueAfterConversionFunction: SetFlagFunction?
+    private let termDomainsFunction: TermDomainsFunction?
+    private let setTermDomainFunction: SetTermDomainFunction?
     private let updateEvaluateFunction: UpdateEvaluateFunction?
 
     private init() {
@@ -217,6 +229,8 @@ final class NativeCore {
         clearLearningFunction = symbol("meltype_clear_learning", as: ClearLearningFunction.self)
         getContinueAfterConversionFunction = symbol("meltype_get_continue_after_conversion", as: GetFlagFunction.self)
         setContinueAfterConversionFunction = symbol("meltype_set_continue_after_conversion", as: SetFlagFunction.self)
+        termDomainsFunction = symbol("meltype_term_domains", as: TermDomainsFunction.self)
+        setTermDomainFunction = symbol("meltype_set_term_domain", as: SetTermDomainFunction.self)
         updateEvaluateFunction = symbol("meltype_update_evaluate", as: UpdateEvaluateFunction.self)
     }
 
@@ -354,6 +368,25 @@ final class NativeCore {
     func setContinueAfterConversion(_ on: Bool) -> Bool {
         guard isCompatible, let setContinueAfterConversionFunction else { return false }
         return setContinueAfterConversionFunction(on ? 1 : 0) == 1
+    }
+
+    /// 専門用語集の分野の一覧 (ID・名称・語数・有効か)。設定はすべての入力欄で共通 (本体が持つ)。取れなければ空。
+    var termDomains: [TermDomain] {
+        guard isCompatible, let pointer = termDomainsFunction?() else { return [] }
+        defer { freeFunction?(pointer) }
+        return String(cString: pointer)
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .compactMap { (line: Substring) -> TermDomain? in
+                let parts = line.split(separator: "\t", omittingEmptySubsequences: false)
+                guard parts.count == 4, let count = Int(parts[2]) else { return nil }
+                return TermDomain(id: String(parts[0]), name: String(parts[1]), count: count, enabled: parts[3] == "1")
+            }
+    }
+
+    /// 専門用語集の分野を有効/無効にして config.json に保存する。すべての入力欄にすぐ反映される。保存できたら true。
+    func setTermDomain(_ id: String, enabled: Bool) -> Bool {
+        guard isCompatible, let setTermDomainFunction else { return false }
+        return id.withCString { setTermDomainFunction($0, enabled ? 1 : 0) } == 1
     }
 
     /// GitHub の最新 Release の JSON を本体で判定する (通信は Swift 側)。更新してよい新しい版があれば、その情報。無い・不正なら nil。

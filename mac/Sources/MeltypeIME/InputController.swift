@@ -12,6 +12,10 @@ import InputMethodKit
 final class MeltypeInputController: IMKInputController {
     private var session: UnsafeMutableRawPointer?
     private var candidateList: [String] = []
+    /// 入力メニューの項目 (tag = 番号) ごとの引数。menu() を作るたびに作り直す。
+    /// IMK はメニュー項目の action に NSMenuItem ではなく infoDictionary を渡すので、representedObject には頼らず、tag で引く。
+    private var menuPayloads: [[String]] = []
+    private var menuPayloadsByTitle: [String: [String]] = [:]
     private var hasMarkedText = false
     /// 直前に本体から受け取った表示。候補ウィンドウのクリックが変換の候補か予測かを見分けるのに使う。
     private var lastView: CompositionView?
@@ -191,8 +195,37 @@ final class MeltypeInputController: IMKInputController {
 
     // ---- メニュー (メニューバーの入力メニュー) ----
 
+    /// メニュー項目に引数を結びつける (tag に番号を入れ、menuPayloads に保存)。
+    private func attach(_ payload: [String], to item: NSMenuItem) {
+        item.tag = menuPayloads.count
+        menuPayloads.append(payload)
+        menuPayloadsByTitle[item.title] = payload
+    }
+
+    /// action の sender (IMK は [kIMKCommandMenuItemName: NSMenuItem] の辞書を渡す。NSMenuItem が直接来ても読む) から、項目の引数を取り出す。
+    private func payload(from sender: Any?) -> [String]? {
+        let item: NSMenuItem?
+        if let direct = sender as? NSMenuItem {
+            item = direct
+        } else if let info = sender as? [AnyHashable: Any] {
+            item = info[kIMKCommandMenuItemName] as? NSMenuItem
+        } else {
+            item = nil
+        }
+        guard let item else {
+            NSLog("Meltype: メニュー項目を読めませんでした (sender: %@)", String(describing: sender))
+            return nil
+        }
+        // IMK が項目を複製してタグを落とすことがあるので、タイトルでも引く
+        if let byTitle = menuPayloadsByTitle[item.title] { return byTitle }
+        guard item.tag >= 0, item.tag < menuPayloads.count else { return nil }
+        return menuPayloads[item.tag]
+    }
+
     override func menu() -> NSMenu! {
         let menu = NSMenu()
+        menuPayloads = []
+        menuPayloadsByTitle = [:]
         // メニューを開いたとき、前の確認から 24 時間たっていれば裏で確認する (OFF のときは何もしない。メニューは待たせない)
         UpdateManager.shared.checkIfDue()
         // 新しい版が見つかっていれば先頭に出す (選ぶと確認のダイアログ。自動では入れない)
@@ -206,14 +239,24 @@ final class MeltypeInputController: IMKInputController {
             // 長い語は 20 文字で省略する (メニューが画面からはみ出さないように。登録する語自体は省略しない)
             let shown = suggestion.word.count > 20 ? String(suggestion.word.prefix(20)) + "…" : suggestion.word
             let accept = menu.addItem(withTitle: "『\(shown)』を辞書に登録 (\(suggestion.reading))", action: #selector(acceptSuggestion(_:)), keyEquivalent: "")
-            accept.representedObject = [suggestion.reading, suggestion.word]
+            attach([suggestion.reading, suggestion.word], to: accept)
             let reject = menu.addItem(withTitle: "    『\(shown)』は登録しない", action: #selector(rejectSuggestion(_:)), keyEquivalent: "")
-            reject.representedObject = [suggestion.reading, suggestion.word]
+            attach([suggestion.reading, suggestion.word], to: reject)
         }
         if !suggestions.isEmpty { menu.addItem(.separator()) }
         // 既定は OFF。ON にすると、Space で変換したあとに文字を打っても確定せず、続けて編集・変換できる (設定は config.json に保存、全入力欄に反映)
         let continueToggle = menu.addItem(withTitle: "変換後も続けて入力できる", action: #selector(toggleContinueAfterConversion(_:)), keyEquivalent: "")
         continueToggle.state = NativeCore.shared.continueAfterConversion ? .on : .off
+        // 専門用語集 (分野ごとに ON/OFF。既定はすべて OFF。設定は config.json に保存、全入力欄に反映)
+        let domains = NativeCore.shared.termDomains
+        if !domains.isEmpty {
+            // IMK のメニューではサブメニューの項目が action に届かないことがあるので、メニュー直下に並べる
+            for domain in domains {
+                let item = menu.addItem(withTitle: "専門用語集: \(domain.name) (\(domain.count) 語)", action: #selector(toggleTermDomain(_:)), keyEquivalent: "")
+                item.state = domain.enabled ? .on : .off
+                attach([domain.id, domain.enabled ? "on" : "off"], to: item)
+            }
+        }
         menu.addItem(.separator())
         menu.addItem(withTitle: "選択中の文字をユーザー辞書に登録…", action: #selector(registerWord(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "辞書の登録提案の履歴を消去", action: #selector(clearSuggestions(_:)), keyEquivalent: "")
@@ -236,6 +279,18 @@ final class MeltypeInputController: IMKInputController {
         failure.runModal()
     }
 
+    /// 専門用語集の分野の ON/OFF。保存できなかったときは、値は変わらないので、そのことを伝える。
+    @objc private func toggleTermDomain(_ sender: Any?) {
+        NSLog("Meltype: 専門用語集の切り替えを受け取りました (sender: %@)", String(describing: sender))
+        guard let pair = payload(from: sender), pair.count == 2 else { return }
+        guard !NativeCore.shared.setTermDomain(pair[0], enabled: pair[1] != "on") else { return }
+        let failure = NSAlert()
+        failure.messageText = "設定を保存できませんでした"
+        failure.informativeText = "Meltype のデータフォルダーの config.json を確認してください (読めない・書けないときは、設定を変えません)。"
+        NSApp.activate(ignoringOtherApps: true)
+        failure.runModal()
+    }
+
     @objc private func startUpdate(_ sender: Any?) {
         UpdateManager.shared.promptUpdate()
     }
@@ -249,8 +304,8 @@ final class MeltypeInputController: IMKInputController {
         UpdateManager.shared.checkNow()
     }
 
-    @objc private func acceptSuggestion(_ sender: NSMenuItem) {
-        guard let pair = sender.representedObject as? [String], pair.count == 2 else { return }
+    @objc private func acceptSuggestion(_ sender: Any?) {
+        guard let pair = payload(from: sender), pair.count == 2 else { return }
         if let error = NativeCore.shared.acceptSuggestion(session, reading: pair[0], word: pair[1]) {
             let failure = NSAlert()
             failure.messageText = "登録できませんでした"
@@ -260,8 +315,8 @@ final class MeltypeInputController: IMKInputController {
         }
     }
 
-    @objc private func rejectSuggestion(_ sender: NSMenuItem) {
-        guard let pair = sender.representedObject as? [String], pair.count == 2 else { return }
+    @objc private func rejectSuggestion(_ sender: Any?) {
+        guard let pair = payload(from: sender), pair.count == 2 else { return }
         NativeCore.shared.rejectSuggestion(session, reading: pair[0], word: pair[1])
     }
 

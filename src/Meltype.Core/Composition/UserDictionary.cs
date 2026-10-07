@@ -40,7 +40,12 @@ public sealed class UserDictionary
     private Dictionary<string, List<string>> _byReading = new(StringComparer.Ordinal);
     private Dictionary<string, List<string>>.AlternateLookup<ReadOnlySpan<char>> _byReadingLookup;
     // 専門用語集 (dictionaries/terms-*.txt)。ユーザー辞書の後・変換エンジンの前。保存も表示もしない。差し替えは参照ごと (読む側は止めない)。
-    private TermDictionary _terms = TermDictionary.Empty;
+    // 同梱の語は、利用者が有効にした分野だけ (TermDomains)。分野の切り替えは、プロセス内のすべてのインスタンス
+    // (共有・非共有を問わない) に届けたいので、各インスタンスが TermDomains.Revision を見て、変わっていれば入れ替える (Terms)。
+    // 辞書・取った時点の Revision・分野の設定に従うか を 1 つの不変オブジェクトにまとめ、参照ごと入れ替える (読む側は Volatile.Read 1 回で、
+    // 辞書と Revision の食い違いを見ない)。従わないのは builtIn: false と、LoadTerms で語を直接渡した辞書。
+    private sealed record TermSnapshot(TermDictionary Terms, int Revision, bool Follows);
+    private TermSnapshot _terms = new(TermDictionary.Empty, -1, false);
     private int _maxReadingLength;
 
     // パスごとの共有インスタンス。セッションごとに別インスタンスだと、登録が他セッションに見えず、
@@ -68,7 +73,9 @@ public sealed class UserDictionary
         if (builtIn)
         {
             Parse(Detection.DictionarySource.ReadEmbedded("phrases.txt").Split('\n'), _builtIn);
-            _terms = TermDictionary.Embedded;
+            // 取る前の Revision を覚える (取っている間に切り替わっても、次の確認でもう一度入れ替わる)
+            var revision = TermDomains.Revision;
+            _terms = new TermSnapshot(TermDomains.Current, revision, true);
         }
         try
         {
@@ -95,14 +102,41 @@ public sealed class UserDictionary
     }
 
     /// <summary>登録内容が変わるたびに増える (変換結果のキャッシュを捨てるため)。</summary>
-    public int Version { get; private set; }
+    public int Version
+    {
+        // 専門用語集の分野が切り替わっていれば、ここで入れ替えて Version を進める (読む側はまず Version でキャッシュを確かめるため)。
+        get { SyncTerms(); return Volatile.Read(ref _version); }
+        private set => _version = value;
+    }
+
+    private int _version;
+
+    private TermDictionary Terms
+    {
+        get { SyncTerms(); return Volatile.Read(ref _terms).Terms; }
+    }
+
+    private void SyncTerms()
+    {
+        var snapshot = Volatile.Read(ref _terms);
+        if (!snapshot.Follows || snapshot.Revision == TermDomains.Revision) return;
+        lock (_gate)
+        {
+            snapshot = _terms;
+            // 取る前の Revision を覚える (取っている間に切り替わっても、次の確認でもう一度入れ替わる)。
+            var revision = TermDomains.Revision;
+            if (!snapshot.Follows || snapshot.Revision == revision) return;
+            Volatile.Write(ref _terms, new TermSnapshot(TermDomains.Current, revision, true));
+            Version++;
+        }
+    }
 
     public int Count => _words.Count;
 
     public IReadOnlyList<UserWord> Words => _words;
 
     /// <summary>専門用語集の語数 (強制型 + 候補追加型)。ユーザー辞書の Count・Words には含めない。</summary>
-    public int TermCount => _terms.Count;
+    public int TermCount => Terms.Count;
 
     /// <summary>
     /// 専門用語集を、渡したテキスト (terms-*.txt の中身) で置き換える。同梱の読み込みはコンストラクターが済ませるので、
@@ -113,17 +147,17 @@ public sealed class UserDictionary
         var terms = TermDictionary.Parse(texts);
         lock (_gate)
         {
-            _terms = terms;
+            Volatile.Write(ref _terms, new TermSnapshot(terms, -1, false));
             Version++;
         }
         return terms;
     }
 
     /// <summary>候補追加型の専門用語 (読みが短い語)。変換候補に足すだけで、文節の区切りは変えない。</summary>
-    public IReadOnlyList<string> LookupTermCandidates(string reading) => _terms.LookupCandidates(reading);
+    public IReadOnlyList<string> LookupTermCandidates(string reading) => Terms.LookupCandidates(reading);
 
     /// <summary>読みが reading で始まる専門用語 (予測変換用。強制型・候補追加型の両方)。</summary>
-    public IEnumerable<string> PredictTerms(string reading) => _terms.StartingWith(reading);
+    public IEnumerable<string> PredictTerms(string reading) => Terms.StartingWith(reading);
 
     /// <summary>登録する。同じ読み・同じ単語が既にあれば何もしない。登録できなければ理由を返す。</summary>
     public string? Add(string reading, string word)
@@ -171,7 +205,7 @@ public sealed class UserDictionary
     {
         var words = _byReading.TryGetValue(reading, out var own) ? own : null;
         // 読みがちょうど同じ強制型の専門用語は、ユーザー辞書・組み込み語句の後ろに足す (重複は除く)。
-        var terms = _terms.LookupForced(reading);
+        var terms = Terms.LookupForced(reading);
         if (terms.Count == 0) return words ?? [];
         var merged = words is null ? [] : new List<string>(words);
         foreach (var term in terms) if (!merged.Contains(term)) merged.Add(term);
@@ -184,7 +218,7 @@ public sealed class UserDictionary
     /// </summary>
     public List<(string Reading, string? Word)>? Split(string kana)
     {
-        var terms = _terms;
+        var terms = Terms;
         if ((_byReading.Count == 0 && terms.ForcedCount == 0) || kana.Length < MinReadingLength) return null;
         var pieces = new List<(string Reading, string? Word)>();
         var plain = new StringBuilder();

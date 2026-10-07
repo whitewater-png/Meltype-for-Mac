@@ -6,8 +6,14 @@ namespace Meltype.Config;
 /// <summary>保存場所はすべて %LOCALAPPDATA%\Meltype\ 配下 (設計書 §21)。ネットワークには何も送らない。</summary>
 internal static class AppPaths
 {
+    /// <summary>
+    /// 保存場所。環境変数 MELTYPE_DATA_DIR があれば、そこ (動作確認で、実際の設定・学習データに触らないため。tools/check-mac-aot-settings.py)。
+    /// 無ければ %LOCALAPPDATA%\Meltype (Mac は ~/Library/Application Support/Meltype。.NET は HOME ではなくアカウント情報から決めるので、HOME の差し替えでは変わらない)。
+    /// </summary>
     public static string DataDirectory { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Meltype");
+        Environment.GetEnvironmentVariable("MELTYPE_DATA_DIR") is { Length: > 0 } custom && Path.IsPathRooted(custom)
+            ? custom
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Meltype");
 
     /// <summary>旧名 (AutoIME) のときの保存場所。</summary>
     private static string OldDataDirectory =>

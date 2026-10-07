@@ -105,9 +105,24 @@ bash uninstall.sh --yes --remove-data      # 設定・学習データ・ユー�
 - JIS キーボードの「英数」キーで英数 (直接入力)、「かな」キーで日本語に戻ります (入力メニューの表示も「英数 (Meltype)」「Meltype」に変わります)
 - Caps Lock で「Meltype」と「英数 (Meltype)」を切り替えられます (効かないときは入力メニューから選んでください)。US 配列では Caps Lock か入力メニューで切り替えます
 - 入力メニューの「学習データをすべて消去…」で、変換・予測・登録提案・英語/日本語・英訳・ユーザーモデル・azooKey の学習を消せます (確認あり。ユーザー辞書と設定は消えません)
+- 入力メニューの「専門用語集」で、分野 (AI・土木・IT・医療・ネットスラングなど) ごとに専門用語の使用を ON/OFF できます (名称と語数つきのチェック項目。既定はすべて OFF、すぐ全入力欄に反映、`config.json` の `EnabledTermDomains` に保存。読めない `config.json` は上書きしません)。詳しくは [docs/DICTIONARY.md](../docs/DICTIONARY.md)
 - パスワード欄など macOS が「秘匿入力」にしている欄 (`IsSecureEventInputEnabled`) では、キーを扱わずアプリに素通しします (アプリが秘匿入力と知らせていない欄は検知できません)
 - 設定・学習データ・ユーザー辞書は `~/Library/Application Support/Meltype` (入力メニューの「Meltype のデータフォルダを開く」)。学習データは本人だけが読める権限 (ファイル 0600・フォルダー 0700) で保存します。
   設定は Windows 版と同じ `config.json` です (自動判定の強さ `DetectionLevel` など)
+
+## 開発者向け: AOT 版で設定を保存できるかの確認
+
+managed (dotnet) のテストが通っても、NativeAOT の `libMeltypeNative.dylib` では System.Text.Json の reflection が使えず、列挙型を持つ設定 (`Settings.Mode` など) の保存が例外になることがある (実際に、入力メニューの切り替えが保存失敗になった)。
+そのため設定・学習データの JSON はソース生成 (`SettingsJsonContext` ほか) で読み書きしている。JSON の型を変えたり足したりしたときは、AOT 版をビルドして確かめる。
+
+```bash
+cd mac && ./build.sh --no-install        # ビルドだけ (インストールしない)
+cd .. && python3 tools/check-mac-aot-settings.py
+```
+
+`tools/check-mac-aot-settings.py` は、ビルドしたライブラリの関数を直接呼び (Meltype.app は起動しない)、専門用語集の分野と「変換後も続けて入力」を保存して `config.json` の中身を確かめ、別プロセスで読み直しても保たれることを確かめる。
+保存場所は環境変数 `MELTYPE_DATA_DIR` で空の一時フォルダーに向ける (.NET は `HOME` ではなくアカウント情報から場所を決めるので、`HOME` の差し替えでは実際の設定に書いてしまう)。一時フォルダーの外を指しているときは、何も書かずに止まる。
+`PASS` が出れば成功。
 
 ## 困ったとき
 

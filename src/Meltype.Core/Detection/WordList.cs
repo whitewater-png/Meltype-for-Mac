@@ -72,6 +72,17 @@ public static class DictionarySource
         }
     }
 
+    /// <summary>名前が prefix で始まる埋め込みの辞書のファイル名 (terms-ai.txt など) を、名前の昇順で返す。</summary>
+    public static IReadOnlyList<string> ListEmbedded(string prefix)
+    {
+        var head = "Meltype.dictionaries." + prefix;
+        return typeof(DictionarySource).Assembly.GetManifestResourceNames()
+            .Where(n => n.StartsWith(head, StringComparison.Ordinal) && n.EndsWith(".txt", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .Select(n => n["Meltype.dictionaries.".Length..])
+            .ToList();
+    }
+
     public static IEnumerable<string> Load(string name, string? userDirectory)
     {
         foreach (var word in WordList.ParseWords(ReadEmbedded(name))) yield return word;

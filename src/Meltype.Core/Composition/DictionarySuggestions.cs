@@ -24,7 +24,7 @@ public sealed class DictionarySuggestions
     /// <summary>メニューに出す表示用の語。<see cref="MaxDisplayLength"/> 文字を超えたら先頭だけにして「…」を付ける。</summary>
     public static string DisplayWord(string word) => word.Length <= MaxDisplayLength ? word : word[..MaxDisplayLength] + "…";
 
-    private sealed class Entry
+    internal sealed class Entry
     {
         public string Reading { get; set; } = "";
         public string Word { get; set; } = "";
@@ -34,7 +34,7 @@ public sealed class DictionarySuggestions
         public bool Rejected { get; set; }
     }
 
-    private sealed class Data
+    internal sealed class Data
     {
         /// <summary>登録ヒントを最後に出した日 (yyyy-MM-dd)。1 日 1 回までにするため。</summary>
         public string? LastHint { get; set; }
@@ -73,7 +73,7 @@ public sealed class DictionarySuggestions
         try
         {
             if (Config.SafeFile.ReadAllText(path) is not { } json) return;
-            var loaded = JsonSerializer.Deserialize<Data>(json);
+            var loaded = JsonSerializer.Deserialize(json, Config.LearningJsonContext.Default.SuggestionData);
             if (loaded is null) return;
             _data.LastHint = loaded.LastHint;
             _data.Items = loaded.Items?.Where(e => e is { Reading.Length: > 0, Word.Length: > 0 }).ToList() ?? [];
@@ -217,7 +217,7 @@ public sealed class DictionarySuggestions
         if (_path is null) return;
         try
         {
-            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_data));
+            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_data, Config.LearningJsonContext.Default.SuggestionData));
         }
         catch (Exception ex)
         {

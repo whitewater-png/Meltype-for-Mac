@@ -38,6 +38,24 @@ internal static class TermDictionaryTests
     }
 
     [Test]
+    public static void Terms_AsciiWords_AreCandidatesOnly()
+    {
+        // 語が ASCII だけの語は、読みが 4 文字以上でも強制しない (「あいこんをくりっく」が「icon|を|click」にならない)
+        var text = "あいこん\ticon\nくりっく\tclick\nぎょうれつしき\t行列式\nえーぴーあい\tAPI v2.0\nまざった\tweb3 技術\n";
+        var terms = TermDictionary.Parse([text]);
+        Assert.Equal(2, terms.ForcedCount, "強制型は日本語を含む語だけ (行列式・web3 技術)");
+        Assert.Equal(3, terms.CandidateCount, "ASCII だけの語は候補追加型");
+        var dictionary = WithTerms(text);
+        Assert.True(dictionary.Split("あいこんをくりっく") is null, "強制しない");
+        Assert.Equal(0, dictionary.Lookup("あいこん").Count, "強制型の Lookup にも出ない");
+        Assert.True(dictionary.LookupTermCandidates("あいこん").Contains("icon"), "候補には出る");
+        Assert.True(dictionary.LookupTermCandidates("あいこんを").Contains("iconを"), "助詞付きでも候補に出る");
+        Assert.True(dictionary.PredictTerms("くりっ").Contains("click"), "予測にも出る");
+        Assert.True(dictionary.Split("ぎょうれつしきをもとめる") is not null, "日本語を含む語は今までどおり強制");
+        Assert.True(TermDictionary.IsAscii("API v2.0") && !TermDictionary.IsAscii("web3 技術") && !TermDictionary.IsAscii("Ａ"), "ASCII の判定");
+    }
+
+    [Test]
     public static void Terms_InvalidLinesAreSkipped()
     {
         var text = string.Join("\n",
@@ -153,7 +171,7 @@ internal static class TermDictionaryTests
         var terms = TermDictionary.Parse([text]);
         Assert.Equal(0, terms.Count, "テンプレートは語を含まない");
         Assert.Equal(0, terms.Skipped, "テンプレートの行はすべてコメント");
-        Assert.True(TermDictionary.Embedded is not null, "同梱の terms-*.txt を読める (ファイルを足すだけで読まれる)");
+        Assert.True(Detection.DictionarySource.ListEmbedded("terms-").Contains("terms-template.txt"), "terms-*.txt の一覧を取れる (ファイルを足すだけで分野に出る)");
         Assert.True(Detection.DictionarySource.ReadEmbeddedWithPrefix("terms-").Any(), "terms-*.txt が埋め込まれている");
     }
 

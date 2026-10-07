@@ -91,7 +91,7 @@ public sealed class ConversionHistory
     private Timer? _saveTimer;
     private bool _dirty;
 
-    private sealed class Entry
+    internal sealed class Entry
     {
         public string Text { get; set; } = "";
         public DateTime Used { get; set; }
@@ -169,7 +169,7 @@ public sealed class ConversionHistory
         try
         {
             if (Config.SafeFile.ReadAllText(path) is not { } json) return;
-            var loaded = JsonSerializer.Deserialize<Dictionary<string, Entry?>>(json);
+            var loaded = JsonSerializer.Deserialize(json, Config.LearningJsonContext.Default.ConversionEntries);
             // 1 文字の読み (き → 記) は、以前の版で覚えてしまったものも使わない (関係ない変換を巻き込むため)。
             // 壊れた項目 (値が null・Text が null か空) は読み飛ばす (後の Score / Get で落ちないように)。
             if (loaded is not null)
@@ -297,7 +297,7 @@ public sealed class ConversionHistory
         _dirty = false;
         try
         {
-            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_entries));
+            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_entries, Config.LearningJsonContext.Default.ConversionEntries));
         }
         catch (Exception ex)
         {

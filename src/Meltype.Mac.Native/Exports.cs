@@ -46,7 +46,7 @@ public static unsafe class Exports
     /// FFI の版数。関数の引数や意味を変えたら上げ、Swift の NativeCore.expectedAbiVersion も同じ値にする
     /// (別の版の libMeltypeNative.dylib が混ざったとき、引数の食い違いで落ちる代わりに初期化を止めるため)。
     /// </summary>
-    public const int AbiVersion = 4;
+    public const int AbiVersion = 5;
 
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
@@ -58,6 +58,40 @@ public static unsafe class Exports
     /// <summary>「変換後も続けて入力できる」を切り替えて config.json に保存する。すべての入力欄にすぐ反映される。保存できたら 1、できなければ 0。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_continue_after_conversion")]
     public static int SetContinueAfterConversion(int on) => Config.ContinueAfterConversionSetting.Set(on != 0) ? 1 : 0;
+
+    /// <summary>
+    /// 専門用語集の分野の一覧。1 行 1 分野で「ID\t名称\t語数\t有効なら 1・そうでなければ 0」を改行でつないだ文字列 (meltype_free で解放する)。
+    /// 分野が無い・取れないときは NULL。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_domains")]
+    public static byte* TermDomainList()
+    {
+        try
+        {
+            var domains = TermDomains.List();
+            return domains.Count == 0 ? null : ToUtf8(TermDomains.FormatForFfi(domains));
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"Mac: 専門用語集の一覧を取れませんでした: {ex}");
+            return null;
+        }
+    }
+
+    /// <summary>専門用語集の分野 (ID) を有効 (on != 0) / 無効にして config.json に保存する。すべての入力欄にすぐ反映される。保存できたら 1、できなければ 0。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_set_term_domain")]
+    public static int SetTermDomain(byte* id, int on)
+    {
+        try
+        {
+            return FromUtf8(id) is { Length: > 0 } name && TermDomains.Set(name, on != 0) ? 1 : 0;
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"Mac: 専門用語集の設定を変えられませんでした: {ex}");
+            return 0;
+        }
+    }
 
     /// <summary>
     /// 学習データ (変換・登録提案・英語/日本語・英訳・ユーザーモデル) をすべて消す。ユーザー辞書と設定は消さない。

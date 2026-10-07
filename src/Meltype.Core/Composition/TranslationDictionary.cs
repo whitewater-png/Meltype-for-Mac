@@ -131,7 +131,7 @@ public sealed class TranslationHistory
         try
         {
             if (Config.SafeFile.ReadAllText(path) is not { } json) return;
-            var loaded = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, int>>>(json);
+            var loaded = JsonSerializer.Deserialize(json, Config.LearningJsonContext.Default.TranslationCounts);
             if (loaded is not null) foreach (var (key, value) in loaded) _counts[key] = value;
         }
         catch (Exception ex)
@@ -174,7 +174,7 @@ public sealed class TranslationHistory
         if (_path is null) return;
         try
         {
-            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_counts));
+            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_counts, Config.LearningJsonContext.Default.TranslationCounts));
         }
         catch (Exception ex)
         {
