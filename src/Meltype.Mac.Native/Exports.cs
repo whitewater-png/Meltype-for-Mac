@@ -46,7 +46,7 @@ public static unsafe class Exports
     /// FFI の版数。関数の引数や意味を変えたら上げ、Swift の NativeCore.expectedAbiVersion も同じ値にする
     /// (別の版の libMeltypeNative.dylib が混ざったとき、引数の食い違いで落ちる代わりに初期化を止めるため)。
     /// </summary>
-    public const int AbiVersion = 2;
+    public const int AbiVersion = 3;
 
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
@@ -316,6 +316,25 @@ public static unsafe class Exports
         {
             Diagnostics.Log.Error($"報告の URL を作れませんでした: {ex}");
             return ToUtf8($"{Config.ProjectInfo.SourceUrl}/issues/new/choose");
+        }
+    }
+
+    /// <summary>
+    /// GitHub の最新 Release の JSON と今の版から、更新してよい新しい版かを判定する。
+    /// 更新できるなら「版・ダウンロード URL・SHA-256・サイズ・リリースページ」を改行でつないだ文字列 (meltype_free で解放)、無い・不正なら NULL。
+    /// 通信は Swift 側が行う。ここは文字列を判定するだけ (UpdateCheck)。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_update_evaluate")]
+    public static byte* UpdateEvaluate(byte* releaseJson, byte* currentVersion)
+    {
+        try
+        {
+            return Update.UpdateCheck.Evaluate(FromUtf8(releaseJson), FromUtf8(currentVersion)) is { } info ? ToUtf8(info.ToLines()) : null;
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"Mac: 更新の判定で例外: {ex.Message}");
+            return null;
         }
     }
 

@@ -578,3 +578,54 @@ if (control && !alt && !command && !shift && _controller.IsComposing && CtrlShor
 - `LanguageMemory` / `TranslationHistory` は元々ロックが無かったので、公開メソッド全部に `lock` を付けた (`Clear` を含む)。
 - ABI 不一致のとき (`isCompatible == false`)、Swift の `NativeCore` の session を使う入口 (handleKey・commit・select・reconvert・setApp・setDirect・登録/提案系) も早期 return する。全消去は、不一致のとき「azooKey の学習だけを消去しました」と実態どおりに表示する。
 - 未検証 (実機): 20MB 超のファイルでの退避の動作、ABI 不一致時のメニュー表示。
+
+---
+
+## 追加項目 P15. 更新通知と更新ボタン (実装済み・未検証)
+
+**目的**: 新しい版が出たことを知らせ、利用者がボタンを押したときだけ、確認してから入れ替える。打った内容は送らない。
+
+### 決定 (リョウ)
+
+既定 ON・入力メニューのチェック項目で切替 / 取得先は GitHub の最新 Release だけ / 自動インストールはしない / 電子署名は入れない (GitHub アカウント乗っ取りは防げないと文書に書く)。
+
+### 変更したファイル
+
+| ファイル | 内容 |
+| --- | --- |
+| `src/Meltype.Core/Update/UpdateCheck.cs` (新規) | `UpdateCheck.Evaluate(json, 現在の版)`。純粋なロジック (System.Net なし)。JSON は 1MB まで・try/catch。draft/prerelease 無視、タグ (`v1.0.4` / `v1.0.4-mac` / `1.0.4`) を数で比較、資産 `Meltype-mac-<版>.zip` の URL 接頭辞・末尾のファイル名・size ≤ 100MB・`digest` = `sha256:` + 64 桁 16 進を全部見る。返すのは版・URL・SHA-256・size・リリースページ |
+| `src/Meltype.Mac.Native/Exports.cs` | `meltype_update_evaluate(json, version)` を追加。改行区切り 5 行か NULL。`AbiVersion` 2 → 3 |
+| `mac/Sources/MeltypeIME/NativeCore.swift` | `evaluateUpdate`、`expectedAbiVersion` 2 → 3 |
+| `mac/Sources/MeltypeIME/Updater.swift` (新規) | `UpdateManager` (update.json・定期確認・通知・メニュー用の状態・osascript のダイアログ) と `Updater` (ダウンロード・SHA-256・展開・検査・切り離した install.sh)。リダイレクト制限のデリゲート |
+| `mac/Sources/MeltypeIME/InputController.swift` | `menu()` に「新しい版があります (v…)…」(先頭)・「更新を確認する」(チェック)・「今すぐ更新を確認する」 |
+| `mac/Sources/MeltypeIME/main.swift` | 起動時に `UpdateManager.shared.start()` |
+| `src/Meltype.Core.Tests/UpdateCheckTests.cs` (新規) | 新しい/同じ/古い・桁の数比較・prerelease/draft・digest 無し/不正・別ホスト/別リポジトリ/http/ファイル名違い・サイズ超過・壊れた JSON・1MB 超・タグ形式 |
+| `README.md` / `SECURITY.md` / `mac/INSTALL.txt` / `mac/README.md` | 「通信するコードは入っていない」を、新しい版の確認と更新の説明に書き換え。限界 (電子署名なし) を SECURITY.md に明記 |
+
+### 設計上の判断
+
+- 確認の間隔は、起動 5 分後・その後 1 時間ごとに「前の確認から 24 時間以上か」を見る (IME は頻繁に再起動されるので、起動のたびに 1 回は確認しない)。通信失敗 (オフライン) は lastCheck を進めず、1 時間は再試行しない。HTTP の応答があれば (404・403 でも) 確認したことにする。
+- 通知: 通知センター (UNUserNotificationCenter、初回に許可を求める)。**利用者が許可を断っているときは、osascript で代わりに出さない**。エラー (使えない) のときだけ osascript の `display notification` にフォールバック。
+- 見つかった版はメモリにだけ持つ (IME を起動し直すと消え、次の確認か「今すぐ更新を確認する」で再び出る)。URL・SHA-256 をファイルに残して信用することを避けた。
+- install.sh は変更不要と確認した: `--yes` は非対話 (stdin が端末でなくても動く)、`pkill` は rsync の後・IME だけを止める。切り離した bash は `POSIX_SPAWN_SETSID` の新しいセッションで動くので、IME が止まっても続く。IME が止まるので、結果のダイアログは切り離した側が出す。
+- `URLSession` の保存には隔離属性 (quarantine) が付かない (Info.plist に `LSFileQuarantineEnabled` なし)。`install.sh --yes` が、入れた Meltype.app の隔離属性を外す (既存の動き)。
+
+### 未検証 (実機で確認が必要)
+
+- 通知の許可ダイアログ・通知の表示 (背面専用アプリから出るか)。許可を断ったときに出ないこと。
+- 実際の Release (digest 付き) での確認と、「更新する」から入れ替え完了までの一連 (切り離した install.sh が IME の停止後も最後まで動き、結果のダイアログが出ること)。
+- OFF のときに通信しないこと (確認は `nettop` / Little Snitch など)。
+- GitHub の実際の JSON (`digest` の形式・リダイレクト先のホスト) が想定どおりか。
+
+### P15 査読後の修正
+
+- **M1**: ダウンロード URL を、`https://github.com/whitewater-png/Meltype-for-Mac/releases/download/<tag_name>/<Meltype-mac-版.zip>` との完全一致にした (`%`・`\`・空白・制御文字・`..`・ポート・query・fragment・ユーザー情報は拒否)。Swift 側 (`UpdateOffer.hasValidDownloadUrl`) でもダウンロードの直前に再検証。テスト `TrickyUrls_AreRejected` を追加。
+- **M2**: 展開前に `zipinfo -t` / `zipinfo -1` でエントリ数 (5000 以下)・展開後の合計 (300MB 以下)・絶対パス・`..`・バックスラッシュの名前を検査して、外れたら中止。
+- **M3**: `install.sh` の入れ直しを「`cp -Rp` で一時退避 → rsync → `codesign --verify` → 失敗なら退避から rsync で書き戻し・成功なら退避を消す」にした。この区間は `set -e` に任せず明示的に処理。`Meltype.app` フォルダーは消さない。新規インストールと対話の動きは変更なし。
+- **M4**: 実行中の IME が `~/Library/Input Methods/Meltype.app` のときだけ「更新する」を出す。それ以外は「詳細」のみ。
+- **M5**: 起動後は `isUpdating` を true のままにし、`offer` を nil にしてメニューの項目を消す。切り離した bash 側も `Application Support/Meltype/update.lock` を `mkdir` で取り (1 時間以上前の古いロックは消す)、取れなければ中止して知らせる。終了時は `trap` で必ず消す。
+- **L1**: `update.json` は項目ごとに読み (`UpdateSettings.swift`)、ファイルがあるのに読めない・壊れているときは `enabled=false`、ファイルが無いときだけ ON。ロジックは Foundation だけの小さな型にして、scratchpad で swiftc の単体確認 (7 項目) をした。
+- **L2**: `finishCheck` の冒頭で ON を再確認し、OFF で手動でなければ結果を捨てる (通知も出さない)。
+- **L5**: IME 起動時に `$TMPDIR` の `meltype-update-*` (自分の接頭辞・ディレクトリ・24 時間以上前) を消す。
+- **L8**: 確認ダイアログに `giving up after 300`。時間切れは「あとで」と同じ扱いで `isUpdating` を解除。
+- 未検証 (実機): 退避と書き戻し (rsync の失敗・署名の検査の失敗を起こして)・ロックの競合・build の場所から動かしたときに「更新する」が出ないこと・`zipinfo` の出力形式 (macOS 26) での検査。

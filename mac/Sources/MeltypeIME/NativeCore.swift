@@ -31,6 +31,7 @@ private typealias ReportUrlFunction = @convention(c) (UnsafePointer<CChar>?) -> 
 private typealias FreeFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
 private typealias AbiVersionFunction = @convention(c) () -> Int32
 private typealias ClearLearningFunction = @convention(c) () -> Int32
+private typealias UpdateEvaluateFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 
 // ---- 本体から呼ばれる関数 (文字列は strdup したものを返し、本体が free する) ----
 
@@ -146,7 +147,7 @@ final class NativeCore {
 
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion と必ず同じにする。
     /// 食い違う dylib (別の版が混ざった) を読むと関数の引数が合わずに落ちるので、食い違ったら初期化を止める。
-    static let expectedAbiVersion: Int32 = 2
+    static let expectedAbiVersion: Int32 = 3
 
     /// dylib の版数が expectedAbiVersion と合っているか (initialize で確かめる)。合わなければ入力を一切扱わない (キーはアプリに渡る)。
     private(set) var isCompatible = false
@@ -174,6 +175,7 @@ final class NativeCore {
     private let freeFunction: FreeFunction?
     private let abiVersionFunction: AbiVersionFunction?
     private let clearLearningFunction: ClearLearningFunction?
+    private let updateEvaluateFunction: UpdateEvaluateFunction?
 
     private init() {
         let path = (Bundle.main.privateFrameworksPath ?? "") + "/libMeltypeNative.dylib"
@@ -209,6 +211,7 @@ final class NativeCore {
         freeFunction = symbol("meltype_free", as: FreeFunction.self)
         abiVersionFunction = symbol("meltype_abi_version", as: AbiVersionFunction.self)
         clearLearningFunction = symbol("meltype_clear_learning", as: ClearLearningFunction.self)
+        updateEvaluateFunction = symbol("meltype_update_evaluate", as: UpdateEvaluateFunction.self)
     }
 
     func initialize() {
@@ -333,6 +336,20 @@ final class NativeCore {
     func clearLearning() -> Bool {
         guard isCompatible, let clearLearningFunction else { return false }
         return clearLearningFunction() == 1
+    }
+
+    /// GitHub の最新 Release の JSON を本体で判定する (通信は Swift 側)。更新してよい新しい版があれば、その情報。無い・不正なら nil。
+    /// 本体の関数は文字列を判定するだけでセッションを使わないので、任意のスレッドから呼べる。
+    func evaluateUpdate(releaseJson: String, currentVersion: String) -> UpdateOffer? {
+        guard isCompatible, let updateEvaluateFunction else { return nil }
+        let pointer = releaseJson.withCString { json in
+            currentVersion.withCString { updateEvaluateFunction(json, $0) }
+        }
+        guard let pointer else { return nil }
+        defer { freeFunction?(pointer) }
+        let lines = String(cString: pointer).split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard lines.count == 5, let size = Int64(lines[3]), let url = URL(string: lines[1]), let releaseUrl = URL(string: lines[4]) else { return nil }
+        return UpdateOffer(version: lines[0], downloadUrl: url, sha256: lines[2], size: size, releaseUrl: releaseUrl)
     }
 
     /// 設定・学習データ・ユーザー辞書の保存場所。

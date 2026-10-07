@@ -8,7 +8,7 @@
 #
 # このスクリプトがやること (影響範囲):
 #   - Meltype.app の署名が壊れていないか確かめる (壊れていたら何も入れずに中止)
-#   - ~/Library/Input Methods/Meltype.app に入れる (cp / 入れ直しのときは rsync --delete で中身だけ入れ替える)
+#   - ~/Library/Input Methods/Meltype.app に入れる (cp / 入れ直しのときは、今のものを一時の場所に退避してから rsync --delete で中身だけ入れ替え、署名の検査に失敗したら退避から戻す)
 #   - 入れ直しのとき、動いている Meltype を止める (pkill -x Meltype)
 #   - 隔離属性 (com.apple.quarantine) を外す (確認してから。下を読むこと)
 #   - 入力ソースとして登録し (Meltype --register)、入力メニューと IME の起動役を起動し直す (killall imklaunchagent TextInputMenuAgent)
@@ -99,7 +99,31 @@ if [[ -d "$TARGET/Meltype.app" ]]; then
     # 入れ直し: Meltype.app のフォルダーは消さずに中身だけを入れ替える。
     # フォルダーごと消して入れ直すと、macOS が入力ソースの一覧から Meltype を外して有効な入力ソースの設定からも消し、
     # 入力メニューに出ない・選んでも切り替わらない状態になる (ログアウトするまで直らない)。
-    rsync -a --delete Meltype.app/ "$TARGET/Meltype.app/"
+    # ただし入れ替えの途中で失敗すると、新旧が混ざった壊れた Meltype.app が残る。入れ替える前に今のものを一時の場所へ退避し、
+    # 入れ替えと、入れ替えたあとの署名の検査のどちらかが失敗したら、退避から書き戻す (この区間は set -e に任せず、明示的に処理する)。
+    BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/meltype-backup.XXXXXX")" || { echo "退避用のフォルダーを作れませんでした。何も入れずに中止します。" >&2; exit 1; }
+    if ! cp -Rp "$TARGET/Meltype.app" "$BACKUP_DIR/Meltype.app"; then
+        echo "今の Meltype.app を退避できませんでした。何も入れずに中止します。" >&2
+        rm -rf "$BACKUP_DIR"
+        exit 1
+    fi
+    SWAP_OK=1
+    rsync -a --delete Meltype.app/ "$TARGET/Meltype.app/" || SWAP_OK=0
+    if [[ $SWAP_OK -eq 1 ]] && ! codesign --verify --deep --strict "$TARGET/Meltype.app" 2>&1; then
+        SWAP_OK=0
+    fi
+    if [[ $SWAP_OK -eq 0 ]]; then
+        echo "入れ替えに失敗したか、入れ替えたあとの署名の検査に失敗しました。元の Meltype.app に戻します…" >&2
+        if rsync -a --delete "$BACKUP_DIR/Meltype.app/" "$TARGET/Meltype.app/"; then
+            rm -rf "$BACKUP_DIR"
+            echo "元に戻しました。今の Meltype はそのまま使えます。" >&2
+        else
+            echo "元に戻すことにも失敗しました。元の Meltype.app は次の場所に残してあります。手で入れ直してください:" >&2
+            echo "  $BACKUP_DIR/Meltype.app" >&2
+        fi
+        exit 1
+    fi
+    rm -rf "$BACKUP_DIR"
     # 入れ替えてから、動いていた Meltype を止める (次にキーを打ったときに macOS が新しい Meltype を起動する)。
     # 先に止めると、入れ替えの途中でキーを打ったときに、新旧が混ざった Meltype が起動されてしまう。
     pkill -x Meltype 2>/dev/null || true

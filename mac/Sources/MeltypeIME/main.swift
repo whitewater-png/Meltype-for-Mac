@@ -30,4 +30,7 @@ var candidatesWindow: IMKCandidates? = IMKCandidates(server: server, panelType: 
 // 本体 (libMeltypeNative.dylib) を読み込み、漢字変換・英単語の判定の関数を登録しておく。
 NativeCore.shared.initialize()
 
+// 新しい版の確認 (既定 ON。起動 5 分後から、24 時間に 1 回。OFF のときは通信しない)。
+UpdateManager.shared.start()
+
 NSApplication.shared.run()

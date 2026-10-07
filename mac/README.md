@@ -38,6 +38,21 @@ cd mac
 ログアウトするまで入力メニューに出なくなります (`build.sh` / `install.sh` は Meltype.app を消さずに中身だけを入れ替えます)。
 `mac/.build` (Swift のビルド結果) は azooKey の辞書の置き場所として使われることがあるので、消さないでください。
 
+## 新しい版の通知と更新 (通信)
+
+- 既定 ON。入力メニューの「更新を確認する」(チェック付き) でいつでも ON/OFF。設定は `~/Library/Application Support/Meltype/update.json` (`enabled` / `lastCheck` / `notifiedVersion`、0600。`uninstall.sh --remove-data` でデータごと消える)。
+- 確認は、IME の起動 5 分後以降に 1 回、その後は前の確認から 24 時間以上たっていれば行う (入力メニューを開いたときも、期限が過ぎていれば確認)。OFF のときは一切通信しない。入力メニューの「今すぐ更新を確認する」は OFF でも手動なら動く。
+- 取得先は `https://api.github.com/repos/whitewater-png/Meltype-for-Mac/releases/latest` だけ (GET、15 秒でタイムアウト、`User-Agent: Meltype/<版>`、認証なし)。打った内容は送らない。失敗は黙って次回に回す。
+- 判定は Core の `UpdateCheck.Evaluate` (`src/Meltype.Core/Update/UpdateCheck.cs`)。draft / prerelease を無視し、タグ (`v1.0.4-mac` など) の版を数で比べ、資産 `Meltype-mac-<版>.zip` の URL (`github.com/whitewater-png/Meltype-for-Mac/releases/download/`)・サイズ (100 MB 以下)・`digest` (`sha256:` + 64 桁) が全部そろったときだけ有効にする。
+- 新しい版が見つかると、入力メニューの先頭に「新しい版があります (v…)…」を出し、通知センターにも 1 度だけ通知する (`notifiedVersion`。許可を断られていれば通知しない)。
+- 「更新する」を押したときだけ、zip をダウンロード (リダイレクトは github.com / githubusercontent.com だけ) → SHA-256 を照合 → `ditto -x -k` で展開 → `codesign --verify --deep --strict`・版・バンドル ID の確認 → (展開の前に zip の中身を検査) → 展開したフォルダーの `install.sh --yes` を新しいセッションで切り離して起動する。
+  `install.sh` は rsync で入れ替えてから `pkill -x Meltype` で IME を止めるが、切り離した bash は続き、終わると結果のダイアログを出して一時フォルダーを消す (ログは `Application Support/Meltype/update.log`)。ダウンロード・SHA-256・展開前の zip の検査 (エントリ 5000 個以下・展開後 300MB 以下・`..` や絶対パスの名前なし)・展開・署名の検査のどれかで失敗したら、入れてある Meltype には触れずに中止する。
+  `install.sh` は入れ替える前に今の Meltype.app を一時フォルダーへ `cp -Rp` で退避し、rsync か入れ替え後の `codesign --verify` が失敗したら退避から書き戻す (成功したら退避を消す。`Meltype.app` フォルダーそのものは消さない)。
+- 「更新する」が出るのは、実行中の Meltype が `~/Library/Input Methods/Meltype.app` のときだけ (それ以外 (ビルドの途中の場所など) は「詳細」でリリースページを開くだけ)。
+  更新を始めたあとは、切り離した install.sh が終わるまで二重に始まらない (メニューの項目を消し、`Application Support/Meltype/update.lock` で排他ロック)。確認のダイアログは 5 分で時間切れ (「あとで」と同じ)。
+- `update.json` は項目ごとに読む (型の違う項目だけ既定値)。ファイルがあるのに壊れていて読めないときは、勝手に通信しないよう OFF にする (ファイルが無いときだけ既定の ON)。更新で残った一時フォルダー (`meltype-update-*`、24 時間以上前) は IME の起動時に消す。
+- 電子署名は付けていない。GitHub のアカウントが乗っ取られた場合は防げない (SECURITY.md)。
+
 ## 配布物の確認とインストールの影響範囲
 
 テスト版の zip は Apple の公証を受けていません。受け取ったら、まず SHA-256 をリリースページ (または渡した人) の値と見比べてください。
@@ -46,9 +61,9 @@ cd mac
 shasum -a 256 ~/Downloads/Meltype-mac.zip   # ファイル名は実際のものに合わせる
 ```
 
-`install.sh` (zip の「Install Meltype.command」から呼ばれる) は、次のことをします。これ以外 (管理者権限・ネットワーク通信) はしません。
+`install.sh` (zip の「Install Meltype.command」から呼ばれる) は、次のことをします。これ以外 (管理者権限・ネットワーク通信) はしません (`install.sh` 自身は通信しません。新しい版の確認の通信は IME が行います。上の節)。
 
-1. `codesign --verify --deep --strict` で Meltype.app が壊れていないか確かめる (壊れていたら何も入れずに中止)
+1. `codesign --verify --deep --strict` で Meltype.app が壊れていないか確かめる (壊れていたら何も入れずに中止)。入れ直しのときは、入れ替える前に今のものを退避し、入れ替えか入れ替え後の署名の検査に失敗したら元に戻す
 2. 実行ファイルと `libMeltypeNative.dylib` の SHA-256 を表示する (リリースページの値と見比べる)
 3. `~/Library/Input Methods/Meltype.app` に入れる (入れ直しのときは `rsync -a --delete` で中身だけ入れ替え、動いている Meltype を `pkill -x Meltype` で止める)
 4. 隔離属性 `com.apple.quarantine` を外す。**macOS の Gatekeeper の検査をこの Meltype.app について回避する**操作なので、端末では `[y/N]` を聞きます (`--yes` で省略。端末でなく `--yes` も無いときは外さない)

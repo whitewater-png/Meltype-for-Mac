@@ -193,6 +193,13 @@ final class MeltypeInputController: IMKInputController {
 
     override func menu() -> NSMenu! {
         let menu = NSMenu()
+        // メニューを開いたとき、前の確認から 24 時間たっていれば裏で確認する (OFF のときは何もしない。メニューは待たせない)
+        UpdateManager.shared.checkIfDue()
+        // 新しい版が見つかっていれば先頭に出す (選ぶと確認のダイアログ。自動では入れない)
+        if let offer = UpdateManager.shared.offer {
+            menu.addItem(withTitle: "新しい版があります (v\(offer.version))…", action: #selector(startUpdate(_:)), keyEquivalent: "")
+            menu.addItem(.separator())
+        }
         // 何度も選び直した語の登録提案 (最大 3 件)。選ぶと辞書に登録、「登録しない」で以後提案しない。
         let suggestions = NativeCore.shared.suggestions(session)
         for suggestion in suggestions {
@@ -207,9 +214,25 @@ final class MeltypeInputController: IMKInputController {
         menu.addItem(withTitle: "選択中の文字をユーザー辞書に登録…", action: #selector(registerWord(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "辞書の登録提案の履歴を消去", action: #selector(clearSuggestions(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "学習データをすべて消去…", action: #selector(clearLearningData(_:)), keyEquivalent: "")
+        let updateToggle = menu.addItem(withTitle: "更新を確認する", action: #selector(toggleUpdateCheck(_:)), keyEquivalent: "")
+        updateToggle.state = UpdateManager.shared.isEnabled ? .on : .off
+        menu.addItem(withTitle: "今すぐ更新を確認する", action: #selector(checkUpdateNow(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "Meltype のデータフォルダを開く (設定・ユーザー辞書)", action: #selector(openDataFolder(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "不具合の報告・提案… (Mac 版はプレビュー版です)", action: #selector(openReport(_:)), keyEquivalent: "")
         return menu
+    }
+
+    @objc private func startUpdate(_ sender: Any?) {
+        UpdateManager.shared.promptUpdate()
+    }
+
+    /// 「更新を確認する」の ON/OFF。OFF のあいだは、手動の「今すぐ更新を確認する」以外では一切通信しない。
+    @objc private func toggleUpdateCheck(_ sender: Any?) {
+        UpdateManager.shared.setEnabled(!UpdateManager.shared.isEnabled)
+    }
+
+    @objc private func checkUpdateNow(_ sender: Any?) {
+        UpdateManager.shared.checkNow()
     }
 
     @objc private func acceptSuggestion(_ sender: NSMenuItem) {
