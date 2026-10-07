@@ -26,8 +26,15 @@ for arg in "$@"; do
     esac
 done
 
+# リポジトリを直接開いたとき (mac/ には Meltype.app が無く、./build.sh が build/ に作る) は、build/Meltype.app を入れる。
+if [[ ! -d Meltype.app && -d build/Meltype.app ]]; then
+    echo "ソースからビルドした build/Meltype.app を入れます。"
+    cd build
+fi
 if [[ ! -d Meltype.app ]]; then
-    echo "Meltype.app が見つかりません。zip を展開したフォルダーで実行してください。" >&2
+    echo "Meltype.app が見つかりません。" >&2
+    echo "  ・配布の zip を使うとき: zip を展開したフォルダーで実行してください。" >&2
+    echo "  ・ソースから入れるとき: 先に mac フォルダーで ./build.sh を実行してください (build.sh は ビルドして、そのまま入れ替えまで行います)。" >&2
     exit 1
 fi
 
