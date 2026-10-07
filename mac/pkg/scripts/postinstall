@@ -1,0 +1,49 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Yukishiro
+#
+# Meltype.pkg のインストール後の処理 (install.sh と同じ考え方):
+#   初めて入れたとき: 入力ソースとして登録し、入力メニューと IME を起動する imklaunchagent を起動し直す
+#   入れ替えたとき: 動いていた Meltype を止める (次にキーを打ったときに新しい版が起動する)
+# インストーラーは root で動くことがあるので、ログイン中のユーザーとして実行する。
+exec >>/tmp/meltype-pkg-install.log 2>&1
+echo "== postinstall $(date)"
+
+CONSOLE_USER="$(stat -f%Su /dev/console)"
+if [[ -z "$CONSOLE_USER" || "$CONSOLE_USER" == root ]]; then
+    echo "ログイン中のユーザーが分かりません。登録をスキップします。"
+    exit 0
+fi
+CONSOLE_UID="$(id -u "$CONSOLE_USER")"
+USER_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory | awk '{print $2}')"
+APP="$USER_HOME/Library/Input Methods/Meltype.app"
+BIN="$APP/Contents/MacOS/Meltype"
+
+if [[ ! -x "$BIN" ]]; then
+    echo "Meltype.app が見つかりません: $APP"
+    exit 0
+fi
+
+# root で入った場合に備えて、持ち主をユーザーに直す
+if [[ "$(id -u)" == 0 ]]; then
+    chown -R "$CONSOLE_USER" "$APP" 2>/dev/null || true
+fi
+
+# ユーザーとして実行する (root のままだと、ユーザーの入力ソースに登録できない)
+as_user() {
+    if [[ "$(id -u)" == 0 ]]; then
+        launchctl asuser "$CONSOLE_UID" sudo -u "$CONSOLE_USER" "$@"
+    else
+        "$@"
+    fi
+}
+
+if as_user "$BIN" --register-check; then
+    echo "入力ソースは登録済み: 入れ替えのみ"
+    pkill -x Meltype 2>/dev/null || true
+else
+    echo "初回: 入力ソースに登録します"
+    as_user "$BIN" --register || echo "登録に失敗しました (ログアウトして入り直すと出ることがあります)"
+    as_user killall imklaunchagent TextInputMenuAgent 2>/dev/null || true
+fi
+exit 0

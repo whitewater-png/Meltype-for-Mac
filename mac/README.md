@@ -59,6 +59,15 @@ shasum -a 256 ~/Downloads/Meltype-mac.zip   # ファイル名は実際のもの�
 `build.sh` は、ビルドした実行ファイルの RPATH からビルドしたマシンの絶対パス (`/Library/Developer/CommandLineTools/...`) を `install_name_tool -delete_rpath` で除いてから署名します。
 組み立てたあとの `otool -l build/Meltype.app/Contents/MacOS/Meltype` で、`LC_RPATH` に `/usr/lib/swift`・`@loader_path`・`@executable_path/../Frameworks` だけが残っていることを確かめられます。
 
+## ワンクリックのインストーラー (.pkg)
+
+```bash
+cd mac && ./build.sh && ./make-pkg.sh   # dist/Meltype-mac-<version>.pkg ができます
+```
+
+ダブルクリックでインストールできる `.pkg` を作ります (「このユーザーのみ」に入れるので、管理者パスワードは不要です)。署名していないので、開くときは右クリック →「開く」が必要です。
+**動作確認中です** (実際のインストールは、まだ別の Mac で確認できていません)。
+
 ## アンインストール
 
 ```bash

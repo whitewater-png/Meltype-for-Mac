@@ -3,6 +3,7 @@ Meltype for Mac テスト版
 ※ テスト版です。
 ※ 試作のため、動かないところがあります。気づいたことは GitHub の Issues から教えてください
    (https://github.com/whitewater-png/Meltype-for-Mac/issues)。
+※ 更新は個人の気ままな対応です。ご連絡いただければ幸いです。
 
 Meltype はアプリではなく「入力ソース」(日本語入力) です。Meltype.app をダブルクリックしても何も起きません。
 下の手順でインストールして、入力ソースに追加して使います。
