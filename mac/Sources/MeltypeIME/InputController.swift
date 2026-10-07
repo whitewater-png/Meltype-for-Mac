@@ -211,6 +211,10 @@ final class MeltypeInputController: IMKInputController {
             reject.representedObject = [suggestion.reading, suggestion.word]
         }
         if !suggestions.isEmpty { menu.addItem(.separator()) }
+        // 既定は OFF。ON にすると、Space で変換したあとに文字を打っても確定せず、続けて編集・変換できる (設定は config.json に保存、全入力欄に反映)
+        let continueToggle = menu.addItem(withTitle: "変換後も続けて入力できる", action: #selector(toggleContinueAfterConversion(_:)), keyEquivalent: "")
+        continueToggle.state = NativeCore.shared.continueAfterConversion ? .on : .off
+        menu.addItem(.separator())
         menu.addItem(withTitle: "選択中の文字をユーザー辞書に登録…", action: #selector(registerWord(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "辞書の登録提案の履歴を消去", action: #selector(clearSuggestions(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "学習データをすべて消去…", action: #selector(clearLearningData(_:)), keyEquivalent: "")
@@ -220,6 +224,16 @@ final class MeltypeInputController: IMKInputController {
         menu.addItem(withTitle: "Meltype のデータフォルダを開く (設定・ユーザー辞書)", action: #selector(openDataFolder(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "不具合の報告・提案… (Mac 版はプレビュー版です)", action: #selector(openReport(_:)), keyEquivalent: "")
         return menu
+    }
+
+    /// 「変換後も続けて入力できる」の ON/OFF。保存できなかったときは、値は変わらないので、そのことを伝える。
+    @objc private func toggleContinueAfterConversion(_ sender: Any?) {
+        guard !NativeCore.shared.setContinueAfterConversion(!NativeCore.shared.continueAfterConversion) else { return }
+        let failure = NSAlert()
+        failure.messageText = "設定を保存できませんでした"
+        failure.informativeText = "Meltype のデータフォルダーの config.json を確認してください (読めない・書けないときは、設定を変えません)。"
+        NSApp.activate(ignoringOtherApps: true)
+        failure.runModal()
     }
 
     @objc private func startUpdate(_ sender: Any?) {
@@ -397,7 +411,16 @@ final class MeltypeInputController: IMKInputController {
     private func showComposition(_ view: CompositionView, client: IMKTextInput, replacing replacement: NSRange? = nil) {
         let text = NSMutableAttributedString(string: view.text)
         let length = (view.text as NSString).length
-        if view.converting && !view.clauses.isEmpty {
+        if !view.converting && !view.clauses.isEmpty {
+            // 変換後も続けて入力: 選んだ変換結果 (細い下線) + 未変換の文節 (最後の 1 つ。かなの下線)
+            var location = 0
+            for (index, clause) in view.clauses.enumerated() {
+                let clauseLength = (clause as NSString).length
+                let style = index == view.clauses.count - 1 ? kTSMHiliteRawText : kTSMHiliteConvertedText
+                addMark(style, to: text, range: NSRange(location: location, length: clauseLength))
+                location += clauseLength
+            }
+        } else if view.converting && !view.clauses.isEmpty {
             var location = 0
             for (index, clause) in view.clauses.enumerated() {
                 let clauseLength = (clause as NSString).length

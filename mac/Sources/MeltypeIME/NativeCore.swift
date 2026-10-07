@@ -31,6 +31,8 @@ private typealias ReportUrlFunction = @convention(c) (UnsafePointer<CChar>?) -> 
 private typealias FreeFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
 private typealias AbiVersionFunction = @convention(c) () -> Int32
 private typealias ClearLearningFunction = @convention(c) () -> Int32
+private typealias GetFlagFunction = @convention(c) () -> Int32
+private typealias SetFlagFunction = @convention(c) (Int32) -> Int32
 private typealias UpdateEvaluateFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 
 // ---- 本体から呼ばれる関数 (文字列は strdup したものを返し、本体が free する) ----
@@ -147,7 +149,7 @@ final class NativeCore {
 
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion と必ず同じにする。
     /// 食い違う dylib (別の版が混ざった) を読むと関数の引数が合わずに落ちるので、食い違ったら初期化を止める。
-    static let expectedAbiVersion: Int32 = 3
+    static let expectedAbiVersion: Int32 = 4
 
     /// dylib の版数が expectedAbiVersion と合っているか (initialize で確かめる)。合わなければ入力を一切扱わない (キーはアプリに渡る)。
     private(set) var isCompatible = false
@@ -175,6 +177,8 @@ final class NativeCore {
     private let freeFunction: FreeFunction?
     private let abiVersionFunction: AbiVersionFunction?
     private let clearLearningFunction: ClearLearningFunction?
+    private let getContinueAfterConversionFunction: GetFlagFunction?
+    private let setContinueAfterConversionFunction: SetFlagFunction?
     private let updateEvaluateFunction: UpdateEvaluateFunction?
 
     private init() {
@@ -211,6 +215,8 @@ final class NativeCore {
         freeFunction = symbol("meltype_free", as: FreeFunction.self)
         abiVersionFunction = symbol("meltype_abi_version", as: AbiVersionFunction.self)
         clearLearningFunction = symbol("meltype_clear_learning", as: ClearLearningFunction.self)
+        getContinueAfterConversionFunction = symbol("meltype_get_continue_after_conversion", as: GetFlagFunction.self)
+        setContinueAfterConversionFunction = symbol("meltype_set_continue_after_conversion", as: SetFlagFunction.self)
         updateEvaluateFunction = symbol("meltype_update_evaluate", as: UpdateEvaluateFunction.self)
     }
 
@@ -336,6 +342,18 @@ final class NativeCore {
     func clearLearning() -> Bool {
         guard isCompatible, let clearLearningFunction else { return false }
         return clearLearningFunction() == 1
+    }
+
+    /// 「変換後も続けて入力できる」が ON か。設定はすべての入力欄で共通 (本体が持つ)。本体が合わないときは false。
+    var continueAfterConversion: Bool {
+        guard isCompatible, let getContinueAfterConversionFunction else { return false }
+        return getContinueAfterConversionFunction() == 1
+    }
+
+    /// 「変換後も続けて入力できる」を切り替えて config.json に保存する。すべての入力欄にすぐ反映される。保存できたら true。
+    func setContinueAfterConversion(_ on: Bool) -> Bool {
+        guard isCompatible, let setContinueAfterConversionFunction else { return false }
+        return setContinueAfterConversionFunction(on ? 1 : 0) == 1
     }
 
     /// GitHub の最新 Release の JSON を本体で判定する (通信は Swift 側)。更新してよい新しい版があれば、その情報。無い・不正なら nil。

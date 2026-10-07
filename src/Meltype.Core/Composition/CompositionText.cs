@@ -287,6 +287,18 @@ public sealed class CompositionText
         foreach (var c in kana) _units.Add(new CompositionUnit(c.ToString(), c.ToString()));
     }
 
+    /// <summary>
+    /// 読み (ひらがな) を、今の内容の前に付ける。変換後も続けて入力するとき、固定していた文節を変換前の読みに戻すのに使う。
+    /// SetKana と同じく、Raw も読みと同じにする。
+    /// </summary>
+    public void PrependReading(string kana)
+    {
+        _units.InsertRange(0, kana.Select(c => new CompositionUnit(c.ToString(), c.ToString())));
+    }
+
+    /// <summary>単位 (読みと打った英字) を、今の内容の前に付ける。固定していた文節を、打ったままの状態に戻すのに使う。</summary>
+    public void PrependUnits(IEnumerable<CompositionUnit> units) => _units.InsertRange(0, units.ToList());
+
     public void Clear()
     {
         _units.Clear();

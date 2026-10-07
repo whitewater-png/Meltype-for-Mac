@@ -148,6 +148,9 @@ internal static class CompositionTests
         public bool FullWidthSymbols { get; set; } = true;
         public bool Prediction { get; set; } = true;
 
+        /// <summary>変換後も続けて入力できるか (CompositionOptions.ContinueAfterConversion)。既定は OFF (今までの動作)。</summary>
+        public bool Continue { get; set; }
+
         public bool SuggestEnabled { get; set; } = true;
 
         /// <summary>かな入力で、仮想キーを順に打つ (shift: その打鍵で Shift を押す)。</summary>
@@ -189,6 +192,7 @@ internal static class CompositionTests
             Controller = new CompositionController(Gate, Detector, converter ?? Converter, Host, new CompositionOptions
             {
                 LiveConversion = () => live,
+                ContinueAfterConversion = () => Continue,
                 DirectMode = () => Direct,
                 ClassifyDirect = (letters, final) => DirectEngine.Evaluate(new Detection.DetectionInput(letters, letters.Select(c => (int)char.ToUpperInvariant(c)).ToArray(), final)).Verdict,
                 DirectDecided = japanese => { if (japanese) Direct = false; else _directEnglishWord = true; },

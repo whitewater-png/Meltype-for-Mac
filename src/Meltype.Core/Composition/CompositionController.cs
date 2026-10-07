@@ -65,6 +65,12 @@ public sealed class CompositionOptions
     /// <summary>かな漢字変換のエンジン (Windows の CompositionService が Mozc / Microsoft IME を選ぶのに使う)。</summary>
     public Func<Config.ConversionEngine> Engine { get; init; } = () => Config.ConversionEngine.System;
 
+    /// <summary>
+    /// Space で変換したあと、続けて文字を打っても確定せず、打った文字を未変換の文節として末尾に足して編集・変換を続けるか。
+    /// 既定は false (今までどおり、確定して新しい入力を始める)。
+    /// </summary>
+    public Func<bool> ContinueAfterConversion { get; init; } = () => false;
+
     /// <summary>英数 (直接入力) 状態か。</summary>
     public Func<bool> DirectMode { get; init; } = () => false;
 
@@ -212,6 +218,14 @@ public sealed class CompositionController
     private List<Clause> _clauses = [];
     private int _selectedClause;
     private bool _converting;
+    // 変換後も続けて入力 (ContinueAfterConversion): _clauses の先頭 _headCount 個は、選んだ候補のまま固定した文節。
+    // 続けて打った文字は、固定した文節とは別の _text (未変換の文節) に入る。0 なら今までどおり。
+    // 変換していない間 (_converting == false) の _clauses は、固定した文節だけ。
+    private int _headCount;
+    private List<CompositionUnit> _fixedUnits = [];
+    // 固定する前の、_text の前の文字の英語/日本語の手がかり (読みに戻すときに戻す)。
+    private bool? _basePrecedingEnglish;
+    private bool _basePrecedingSentence;
     // 予測変換: 候補の一覧と、Tab で候補に入っているか・選んでいる位置。
     private bool _predicting;
     private int _predictionIndex;
@@ -270,7 +284,7 @@ public sealed class CompositionController
     }
 
     /// <summary>変換ボックスに入力中か、英数状態で打ち始めの語を判定中か。</summary>
-    public bool IsComposing => !_text.IsEmpty || _heldLetters.Length > 0;
+    public bool IsComposing => !_text.IsEmpty || _heldLetters.Length > 0 || _headCount > 0;
 
     /// <summary>直近に確定した文字列 (テスト・ログ用)。</summary>
     public event Action<string>? Committed;
@@ -378,6 +392,8 @@ public sealed class CompositionController
         _reconvertOriginal = null;
         _converting = false;
         _clauses = [];
+        _headCount = 0;
+        _fixedUnits = [];
         ClearConversionCaches();
         ResetPrediction();
         ClearHeld();
@@ -511,8 +527,8 @@ public sealed class CompositionController
                 {
                     Commit(suffix: " ", fixEnglish: true);
                 }
-                else if (EndsWithEnglish(final: true)) CommitText(FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + " ", english: true, _text.Raw);
-                else if (_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level())) CommitText(FixEnglishTypo(_text.Raw) + " ", english: true, _text.Raw);
+                else if (EndsWithEnglish(final: true)) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + " ", english: true, _text.Raw);
+                else if (_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level())) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.Raw) + " ", english: true, _text.Raw);
                 else
                 {
                     // Space で変換した = 語の後に空白を打とうとした、とも取れる (確定し直して英語にするときに空白を足す)。
@@ -522,6 +538,12 @@ public sealed class CompositionController
                 return;
             case VirtualKeys.Back:
                 _text.RemoveLast();
+                // 未変換の文節を消し切ったら、前の文節の選択に戻る。
+                if (_headCount > 0 && _text.IsEmpty) SelectLastFixedClause();
+                return;
+            case VirtualKeys.Escape when _headCount > 0:
+                // 固定した文節を、変換前の読みに戻す (その次の Esc は今までどおり入力を取り消す)。
+                UnfixClauses();
                 return;
             case VirtualKeys.Escape:
                 _text.Clear();
@@ -565,11 +587,7 @@ public sealed class CompositionController
 
         if (_text.KanaInput && KanaOf(e) is { } key)
         {
-            if (_converting)
-            {
-                Commit();
-                BeginComposition();
-            }
+            if (_converting) EndConversionForNewInput();
             _text.AppendKana(key.Raw, key.Kana);
             return;
         }
@@ -577,11 +595,8 @@ public sealed class CompositionController
         if (_host.CharFromKey(e, _swallowedShift.Count > 0) is { } ch && !char.IsControl(ch) && ch != ' ')
         {
             // 変換中に次の文字を打ったら、今の候補で確定して新しい入力を始める (IME と同じ)。
-            if (_converting)
-            {
-                Commit();
-                BeginComposition();
-            }
+            // ContinueAfterConversion が ON なら、確定せずに、今の候補のまま固定して続きを未変換の文節にする。
+            if (_converting) EndConversionForNewInput();
             _text.Append(ch);
             return;
         }
@@ -874,6 +889,17 @@ public sealed class CompositionController
                 return true;
             case VirtualKeys.Back:
             case VirtualKeys.Escape:
+                if (_headCount > 0)
+                {
+                    // 未変換の文節の変換だけを取り消す (Backspace)。Esc、または未変換の文節が無いときは、固定した文節も変換前の読みに戻す。
+                    if (vk == VirtualKeys.Escape || _clauses.Count == _headCount) UnfixClauses();
+                    else
+                    {
+                        _converting = false;
+                        TrimToFixedClauses();
+                    }
+                    return true;
+                }
                 // 変換を取り消して、かなの入力に戻る。
                 _converting = false;
                 return true;
@@ -900,15 +926,101 @@ public sealed class CompositionController
         StartConversion();
         if (!_converting) return;
         var shift = _swallowedShift.Count > 0;
-        _selectedClause = vk == VirtualKeys.Left ? _clauses.Count - 1 : 0;
+        _selectedClause = vk == VirtualKeys.Left ? _clauses.Count - 1 : _headCount;
         if (shift && vk is VirtualKeys.Left or VirtualKeys.Right) Resize(vk == VirtualKeys.Left ? -1 : +1);
         else if (vk == VirtualKeys.Up) NextCandidate(-1);
     }
 
     private void SetMode(DisplayMode mode)
     {
+        // 固定した文節だけが残っている (未変換の文節が空の) ときは、表示モードを変える相手がいない。
+        if (_headCount > 0 && _text.IsEmpty) return;
         _converting = false;
+        TrimToFixedClauses();
         _text.Mode = mode;
+    }
+
+    // ---- 変換後も続けて入力 ----
+
+    /// <summary>固定した文節の、選んだ候補をつなげた文字列。</summary>
+    private string FixedText => string.Concat(_clauses.Take(_headCount).Select(c => c.Text));
+
+    /// <summary>変換の文脈にする、キャレットの前の文字列。固定した文節があれば、その分も含める。</summary>
+    private string? PrecedingForConversion => _headCount == 0 ? _precedingText : (_precedingText ?? "") + FixedText;
+
+    /// <summary>未変換の文節の変換結果 (_clauses の固定した文節より後ろ) を捨てる。</summary>
+    private void TrimToFixedClauses()
+    {
+        if (_headCount > 0 && _clauses.Count > _headCount) _clauses = _clauses.Take(_headCount).ToList();
+    }
+
+    /// <summary>
+    /// 変換中に新しい文字が打たれたとき。今までは今の候補で確定して新しい入力を始めていた。
+    /// ContinueAfterConversion が ON なら、各文節の選択を保ったまま固定し、新しい文字は空の _text (未変換の文節) に入れる。
+    /// </summary>
+    private void EndConversionForNewInput()
+    {
+        if (!_options.ContinueAfterConversion())
+        {
+            Commit();
+            BeginComposition();
+            return;
+        }
+        // 初めて固定するとき、読みに戻すために元の手がかりを覚えておく。
+        if (_headCount == 0)
+        {
+            _basePrecedingEnglish = _text.PrecedingEnglish;
+            _basePrecedingSentence = _text.PrecedingEnglishSentence;
+        }
+        _headCount = _clauses.Count;
+        _converting = false;
+        ResetPrediction();
+        // 読みに戻すとき (Esc) のために、変換していた分の打った英字つきの単位を覚えておく。
+        _fixedUnits.AddRange(_text.Units);
+        // 変換した読みは文節が持っているので、_text は未変換の文節の分だけにする。
+        _text.Clear();
+        _text.KanaInput = _options.KanaInput();
+        if (LanguageOf(FixedText) is { } english) _text.PrecedingEnglish = english;
+        _text.PrecedingEnglishSentence = IsEnglishSentence(PrecedingForConversion);
+    }
+
+    /// <summary>固定した文節の最後を選んだ変換中の状態にする (未変換の文節を消し切ったとき)。</summary>
+    private void SelectLastFixedClause()
+    {
+        TrimToFixedClauses();
+        _selectedClause = _headCount - 1;
+        _converting = true;
+    }
+
+    /// <summary>固定した文節を、変換前の読みに戻して、未変換の文節の前に付ける (変換前に打っていた状態に戻る)。</summary>
+    private void UnfixClauses()
+    {
+        var reading = string.Concat(_clauses.Take(_headCount).Select(c => c.Reading));
+        // 固定する前に打っていた単位 (打った英字つき) があれば、それを戻す (F10 で打ったままの英字に戻せる)。読みが合わなければ読みだけ。
+        if (string.Concat(_fixedUnits.Select(u => u.Kana)) == reading) _text.PrependUnits(_fixedUnits);
+        else _text.PrependReading(reading);
+        _fixedUnits = [];
+        // 未変換の文節だけに効かせていた表示モード (F7 など) は、全体には引き継がない。
+        _text.Mode = DisplayMode.Auto;
+        _text.PrecedingEnglish = _basePrecedingEnglish;
+        _text.PrecedingEnglishSentence = _basePrecedingSentence;
+        _headCount = 0;
+        _clauses = [];
+        _converting = false;
+        ResetPrediction();
+    }
+
+    /// <summary>
+    /// 固定した文節があれば、学習して、その文字列を返す (未変換の文節だけを直接 CommitText するとき、前に付ける)。
+    /// 確定の処理 (CommitText) が文節を片付けるので、ここでは捨てない。
+    /// </summary>
+    private string TakeFixedClauses()
+    {
+        if (_headCount == 0) return "";
+        var text = FixedText;
+        TrimToFixedClauses();
+        Learn();
+        return text;
     }
 
     /// <summary>
@@ -917,6 +1029,8 @@ public sealed class CompositionController
     /// </summary>
     private void StartConversion(bool preferJapanese = false)
     {
+        // 固定した文節があるときは、未変換の文節だけを変換して、固定した文節の後ろにつなぐ。
+        TrimToFixedClauses();
         var clauses = new List<Clause>();
         var segments = _text.ConversionSegments();
         for (var s = 0; s < segments.Count; s++)
@@ -948,8 +1062,9 @@ public sealed class CompositionController
             clauses.AddRange(japanese);
         }
         if (clauses.Count == 0) return;
+        if (_headCount > 0) clauses.InsertRange(0, _clauses.Take(_headCount));
         _clauses = clauses;
-        _selectedClause = 0;
+        _selectedClause = _headCount;
         _converting = true;
     }
 
@@ -1062,7 +1177,7 @@ public sealed class CompositionController
         // 変換エンジンの文節も、語句の文節を含めた前後で文脈の手がかりを見直す (甲斐性ない + こうかい → 後悔)。
         foreach (var clause in clauses)
         {
-            var surrounding = (_precedingText ?? "") + string.Concat(clauses.Where(c => c != clause).Select(c => c.Text)) + (_followingText ?? "");
+            var surrounding = (PrecedingForConversion ?? "") + string.Concat(clauses.Where(c => c != clause).Select(c => c.Text)) + (_followingText ?? "");
             var preferred = _options.ContextRules?.Choose(clause.Reading, surrounding) ?? (registered.Contains(clause) ? _options.History?.Get(clause.Reading) : null);
             if (preferred is not null) Prefer(clause, preferred);
         }
@@ -1195,7 +1310,7 @@ public sealed class CompositionController
         for (var i = 0; i < clauses.Count; i++)
         {
             var others = string.Concat(clauses.Where((_, k) => k != i).Select(c => c.Text));
-            var surrounding = (_precedingText ?? "") + others + (_followingText ?? "");
+            var surrounding = (PrecedingForConversion ?? "") + others + (_followingText ?? "");
             var preferred = _options.ContextRules?.Choose(clauses[i].Reading, surrounding) ?? _options.History?.Get(clauses[i].Reading);
             // 変換エンジンは、文節が「から」だけだと記号 (～) にしてしまう。記号だけの変換結果は、ひらがなの後ろに回す。
             preferred ??= IsSymbolOnly(clauses[i].Text) && clauses[i].Reading.All(c => c is >= 'ぁ' and <= 'ゖ') ? clauses[i].Reading : null;
@@ -1231,7 +1346,7 @@ public sealed class CompositionController
     {
         var reading = clauses[i].Reading;
         if (reading.Length == 0 || reading[0] != 'え' || !reading.Skip(1).All(SentencePunctuation.Contains) || clauses[i].Text == reading) return false;
-        var before = i > 0 ? clauses[i - 1].Text : _precedingText ?? "";
+        var before = i > 0 ? clauses[i - 1].Text : PrecedingForConversion ?? "";
         if (before.Length > 0 && !SentencePunctuation.Contains(before[^1])) return false;
         if (reading.Length > 1) return true;
         return i + 1 == clauses.Count || clauses[i + 1].Text is [var next, ..] && SentencePunctuation.Contains(next);
@@ -1279,7 +1394,7 @@ public sealed class CompositionController
     }
 
     /// <summary>変換エンジンに渡す文脈: キャレットの前の確定済みの文字のうち、同じ文の日本語の部分 (最大 10 文字)。</summary>
-    private string? ConversionContext() => _chunkContext.Active ? _chunkContext.Text : ContextOf(_precedingText);
+    private string? ConversionContext() => _chunkContext.Active ? _chunkContext.Text : ContextOf(PrecedingForConversion);
 
     private string? ContextOf(string? text)
     {
@@ -1430,13 +1545,19 @@ public sealed class CompositionController
         if (current.IsEnglish) return;
         var next = _selectedClause + 1 < _clauses.Count ? _clauses[_selectedClause + 1] : null;
         if (next is { IsEnglish: true }) next = null;
+        // 固定した文節と未変換の文節の境目は、またいで区切りを変えない。
+        if (_headCount > 0 && _selectedClause == _headCount - 1) return;
 
         if (delta > 0)
         {
             if (next is null) return;
             current.Reading += next.Reading[0];
             next.Reading = next.Reading[1..];
-            if (next.Reading.Length == 0) _clauses.Remove(next);
+            if (next.Reading.Length == 0)
+            {
+                if (_clauses.IndexOf(next) < _headCount) _headCount--;
+                _clauses.Remove(next);
+            }
             else Reconvert(next);
         }
         else
@@ -1448,6 +1569,9 @@ public sealed class CompositionController
             {
                 next = new Clause(moved.ToString(), false, []);
                 _clauses.Insert(_selectedClause + 1, next);
+                // 固定した文節の中 (後ろが英語の文節のとき) に足した文節は、固定した側に数える。数えないと、
+                // 最後の固定した文節が未変換の側に押し出され、あとで捨てられる。
+                if (_selectedClause < _headCount) _headCount++;
             }
             else next.Reading = moved + next.Reading;
             Reconvert(next);
@@ -1480,7 +1604,7 @@ public sealed class CompositionController
     private string LiveConvert(string kana)
     {
         if (kana.Length < LiveConversionMinLength) return kana;
-        var key = string.Join("\u0001", kana, _precedingText, _followingText, _options.History?.Version, _options.UserDictionary?.Version);
+        var key = string.Join("\u0001", kana, PrecedingForConversion, _followingText, _options.History?.Version, _options.UserDictionary?.Version);
         if (_liveCache.TryGetValue(key, out var cached)) return cached;
         var converted = string.Concat(ConvertJapanese(kana).Select(c => c.Text));
         if (_liveCache.Count > 256) _liveCache.Clear();
@@ -1496,18 +1620,25 @@ public sealed class CompositionController
 
     private void CommitIfAny()
     {
-        if (!_text.IsEmpty) Commit();
+        if (!_text.IsEmpty || _headCount > 0) Commit();
     }
 
     private void Commit(string suffix = "", bool fixEnglish = false)
     {
         var converting = _converting && _clauses.Count > 0;
-        var text = converting ? string.Concat(_clauses.Select(c => c.Text)) : CurrentDisplay(final: true);
+        // 変換後も続けて入力: 固定した文節 + 未変換の文節 (変換していなければ、表示のまま)。
+        var fixedOnly = !converting && _headCount > 0;
+        if (fixedOnly) TrimToFixedClauses();
+        var text = converting ? string.Concat(_clauses.Select(c => c.Text)) : fixedOnly ? FixedText + CurrentDisplay(final: true) : CurrentDisplay(final: true);
         if (fixEnglish && !converting && _text.Mode == DisplayMode.Auto) text = FixEnglishTypo(text);
         var english = converting ? _clauses.All(c => c.IsEnglish) : _text.IsAlphanumericAt(final: true);
-        var chosen = converting && _clauses.Any(c => c.Changed);
+        var chosen = (converting || fixedOnly) && _clauses.Any(c => c.Changed);
         if (converting) Learn();
-        else LearnLanguage();
+        else
+        {
+            if (fixedOnly) Learn();
+            LearnLanguage();
+        }
         CommitText(text + suffix, english, _text.Raw, chosen);
     }
 
@@ -1670,7 +1801,8 @@ public sealed class CompositionController
     private void LearnConversion()
     {
         if (_converter is not ILearningConverter learner) return;
-        var context = ConversionContext();
+        // 学習する文節の前の文脈。固定した文節があっても、その前 (キャレットの前) の文字列にする。
+        var context = ContextOf(_precedingText);
         var run = new List<ConversionClause>();
         void Flush()
         {
@@ -1696,6 +1828,8 @@ public sealed class CompositionController
     {
         var spaceIntended = _spaceStartedConversion;
         _spaceStartedConversion = false;
+        // 固定した文節を含む確定は、語の単位の判定 (英語とも日本語とも読める語の確定し直し) の対象にしない。
+        var hadFixed = _headCount > 0;
         // 誤変換の報告を調べられるように、打った英字・読み・文節の区切りもログに残す (ログはファイルに書く設定のときだけ保存される)。
         if (!_text.IsEmpty)
         {
@@ -1706,12 +1840,14 @@ public sealed class CompositionController
         _reconvertOriginal = null;
         _converting = false;
         _clauses = [];
+        _headCount = 0;
+        _fixedUnits = [];
         ResetPrediction();
         if (text.Length == 0) return;
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, _followingText);
-        CorrectPreviousCommit(raw, english);
+        if (!hadFixed) CorrectPreviousCommit(raw, english);
         // 英語とも日本語とも読める語を、文脈を決めずに (選び直さずに) 確定したときだけ、後で確定し直せるようにしておく。
-        if (!chosen && _detector.IsAmbiguousWord(raw))
+        if (!hadFixed && !chosen && _detector.IsAmbiguousWord(raw))
         {
             // 前の語の後に Space で区切って続けたときだけつなげる (それ以外は新しい並び)。
             if (_correctable.Count > 0 && !_correctable[^1].SpaceIntended) _correctable.Clear();
@@ -1791,7 +1927,7 @@ public sealed class CompositionController
 
     private void UpdateView()
     {
-        if (_text.IsEmpty)
+        if (_text.IsEmpty && _headCount == 0)
         {
             ClearConversionCaches();
             ResetPrediction();
@@ -1821,7 +1957,17 @@ public sealed class CompositionController
             var hint = _text.IsAlphanumeric ? "Enter 確定　Space 確定+空白　Shift+Space 日本語で変換　半角/全角 日本語に" : "Space 変換　←→ 文節　Enter 確定　F7 カタカナ　F8 半角カナ　F10 英字";
             if (_text.Suggestion() is { } suggestion) hint = $"Tab → {suggestion} (英字に)　" + hint;
             RefreshPredictions();
-            _host.Show(new CompositionView(CurrentDisplay(final: false), [], -1, false, hint, Suggestion: MisspellingSuggestion(),
+            var tail = CurrentDisplay(final: false);
+            if (_headCount > 0)
+            {
+                // 固定した文節 (選んだ変換結果) + 未変換の文節。文節ごとの表示で、最後の 1 つが未変換 (選択中の文節は無し)。
+                var fixedTexts = _clauses.Take(_headCount).Select(c => c.Text).ToList();
+                hint = "Space 変換　←→ 文節　Enter 確定　Esc 変換前の読みに戻す";
+                if (_text.Suggestion() is { } fixedSuggestion) hint = $"Tab → {fixedSuggestion} (英字に)　" + hint;
+                _host.Show(new CompositionView(string.Concat(fixedTexts) + tail, [], -1, false, hint, [.. fixedTexts, tail], -1, Suggestion: MisspellingSuggestion()));
+                return;
+            }
+            _host.Show(new CompositionView(tail, [], -1, false, hint, Suggestion: MisspellingSuggestion(),
                 Predictions: _predictions, SelectedPrediction: _predicting ? _predictionIndex : -1));
         }
     }
@@ -1837,7 +1983,8 @@ public sealed class CompositionController
     private void RefreshPredictions()
     {
         var reading = _text.AllKana(final: false);
-        if (_options.Prediction() && _text.Mode is DisplayMode.Auto or DisplayMode.Hiragana && !_text.IsAlphanumeric && !EndsWithEnglish(final: false) &&
+        // 固定した文節があるときは、予測を出さない (予測を確定すると固定した文節が消えてしまうため)。
+        if (_headCount == 0 && _options.Prediction() && _text.Mode is DisplayMode.Auto or DisplayMode.Hiragana && !_text.IsAlphanumeric && !EndsWithEnglish(final: false) &&
             reading.Length >= _options.PredictionMinLength())
         {
             _predictions = CollectPredictions(reading);

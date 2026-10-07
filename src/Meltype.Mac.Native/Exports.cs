@@ -46,10 +46,18 @@ public static unsafe class Exports
     /// FFI の版数。関数の引数や意味を変えたら上げ、Swift の NativeCore.expectedAbiVersion も同じ値にする
     /// (別の版の libMeltypeNative.dylib が混ざったとき、引数の食い違いで落ちる代わりに初期化を止めるため)。
     /// </summary>
-    public const int AbiVersion = 3;
+    public const int AbiVersion = 4;
 
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
+
+    /// <summary>「変換後も続けて入力できる」が ON なら 1、OFF なら 0。入力メニューのチェック表示用。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_get_continue_after_conversion")]
+    public static int GetContinueAfterConversion() => Config.ContinueAfterConversionSetting.IsOn ? 1 : 0;
+
+    /// <summary>「変換後も続けて入力できる」を切り替えて config.json に保存する。すべての入力欄にすぐ反映される。保存できたら 1、できなければ 0。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_set_continue_after_conversion")]
+    public static int SetContinueAfterConversion(int on) => Config.ContinueAfterConversionSetting.Set(on != 0) ? 1 : 0;
 
     /// <summary>
     /// 学習データ (変換・登録提案・英語/日本語・英訳・ユーザーモデル) をすべて消す。ユーザー辞書と設定は消さない。

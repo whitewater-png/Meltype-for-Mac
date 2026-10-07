@@ -700,3 +700,54 @@ Core の 1 キーあたり (ms)。「末尾」は最後の 10% のキー (一番
 - 区間判定の覚えは、OS のスペルチェッカーの内容が変わったこと (ユーザーが単語を登録したなど) を検知しない。変換ボックスを閉じると捨てるので、次の入力からは反映される。
 - 区切りの境界を越えるキー (新しい区切りができる 1 キー) は、区切り位置を決めるための変換が 1 回増え、80〜100 ms かかることがある。
 
+---
+
+## 追加項目 P17 (変換後も続けて入力)
+
+**要望**: Space で変換したあと (候補を選んでいる状態) に続けて文字を打つと、その時点で変換結果が確定してしまう。続けて打った文字を含めて、編集・変換を続けたい。
+
+**方針 (決定済み)**: 設定 `ContinueAfterConversion` (bool、カテゴリ「1. 全般」、**既定 OFF = 今までの動作**)。Mac は設定画面が無いので、入力メニューのチェック付き項目「変換後も続けて入力できる」で切り替え、`config.json` に保存する。OFF のときの挙動は完全に従来どおり。
+
+### 変更したファイル
+
+| ファイル | 内容 |
+| --- | --- |
+| `src/Meltype.Core/Config/Settings.cs` | `ContinueAfterConversion` を追加 (既定 false なので Migrate・SettingsVersion は不要。古い config.json に項目が無ければ OFF)。書き換え用に、読めないとき null を返す `LoadForUpdate` を追加 |
+| `src/Meltype.Core/Config/ContinueAfterConversionSetting.cs` (新規) | プロセスで 1 つの値 (`IsOn`) と、切り替えて `config.json` に保存する `Set`。読めない config.json は上書きしない |
+| `src/Meltype.Core/Composition/CompositionController.cs` | `CompositionOptions.ContinueAfterConversion` (Func)。固定した文節の扱い (下の「設計」) |
+| `src/Meltype.Core/Composition/CompositionText.cs` | `PrependReading` (固定した文節を変換前の読みに戻すために、先頭に読みを足す) |
+| `src/Meltype.Core/Composition/MeltypeSession.cs` | `CreateDefault` で `ContinueAfterConversion = () => ContinueAfterConversionSetting.IsOn` |
+| `src/Meltype.Mac.Native/Exports.cs` | `meltype_get_continue_after_conversion` / `meltype_set_continue_after_conversion`。`AbiVersion` 3 → 4 |
+| `mac/Sources/MeltypeIME/NativeCore.swift` | 上の 2 関数の呼び出し。`expectedAbiVersion` 3 → 4 |
+| `mac/Sources/MeltypeIME/InputController.swift` | 入力メニューの項目 (チェック付き)。固定した文節 + 未変換の文節の下線表示 |
+| `src/Meltype.Core.Tests/ContinueAfterConversionTests.cs` (新規) | 28 件 (OFF は従来どおり・ON の各操作・設定の切り替え・ABI 版の一致) |
+
+### 設計
+
+- `_clauses` の先頭 `_headCount` 個を「固定した文節」(選んだ候補のまま)、続けて打った文字は空にした `_text` (= 未変換の文節) に入れる。`_text` を共有せず分けたのは、`CompositionText` がローマ字の途中・英単語の区切りの判定で直前の単位までさかのぼって書き換える作りで、変換済みの読みと同じ `_text` に入れると、固定した文節が壊れうるため。
+- 変換中に「文字として入るキー」(ローマ字・かな・記号。数字は候補の選択のまま) が来たとき、`ContinueAfterConversion` が ON なら固定して続きを未変換の文節にする (OFF は `Commit` + `BeginComposition` で従来どおり)。
+- Space = 未変換の文節だけ変換 (最初の文節を選んだ状態)。← → は固定した文節にも戻れる。Shift+←→ は固定した文節と未変換の文節の境目をまたがない。Backspace = 未変換の文節の末尾を消し、空になったら最後の固定した文節の選択に戻る (変換中の Backspace は未変換の文節の変換だけを取り消す)。Enter = 全体を確定 (固定した文節も従来どおり学習: `Learn` / `LearnConversion` / `History`)。Esc = 固定した文節を変換前の読みに戻す (その次の Esc は従来どおり入力を取り消す)。
+- F6〜F10 は未変換の文節にだけかかる。英単語は、未変換の文節の中で別に判定する (固定した文節が日本語でも英語でも)。ライブ変換が ON なら、続けて打った部分も漢字で見える。
+- 変換の文脈 (`PrecedingForConversion`) には固定した文節の文字列も含める。
+
+### 既知の制限
+
+- 固定した文節があるあいだは、予測変換を出さない (予測を確定すると固定した文節が消えるため)。
+- 固定した文節をまたぐ「英語とも日本語とも読める語の確定し直し」(`CorrectPreviousCommit`) はしない。
+- 設定は入力メニューか config.json の手編集 (再起動後に反映) だけ。Windows 版は `CompositionOptions` に配線していないので、設定画面に項目は出るが動かない (Windows 側は `TrayApplicationContext` と `CompositionService` に 1 行ずつ足せば動く)。
+- かな入力 (JIS) の経路は、ローマ字入力と同じ関数を通すが、専用のテストは無い。
+
+### P17 査読後の修正
+
+- **重大**: 固定した文節の Shift+← で、後ろが英語の文節のとき、新しい文節を固定した側の途中に足すのに `_headCount` を増やしておらず、最後の固定した文節 (で検索) が未変換の側に押し出されて捨てられていた。`Resize` で、足した位置が固定した側なら `_headCount` を増やすようにした (縮めを禁止するより、固定した文節どうしの区切り直しが従来どおりできるほうが自然なため)。再現のキー列 (`kyouhagoogledekensaku` → Space → `ta` → ← ×4 → Shift+←) で、Backspace・Esc・F7・Space のあとも欠けないテストと、固定した文節への Shift+←→ をランダムに繰り返して読みの連結が変わらないことを確かめるテストを追加。
+- Esc で戻すとき、固定する前に打っていた単位 (打った英字つき) を戻すようにした。OFF の Space → Esc → F10 と同じく `tanniwotoru` に戻る。
+- Esc で、未変換の文節だけに効かせていた表示モード (F7 など) を Auto に戻す。
+- 設定の保存に失敗したときのダイアログを専用のタイトル「設定を保存できませんでした」にした。
+- `docs/USAGE.md` に説明を追記。
+
+### P17 の既知の制限 (追加。対応しない)
+
+- プロファイルの共通項目 (SharedKeys) には入れていない。プロファイルを切り替えると、プロファイルに保存した値に戻りうる (Mac はプロファイルを使わない)。
+- 周辺文脈のコールバックが固定したあとに届くと、その分は文脈に反映されない。
+- 保存は設定を読み直して書き直すので、config.json の未知のキー・コメントは残らない。
+- 保存はロックの中でファイルを書くので、遅いディスクでは切り替えが一瞬待つ。

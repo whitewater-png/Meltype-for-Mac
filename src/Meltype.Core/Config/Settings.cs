@@ -179,6 +179,10 @@ public sealed class Settings
      Description("Keyboard モードで、Space を押さなくても打ったそばから漢字に変換して表示します。")]
     public bool LiveConversion { get; set; } = true;
 
+    [Category("1. 全般"), DisplayName("変換後も続けて入力できる"),
+     Description("Space で変換したあと、続けて文字を打っても確定せず、打った文字を含めて編集・変換を続ける。OFF のときは、今までどおり変換した結果を確定して新しい入力を始めます。現在は Mac 版だけで動きます (入力メニューの「変換後も続けて入力できる」で切り替え)。")]
+    public bool ContinueAfterConversion { get; set; }
+
     [Category("1. 全般"), DisplayName("変換エンジン"),
      Description("かな漢字変換に使うエンジン。「両方」は Mozc (Google 日本語入力のオープンソース版) で変換し、Mozc が使えないときは Microsoft IME で変換します。候補には両方の候補が出ます。")]
     public ConversionEngine ConversionEngine { get; set; } = ConversionEngine.Hybrid;
@@ -590,6 +594,29 @@ public sealed class Settings
         }
         SettingsVersion = CurrentVersion;
         return true;
+    }
+
+    /// <summary>
+    /// 設定を読んで書き換えるために読む。<see cref="Load"/> と違い、読めないとき (大きすぎる・壊れている) は null を返す
+    /// (既定値で上書きして、元の設定を失わないため)。ファイルが無ければ既定値。
+    /// </summary>
+    internal static Settings? LoadForUpdate(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return new Settings();
+            if (SafeFile.ReadAllText(path) is not { } json) return null;
+            var settings = JsonSerializer.Deserialize<Settings>(json, JsonOptions);
+            if (settings is null) return null;
+            if (!json.Contains(nameof(SettingsVersion))) settings.SettingsVersion = 1;
+            settings.Migrate();
+            return settings.Normalize();
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Warn($"config.json を読めないので書き換えません: {ex.Message}");
+            return null;
+        }
     }
 
     public static Settings Load(string path)
