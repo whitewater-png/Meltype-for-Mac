@@ -1,78 +1,110 @@
-# Meltype
+# Meltype for Mac
 
-**雪解けのように、半角/全角の壁を溶かす日本語入力。**
+**雪解けのように、半角/全角の壁を溶かす日本語入力 — Mac 版。**
 
-半角/全角 キーを押さなくても、日本語と英語を打ち分けられるようにする Windows 常駐ツールです。
-(開発中は AutoIME という仮の名前でした。以前の設定と学習データは、Meltype の初回起動時に自動で引き継ぎます)
+Mac の標準的な IME の仕組み (Input Method Kit) で動く Meltype です。「英数」「かな」を切り替えなくても、ローマ字のまま日本語と英語を打ち分けられます。
+英単語 (`google` `github` …) は英字のまま、英語とも日本語とも読める語は前後の文脈で判定します。メニューバーの入力メニューに、ふつうの日本語入力として表示されます。
 
-Windows 版のほか、Mac 版・Linux 版のプレビュー版があります ([mac/README.md](mac/README.md)。Linux 版は IBus のエンジン)。プレビュー版は、まだ一部の機能が無く、動きも変わることがあります。
+このリポジトリは、雪代 / Yukishiro さんの [Meltype](https://github.com/yksr-melt/Meltype) (Windows 版が本家) をもとにした **Mac 版の開発リポジトリ**です。判定・変換の中核 (`src/Meltype.Core`) は本家と共通で、Mac 用の IME (Swift) と、Mac 向けの機能追加を加えています。
+
+> テスト版です。動かないところがあれば、[Issues](https://github.com/whitewater-png/Meltype-for-Mac/issues) から教えてください。
+> 「どのアプリで」「何と打って」「どうなったか」(できればスクリーンショット) があると助かります。
 
 ## できること
 
-- 半角/全角 キーを押さずに、ローマ字のまま日本語と英語を混ぜて打てます (`kyouhagoogledekensaku` → 今日はgoogleで検索)
-- 日本語は変換ボックスでかな・漢字に変換し、英単語 (`google` `github` `hello` …) は自動で英字のまま
-- 英文 (`I want to go to the park`) も、そのまま打てます
-- 絵文字・顔文字の変換 (えがお → 😊)、よくある書き間違いの指摘 (ブレスレッド → ブレスレット)
-- VS Code やターミナルでは基本は英数、コメントや文字列の中だけ日本語
-- 打った内容をネットワークに送りません。判定・変換はすべて PC の中で行います
+### 日本語と英語の自動判定
+- 半角/全角を切り替えずに、ローマ字のまま日本語と英語を混ぜて打てます (`kyouhagoogledekensaku` → 今日はgoogleで検索)
+- 英文 (`I want to go to the park`) もそのまま打てます
+- 絵文字・顔文字の変換 (えがお → 😊)、よくある書き間違いの指摘
+- 打った内容をネットワークに送りません。判定・変換はすべて Mac の中で行います
+
+### Mac 版で実装した機能
+- **F6〜F10 の表示切り替え**: F6 ひらがな / F7 カタカナ / **F8 半角カナ** / F9 全角英数 / F10 半角英数。変換中でも使えます
+- **Ctrl キーの代替**: F キーが macOS のショートカットに取られる場合に備えて、変換ボックスが出ているときは Ctrl キーでも同じ操作ができます (Apple 日本語入力と同じ割り当て)
+  | Ctrl + | 動作 |
+  | --- | --- |
+  | J | ひらがな |
+  | K | カタカナ |
+  | ; | 半角カナ |
+  | L | 全角英数 |
+  | ' (JIS は :) | 半角英数 |
+- **「英数 (Meltype)」入力モード**: 入力メニューに「Meltype」と「英数 (Meltype)」の 2 つが並びます。JIS キーボードの「英数」「かな」キー、**Caps Lock**、入力メニューで切り替えられます (US 配列は Caps Lock か入力メニュー)
+- **予測変換**: ひらがなを 2 文字以上打つと、候補ウィンドウに予測が出ます。**Tab** で予測に入り、↓↑ で選び、**Enter** で確定します。英語と判定した語には出ません。出どころは、ユーザー辞書・azooKey の予測・変換履歴の 3 つです。よく使う語・最近使った語ほど上に出ます (回数が 30 日で半分に減る重み付け)
+- **候補の数字キー選択**: 変換中に **1〜9** で候補を選んで確定、**PageUp / PageDown** で 9 個ずつ移動
+- **学習**: 選び直した候補を覚えます。azooKey の学習も有効で、使うほど文節の区切りと候補の順が良くなります (`~/Library/Application Support/Meltype/` に保存)
+- **ユーザー辞書への登録**: 入力メニューの「選択中の文字をユーザー辞書に登録…」で、選択した文字と読みを登録できます
+- **辞書への登録提案**: 同じ語を選び直して 3 回確定すると、入力メニューに「『語』を辞書に登録」が出ます。「登録しない」を選んだ語は二度と提案しません。提案の履歴は入力メニューから消去できます
+- **確定後の再変換**: 確定した文字を選択して **Shift + Space** を押すと、読みに戻して変換し直します (Esc を 2 回で元の文字に戻ります)
+- **句読点・記号の設定**: 「、。」「，．」「，。」の選択と、`! ? ~` などを全角にするかどうかを設定できます
+- **アプリ別の挙動**: Terminal・iTerm2・VS Code・Cursor・Xcode・JetBrains 系などのコード向けアプリでは、英数 (直接入力) から始まります。アプリ別設定で OFF にしたアプリでは、Meltype はキーを一切処理しません
 
 ## インストール
 
-1. [Releases](https://github.com/yksr-melt/Meltype/releases) から `Meltype-<version>-windows.zip` をダウンロードして展開する
-   (Mac 版は `Meltype-<version>-mac.zip`、Linux 版は `Meltype-<version>-linux.zip`。どちらもプレビュー版)
-2. `Install.cmd` をダブルクリックする (管理者権限は不要)
-   - Meltype はコード署名をしていないので、「Windows によって PC が保護されました」と出ることがあります。「詳細情報」→「実行」で入れられます。
-   - キーボードの入力を受け持つソフトなので、ウイルス対策ソフトが誤って止めることがあります。そのときは、お使いのウイルス対策ソフトで Meltype のフォルダーを許可してください。
-   - ダウンロードした zip が本物か確かめたいときは、リリースのページに出ている SHA-256 と比べてください (PowerShell: `Get-FileHash .\Meltype-<version>-windows.zip`)。
-3. タスクトレイに「あ」のアイコンが出れば動いています。Windows の起動時にも自動で起動します。
+### 配布版 (zip)
+1. [Releases](https://github.com/whitewater-png/Meltype-for-Mac/releases) から `Meltype-mac-<version>.zip` をダウンロードして展開する
+2. 「Install Meltype.command」をダブルクリックする
+   - 「開発元が未確認のため開けません」と出たら、右クリック (control + クリック) →「開く」→「開く」
+   - macOS 15 以降は、一度ダブルクリックしてから システム設定 → プライバシーとセキュリティ → 下のほうの「このまま開く」
+3. メニューバーの入力メニューで Meltype を選ぶ。出ていないときは、いったんログアウトしてログインし直す (それでも出ないときは、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype を追加)
 
-1.0.0 以降は、新しい版が出ると自動で更新します (トレイのアイコンを右クリック →「更新」→「自動で更新する」で止められます)。
-アンインストールは、トレイの Meltype のアイコンを右クリック →「アンインストール...」か、Windows の「設定」→「アプリ」→「インストールされているアプリ」で Meltype の「…」→「アンインストール」を選びます (設定と学習データも消えます)。zip の中の `Uninstall.cmd` をダブルクリックしても同じです。
+必要なもの: **macOS 13 以降、Apple シリコン (M1 以降)** の Mac。署名は ad-hoc で、Apple の公証は受けていません。
 
-必要なもの: Windows 10 / 11 (64bit)、Microsoft IME (Windows 標準の日本語入力)。.NET は同梱しているので、別に入れる必要はありません。
+新しい版に入れ替えるときも、同じ手順です。`~/Library/Input Methods/Meltype.app` を自分で消して入れ直さないでください (ログアウトするまで入力メニューに出なくなります)。
+
+### ソースからビルドする
+必要なもの: Xcode またはコマンドラインツール (`xcode-select --install`)、.NET 10 SDK。
+
+```bash
+cd mac
+./build.sh
+```
+
+詳しい手順とトラブルシューティングは [mac/README.md](mac/README.md) を見てください。
 
 ## 使い始める
 
 メモ帳やブラウザーの入力欄で、IME を気にせずそのままローマ字で打ってください。
 
-- 日本語はかなで、英単語は英字のまま、カーソルの下の変換ボックスに出ます
-- **Enter** で確定、**Space** で漢字に変換 (英単語のときは確定して空白)
-- 変換中は ← → で文節を選び、Space / ↓ で候補を切り替え
-- **F7** でカタカナ、**F8** で半角カナ、**F10** で英字。英字にして確定した語は、次から英字になります
-- **半角/全角** で英数 (そのまま入力) ⇔ 日本語、**Ctrl + 半角/全角** で Meltype 自体の一時停止 / 再開
-- よく使う言葉は、トレイのアイコンを右クリック →「ユーザー辞書...」で登録できます
+- 日本語はかなで、英単語は英字のまま、下線付きの変換ボックスに出ます
+- **Space** で漢字に変換 (候補の一覧が出ます)、**Enter** で確定、← → で文節を選択、**Esc** で取り消し
+- 設定・学習データ・ユーザー辞書は `~/Library/Application Support/Meltype/` にあります (入力メニューの「Meltype のデータフォルダを開く」から開けます)。設定は `config.json` を直接編集します
 
-詳しい使い方 (キー操作・判定の強さ・かな入力・コードエディター・設定など) は [docs/USAGE.md](docs/USAGE.md) にあります。
+詳しいキー操作・判定の強さは [docs/USAGE.md](docs/USAGE.md) にあります (Windows 版の項目も含みます)。
 
 ## よくある質問
 
-**タスクバーの IME の表示がずっと「A」のまま**
-Meltype が Windows の IME を OFF にして、代わりに入力を受け持っているためです (故障ではありません)。今のモードは、入力欄に入ったときにカーソルの近くに出る「あ」「A」か、タスクトレイの Meltype のアイコンで分かります。
+**F9 などのキーが効かない**
+macOS が F キーをショートカットに使っています。システム設定 → キーボード → キーボードショートカットで割り当てを外すか、上の Ctrl キーを使ってください。
 
-**Google 日本語入力など、ほかの IME も使いたい**
-Ctrl + 半角/全角 で Meltype を一時停止してから使ってください。
+**「英数 (Meltype)」が入力メニューに出ない**
+いったんログアウトしてログインし直してください。
 
 **英語のつもりがかなになった / かなのつもりが英字になった**
-F10 (英字) / F6 (ひらがな) で直して確定すると、次からその語は直した方になります。トレイの右クリック →「自動判定の強さ」でも調整できます。
+F10 (英字) / F6 (ひらがな) で直して確定すると、次からその語は直した方になります。
 
-**おかしな動きを見つけた**
-トレイのアイコンを右クリック →「不具合の報告・提案...」から報告できます。「どのアプリで」「何と打って」「どうなったか」を書いてもらえると助かります。
+**動きがおかしい・止まった**
+`pkill -x Meltype` で止められます (次にキーを打つと macOS が起動し直します)。ログは `log stream --predicate 'process == "Meltype"' --level debug` で見られます。
 
 ## プライバシー
 
-Meltype はキーボードの入力を監視して動くツールですが、打った内容をネットワークに送ることはありません。 セキュリティの方針と脆弱性の報告先は [SECURITY.md](SECURITY.md)。通信するのは、自動更新で GitHub に新しい版があるかを確かめるとき (送るのは今の版だけ) と、自分で開いた不具合報告のフォームだけです。
-保存するのは `%LOCALAPPDATA%\Meltype` の設定・学習データ・ユーザー辞書と、ファイルログを ON にしたときのログだけです。
+Meltype は打った内容をネットワークに送りません。変換・学習・辞書の登録提案はすべて Mac の中だけで行い、保存するのは `~/Library/Application Support/Meltype/` の設定・学習データ・ユーザー辞書だけです。
+学習の提案用の履歴 (`suggest.json`) には、「読み」「語」「回数」だけを保存し、前後の文章は保存しません。
+
+## 仕組み
+
+| 部分 | 中身 |
+| --- | --- |
+| IME 本体 (`mac/Sources/MeltypeIME`, Swift) | Input Method Kit でキーを受け取り、変換中の文字・候補の一覧・確定を入力欄に反映する |
+| 判定の本体 (`src/Meltype.Mac.Native`) | 英語 / 日本語の判定・ローマ字・変換の流れ・学習・辞書を持つ共通の C# の部分 (`src/Meltype.Core`) を、NativeAOT で Mac 用のライブラリにしたもの |
+| 漢字変換 | [azooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter) の変換エンジン (MIT License、辞書付き) |
+| 英単語の判定 | macOS のスペルチェッカー (英語) |
 
 ## ライセンス
 
-Meltype は **GNU General Public License v3.0** ([LICENSE](LICENSE)) で公開しています。
+Meltype は **GNU General Public License v3.0** ([LICENSE](LICENSE)) で公開されています。本リポジトリも同じ条件で、改造版もソースを公開する条件で自由に使えます。
+GPL v3 の条件で使えない場合は、本家の作者にご相談ください。貢献の方法と貢献者ライセンス同意 (CLA) は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
-- 個人・会社でそのまま使う、GPL v3 の条件 (改造版もソースを公開) で改造・再配布する → 無料で自由に使えます
-- GPL v3 の条件で使えない場合 (製品に組み込んでソースを公開せずに配布したいなど、非公開で利用したい場合) は、メールでご相談ください: ibutya0319@gmail.com
-
-貢献の方法と貢献者ライセンス同意 (CLA) は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
-
-ソースファイルの先頭には `SPDX-License-Identifier: GPL-3.0-or-later` を付けています。配布用パッケージに同梱している .NET ランタイム (MIT ライセンス) と、実行時に使う Windows の機能は [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) を参照してください。アプリのバージョン・著作権・ライセンスは、トレイの「Meltype について...」で確認できます。
+使っているライブラリのライセンスは [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) にあります。
 
 ```
 Meltype
@@ -87,20 +119,7 @@ even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE
 General Public License for more details.
 ```
 
-## 協力してくださった方々
-
-テスト版を使って、不具合の報告や意見をくださった方々です。ありがとうございました (敬称略)。
-
-- くらいど！ ([@Kuraido8888](https://x.com/Kuraido8888))
-- しぐれ ([@Akisameee0465](https://x.com/Akisameee0465))
-- 琴音Link
-- あげちゃ
-- うな ([@una08142009](https://x.com/una08142009))
-- かふぇらて ([@cafely_latte](https://x.com/cafely_latte))
-- ウパー ([@upah_setu](https://x.com/upah_setu))
-- Ray
-- うぽつです ([@up2ds](https://x.com/up2ds))
-
 ## 開発に参加する
 
-ソースからのビルド・テスト・動作の仕組みは [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)、不具合の報告・辞書の追加・Pull Request の送り方は [CONTRIBUTING.md](CONTRIBUTING.md) を見てください。
+ソースからのビルド・テスト・動作の仕組みは [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)、Mac 版の実装計画と実装済みの内容は [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) を見てください。
+本家 (Windows 版) の情報は <https://github.com/yksr-melt/Meltype> にあります。
