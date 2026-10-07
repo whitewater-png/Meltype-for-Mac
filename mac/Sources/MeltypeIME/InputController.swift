@@ -276,29 +276,45 @@ final class MeltypeInputController: IMKInputController {
                 }
             }
         }
-        let alert = NSAlert()
-        alert.messageText = "ユーザー辞書に登録"
-        alert.informativeText = "読み (ひらがな 2 文字以上) と単語を入力してください。登録すると次の変換から効きます。"
-        let readingField = NSTextField(frame: NSRect(x: 0, y: 28, width: 260, height: 24))
-        readingField.placeholderString = "読み (ひらがな)"
-        let wordField = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-        wordField.placeholderString = "単語"
-        wordField.stringValue = selected
-        let box = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 52))
-        box.addSubview(readingField)
-        box.addSubview(wordField)
-        alert.accessoryView = box
-        alert.addButton(withTitle: "登録")
-        alert.addButton(withTitle: "キャンセル")
-        alert.window.initialFirstResponder = readingField
-        // IME は背面のアプリなので、ダイアログを前に出す。
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        if let error = NativeCore.shared.addUserWord(session, reading: readingField.stringValue, word: wordField.stringValue) {
-            let failure = NSAlert()
-            failure.messageText = "登録できませんでした"
-            failure.informativeText = error
-            failure.runModal()
+        // IME は背面専用のアプリ (LSBackgroundOnly) なので、自分のウィンドウは入力欄がキーボード入力を受けられない。
+        // そのため、入力は別プロセスの osascript のダイアログで受ける。
+        // 待っている間も、ダイアログへ打つキーをこの IME が処理する必要があるので、メインスレッドは止めない (非同期で順に聞く)。
+        askText(prompt: "登録する単語を入力してください", defaultText: selected) { [weak self] word in
+            guard let self, let word, !word.isEmpty else { return }
+            self.askText(prompt: "「\(word)」の読み (ひらがな 2 文字以上) を入力してください", defaultText: "") { [weak self] reading in
+                guard let self, let reading else { return }
+                if let error = NativeCore.shared.addUserWord(self.session, reading: reading, word: word) {
+                    self.showSelectionError(error)
+                }
+            }
+        }
+    }
+
+    /// osascript のダイアログで 1 行の文字を聞く。キャンセル・失敗のときは nil。メインスレッドを止めずに、メインスレッドで completion を呼ぶ。
+    /// 文字は AppleScript のソースに埋め込まず引数 (argv) で渡すので、入力した文字が命令として解釈されることはない。
+    private func askText(prompt: String, defaultText: String, completion: @escaping (String?) -> Void) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = [
+            "-e", "on run argv",
+            "-e", "set answer to display dialog (item 1 of argv) default answer (item 2 of argv) with title \"Meltype: ユーザー辞書に登録\" buttons {\"キャンセル\", \"登録\"} default button \"登録\" cancel button \"キャンセル\"",
+            "-e", "return text returned of answer",
+            "-e", "end run",
+            "--", prompt, defaultText,
+        ]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        process.terminationHandler = { finished in
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            DispatchQueue.main.async { completion(finished.terminationStatus == 0 ? text : nil) }
+        }
+        do {
+            try process.run()
+        } catch {
+            NSLog("Meltype: osascript を起動できませんでした")
+            completion(nil)
         }
     }
 
