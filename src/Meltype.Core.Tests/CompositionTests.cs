@@ -613,6 +613,17 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Candidates_OtokoNoKo_IncludesMusume()
+    {
+        // おとこのこ → 男の子 だけでなく 男の娘 も変換候補に出す (既定の候補辞書)
+        var dictionary = CandidateDictionary.Load(null);
+        var words = dictionary.Lookup("おとこのこ");
+        Assert.True(words.Contains("男の子"), "おとこのこ → 男の子");
+        Assert.True(words.Contains("男の娘"), "おとこのこ → 男の娘");
+        Assert.True(dictionary.Lookup("おとこのこが").Contains("男の娘が"), "助詞が付いても 男の娘が");
+    }
+
+    [Test]
     public static void CandidateMeaning_FromTranslations()
     {
         // 候補で止まったら意味を出す (同音異義語の手がかり)
