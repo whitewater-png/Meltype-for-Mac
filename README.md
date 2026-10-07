@@ -158,7 +158,26 @@ even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE
 General Public License for more details.
 ```
 
+## リポジトリの構成 (Mac で使うもの / 使わないもの)
+
+このリポジトリは、本家 Meltype (Windows 版・Linux 版を含む) のソースをもとにしているため、Mac では使わないファイルも残っています。**Mac 版を使う・作るときは、`mac/` フォルダーのスクリプトと説明書を使ってください。**
+`./build.sh`、`install.sh`、`uninstall.sh`、`make-pkg.sh` などは、すべて `mac/` の中にあります。トップにある `.ps1` や、`docs/` の Windows 向けのコマンドは、Mac では使いません。
+
+| 場所 | 中身 | Mac での扱い |
+| --- | --- | --- |
+| `mac/` | Mac 版 IME (Swift)、`build.sh`・`install.sh`・`uninstall.sh`・`make-pkg.sh`・`make-zip.sh`、`README.md`、`INSTALL.txt` | **使う** |
+| `src/Meltype.Core/` | 英語 / 日本語の判定・変換・学習・辞書 (Windows / Linux と共通) | **使う** (NativeAOT で Mac 用のライブラリになる) |
+| `src/Meltype.Mac.Native/` | Core を Mac の Swift から呼ぶための橋渡し | **使う** |
+| `src/Meltype.Core.Tests/` | Core のテスト (`dotnet run --project src/Meltype.Core.Tests`) | **使う** |
+| `dictionaries/` | 辞書データ (Core に埋め込まれる) | **使う** |
+| `tools/` | 辞書データを作るスクリプト (Node) | 辞書を作り直すときだけ |
+| `src/Meltype/`、`src/Meltype.Tests/` | Windows 版のアプリとそのテスト | 使わない |
+| `Build-Package.ps1`、`Install-Meltype.ps1`、`Uninstall-Meltype.ps1`、`packaging/` | Windows 版のビルドとインストール | 使わない |
+| `linux/`、`native/mozc/` | Linux 版 (IBus) と、Windows / Linux 用の Mozc 変換 | 使わない |
+| `docs/DEVELOPMENT.md`、`docs/USAGE.md` | 本家 (主に Windows 版) の開発・使い方 | 参考程度 (Mac 版の手順は `mac/README.md`) |
+| `docs/IMPROVEMENT_PLAN.md` | Mac 版の実装計画と、実装済みの内容 | 参考 |
+
 ## 開発に参加する
 
-ソースからのビルド・テスト・動作の仕組みは [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)、Mac 版の実装計画と実装済みの内容は [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) を見てください。
+Mac 版のビルド・インストール・トラブルシューティングは [mac/README.md](mac/README.md)、実装計画と実装済みの内容は [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) を見てください。本家 (主に Windows 版) の開発手順は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) にありますが、コマンドは Windows 向けです。
 本家 (Windows 版) の情報は <https://github.com/yksr-melt/Meltype> にあります。
