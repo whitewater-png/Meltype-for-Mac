@@ -1,0 +1,315 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Yukishiro
+#
+# Meltype の Linux 版 (IBus の入力エンジン)。キーを受け取って Meltype の本体 (libMeltypeNative.so、
+# Windows 版と共通の C# の部分を NativeAOT にしたもの) に渡し、返ってきた結果 (確定する文字・変換中の文字・候補) を
+# 入力欄に出す。漢字変換は Mozc の変換ヘルパー (meltype_mozc_helper) を本体が呼ぶ。
+#   ibus-engine-meltype --ibus   IBus から起動されるとき (コンポーネントの <exec>)
+import ctypes
+import json
+import os
+import subprocess
+import sys
+
+import gi
+
+gi.require_version("IBus", "1.0")
+from gi.repository import GLib, GObject, IBus  # noqa: E402
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+
+# ---- 本体 (libMeltypeNative.so) ----
+
+_lib = ctypes.CDLL(os.path.join(HERE, "libMeltypeNative.so"))
+_lib.meltype_init_mozc.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+_lib.meltype_init_mozc.restype = ctypes.c_int
+_lib.meltype_create.restype = ctypes.c_void_p
+_lib.meltype_destroy.argtypes = [ctypes.c_void_p]
+_lib.meltype_handle_key.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p]
+_lib.meltype_handle_key.restype = ctypes.c_void_p
+_lib.meltype_commit.argtypes = [ctypes.c_void_p]
+_lib.meltype_commit.restype = ctypes.c_void_p
+_lib.meltype_select_candidate.argtypes = [ctypes.c_void_p, ctypes.c_int]
+_lib.meltype_select_candidate.restype = ctypes.c_void_p
+_lib.meltype_set_direct.argtypes = [ctypes.c_void_p, ctypes.c_int]
+_lib.meltype_free.argtypes = [ctypes.c_void_p]
+_lib.meltype_report_url.argtypes = [ctypes.c_char_p]
+_lib.meltype_report_url.restype = ctypes.c_void_p
+
+
+def _report_url():
+    """不具合報告を開く URL (OS・版・実行環境を入れたもの)。"""
+    pointer = _lib.meltype_report_url(b"Linux")
+    if not pointer:
+        return "https://github.com/yksr-melt/Meltype/issues/new/choose"
+    try:
+        return ctypes.string_at(pointer).decode("utf-8")
+    finally:
+        _lib.meltype_free(pointer)
+
+if not _lib.meltype_init_mozc(os.path.join(HERE, "mozc", "meltype_mozc_helper").encode(), None):
+    print("Meltype: Mozc を使えません (漢字変換はひらがなのままになります)", file=sys.stderr)
+
+
+def _result(pointer):
+    """本体が返した JSON (SessionResult) を読んで解放する。NULL なら None (キーはアプリに渡す)。"""
+    if not pointer:
+        return None
+    try:
+        return json.loads(ctypes.string_at(pointer).decode("utf-8"))
+    finally:
+        _lib.meltype_free(pointer)
+
+
+# ---- キー: IBus のキー (keyval) → Meltype の本体が使う Windows の仮想キーコード ----
+
+# 文字を入力するキーで、特別な扱いのないもの (記号など)。本体では文字だけを見る。
+OTHER_CHARACTER_KEY = 0x07
+
+SPECIAL_KEYS = {
+    IBus.KEY_Return: 0x0D, IBus.KEY_KP_Enter: 0x0D, IBus.KEY_Tab: 0x09, IBus.KEY_space: 0x20,
+    IBus.KEY_BackSpace: 0x08, IBus.KEY_Delete: 0x2E, IBus.KEY_Escape: 0x1B,
+    IBus.KEY_Left: 0x25, IBus.KEY_Up: 0x26, IBus.KEY_Right: 0x27, IBus.KEY_Down: 0x28,
+    IBus.KEY_Home: 0x24, IBus.KEY_End: 0x23, IBus.KEY_Page_Up: 0x21, IBus.KEY_Page_Down: 0x22,
+    IBus.KEY_F6: 0x75, IBus.KEY_F7: 0x76, IBus.KEY_F8: 0x77, IBus.KEY_F9: 0x78, IBus.KEY_F10: 0x79,
+}
+
+SYMBOL_KEYS = {",": 0xBC, ".": 0xBE, "-": 0xBD, "/": 0xBF, "[": 0xDB, "]": 0xDD}
+
+
+def virtual_key(keyval):
+    """(仮想キーコード, 入力する文字) を返す。Meltype が扱わないキーなら (None, 0)。"""
+    if keyval in SPECIAL_KEYS:
+        return SPECIAL_KEYS[keyval], (0x20 if keyval == IBus.KEY_space else 0)
+    character = IBus.keyval_to_unicode(keyval)
+    if not character or ord(character) < 0x20:
+        return None, 0
+    lower = character.lower()
+    if "a" <= lower <= "z":
+        return ord(lower) - 0x20, ord(character)
+    if "0" <= character <= "9":
+        return ord(character), ord(character)
+    return SYMBOL_KEYS.get(character, OTHER_CHARACTER_KEY), ord(character)
+
+
+# ---- 入力エンジン ----
+
+class MeltypeEngine(IBus.Engine):
+    __gtype_name__ = "MeltypeEngine"
+
+    def __init__(self):
+        super().__init__()
+        self._session = _lib.meltype_create()
+        self._direct = False
+        self._preedit_visible = False
+        self._lookup = IBus.LookupTable.new(9, 0, True, True)
+        self._lookup.set_orientation(IBus.Orientation.VERTICAL)
+        self._candidates = []
+        # 候補で少し (1.5 秒) 止まったら、その候補の意味を補助テキストに出す (Windows 版と同じ)
+        self._meaning_key = None
+        # 入力メソッドのメニュー (GNOME の入力ソースのメニューなど) に出す項目
+        self._properties = IBus.PropList()
+        self._properties.append(IBus.Property(key="report", label=IBus.Text.new_from_string("不具合の報告・提案… (Linux 版はプレビュー版です)"),
+                                              type=IBus.PropType.NORMAL, sensitive=True, visible=True))
+
+    # IBus からの呼び出し
+
+    def do_process_key_event(self, keyval, keycode, state):
+        if state & IBus.ModifierType.RELEASE_MASK or not self._session:
+            return False
+        # 半角/全角: 英数 (直接入力) ⇔ 日本語。英数・ひらがなのキーでも切り替える (JIS キーボード)。
+        if keyval in (IBus.KEY_Zenkaku_Hankaku, IBus.KEY_Hankaku, IBus.KEY_Zenkaku, IBus.KEY_Eisu_toggle, IBus.KEY_Hiragana_Katakana, IBus.KEY_Muhenkan, IBus.KEY_Henkan):
+            to_direct = keyval in (IBus.KEY_Eisu_toggle, IBus.KEY_Muhenkan) or (keyval in (IBus.KEY_Zenkaku_Hankaku, IBus.KEY_Hankaku, IBus.KEY_Zenkaku) and not self._direct)
+            self._apply(_result(_lib.meltype_commit(self._session)))
+            self._direct = to_direct
+            _lib.meltype_set_direct(self._session, 1 if to_direct else 0)
+            return True
+        vk, character = virtual_key(keyval)
+        if vk is None:
+            return False
+        modifiers = 0
+        if state & IBus.ModifierType.SHIFT_MASK:
+            modifiers |= 1
+        if state & IBus.ModifierType.CONTROL_MASK:
+            modifiers |= 2
+        if state & IBus.ModifierType.MOD1_MASK:
+            modifiers |= 4
+        if state & (IBus.ModifierType.SUPER_MASK | IBus.ModifierType.MOD4_MASK):
+            modifiers |= 8
+        before, after = (None, None) if self._preedit_visible else self._surrounding_text()
+        result = _result(_lib.meltype_handle_key(
+            self._session, vk, character, modifiers,
+            before.encode() if before is not None else None,
+            after.encode() if after is not None else None))
+        if result is None:
+            return False
+        self._apply(result)
+        return bool(result.get("consumed"))
+
+    def do_focus_out(self):
+        # 別の入力欄・アプリに移るときは、未確定の内容をそのまま確定する。
+        if self._session:
+            self._apply(_result(_lib.meltype_commit(self._session)))
+
+    def do_focus_in(self):
+        self.register_properties(self._properties)
+
+    def do_property_activate(self, prop_name, state):
+        if prop_name == "report":
+            try:
+                subprocess.Popen(["xdg-open", _report_url()])
+            except OSError as error:
+                print(f"Meltype: 報告の画面を開けませんでした: {error}", file=sys.stderr)
+
+    def do_reset(self):
+        self.do_focus_out()
+
+    def do_disable(self):
+        self.do_focus_out()
+
+    def do_candidate_clicked(self, index, button, state):
+        if not self._session:
+            return
+        page = self._lookup.get_cursor_pos() // self._lookup.get_page_size()
+        self._apply(_result(_lib.meltype_select_candidate(self._session, page * self._lookup.get_page_size() + index)))
+
+    def do_destroy(self):
+        if self._session:
+            _lib.meltype_destroy(self._session)
+            self._session = None
+        IBus.Engine.do_destroy(self)
+
+    # 結果を入力欄に出す
+
+    def _apply(self, result):
+        if not result:
+            return
+        for edit in result.get("commits", []):
+            self._hide_preedit()
+            if edit.get("deleteBefore", 0) > 0:
+                # 確定し直し: キャレットの前の文字を消してから入れる (入力欄が対応していれば)。
+                self.delete_surrounding_text(-edit["deleteBefore"], edit["deleteBefore"])
+            if edit.get("text"):
+                self.commit_text(IBus.Text.new_from_string(edit["text"]))
+        view = result.get("view")
+        if view:
+            self._show_preedit(view)
+            self._show_candidates(view)
+        else:
+            self._hide_preedit()
+            self._hide_candidates()
+
+    def _show_preedit(self, view):
+        text = view.get("text", "")
+        attributes = IBus.AttrList()
+        clauses = view.get("clauses") or []
+        if view.get("converting") and clauses:
+            # 変換中: 文節ごとに下線。選んでいる文節は背景を付ける。
+            position = 0
+            for index, clause in enumerate(clauses):
+                end = position + len(clause)
+                attributes.append(IBus.attr_underline_new(IBus.AttrUnderline.SINGLE, position, end))
+                if index == view.get("selectedClause", -1):
+                    attributes.append(IBus.attr_background_new(0x4CA0FF, position, end))
+                    attributes.append(IBus.attr_foreground_new(0xFFFFFF, position, end))
+                position = end
+        elif text:
+            attributes.append(IBus.attr_underline_new(IBus.AttrUnderline.SINGLE, 0, len(text)))
+        preedit = IBus.Text.new_from_string(text)
+        preedit.set_attributes(attributes)
+        # フォーカスが外れたら、変換中の文字をそのまま確定する (COMMIT)。
+        self.update_preedit_text_with_mode(preedit, len(text), bool(text), IBus.PreeditFocusMode.COMMIT)
+        self._preedit_visible = bool(text)
+        # 案内 (Space で変換 など) は補助テキストに出す
+        hint = view.get("hint") or ""
+        # もしかして (書き間違い) は案内の先頭に出す (Tab で直せる)
+        if view.get("suggestion"):
+            hint = view["suggestion"] + "　" + hint
+        if hint:
+            self.update_auxiliary_text(IBus.Text.new_from_string(hint), True)
+        else:
+            self.hide_auxiliary_text()
+
+    def _hide_preedit(self):
+        if self._preedit_visible:
+            self.update_preedit_text_with_mode(IBus.Text.new_from_string(""), 0, False, IBus.PreeditFocusMode.CLEAR)
+            self._preedit_visible = False
+        self.hide_auxiliary_text()
+
+    def _show_candidates(self, view):
+        candidates = view.get("candidates") or []
+        if not (view.get("converting") and len(candidates) > 1):
+            self._hide_candidates()
+            return
+        if candidates != self._candidates:
+            self._lookup.clear()
+            for candidate in candidates:
+                self._lookup.append_candidate(IBus.Text.new_from_string(candidate))
+            self._candidates = candidates
+        selected = view.get("selectedIndex", 0)
+        if 0 <= selected < len(candidates):
+            self._lookup.set_cursor_pos(selected)
+        self.update_lookup_table(self._lookup, True)
+        self._schedule_meaning(view)
+
+    def _schedule_meaning(self, view):
+        meaning = view.get("meaning")
+        key = f"{view.get('selectedIndex')}:{meaning}" if meaning else None
+        if key == self._meaning_key:
+            return
+        self._meaning_key = key
+        if key is None:
+            return
+
+        def show():
+            if self._meaning_key == key and self._candidates:
+                self.update_auxiliary_text(IBus.Text.new_from_string(meaning), True)
+            return False
+
+        GLib.timeout_add(1500, show)
+
+    def _hide_candidates(self):
+        self._meaning_key = None
+        if self._candidates:
+            self._lookup.clear()
+            self._candidates = []
+        self.hide_lookup_table()
+
+    def _surrounding_text(self):
+        """入力欄のキャレットの前後の文字列 (それぞれ 20 文字まで)。入力欄が対応していなければ (None, None)。"""
+        try:
+            text, cursor, _anchor = self.get_surrounding_text()
+            value = text.get_text() if text else ""
+            if not value:
+                return None, None
+            return value[max(0, cursor - 20):cursor], value[cursor:cursor + 20]
+        except Exception:
+            return None, None
+
+
+# ---- 起動 ----
+
+def main():
+    IBus.init()
+    bus = IBus.Bus()
+    if not bus.is_connected():
+        print("Meltype: IBus につながりません", file=sys.stderr)
+        sys.exit(1)
+    loop = GLib.MainLoop()
+    # IBus が終わったら (ログアウト・ibus restart) 一緒に終わる
+    bus.connect("disconnected", lambda *_: loop.quit())
+    factory = IBus.Factory.new(bus.get_connection())
+    factory.add_engine("meltype", GObject.type_from_name("MeltypeEngine"))
+    if "--ibus" in sys.argv:
+        bus.request_name("org.freedesktop.IBus.Meltype", 0)
+    else:
+        # 手で起動したとき (試すとき): コンポーネントを登録する
+        component = IBus.Component.new("org.freedesktop.IBus.Meltype", "Meltype", "1.0.1", "GPL-3.0-or-later", "Yukishiro", "https://github.com/yksr-melt/Meltype", "", "")
+        component.add_engine(IBus.EngineDesc.new("meltype", "Meltype", "Meltype", "ja", "GPL-3.0-or-later", "Yukishiro", "", "default"))
+        bus.register_component(component)
+    loop.run()
+
+
+if __name__ == "__main__":
+    main()

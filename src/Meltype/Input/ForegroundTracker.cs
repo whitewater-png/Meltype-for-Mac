@@ -1,0 +1,151 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
+using System.Diagnostics;
+using System.Text;
+using Meltype.Config;
+
+namespace Meltype.Input;
+
+/// <summary>前面アプリの情報 (アプリ別設定と、保留してよいかの判断に使う)。</summary>
+public sealed record AppInfo(IntPtr Window, uint ProcessId, string ProcessName, bool? IsElevated, bool IsFullscreen, bool IsOwnProcess, bool LooksLikeGame = false)
+{
+    public static AppInfo None { get; } = new(IntPtr.Zero, 0, "", false, false, false);
+}
+
+/// <summary>
+/// 前面ウィンドウごとにプロセス名・権限・全画面かどうかをキャッシュする。
+/// フックのスレッドから呼ばれるので、取得は前面ウィンドウが変わったときの 1 回だけにする。
+/// </summary>
+internal sealed class ForegroundTracker
+{
+    private static readonly uint OwnProcessId = (uint)Environment.ProcessId;
+    private static readonly bool SelfElevated = QueryElevation(Process.GetCurrentProcess().Handle) ?? false;
+    private readonly object _gate = new();
+    private AppInfo _current = AppInfo.None;
+
+    /// <summary>
+    /// Meltype 自身のウィンドウのうち、Meltype キーボードで入力してよいもの (ユーザー辞書の登録画面)。
+    /// ほかの自分のウィンドウ (設定画面など) では横取りしない。
+    /// </summary>
+    public static System.Collections.Concurrent.ConcurrentDictionary<IntPtr, bool> TypingAllowedWindows { get; } = new();
+
+    /// <summary>Meltype 自身のウィンドウで、入力してよい画面 (ユーザー辞書) ではないもの。</summary>
+    public static bool IsOwnWindow(IntPtr window)
+    {
+        if (window == IntPtr.Zero) return false;
+        Native.GetWindowThreadProcessId(window, out var processId);
+        return processId == OwnProcessId && !TypingAllowedWindows.ContainsKey(window);
+    }
+
+    public AppInfo Current
+    {
+        get
+        {
+            var window = Native.GetForegroundWindow();
+            lock (_gate)
+            {
+                if (_current.Window == window) return _current;
+            }
+            return Refresh(window);
+        }
+    }
+
+    public AppInfo Refresh(IntPtr window)
+    {
+        var info = Describe(window);
+        lock (_gate) _current = info;
+        return info;
+    }
+
+    /// <summary>このアプリで打鍵を保留してよいか。</summary>
+    public CollectPermission Check(Settings settings)
+    {
+        if (!settings.Enabled) return CollectPermission.Deny("自動切替が無効");
+        var app = Current;
+        if (app.Window == IntPtr.Zero) return CollectPermission.Deny("前面ウィンドウがない");
+        if (app.IsOwnProcess) return CollectPermission.Deny("Meltype 自身のウィンドウ");
+        // 権限の高いアプリには SendInput が届かず (UIPI)、保留した入力を失うおそれがある。
+        if (app.IsElevated != false && !SelfElevated) return CollectPermission.Deny($"{app.ProcessName} は管理者権限で動作中 (または権限を確認できない)");
+        if (!settings.IsAppEnabled(app.ProcessName)) return CollectPermission.Deny($"{app.ProcessName} はアプリ別設定で OFF");
+        if (settings.ExcludeFullscreen && app.IsFullscreen) return CollectPermission.Deny($"{app.ProcessName} は全画面表示");
+        if (settings.IsGame(app.ProcessName, app.LooksLikeGame)) return CollectPermission.Deny($"{app.ProcessName} はゲーム");
+        return CollectPermission.Allow;
+    }
+
+    private static AppInfo Describe(IntPtr window)
+    {
+        if (window == IntPtr.Zero) return AppInfo.None;
+        Native.GetWindowThreadProcessId(window, out var processId);
+        if (processId == OwnProcessId) return new AppInfo(window, processId, "Meltype.exe", false, false, !TypingAllowedWindows.ContainsKey(window));
+
+        var name = "";
+        bool? elevated = null;
+        var looksLikeGame = false;
+        var process = Native.OpenProcess(Native.PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+        if (process != IntPtr.Zero)
+        {
+            try
+            {
+                var builder = new StringBuilder(1024);
+                var size = builder.Capacity;
+                if (Native.QueryFullProcessImageName(process, 0, builder, ref size))
+                {
+                    name = Path.GetFileName(builder.ToString());
+                    looksLikeGame = LooksLikeGame(builder.ToString());
+                }
+                elevated = QueryElevation(process);
+            }
+            finally
+            {
+                Native.CloseHandle(process);
+            }
+        }
+        return new AppInfo(window, processId, name, elevated, IsFullscreen(window), false, looksLikeGame);
+    }
+
+    /// <summary>ゲームのストアのインストール先にある実行ファイルか (Steam・Epic・Riot・EA・Ubisoft・Battle.net・Xbox)。</summary>
+    private static readonly string[] GameFolders =
+    [
+        @"\steamapps\common\", @"\Epic Games\", @"\Riot Games\", @"\EA Games\", @"\Electronic Arts\",
+        @"\Ubisoft Game Launcher\games\", @"\Battle.net\", @"\XboxGames\", @"\GOG Galaxy\Games\", @"\Origin Games\",
+        // 専用のランチャーから入れるゲーム (PSO2 NGS: …\PHANTASYSTARONLINE2_JP\pso2_bin\pso2.exe)
+        @"\pso2_bin\",
+    ];
+
+    public static bool LooksLikeGame(string path) =>
+        GameFolders.Any(folder => path.Contains(folder, StringComparison.OrdinalIgnoreCase)) &&
+        // ランチャー本体 (Steam のクライアントなど) は除く。ストアの画面の検索欄では Meltype を使える
+        !Path.GetFileName(path).Equals("steam.exe", StringComparison.OrdinalIgnoreCase) &&
+        !path.Contains(@"\Launcher\", StringComparison.OrdinalIgnoreCase);
+
+    private static bool? QueryElevation(IntPtr process)
+    {
+        if (!Native.OpenProcessToken(process, Native.TOKEN_QUERY, out var token)) return null;
+        try
+        {
+            return Native.GetTokenInformation(token, Native.TokenElevation, out var elevation, sizeof(int), out _) ? elevation != 0 : null;
+        }
+        finally
+        {
+            Native.CloseHandle(token);
+        }
+    }
+
+    private static bool IsFullscreen(IntPtr window)
+    {
+        if (window == Native.GetShellWindow() || window == Native.GetDesktopWindow()) return false;
+        var className = new StringBuilder(64);
+        Native.GetClassName(window, className, className.Capacity);
+        if (className.ToString() is "Progman" or "WorkerW") return false;
+        // タイトルバーのあるウィンドウは最大化されているだけ (タスクバー自動非表示だと画面全体を覆う)。
+        const long WS_CAPTION = 0x00C00000;
+        if ((Native.GetWindowLongPtr(window, Native.GWL_STYLE).ToInt64() & WS_CAPTION) == WS_CAPTION) return false;
+        if (!Native.GetWindowRect(window, out var rect)) return false;
+        var monitor = Native.MonitorFromWindow(window, Native.MONITOR_DEFAULTTONEAREST);
+        var info = new Native.MONITORINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<Native.MONITORINFO>() };
+        if (!Native.GetMonitorInfo(monitor, ref info)) return false;
+        return rect.Left <= info.rcMonitor.Left && rect.Top <= info.rcMonitor.Top &&
+               rect.Right >= info.rcMonitor.Right && rect.Bottom >= info.rcMonitor.Bottom;
+    }
+}

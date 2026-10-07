@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Meltype の中身のうち、OS に依存しない部分 (英語 / 日本語の判定・ローマ字・変換ボックスの中身・辞書・学習・設定)。
+    Windows 版 (src/Meltype) のほか、Mac 版・Linux 版からも使う。キー入力の受け取り・画面・漢字変換エンジンは各 OS 側で用意する。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Meltype.Core</AssemblyName>
+    <RootNamespace>Meltype</RootNamespace>
+    <Version>1.0.1</Version>
+    <Product>Meltype</Product>
+    <Authors>Yukishiro</Authors>
+    <Copyright>Copyright (C) 2026 雪代 / Yukishiro. GPL-3.0-or-later</Copyright>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Meltype" />
+    <InternalsVisibleTo Include="Meltype.Tests" />
+    <InternalsVisibleTo Include="Meltype.Core.Tests" />
+    <InternalsVisibleTo Include="MeltypeNative" />
+    <EmbeddedResource Include="..\..\dictionaries\*.txt" LogicalName="Meltype.dictionaries.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

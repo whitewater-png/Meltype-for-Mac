@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
+using System.Runtime.InteropServices;
+
+namespace Meltype;
+
+/// <summary>
+/// 動いている Meltype に「終了して」と伝える (Meltype.exe --exit)。インストール・アンインストールの前に使う。
+/// 管理者として動いている Meltype は、ふつうの権限のプロセスからは止められない (Stop-Process が拒否される) ので、
+/// 見えない窓で終了の合図を受け取り、ふつうの権限からの合図も受け付ける (ChangeWindowMessageFilterEx)。
+/// </summary>
+internal sealed class ExitSignal : NativeWindow, IDisposable
+{
+    private const string Caption = "Meltype.ExitSignal";
+    private const uint MSGFLT_ALLOW = 1;
+    private static readonly uint ExitMessage = RegisterWindowMessage("Meltype.Exit");
+
+    public ExitSignal()
+    {
+        CreateHandle(new CreateParams { Caption = Caption });
+        ChangeWindowMessageFilterEx(Handle, ExitMessage, MSGFLT_ALLOW, IntPtr.Zero);
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (ExitMessage != 0 && m.Msg == (int)ExitMessage)
+        {
+            Diagnostics.Log.Info("終了の合図を受け取りました (インストール・アンインストール)。");
+            Application.Exit();
+            return;
+        }
+        base.WndProc(ref m);
+    }
+
+    /// <summary>動いている Meltype に終了の合図を送る。送れたら true。</summary>
+    public static bool Send()
+    {
+        var window = FindWindow(null, Caption);
+        return window != IntPtr.Zero && PostMessage(window, ExitMessage, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    public void Dispose() => DestroyHandle();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint RegisterWindowMessage(string name);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ChangeWindowMessageFilterEx(IntPtr hwnd, uint message, uint action, IntPtr changeFilterStruct);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindow(string? className, string windowName);
+
+    [DllImport("user32.dll")]
+    private static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+}

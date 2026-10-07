@@ -1,0 +1,7 @@
+/* システム設定の入力ソースの一覧に出す名前 (無いと内部の ID がそのまま出る) */
+"CFBundleName" = "Meltype";
+"CFBundleDisplayName" = "Meltype";
+"io.github.yksr-melt.inputmethod.Meltype" = "Meltype";
+"io.github.yksr-melt.inputmethod.Meltype.Japanese" = "Meltype";
+"io.github.yksr-melt.inputmethod.Meltype.Roman" = "Alphanumeric (Meltype)";
+"com.apple.inputmethod.Roman" = "Alphanumeric (Meltype)";

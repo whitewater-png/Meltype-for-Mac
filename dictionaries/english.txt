@@ -1,0 +1,215 @@
+# Meltype 英語辞書
+# ローマ字として成立しない綴り (th, l, v, 子音連続 …) は辞書が無くても英語と判定されるので、
+# ここでは「ローマ字としても読めてしまう英単語」「技術用語」「日本語由来の外来語」を重点的に入れている。
+# %LOCALAPPDATA%\Meltype\dictionaries\english.txt に同じ形式で書くとユーザー辞書として追加される。
+
+# --- 日本語由来で英語としても使われる語 (設計書 §13: ローマ字として読めるだけでは切り替えない) ---
+kana sushi radio karaoke karate tsunami anime manga ninja samurai tofu ramen kimono futon bonsai origami
+sake sumo tokyo osaka kyoto kobe nagoya yokohama hokkaido okinawa honda toyota mazda nissan subaru suzuki
+yamaha kawasaki sony nintendo pokemon sega capcom konami bandai namco zen haiku judo sensei otaku kawaii
+senpai matcha wasabi tempura udon soba miso tatami shogun geisha kamikaze tycoon honcho emoji ikebana
+sudoku koi dojo kaizen umami yakuza teriyaki sashimi edamame mochi aikido kendo kabuki banzai kanji
+hiragana katakana romaji hentai kaiju mecha shinto bento furoshiki tanuki shiba akita shiitake yuzu
+ramune gyoza takoyaki okonomiyaki onigiri nori dashi mirin sakura hanami ninjutsu jujitsu karoshi
+tamagotchi uniqlo muji rakuten toshiba hitachi panasonic fujitsu canon nikon ricoh kyocera mitsubishi
+sumitomo mizuho nomura daikin shimano asics mazinger gundam naruto dragonball doraemon totoro ghibli
+# 日本人の姓は日本語として打つことの方が多いので、ここには入れない。
+
+# --- 技術用語 ---
+github gitlab bitbucket git svn typescript javascript java python node nodejs npm npx yarn pnpm deno bun
+react vue angular svelte next nuxt vite webpack rollup esbuild babel eslint prettier jest mocha vitest
+docker podman kubernetes kubectl helm terraform ansible aws azure gcp linux ubuntu debian fedora centos
+windows macos ios android bash zsh fish powershell pwsh cmd terminal console server client localhost
+http https www html css scss sass json yaml yml toml xml csv sql mysql postgres postgresql sqlite mongodb
+redis nginx apache kafka rabbitmq elasticsearch commit commits push pull merge rebase branch checkout
+clone fetch stash status diff log init install uninstall update upgrade build run test tests debug deploy
+release config configure setup start stop restart reset revert cherry pick tag tags dev prod staging api
+apis rest graphql grpc sdk cli gui ide vscode vim neovim emacs nano code visual studio dotnet csharp cpp
+rust golang kotlin swift ruby rails php laravel django flask fastapi spring boot maven gradle cargo pip
+pipenv poetry conda venv jupyter notebook pandas numpy scipy matplotlib tensorflow pytorch keras openai
+anthropic claude chatgpt gpt llm discord slack teams zoom notion figma jira confluence trello asana
+google youtube twitter facebook instagram amazon microsoft apple iphone ipad chrome firefox edge safari
+email gmail outlook excel word powerpoint onedrive dropbox admin root sudo chmod chown mkdir rmdir grep
+sed awk curl wget ssh scp sftp ftp tcp udp dns vpn url uri uuid token tokens auth oauth login logout
+logon password passwd username user users readme license todo fixme hotfix feature features bugfix bug
+bugs main master origin upstream remote remotes version versions package packages module modules import
+export function functions const let var return async await promise class classes interface type types
+typedef enum struct public private protected static void int integer string strings bool boolean true
+false null nil undefined none self this new delete object objects array arrays list lists map maps set
+dict tuple float double char byte bytes long short args argv printf println print echo error errors warn
+warning info trace exception exceptions try catch finally throw raise def lambda yield await async
+while for if else elif switch case default goto break continue unset source alias sudo kill ps top
+make makefile cmake meson ninja gcc clang llvm msbuild nuget winget choco scoop brew apt yum dnf pacman
+node_modules dist bin obj lib src tmp temp var etc usr opt home desktop documents downloads
+backend frontend fullstack database databases schema query queries index indexes table tables column
+columns row rows record records field fields value values key keys id ids hash cache cached memory cpu
+gpu ram disk file files folder folders directory path paths dir repo repos repository repositories
+issue issues pullrequest review reviews reviewer approve approved merged draft label labels milestone
+deployment pipeline pipelines workflow workflows action actions runner runners job jobs artifact
+artifacts container containers image images volume volumes network networks port ports host hosts
+domain domains proxy firewall certificate certificates ssl tls encrypt decrypt encryption sign signed
+signature hash sha md base64 unicode utf ascii encoding decode encode parse parser parsing serialize
+compile compiler compiled runtime framework frameworks library libraries dependency dependencies
+plugin plugins extension extensions template templates component components props state hooks hook
+render rendering route routes router routing middleware controller controllers model models view views
+service services provider providers handler handlers event events listener listeners callback callbacks
+timeout timer interval thread threads process processes task tasks queue queues stack stacks heap
+pointer pointers reference references instance instances method methods property properties attribute
+attributes parameter parameters argument arguments variable variables constant constants operator
+namespace package scope global local remote origin target source destination input output stdin stdout
+stderr pipe redirect regex pattern patterns match matches filter filters sort sorted search replace
+refactor refactoring lint linter format formatter formatting indent tabs spaces newline whitespace
+monitor monitoring metric metrics logging logger logs dashboard dashboards alert alerts incident
+kubernetes pod pods node nodes cluster clusters namespace namespaces ingress secret secrets config
+configmap helm chart charts manifest manifests yaml terraform module provider resource resources
+localhost admin administrator setting settings preference preferences option options menu menus
+button buttons window windows dialog dialogs popup modal tooltip icon icons font fonts theme themes
+mode modes dark light layout layouts style styles stylesheet margin padding border width height size
+color colors pixel pixels screen screens display monitor keyboard mouse touch click tap scroll drag drop
+copy paste cut undo redo save open close exit quit new edit view help about home back next previous
+submit cancel confirm delete remove add create update upload download share send receive reply forward
+select deselect enable disable enabled disabled toggle check uncheck on off yes no ok okay
+
+# --- ローマ字としても読めてしまう一般的な英単語 ---
+a an and are as at be been but by can do does done did go goes going gone get got give given
+he her him his i if in is it its me my no not of on or our out so some such than that the them then
+there these they this to too up us was we were what when where which who why will with you your
+about above after again against age ago ahead air all almost alone along already also although always
+among amount ancient anger angle animal annual another answer anti anybody anyone anything anyway
+anywhere apart appear area areas arise arid arm army around arrive art article ask asked asleep aside
+ate attach attack attempt attend attention attitude aunt auto autumn avenue average avoid awake away
+awesome baby bad bag bake baker ban banana band bank bar bare base based basic basin basis bat bath
+bay beach bean bear beat beautiful became become bed bee beef been beer before began begin behind
+being believe bell belong below belt bench bend beneath benefit berry beside best bet better between
+beyond bid big bike bill bin bird birth bit bite bitter black blade blame blank blind block blood blow
+blue board boat body boil bomb bond bone bonus book boot border bore born borrow boss both bottle
+bottom bought bounce bound bowl box boy brain brand brave bread break breath bridge brief bright bring
+broad broke broken brother brown brush budget buffer build built bunch burn burst bury bus bush business
+busy butter button buy buyer cabin cable cake call calm came camera camp campus canal cancel candy
+cannot capital car card care career careful carry case cash cast cat catch cause cave cease cell center
+chain chair chance change chapter charge chat cheap check cheese chef chess chest chicken chief child
+children chip choice choose chose chosen church circle citizen city civil claim clean clear climb clock
+close cloth cloud club coach coast coat coffee cold collect college come comes coming common company
+compare complete concern consider contain content context continue control cook cool core corn corner
+cost could count country couple course court cover cow crash crazy cream create credit crew crime crop
+cross crowd crown cry culture cup current curve customer cut cute cycle dad daily damage dame dance
+danger dare dark data date daughter day dead deal dear death debate debt decade decide deep deer defeat
+defend define degree delay demand demo demon denial dense density deny depend deposit depth describe
+design desk detail detect develop device dew diet differ dig digital dinner direct dirt dirty discover
+dish dog doing dollar domestic dominant donate donkey donor door dose double doubt down dozen draft
+drama draw dream dress drink drive drop drum dry duck due during dust duty each eager early earn earth
+ease east easy eat economy edge editor educate effect effort egg eight either elder elect element else
+emerge emotion employ empty end enemy energy engine enjoy enough ensure enter entire entry equal era
+escape essay estate even evening ever every evidence exact exam example excel except exchange excite
+exercise exist expect expert explain extra eye face fact factor fail fair faith fall false fame family
+famous fan far farm fashion fast fat fate father fault favor fear feature fee feed feel feet fell felt
+female fence few fiction fifteen fight figure fill film final finance find fine finger finish fire
+firm first fish fit five fix flag flat flight floor flow flower fly focus fold follow food foot force
+foreign forest forget form formal former forth fortune forty found four frame free fresh friend from
+front fruit fuel full fun fund funny future gain game gap garden gas gate gather gave gear gene general
+gentle genius genuine gesture ghost giant gift girl give glad glass global goal god gold good govern
+grab grade grand grant grass great green grew ground group grow growth guard guess guest guide gun guy
+habit hair half hall hand handle hang happen happy hard harm has hat hate have head health hear heard
+heart heat heavy held hello help hence here hero hide high hill hire history hit hold hole holiday
+hollow holy home honest honey honor hope horse host hot hotel hour house however huge human humor
+hundred hungry hunt hurry hurt husband ice idea identity image imagine impact inch income index inside
+item items italy italic japan japanese join joke journey joy judge juice jump junior just keen keep kid
+kill kind king kiss kit kitchen kite kitten kitty knee knew knife knock know known labor lady lake land
+large last late later laugh law lay lead leader learn least leave left leg legal less lesson letter
+level lie life lift light like limit line link lion lip list listen little live load loan local lock
+long look lose loss lost lot loud love low luck lunch machine mad made magic mail major make maker male
+man manage many march mark market marry mass master match mate material matter matte maybe mayor meal
+mean meat media medical meet member memo memory men mental mention mere merit mesh message metal meter
+method middle might mild mile milk mind mine minor minute miracle mirror miser misery miss mission mist
+mistake mix mobile modern moment monday money month mood moon moral more morning most mother motion
+motor motto mount mouse mouth move movie much mud music must mutual name nanny narrow nation native
+nature near neat neck need nerve net never news next nice night nine noise nominal nominate none noon
+nor normal north nose note notes nothing notice novel now number nurse object obtain occur ocean odd
+offer office often oil old once one ones only onto open opera opinion orange order other ought ounce
+over owe own owner pace pack page paid pain paint pair palm pan panel panic paper parent park part
+party pass past pat patch patient pause pay peace peak pen penny people pepper per period person pet
+phone photo piano pick piece pig pile pin pink pipe pit pity place plan plane plant plate play please
+plus pocket poem poet point police polite pond pool poor pop popular pose post pot potato pound power
+praise pray present press pretty price pride prime prize problem produce product profit program
+promise proof proper protect proud prove public pull punch pupil pure purpose put quick quiet quite
+race rain raise ran range rapid rare rash rate rather raw reach read ready real reason receive recent
+red refer region relate remain remote repeat report rest result retire return rice rich ride right
+ring rise risk river road rob rock rod role roll roof room root rope rose rough round route royal rub
+rude rule run rush sad safe said sail salad salary sale salt same sample sand sat save saw say scale
+scene school score sea season seat second secret section see seed seek seem seen sell send sense
+sent series serve session settle setting settee seven sew shade shadow shake shall shame shape share
+sharp she sheep sheet shelf shell shift shine shiny shingle ship shirt shock shoe shoot shop shore short
+shot should shout show shut shy sick side sight sign silent silk silver simple since sing single sink
+sir sister sit site six size skin sky sleep slide slow small smart smell smile smoke snake snow soap
+social sock soft soil sold soldier solid solve son song sonnet soon sore sorry sort soul sound soup
+south space spare speak special speech speed spend spent spirit spite split sport spot spread spring
+square staff stage stair stamp stand star state station stay steal step stick still stock stomach stone
+stood store storm story street strong student stuff subject success such sudden sugar suit summer sun
+super supply support sure surface surprise sweet swim table tail take taken tale talk tall tame tank
+tap tape task taste tax taxi tea teach team tear tell ten tend tennis term terrible test text than
+thank the their theme then theory there thick thin thing think third though thought thousand three
+throw ticket tide tie tight till time tiny tip tire title today toe together told tomato tomorrow
+tone tongue tonight took tool tooth total totem tote touch tough tour toward tower town toy trade
+train travel tree trip true trust truth tube tune turn twice two type uncle under unit unite until
+upon upset urban urge use used user usual very video village visit voice vote wage wait wake walk wall
+want war warm wash watch water wave way weak wear weather web wedding week weight well went west wet
+wide wife wild will win wind wine wing winner winter wire wise wish woman women won wonder wood wool
+work world worry worse worst worth would wound write wrong yard yeah year yellow yes yesterday yet
+yoga young youth zero zone zoo
+anatomy anonymous anomaly michael michigan minnesota minnow kaiser tantrum sonata senate
+myopia genesis hibiscus hippo hobby hockey homage honorary hopeful horizon hose hospital
+monopoly monotone monolith monsoon monster monsters mosaic moose mop mob mode model moderate modest
+nod node nomad nope nose notation notebook nuance nugget nun nut
+banner banana bandana badminton bamboo bazaar bizarre bogus bonanza bosom botany
+dagger damage dash daisy dais dame dagger dairy dune dungeon dusk
+gamma garage garbage gazette geometry gorilla gossip gourmet govern guru
+hamburger hammer hamster harmony harvest hazard hunger hurricane husband
+kangaroo karma kebab kennel kettle kidnap kimchi kiosk koala
+mama mammoth mango manor maple marathon marine maroon mascot mature maximum medium mega memento
+menace mermaid meteor mimic mingle minimum minister mirage mission mitten
+nachos namaste nausea nectar nemesis neon nephew nest neutral nibble nimble nitrogen nobody nugget
+oasis obese oboe octopus odyssey omega omen onion opium orbit orchestra organ origin oyster
+pajama panda panorama papa papaya paradise paradox pasta patio peanut pebble pedal penguin pepper
+pesto piano picnic pigeon pita pizza pogo potato puppet puppy pyramid
+rabbit raccoon radar rainbow ramp ranger rebate recipe rhino ribbon riddle rodeo romance rumor
+safari saga salami salmon samba sardine satire sauna savanna scenario sedan semester senior sepia
+siesta sierra sonar soprano spinach stereo sumac summit sunset suspect sushi
+taboo taco tapioca tattoo teddy tempo tenor terrace tiger tomato torpedo tornado tuna tundra tuxedo
+umbrella unicorn utopia
+wagon wasabi wombat
+yacht yoga yogurt yummy
+zebra zenith zeppelin zigzag zombie
+
+# --- 日本語辞書 (v2) の語と先頭が重なる英単語 ---
+haha hahaha hehe madonna semantic semantics hair haircut hairy suitable suite suitcase abundant abundance
+mend naked torus matador nerd norm norms hare harem motif motive kidney hotel hotels nana karen
+oboe obey tamale seminar seminars moist musk mushroom musical music tsar kabob kiwi kiwis
+
+# --- 追加 (2026-09): ローマ字としても読める英単語 (前後が英語のときだけ英字になる) ---
+beta cafe cage cane cape coma cone cube cure dine dire dome dope dude duke ego fade fake fuse hype june
+lane logo meta mute nude nuke pane pine poke polo pope rage rake ripe rode rune sage sane soda solo tore
+wade wipe woke wore anime demo dojo emoji kimono karate tsunami typhoon tycoon
+# 技術用語 (日本語の文の中でもそのまま英字で書くことが多い)
+api apis url urls uri json yaml csv pdf png jpg jpeg gif svg html css xml sql ssh ssl tls dns ip tcp udp http https
+cpu gpu ram rom ssd hdd usb hdmi wifi bluetooth nfc os ui ux io ai ml llm gpt rag mcp sdk ide cli gui repo repos
+bug bugs issue issues pull push merge commit commits branch branches deploy build release tag tags diff patch
+token tokens prompt prompts model models agent agents tool tools server servers client clients browser
+
+# --- 話し言葉の英語 (歌詞・チャット) ---
+outta gonna wanna gotta kinda sorta lotta dunno gimme lemme ya yeah nope yep hey oh baby tonight
+# --- 感動詞 (Ah! Ooh, Wow) ---
+ah ooh wow oops yay huh ugh aww hmm whoa yo
+# --- 言語の名前 (English、Japanese。スペルチェッカーは大文字で始まる形しか知らない) ---
+english japanese chinese korean french german spanish italian russian portuguese arabic hindi thai vietnamese indonesian dutch swedish latin greek
+# --- bot まわり (korosuzobot → 殺すぞbot。bo + t として 墓t になっていた) ---
+bot bots chatbot chatbots
+# --- 略語・ゲームの名前 (ローマ字として読めない英字を含むもの。ai・ui のように読めるものは日本語とまぎらわしいので入れない) ---
+av vr ar tv pc pv mv cg sns rta fps rpg nft dm dlc npc pvp pve mvp cv bgm geoguessr geoguesser
+vc vrc bpm mac dtm pro gb jk asmr luna yann tetr iidx
+# --- テスターのチャット (summary.json) で英字のまま打たれていた語 (ローマ字として読めない、または日本語でまず使わない綴り) ---
+everyone jc revanced lavalink skeb vol rtx fanbox ryzen wav mov unix lim lite launcher intellisense zenfone firmware llm npm
+riverside seaside teenage teenager woah mod mods hardcore tacz nsfw sfw fbc mineall probot carlbot disboard
+# --- Issue #12 ---
+online
+# --- 英単語 + する (pushして) の site と同じ綴りで終わる語 (web + site で分けない) ---
+website websites campsite worksite onsite offsite

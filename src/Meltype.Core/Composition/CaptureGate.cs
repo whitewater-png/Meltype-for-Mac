@@ -1,0 +1,96 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
+using Meltype.Input;
+
+namespace Meltype.Composition;
+
+/// <summary>マウスボタンの押下/解放 (変換中にクリックされたとき、確定してからクリックを再生するため)。</summary>
+public readonly record struct MouseButtonEvent(int Message, int X, int Y, uint MouseData);
+
+/// <summary>フックから変換ボックスへ渡す入力。キーかマウスボタンのどちらか。</summary>
+public readonly record struct CapturedInput(KeyEvent? Key, MouseButtonEvent? Mouse);
+
+/// <summary>
+/// フック側の関所。変換ボックスが開いている間 (captured) は、届いたキーとマウスボタンを
+/// すべて握りつぶして順番どおりキューに積み、UI スレッドの CompositionController に処理させる。
+/// こうすることで、確定前の文字を後続の打鍵やクリックが追い越すことがない。
+///
+/// フックのスレッドから呼ばれるので、ロック内ではキューへの出し入れしかしない。
+/// </summary>
+public sealed class CaptureGate
+{
+    private readonly object _gate = new();
+    private readonly Queue<CapturedInput> _queue = new();
+    private readonly Action _signal;
+    private bool _captured;
+
+    /// <param name="signal">キューに積んだことを UI スレッドへ知らせる (BeginInvoke など、ブロックしないもの)。</param>
+    public CaptureGate(Action signal) => _signal = signal;
+
+    public bool IsCaptured { get { lock (_gate) return _captured; } }
+
+    /// <summary>true ならフックでその打鍵を握りつぶす。</summary>
+    public bool OnKey(KeyEvent e, Func<KeyEvent, bool> startsComposition)
+    {
+        lock (_gate)
+        {
+            if (!_captured)
+            {
+                if (!startsComposition(e)) return false;
+                _captured = true;
+            }
+            _queue.Enqueue(new CapturedInput(e, null));
+        }
+        _signal();
+        return true;
+    }
+
+    public bool OnMouseButton(MouseButtonEvent e)
+    {
+        lock (_gate)
+        {
+            if (!_captured) return false;
+            _queue.Enqueue(new CapturedInput(null, e));
+        }
+        _signal();
+        return true;
+    }
+
+    public bool TryDequeue(out CapturedInput input)
+    {
+        lock (_gate) return _queue.TryDequeue(out input);
+    }
+
+    /// <summary>
+    /// 関所を閉じる (変換中にする)。キーを押さずに変換ボックスを開いたとき (確定後の再変換) は、
+    /// <see cref="OnKey"/> が閉じる機会が無く、続く Space などがアプリへ素通りしてしまうため。
+    /// </summary>
+    public void Capture()
+    {
+        lock (_gate) _captured = true;
+    }
+
+    /// <summary>変換ボックスが空になったら呼ぶ。キューも空なら関所を開けて true を返す。</summary>
+    public bool TryRelease()
+    {
+        lock (_gate)
+        {
+            if (_queue.Count > 0) return false;
+            _captured = false;
+            return true;
+        }
+    }
+
+    /// <summary>無効化・終了時。残っている入力を返す (呼び出し側で再生する)。</summary>
+    public List<CapturedInput> Abort()
+    {
+        lock (_gate)
+        {
+            var rest = _queue.ToList();
+            _queue.Clear();
+            _captured = false;
+            return rest;
+        }
+    }
+}

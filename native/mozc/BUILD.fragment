@@ -1,0 +1,20 @@
+# Meltype (https://github.com/yksr-melt/Meltype) 用の変換ヘルパー。標準入出力で変換結果を返す。
+mozc_cc_binary(
+    name = "meltype_mozc_helper",
+    srcs = ["meltype_mozc_helper.cc"],
+    deps = [
+        ":converter_interface",
+        ":segments",
+        "//base:init_mozc",
+        "//base:system_util",
+        "//base:util",
+        "//composer",
+        "//config:config_handler",
+        "//engine",
+        "//engine:engine_factory",
+        "//protocol:commands_cc_proto",
+        "//protocol:config_cc_proto",
+        "//request:conversion_request",
+        "@com_google_absl//absl/strings",
+    ],
+)

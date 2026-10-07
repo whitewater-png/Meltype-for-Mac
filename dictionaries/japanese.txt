@@ -1,0 +1,146 @@
+# Meltype 日本語辞書 (ローマ字・ヘボン式で記述)
+# 訓令式 (si/tu/ti/hu/zi/sya …) や ん の n/nn の揺れは読み込み時に自動展開されるので、1 語につき 1 表記でよい。
+# 空白・改行区切り。# 以降はコメント。
+# %LOCALAPPDATA%\Meltype\dictionaries\japanese.txt に同じ形式で書くとユーザー辞書として追加される。
+
+# あいさつ
+konnichiwa konnichiha konbanwa konbanha ohayou ohayougozaimasu arigatou arigatougozaimasu
+sayounara sayonara sumimasen gomen gomennasai onegai onegaishimasu yoroshiku yoroshikuonegaishimasu
+otsukare otsukaresama otsukaresamadesu oyasumi oyasuminasai itadakimasu gochisousama gochisousamadeshita
+tadaima okaeri okaerinasai itterasshai ittekimasu hajimemashite douzo doumo moshimoshi omedetou
+shitsurei shitsureishimasu daijoubu osewaninatteorimasu osewani yoroshiidesuka
+
+# 代名詞・指示語・疑問詞
+watashi watakushi boku ore anata kimi kare kanojo karera minna minasan jibun dareka nanika nanimo
+doko dare nani nanda nande naze dou dore docchi dochira kochira sochira achira kocchi socchi
+kore sore are kono sono ano koko soko asoko konna sonna anna donna doushite doushiyou ikutsu ikura itsu
+
+# 時
+kyou ashita asatte kinou ototoi ima imamade mainichi maiasa maiban maishuu raishuu senshuu konshuu
+raigetsu sengetsu kongetsu rainen kotoshi kyonen asa hiru yoru gozen gogo jikan jikoku zutto mou mada
+sugu mazu tsugi saigo saisho sakki atode korekara ichiban hayaku
+
+# 動詞
+suru shimasu shimashita shita shite shinai shinakereba dekiru dekimasu dekinai dekita
+iku ikimasu itta itte ikanai ikou ikimashou kuru kimasu kita kite konai kimashita
+miru mimasu mita mite minai mimashita taberu tabemasu tabeta tabete tabetai tabemashou
+nomu nomimasu nonda nonde nomitai yomu yomimasu yonda yonde kaku kakimasu kaita kaite
+hanasu hanashimasu hanashita hanashite kiku kikimasu kiita kiite omou omoimasu omotta omotte
+wakaru wakarimasu wakatta wakaranai wakarimashita shiru shitte shiranai shitteru
+aru arimasu atta atte nai nakatta arimasen iru imasu ita ite inai imashita
+oshieru oshiete tsukau tsukaimasu tsukatta tsukatte tsukuru tsukurimasu tsukutta tsukutte
+kaeru kaerimasu kaetta kaette kau kaimasu katta katte matsu machimasu matte yaru yarimasu yatte yatta
+tanomu tanomimasu kangaeru kangaete hajimeru hajimemasu hajimeta owaru owarimasu owatta tsuzuku tsuzukeru
+okuru okurimasu okutte ukeru uketoru mitsukeru mitsukaru shiraberu shirabete naosu naoshimasu naoshita
+kakunin kakuninshimasu shuusei henkou sakujo tsuika setsumei kentou taiou renraku soudan hanashiai
+yoyaku junbi sanka kyouryoku houkoku teishutsu
+
+# 形容詞・副詞
+ii yoi warui ookii chiisai atarashii furui takai yasui hayai osoi omoshiroi tanoshii ureshii kanashii
+sabishii muzukashii yasashii kawaii kirei sugoi sugoku samui atsui tsumetai atatakai isogashii hima
+genki daisuki suki kirai jouzu heta benri fuben taihen daiji taisetsu hontou hontoni honto mochiron
+tabun kitto zenzen totemo chotto sukoshi takusan ippai zenbu yappari yahari tashikani mattaku
+nakanaka dandan sorosoro mettani tokidoki itsumo yoku amari hotondo daitai zettai
+
+# 名詞
+nihon nihongo nippon eigo kotoba shigoto kaisha gakkou daigaku gakusei tomodachi kazoku okaasan
+otousan oniisan oneesan kodomo hito otoko onna namae denwa meeru shashin eiga ongaku terebi
+shinbun kuruma densha eki michi uchi heya mise tabemono nomimono gohan asagohan hirugohan bangohan
+mizu ocha kouhii okane kaimono ryokou tenki yuki kaze sora umi yama kawa hana inu neko sakana niku
+yasai kudamono byouki byouin kusuri karada atama kuchi kokoro kimochi bunshou shitsumon kotae mondai
+riyuu imi basho houhou kekka keikaku yotei kaigi shiryou kikaku hinshitsu tantou tantousha kyaku
+okyakusama gyoumu shouhin jouhou naiyou settei kankyou shiyou sekkei jissou kaihatsu shuuryou kaishi
+seikou shippai genin kaiketsu kinyuu toiawase kakunin
+
+# 助詞・助動詞・接続詞など
+dakara demo shikashi soshite sorede sorekara keredo kedo node nado dake shika desu deshita
+dewa janai masu mashita masen mashou darou deshou kamoshirenai hazu rashii soudesu soudesune
+naruhodo iie uun sayou tsumari tatoeba toriaezu ichiou
+
+# 口語
+yabai maji majide sugee usso ussou ikou yarimashou kudasai kudasaimasen itadakemasuka
+onegaishimasu wakatta ryoukai ryou shouchi kashikomarimashita shoushou omachikudasai
+
+# ---- v2 で追加 ----
+# 体調・気分
+onaka suita onakasuita suku nemui nemuku nemutai tsukareta tsukareru tsukare kibun guai itai kowai abunai
+urusai mendou mendokusai hazukashii natsukashii kuyashii shinpai anshin tanoshimi ochitsuku
+
+# 時間・曜日・季節・数
+yuugata yuugohan shinya ichiji niji sanji yoji goji rokuji shichiji hachiji kuji juuji
+getsuyoubi kayoubi suiyoubi mokuyoubi kinyoubi doyoubi nichiyoubi shuumatsu heijitsu yasumi
+natsuyasumi fuyuyasumi haru natsu fuyu tanjoubi otanjoubi kinenbi shougatsu oshougatsu
+ichi hachi kyuu juu hyaku hitotsu futatsu mittsu yottsu
+
+# 人
+otouto imouto musuko musume tsuma kareshi kouhai joushi buka douryou shachou buchou kachou tenchou
+isha kangoshi okusan goshujin obaachan ojiichan obasan ojisan akachan
+
+# もの・場所
+keitai sumaho pasokon kaban saifu kagi megane kutsu boushi kasa tokei tsukue tobira kabe yuka tenjou
+daidokoro genkan niwa kouen ginkou yuubinkyoku toshokan eigakan konbini suupaa depaato kuukou hoteru
+toukyou oosaka kyouto hokkaidou okinawa kyuushuu
+
+# 食べ物
+gyuudon karee okashi gyuunyuu tamago mikan biiru osake koohii yakiniku oyatsu obentou ohiru
+
+# 動詞
+neru okiru nemuru hashiru aruku oyogu asobu utau odoru warau okoru tetsudau tasukeru wasureru oboeru
+shinjiru erabu kimeru tsutaeru kotaeru tazuneru aimasu motsu motte toru totte ireru dasu shimeru akeru
+tsukeru kesu hairu deru noru oriru suwaru tatsu yasumu hataraku benkyou renshuu shiken shukudai jugyou
+kougi kenkyuu ronbun happyou sentaku souji ryouri ofuro ganbaru ganbatte ganbarimasu ganbarou
+mitsukenai wasureta oboeteru shiranakatta omoidashita kizuita
+
+# 形容詞・副詞
+oishii mazui amai karai shoppai nagai mijikai hiroi semai omoi karui tsuyoi yowai akarui kurai shizuka
+nigiyaka yuumei tekitou hitsuyou fuan muri kantan fukuzatsu tadashii machigai onaji chigau betsu hoka
+migi hidari chikai tooi yukkuri sukkari hakkiri chanto kichinto shikkari kyuuni totsuzen ikinari yatto
+tsuini kekkyoku kanarazu zehi dekireba nantoka nandemo nanka motto zuibun kanari hijouni hontouni
+
+# 仕事・PC
+shiawase yume kibou mirai kako genzai rekishi bunka shakai keizai seiji kankei shumi tokui nigate keiken
+chishiki gijutsu yakusoku tetsuzuki shinsei shounin kanryou irai hikitsugi shinchoku kadai kousei
+henshuu sakusei koushin hozon kidou setsuzoku douki gamen kensaku hyouji nyuuryoku shutsuryoku henkan
+moji bangou juusho shouhin kakaku mitsumori seikyuusho keiyaku nouki shimekiri
+
+# あいさつ・応答・つなぎ
+douitashimashite yokatta zannen osoreirimasu moushiwake moushiwakearimasen onegaiitashimasu
+shouchishimashita gomenne ohisashiburi hisashiburi matane jaane sorenara tokorode datte sasuga etto
+eeto anone desuka masuka deshouka kamo yone dayo desho chatta shimatta yoroshikune
+
+# --- 追加 (2026-09) ---
+# 代名詞・指示語・疑問詞
+watashi boku ore atashi anata kimi kare kanojo karera watashitachi minna jibun koko soko asoko doko kochira sochira achira dochira
+kore sore are dore kono sono ano dono konna sonna anna donna nani nan dare itsu naze doushite dou ikura ikutsu
+# 時・日付
+kyou ashita asatte kinou ototoi ima imamade korekara saikin mukashi mainichi maiasa maiban maishuu maitsuki mainen
+asa hiru yoru yuugata yonaka gozen gogo getsuyoubi kayoubi suiyoubi mokuyoubi kinyoubi doyoubi nichiyoubi
+raishuu senshuu konshuu raigetsu sengetsu kongetsu rainen kyonen kotoshi jikan fun byou nichi shuu tsuki toshi
+# 人・家族
+hito kodomo otona otoko onna chichi haha otousan okaasan oniisan oneesan otouto imouto kazoku tomodachi sensei gakusei
+shachou buchou kachou senpai kouhai douryou okyakusan tannin kaisha shigoto kaigi
+# よく使う動詞
+iku kuru suru naru aru iru miru kiku hanasu yomu kaku taberu nomu neru okiru aruku hashiru oyogu matsu motsu
+tsukau tsukuru kaeru kau uru ageru morau kureru oshieru narau manabu wakaru shiru omou kangaeru oboeru wasureru
+hajimeru owaru tsuzukeru yameru tetsudau tanomu sagasu mitsukeru erabu kimeru kakunin kentou taiou henkou shuusei
+dekiru mieru kikoeru ireru dasu akeru shimeru tsukeru kesu okuru todoku uketoru harau kariru kaesu
+# よく使う形容詞・副詞
+ii yoi warui ookii chiisai takai yasui hikui nagai mijikai atarashii furui hayai osoi omoi karui atsui samui
+tsumetai atatakai muzukashii yasashii tanoshii ureshii kanashii sabishii kowai omoshiroi tsumaranai isogashii hima
+totemo sukoshi chotto takusan zenzen amari mada mou sugu yukkuri hayaku motto zutto kitto tabun zettai hontou
+yahari yappari daitai hotondo mattaku tokidoki itsumo tamani sakki atode sorekara demo shikashi dakara soshite
+# 仕事・IT (日本語で書くことが多い語)
+shiryou houkoku renraku sankou kanryou mikanryou shinchoku kadai mondai kaiketsu gennin eikyou kekka seika hyouka
+sekkei kaihatsu jissou tesuto shiken honban kankyou settei kidou teishi saikidou hozon sakujo tsuika henshuu
+fuguai shougai taiou shuusei kaizen kouritsu jidou shudou kinou gamen sousa nyuuryoku shutsuryoku henkan kensaku
+# 食べ物・生活
+gohan asagohan hirugohan bangohan pan niku sakana yasai kudamono tamago gyuunyuu ocha mizu osake biiru
+heya ie uchi eki michi mise ginkou byouin gakkou kouen kuukou hoteru denwa keitai kuruma densha basu jitensha
+tenki ame yuki kaze kumori hare kion natsu fuyu haru aki
+
+# カタカナ語 (助詞の後に続けて打つことが多いもの)
+tasuku sukejuuru purojekuto miitingu kaigi shiryou fairu foruda pasuwaado akaunto rogu settei
+gamen botan messeeji menyuu risuto deeta saabaa apuri sofuto baagu tesuto koodo
+
+# 英語の固有名詞でも、日本語の文ではカタカナ表記にする語
+nikon

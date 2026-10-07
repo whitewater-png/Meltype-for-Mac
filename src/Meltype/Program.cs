@@ -1,0 +1,120 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
+using Meltype.Config;
+using Meltype.Diagnostics;
+using Meltype.UI;
+
+namespace Meltype;
+
+internal static class Program
+{
+    [STAThread]
+    private static int Main(string[] args)
+    {
+        // Meltype.exe --selftest [結果ファイル]: キーボードフックを掛けずに、主な機能が動くかだけを確かめる。
+        if (args.FirstOrDefault() == "--selftest") return SelfTest.Run(args.ElementAtOrDefault(1));
+        // Meltype.exe --exit: 動いている Meltype を終了させる (インストール・アンインストール用。管理者として動いていても止められる)。
+        if (args.FirstOrDefault() == "--exit") return ExitSignal.Send() ? 0 : 1;
+
+        // フックを二重に掛けると同じ打鍵を二重に保留・再入力してしまうので、多重起動させない。
+        using var mutex = new Mutex(initiallyOwned: true, @"Local\Meltype.SingleInstance", out var createdNew);
+        // Meltype.exe --restore <バックアップ>: 動いている Meltype が終わるのを待ってから、バックアップを戻して起動する
+        // (動いている Meltype が終わるときに学習データを書き戻すので、戻すのはその後)。
+        var restore = args.FirstOrDefault() == "--restore" ? args.ElementAtOrDefault(1) : null;
+        if (!createdNew && (restore is null || !WaitForExit(mutex))) return 0;
+
+        ApplicationConfiguration.Initialize();
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (_, e) => Log.Error($"UI で例外: {e.Exception}");
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            Log.Error($"未処理の例外: {e.ExceptionObject}");
+            Log.FlushFile();
+            WriteCrashLog(e.ExceptionObject);
+        };
+
+        AppPaths.MigrateFromOldName();
+        Directory.CreateDirectory(AppPaths.DataDirectory);
+        if (restore is not null) RestoreBackup(restore);
+        var settings = Settings.Load(AppPaths.ConfigFile);
+        if (!File.Exists(AppPaths.ConfigFile))
+        {
+            try { settings.Save(AppPaths.ConfigFile); } catch { }
+        }
+
+        // ダウンロード済みの新しい版があれば、起動せずに更新する (install.ps1 が新しい版を起動する)。
+        if (Updater.ApplyStagedAtStartup(() => settings.AutoUpdate)) return 0;
+
+        MeltypeEngine engine;
+        try
+        {
+            engine = new MeltypeEngine(settings, AppPaths.ConfigFile, AppPaths.ModelFile, AppPaths.UserDictionaryDirectory);
+            engine.Start();
+        }
+        catch (Exception ex)
+        {
+            WriteCrashLog(ex);
+            MessageBox.Show($"Meltype を開始できませんでした。\n\n{ex.Message}\n\n詳しい内容: {AppPaths.CrashLogFile}", "Meltype", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return 1;
+        }
+
+        using (engine)
+        {
+            using var exitSignal = new ExitSignal();
+            Application.Run(new TrayApplicationContext(engine));
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// 落ちたとき (起動できなかったとき) の例外を crash.log に書き足す。ファイルへのログ (設定) が OFF でも書く:
+    /// 起動直後に落ちる報告で、原因の手がかりが何も残っていなかった。打った文字は含まない (例外の種類と場所だけ)。
+    /// </summary>
+    private static void WriteCrashLog(object exception)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.DataDirectory);
+            File.AppendAllText(AppPaths.CrashLogFile,
+                $"==== {DateTime.Now:yyyy-MM-dd HH:mm:ss} Meltype {AppInfo.Version} / {Environment.OSVersion} ====\n{exception}\n\n");
+        }
+        catch
+        {
+            // 書けなくても、元の例外の処理を続ける
+        }
+    }
+
+    /// <summary>前の Meltype が終わる (単一起動の印が空く) のを待つ。</summary>
+    private static bool WaitForExit(Mutex mutex)
+    {
+        try
+        {
+            return mutex.WaitOne(TimeSpan.FromSeconds(15));
+        }
+        catch (AbandonedMutexException)
+        {
+            // 前の Meltype が印を返さずに終わった: 取れたことになる
+            return true;
+        }
+    }
+
+    private static void RestoreBackup(string path)
+    {
+        try
+        {
+            var count = Backup.Restore(File.ReadAllBytes(path), AppPaths.DataDirectory);
+            Log.Info($"バックアップから {count} 個のファイルを戻しました。");
+            MessageBox.Show($"バックアップを戻しました ({count} 個のファイル)。\n今までのファイルは、データフォルダーに .before-restore として残しています。", "Meltype",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"バックアップを戻せませんでした。\n\n{ex.Message}", "Meltype", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
+    }
+}

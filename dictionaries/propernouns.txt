@@ -1,0 +1,75 @@
+# Meltype 英語の固有名詞 (正しい大文字小文字で書く)
+# ローマ字としても読めてしまう固有名詞 (amazon → あまぞん、adobe → あどべ) を英語として扱うための辞書。
+# 変換中の候補には、ここに書いた大文字小文字の形 (GitHub, iPhone) も出る。
+# 日本語の語 (hana, sakura …) と同じ綴りのものや、日本語で書くことが多い日本の社名・作品名 (suzuki, rakuten, mario) は入れない。
+# %LOCALAPPDATA%\Meltype\dictionaries\propernouns.txt に同じ形式で書くと追加できる。
+
+# IT・サービス
+Amazon Google Apple Microsoft Windows macOS iOS iPadOS Android Linux Ubuntu Debian Fedora
+GitHub Meltype GitLab Bitbucket Docker Kubernetes Azure AWS Heroku Vercel Netlify Firebase Supabase Cloudflare
+YouTube Twitter Facebook Instagram TikTok LINE Discord Slack Zoom Teams Notion Figma Canva Miro Trello Jira Confluence
+Netflix Spotify Hulu Disney Prime Twitch Reddit Pinterest LinkedIn Tumblr Medium Substack
+Yahoo Bing DuckDuckGo Baidu Naver Kakao WeChat WhatsApp Telegram Signal Messenger Skype Webex
+ChatGPT OpenAI Claude Anthropic Gemini Copilot Midjourney Perplexity Bard DeepL
+iPhone iPad iPod iMac MacBook AirPods Pixel Galaxy Xperia Surface Kindle Echo Alexa Siri Cortana
+Chrome Firefox Safari Edge Opera Brave Vivaldi
+Excel Word PowerPoint Outlook OneDrive OneNote SharePoint Access Visio Dropbox Evernote Box
+Photoshop Illustrator Premiere Lightroom Acrobat InDesign Adobe Unity Unreal Blender Maya
+Python JavaScript TypeScript Java Kotlin Swift Rust Ruby PHP Perl Haskell Scala Elixir Dart Flutter React Vue Angular Svelte
+Node Deno Bun Django Flask Rails Laravel Spring Next Nuxt Vite Webpack Tailwind Bootstrap jQuery
+MySQL PostgreSQL SQLite MongoDB Redis Oracle Elasticsearch Kafka Nginx Apache Tomcat
+Steam PlayStation Xbox Switch Minecraft Fortnite Roblox Valorant Apex Overwatch Tetris
+Uber Airbnb Tesla Paypal Stripe Shopify Etsy eBay
+Visa Mastercard JCB Amex
+
+# 企業・ブランド
+Adidas Nike Puma Reebok Converse Vans Gucci Prada Chanel Hermes Rolex Omega Citizen
+Sony Panasonic Sharp Canon Nikon Fujifilm Olympus Epson Brother
+ Lexus Mercedes BMW Audi Volkswagen Porsche Ferrari Lamborghini Volvo Hyundai Kia
+Samsung LG Huawei Xiaomi Lenovo Dell HP Asus Acer Intel AMD Nvidia Qualcomm Arm IBM Cisco
+CocaCola Pepsi Starbucks McDonalds Burger KFC Subway Domino Nestle Kellogg Lego Ikea Costco Walmart Target
+Boeing Airbus Disney Pixar Marvel DC Netflix Warner Paramount Universal
+
+# 地名
+America Canada Mexico Brazil Argentina Peru Chile England Britain London Paris France Germany Berlin Italy Rome Milano Venice
+Spain Madrid Barcelona Portugal Lisbon Netherlands Amsterdam Belgium Brussels Swiss Zurich Geneva Austria Vienna Poland Warsaw
+Russia Moscow Ukraine Kyiv Turkey Istanbul Greece Athens Egypt Cairo Kenya Nigeria Africa Europe Asia Oceania
+India Delhi Mumbai China Beijing Shanghai Korea Seoul Taiwan Taipei Hongkong Singapore Malaysia Thailand Bangkok Vietnam Hanoi
+Indonesia Jakarta Bali Philippines Manila Australia Sydney Melbourne Zealand Auckland Hawaii Honolulu Guam Alaska
+California Texas Florida NewYork Manhattan Brooklyn Boston Chicago Seattle Portland Denver Vegas Hollywood Washington Atlanta Miami
+Dallas Houston Phoenix Detroit Philadelphia Toronto Vancouver Montreal Dubai Doha Riyadh Tehran Jerusalem
+
+# 人名 (英語圏の名前。日本語の語と同じ綴りのものは除く)
+John Mike Michael David James Robert William Richard Thomas Charles Daniel Matthew Anthony Mark Paul Steven Kevin Brian George
+Edward Peter Adam Jacob Ethan Noah Liam Oliver Lucas Mason Logan Alex Alexander Andrew Joshua Ryan Nathan Tyler Jack Luke Henry
+Mary Jennifer Linda Elizabeth Susan Jessica Sarah Karen Nancy Lisa Betty Sandra Ashley Emily Emma Olivia Sophia Isabella Mia
+Amelia Harper Evelyn Abigail Ella Grace Chloe Victoria Natalie Hannah Lily Zoe Julia Laura Rachel Rebecca Amanda
+Bob Tom Tim Joe Jim Sam Dave Steve Tony Nick Ben Dan Ted Bill Jeff Greg Eric Frank Carl Oscar Victor Hugo Leo Max Felix
+Elon Jobs Gates Bezos Zuckerberg Musk Trump Obama Biden Lincoln Einstein Newton Darwin Shakespeare Beethoven Mozart Bach
+
+# --- 追加 (2026-09) ---
+# AI・開発ツール
+OpenAI ChatGPT Anthropic Claude Gemini Copilot Perplexity Midjourney HuggingFace Ollama LangChain LlamaIndex
+Cursor Windsurf Replit CodeSandbox StackBlitz Postman Insomnia Sentry Datadog Grafana Prometheus Kibana Splunk
+Jenkins CircleCI TravisCI Terraform Ansible Pulumi Vagrant Nginx Apache Tomcat Redis MongoDB PostgreSQL MySQL MariaDB SQLite Oracle Snowflake Databricks BigQuery Elasticsearch Kafka RabbitMQ
+React Vue Angular Svelte Nextjs Nuxt Remix Astro Gatsby Vite Webpack Rollup Parcel Babel TypeScript JavaScript CoffeeScript Deno Bun Nodejs
+Django Flask FastAPI Rails Laravel Symfony Spring Express NestJS Electron Tauri Flutter Kotlin Swift SwiftUI Xamarin Unity Unreal Godot Blender
+Python Ruby Rust Golang Haskell Scala Clojure Elixir Erlang Julia Fortran COBOL Perl Lua Dart Zig Crystal Nim OCaml
+PyTorch TensorFlow Keras NumPy Pandas SciPy Jupyter Anaconda Matplotlib OpenCV
+# 会社・サービス
+Salesforce Shopify Stripe PayPal Square Adyen Klarna Airbnb Uber Lyft DoorDash Instacart Etsy eBay Alibaba Tencent ByteDance Xiaomi Huawei Lenovo
+Samsung Intel AMD Nvidia Qualcomm Broadcom Cisco IBM Dell Asus Acer Logitech Razer Corsair Seagate Kingston
+Adobe Photoshop Illustrator Premiere Lightroom Acrobat InDesign Dropbox Evernote Slack Asana Monday ClickUp Airtable Zapier Calendly Typeform Mailchimp HubSpot Zendesk Intercom
+Tesla SpaceX Starlink Boeing Airbus Porsche Ferrari Lamborghini Volkswagen Audi BMW Mercedes Volvo Jaguar Hyundai Kia Peugeot Renault Chevrolet Cadillac
+Starbucks McDonalds KFC Subway Dominos Costco Walmart Target IKEA Uniqlo Nike Adidas Puma Reebok Gucci Prada Chanel Hermes Louis Vuitton Rolex Cartier Tiffany
+Coca Pepsi Nestle Danone Heineken Budweiser
+Microsoft Excel Word PowerPoint Outlook OneDrive OneNote SharePoint Bing Edge Chrome Firefox Safari Opera Brave Vivaldi Thunderbird
+Wikipedia Quora Medium Discord Mastodon Bluesky Threads Snapchat Pinterest Vimeo Dailymotion SoundCloud Bandcamp Deezer Tidal
+Minecraft Fortnite Roblox Valorant Overwatch Apex Steam Epic Xbox PlayStation Nintendo Switch Twitch
+VRC BPM DTM ASMR Zorin Luna Yann Tetr IIDX Wakatte
+# 地名 (英語で書くことが多いもの)
+London Paris Berlin Madrid Rome Moscow Beijing Shanghai Seoul Singapore Bangkok Sydney Melbourne Toronto Vancouver Chicago Boston Seattle Texas California Florida Hawaii Alaska
+America Europe Africa Australia Canada Mexico Brazil Germany France Italy Spain England Ireland Scotland Sweden Norway Finland Denmark Netherlands Belgium Switzerland Austria Poland Russia Ukraine India China Korea Taiwan Vietnam Thailand Philippines Indonesia Malaysia
+# テスターのチャット (summary.json) で英字のまま打たれていた名前
+ReVanced Lavalink Skeb FANBOX Ryzen RTX Zenfone IntelliSense Unix
+Suica DCafe ProBot Carlbot Disboard TaCZ NSFW

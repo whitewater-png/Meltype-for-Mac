@@ -1,0 +1,592 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
+using System.ComponentModel;
+using System.Reflection;
+using Meltype.Config;
+
+namespace Meltype.UI;
+
+/// <summary>
+/// 設定画面。Settings の各項目を種類に合わせた部品で並べる:
+///   ON/OFF → プルダウン、選択肢 (列挙型) → 日本語名のプルダウン、数値 → 数値入力、アプリ別設定 → 表 (ON/OFF はプルダウン)。
+/// 項目名・分類・説明は Settings の属性 (DisplayName / Category / Description) から取る。
+/// 下の「判定テスト」欄では、打った英字が IME 自動切替でどう判定されるかと理由を確認できる。
+/// </summary>
+internal sealed class SettingsForm : Form
+{
+    private const string On = "ON";
+    private const string Off = "OFF";
+
+    private readonly MeltypeEngine _engine;
+    private readonly List<Binding> _bindings = [];
+    private readonly Label _help = new() { Dock = DockStyle.Fill, ForeColor = SystemColors.GrayText, Padding = new Padding(8, 4, 8, 4) };
+    // 説明の欄。長い説明でも見切れないよう、説明の長さに合わせて高さを変える
+    private readonly Panel _helpPanel = new() { Dock = DockStyle.Bottom, Height = HelpMinHeight, BorderStyle = BorderStyle.FixedSingle };
+    private const int HelpMinHeight = 46;
+    private const int HelpMaxHeight = 150;
+    private readonly TextBox _testInput = new() { Dock = DockStyle.Top, ImeMode = ImeMode.Disable };
+    private readonly TextBox _testResult = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
+    private readonly ToolTip _toolTip = new() { AutoPopDelay = 20000 };
+    // プロファイル (仕事用・趣味用・SNS 用など) を選ぶ欄
+    private readonly ComboBox _profiles = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200, Anchor = AnchorStyles.Left };
+    private bool _loadingProfiles;
+
+    /// <summary>画面の部品に出していない値 (プロファイルの一覧・使っているプロファイル など) を持つ設定。</summary>
+    private Settings _draft;
+
+    /// <summary>1 項目分の部品と、設定値との受け渡し。</summary>
+    private sealed record Binding(PropertyInfo Property, Control Control, Action<Settings> Load, Action<Settings> Store);
+
+    public SettingsForm(MeltypeEngine engine)
+    {
+        _engine = engine;
+        _draft = engine.Settings.Clone().Normalize();
+        Text = "Meltype 設定";
+        StartPosition = FormStartPosition.CenterScreen;
+        // 画面に収まる高さにする (中身はスクロールできる)。
+        var area = Screen.FromPoint(Cursor.Position).WorkingArea;
+        Size = new Size(Math.Min(640, area.Width - 40), Math.Min(640, area.Height - 60));
+        MinimumSize = new Size(480, 400);
+        Font = new Font("Yu Gothic UI", 9.5F);
+
+        // 1 列の表に分類ごとの枠を縦に並べる (どの枠も画面の幅いっぱいにそろう)。
+        var body = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            AutoScroll = true,
+            Padding = new Padding(8, 8, SystemInformation.VerticalScrollBarWidth + 4, 8),
+        };
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        foreach (var group in BuildGroups())
+        {
+            group.Dock = DockStyle.Fill;
+            body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            body.Controls.Add(group);
+        }
+        // 自動スクロールの表は、最後の行の下の余白を含めないことがあり、一番下の枠が少し見切れる。空の行で余白を取る
+        body.RowStyles.Add(new RowStyle(SizeType.Absolute, 16));
+        body.Controls.Add(new Panel { Height = 16, Margin = Padding.Empty });
+
+        _helpPanel.Controls.Add(_help);
+        _helpPanel.Resize += (_, _) => FitHelp();
+
+        var testLabel = new Label { Text = "判定テスト (IME 自動切替の判定。英字で入力):", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 6, 0, 2) };
+        _testInput.TextChanged += (_, _) => RunTest();
+        var testPanel = new Panel { Dock = DockStyle.Bottom, Height = 110, Padding = new Padding(8, 0, 8, 0) };
+        testPanel.Controls.Add(_testResult);
+        testPanel.Controls.Add(_testInput);
+        testPanel.Controls.Add(testLabel);
+
+        var ok = new Button { Text = "OK", Width = 90 };
+        var cancel = new Button { Text = "キャンセル", Width = 90, DialogResult = DialogResult.Cancel };
+        var defaults = new Button { Text = "既定値に戻す", Width = 110 };
+        // OK と × (閉じる) は保存する。変更を捨てるのは キャンセル だけ。
+        var discard = false;
+        ok.Click += (_, _) => Close();
+        cancel.Click += (_, _) =>
+        {
+            discard = true;
+            Close();
+        };
+        FormClosing += (_, _) =>
+        {
+            if (discard) return;
+            var next = Collect();
+            if (next.ToJson() != _engine.Settings.Clone().Normalize().ToJson()) _engine.ApplySettings(next);
+        };
+        defaults.Click += (_, _) =>
+        {
+            LoadFrom(new Settings());
+            RunTest();
+        };
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, Height = 42, Padding = new Padding(6) };
+        buttons.Controls.AddRange([cancel, ok, defaults]);
+
+        Controls.Add(body);
+        Controls.Add(BuildProfileBar());
+        Controls.Add(_helpPanel);
+        Controls.Add(testPanel);
+        Controls.Add(buttons);
+        AcceptButton = ok;
+        CancelButton = cancel;
+
+        LoadFrom(_draft);
+        RefreshProfiles();
+    }
+
+    /// <summary>上のプロファイルの欄: 選ぶと、そのプロファイルの値を画面に読み込む。新規は今の値を写して作る。</summary>
+    private Control BuildProfileBar()
+    {
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(8, 8, 8, 0) };
+        var label = new Label { Text = "プロファイル:", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 0, 0) };
+        var add = new Button { Text = "新規...", AutoSize = true };
+        var rename = new Button { Text = "名前を変更...", AutoSize = true };
+        var remove = new Button { Text = "削除", AutoSize = true };
+        var export = new Button { Text = "書き出す...", AutoSize = true };
+        var import = new Button { Text = "読み込む...", AutoSize = true };
+        ShowHelpFor(_profiles, "プロファイル", "仕事用・趣味用・SNS 用など、設定の値をまとめて切り替えられます。トレイのメニューの「プロファイル」からも切り替えられます。Meltype の ON/OFF・ログ・更新の設定は、どのプロファイルでも共通です。「書き出す...」でファイルにして、ほかの人に渡せます (「読み込む...」で新しいプロファイルとして足せます)。");
+        _profiles.SelectedIndexChanged += (_, _) =>
+        {
+            if (_loadingProfiles || _profiles.SelectedItem is not string name || name == _draft.ActiveProfile) return;
+            // 今の画面の値を今のプロファイルに入れてから、選んだプロファイルの値を読み込む
+            _draft = Collect().SwitchProfile(name);
+            LoadFrom(_draft);
+            RunTest();
+        };
+        add.Click += (_, _) =>
+        {
+            if (TextPrompt.Ask(this, "新しいプロファイル", "名前 (例: 仕事用、趣味用、SNS 用)。今の設定を写して作ります。", "") is not { } name) return;
+            if (Collect().AddProfile(name) is not { } next)
+            {
+                MessageBox.Show(this, "名前が空か、同じ名前のプロファイルがあります。", "プロファイル", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            _draft = next;
+            RefreshProfiles();
+        };
+        rename.Click += (_, _) =>
+        {
+            var old = _draft.ActiveProfile;
+            if (TextPrompt.Ask(this, "プロファイルの名前を変更", "新しい名前:", old) is not { } name || name == old) return;
+            if (Collect().RenameProfile(old, name) is not { } next)
+            {
+                MessageBox.Show(this, "名前が空か、同じ名前のプロファイルがあります。", "プロファイル", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            _draft = next;
+            RefreshProfiles();
+        };
+        remove.Click += (_, _) =>
+        {
+            var name = _draft.ActiveProfile;
+            if (_draft.Profiles.Count <= 1)
+            {
+                MessageBox.Show(this, "プロファイルが 1 つだけのときは削除できません。", "プロファイル", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (MessageBox.Show(this, $"プロファイル「{name}」を削除しますか?", "プロファイル", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            _draft = Collect().RemoveProfile(name) ?? _draft;
+            LoadFrom(_draft);
+            RefreshProfiles();
+            RunTest();
+        };
+        // プロファイルを人に渡す: 書き出したファイルを、相手が「読み込む...」で新しいプロファイルとして足す
+        export.Click += (_, _) =>
+        {
+            var draft = Collect();
+            using var dialog = new SaveFileDialog
+            {
+                Title = "プロファイルを書き出す",
+                Filter = "Meltype のプロファイル (*.meltype-profile.json)|*.meltype-profile.json|すべてのファイル (*.*)|*.*",
+                FileName = $"{string.Concat(draft.ActiveProfile.Split(Path.GetInvalidFileNameChars()))}.meltype-profile.json",
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            try
+            {
+                File.WriteAllText(dialog.FileName, draft.ExportProfile());
+                MessageBox.Show(this, $"プロファイル「{draft.ActiveProfile}」を書き出しました。\nアプリ別設定 (アプリのプロセス名) も入っています。渡す前に、見られてもよいか確かめてください。", "プロファイル", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"書き出せませんでした: {ex.Message}", "プロファイル", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        };
+        import.Click += (_, _) =>
+        {
+            using var dialog = new OpenFileDialog
+            {
+                Title = "プロファイルを読み込む",
+                Filter = "Meltype のプロファイル (*.meltype-profile.json)|*.meltype-profile.json|JSON (*.json)|*.json|すべてのファイル (*.*)|*.*",
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            Settings? next = null;
+            try
+            {
+                // プロファイルは数 KB。大きすぎるファイルは読まない
+                if (new FileInfo(dialog.FileName).Length <= 1024 * 1024) next = Collect().ImportProfile(File.ReadAllText(dialog.FileName));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+            if (next is null)
+            {
+                MessageBox.Show(this, "Meltype のプロファイルとして読めませんでした。「書き出す...」で作ったファイルを選んでください。", "プロファイル", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            _draft = next;
+            LoadFrom(_draft);
+            RefreshProfiles();
+            RunTest();
+        };
+        bar.Controls.AddRange([label, _profiles, add, rename, remove, export, import]);
+        return bar;
+    }
+
+    /// <summary>プロファイルの一覧を出し直して、使っているものを選ぶ。</summary>
+    private void RefreshProfiles()
+    {
+        _loadingProfiles = true;
+        _profiles.Items.Clear();
+        _profiles.Items.AddRange(_draft.ProfileNames.Cast<object>().ToArray());
+        _profiles.SelectedItem = _draft.ActiveProfile;
+        _loadingProfiles = false;
+    }
+
+    /// <summary>分類 (Category) ごとの枠に、項目を 1 行ずつ並べる。</summary>
+    private IEnumerable<GroupBox> BuildGroups()
+    {
+        var properties = typeof(Settings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanWrite && p.GetCustomAttribute<BrowsableAttribute>()?.Browsable != false)
+            .GroupBy(p => p.GetCustomAttribute<CategoryAttribute>()?.Category ?? "その他")
+            .OrderBy(g => g.Key, StringComparer.Ordinal);
+        foreach (var category in properties)
+        {
+            var table = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Padding = new Padding(4) };
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
+            foreach (var property in category)
+            {
+                if (CreateBinding(property) is not { } binding) continue;
+                var name = property.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName ?? property.Name;
+                var description = property.GetCustomAttribute<DescriptionAttribute>()?.Description ?? "";
+                var label = new Label { Text = name, AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 0, 6) };
+                // 表 (アプリ別設定は表 + ボタンの枠) は、右の列だと狭くて列が見切れるので、名前の下に幅いっぱいで出す
+                var fullRow = binding.Control is DataGridView or Panel;
+                if (fullRow)
+                {
+                    table.Controls.Add(label);
+                    table.SetColumnSpan(label, 2);
+                    table.Controls.Add(binding.Control);
+                    table.SetColumnSpan(binding.Control, 2);
+                }
+                else
+                {
+                    table.Controls.Add(label);
+                    table.Controls.Add(binding.Control);
+                }
+                ShowHelpFor(label, name, description);
+                ShowHelpFor(binding.Control, name, description);
+                _bindings.Add(binding);
+            }
+            var group = new GroupBox { Text = StripNumber(category.Key), AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(6) };
+            group.Controls.Add(table);
+            yield return group;
+        }
+    }
+
+    /// <summary>項目の種類に合わせた部品を作る。</summary>
+    private Binding? CreateBinding(PropertyInfo property)
+    {
+        var type = property.PropertyType;
+        if (type == typeof(bool))
+        {
+            var combo = DropDown([On, Off]);
+            return new Binding(property, combo,
+                s => combo.SelectedItem = (bool)property.GetValue(s)! ? On : Off,
+                s => property.SetValue(s, Equals(combo.SelectedItem, On)));
+        }
+        if (type.IsEnum)
+        {
+            var values = Enum.GetValues(type).Cast<object>().ToList();
+            var combo = DropDown(values.Select(v => EnumName(type, v)).ToArray());
+            return new Binding(property, combo,
+                s => combo.SelectedIndex = values.IndexOf(property.GetValue(s)!),
+                s => property.SetValue(s, values[Math.Max(0, combo.SelectedIndex)]));
+        }
+        if (type == typeof(int))
+        {
+            var number = new NumericUpDown { Minimum = 0, Maximum = 60000, Width = 120, Anchor = AnchorStyles.Left };
+            return new Binding(property, number,
+                s => number.Value = Math.Clamp((int)property.GetValue(s)!, (int)number.Minimum, (int)number.Maximum),
+                s => property.SetValue(s, (int)number.Value));
+        }
+        if (type == typeof(List<AppRule>))
+        {
+            var grid = _rulesGrid = AppRulesGrid();
+            // プロセス名 (maya.exe など) を知らなくても足せるように、実行中のアプリから選べるようにする。
+            var add = new Button { Text = "実行中のアプリから追加…", AutoSize = true };
+            add.Click += (_, _) => ShowRunningApps(grid, add);
+            // 行の削除は Delete キーでもできるが、気づきにくいのでボタンも置く
+            var remove = new Button { Text = "選んだ行を削除", AutoSize = true };
+            remove.Click += (_, _) =>
+            {
+                foreach (var row in grid.SelectedCells.Cast<DataGridViewCell>().Select(c => c.OwningRow).Distinct().Where(r => !r.IsNewRow).ToList()) grid.Rows.Remove(row);
+            };
+            var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+            actions.Controls.AddRange([add, remove]);
+            var panel = new Panel { Height = grid.Height + add.PreferredSize.Height + 10, Dock = DockStyle.Fill };
+            panel.Controls.Add(grid);
+            panel.Controls.Add(actions);
+            return new Binding(property, panel,
+                s =>
+                {
+                    RefreshKindChoices(s.AppKinds.Select(k => k.Name));
+                    grid.Rows.Clear();
+                    foreach (var rule in (List<AppRule>)property.GetValue(s)!)
+                    {
+                        var kind = rule.Kind is { Length: > 0 } name && s.AppKinds.Any(k => k.Name == name) ? name : EnumName(typeof(AppProfile), rule.Profile);
+                        grid.Rows.Add(rule.Process, rule.Enabled ? On : Off, kind);
+                    }
+                },
+                s => property.SetValue(s, grid.Rows.Cast<DataGridViewRow>()
+                    .Where(r => !r.IsNewRow)
+                    .Select(r => (Process: (r.Cells[0].Value as string ?? "").Trim(), r.Cells[1].Value, Kind: r.Cells[2].Value as string ?? ""))
+                    .Where(r => r.Process.Length > 0)
+                    .Select(r =>
+                    {
+                        var builtIn = Enum.GetValues<AppProfile>().Where(p => EnumName(typeof(AppProfile), p) == r.Kind).Cast<AppProfile?>().FirstOrDefault();
+                        return new AppRule
+                        {
+                            Process = r.Process,
+                            Enabled = !Equals(r.Value, Off),
+                            Profile = builtIn ?? AppProfile.General,
+                            Kind = builtIn is null && r.Kind.Length > 0 ? r.Kind : null,
+                        };
+                    })
+                    .ToList()));
+        }
+        if (type == typeof(List<AppKind>))
+        {
+            var grid = AppKindsGrid();
+            return new Binding(property, grid,
+                s =>
+                {
+                    grid.Rows.Clear();
+                    foreach (var kind in (List<AppKind>)property.GetValue(s)!)
+                    {
+                        grid.Rows.Add(kind.Name, EnumName(typeof(AppProfile), kind.Base),
+                            kind.DetectionLevel is { } level ? EnumName(typeof(DetectionLevel), level) : SameAsGlobal,
+                            kind.LiveConversion is { } live ? (live ? On : Off) : SameAsGlobal,
+                            kind.StartInEnglish ? On : Off);
+                    }
+                },
+                s => property.SetValue(s, ReadKinds(grid)));
+        }
+        return null;
+    }
+
+    private const string SameAsGlobal = "全体と同じ";
+    private DataGridView? _rulesGrid;
+
+    private static List<AppKind> ReadKinds(DataGridView grid) => grid.Rows.Cast<DataGridViewRow>()
+        .Where(r => !r.IsNewRow && (r.Cells[0].Value as string ?? "").Trim().Length > 0)
+        .Select(r => new AppKind
+        {
+            Name = ((string)r.Cells[0].Value).Trim(),
+            Base = Equals(r.Cells[1].Value, EnumName(typeof(AppProfile), AppProfile.Code)) ? AppProfile.Code : AppProfile.General,
+            DetectionLevel = Enum.GetValues<DetectionLevel>().Where(l => Equals(r.Cells[2].Value, EnumName(typeof(DetectionLevel), l))).Cast<DetectionLevel?>().FirstOrDefault(),
+            LiveConversion = Equals(r.Cells[3].Value, On) ? true : Equals(r.Cells[3].Value, Off) ? false : null,
+            StartInEnglish = Equals(r.Cells[4].Value, On),
+        })
+        .GroupBy(k => k.Name).Select(g => g.First())
+        .ToList();
+
+    /// <summary>アプリ別設定の「種類」の選択肢を、一般 / コード + 独自の種類 にする。</summary>
+    private void RefreshKindChoices(IEnumerable<string> kinds)
+    {
+        if (_rulesGrid?.Columns[2] is not DataGridViewComboBoxColumn column) return;
+        var choices = Enum.GetValues<AppProfile>().Select(p => EnumName(typeof(AppProfile), p)).Concat(kinds).Distinct().ToList();
+        // 使われている値が選択肢から消えるとエラーになるので、今の値も残す。
+        foreach (DataGridViewRow row in _rulesGrid.Rows)
+        {
+            if (row.Cells[2].Value is string value && !choices.Contains(value)) choices.Add(value);
+        }
+        column.Items.Clear();
+        column.Items.AddRange(choices.Cast<object>().ToArray());
+    }
+
+    private DataGridView AppKindsGrid()
+    {
+        var grid = new DataGridView
+        {
+            Height = 140,
+            Dock = DockStyle.Fill,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            RowHeadersWidth = 24,
+            BackgroundColor = SystemColors.Window,
+            AllowUserToAddRows = true,
+            AllowUserToDeleteRows = true,
+        };
+        grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "名前 (例: チャット)", FillWeight = 26 });
+        grid.Columns.Add(Choices("元にする種類", 18, Enum.GetValues<AppProfile>().Select(p => EnumName(typeof(AppProfile), p))));
+        grid.Columns.Add(Choices("判定の強さ", 20, [SameAsGlobal, .. Enum.GetValues<DetectionLevel>().Select(l => EnumName(typeof(DetectionLevel), l))]));
+        grid.Columns.Add(Choices("ライブ変換", 18, [SameAsGlobal, On, Off]));
+        grid.Columns.Add(Choices("最初は英数", 18, [Off, On]));
+        grid.DefaultValuesNeeded += (_, e) =>
+        {
+            e.Row.Cells[1].Value = EnumName(typeof(AppProfile), AppProfile.General);
+            e.Row.Cells[2].Value = SameAsGlobal;
+            e.Row.Cells[3].Value = SameAsGlobal;
+            e.Row.Cells[4].Value = Off;
+        };
+        // 種類を足したり名前を変えたりしたら、アプリ別設定の「種類」の選択肢にすぐ出す。
+        void Changed() => RefreshKindChoices(ReadKinds(grid).Select(k => k.Name));
+        grid.CellValueChanged += (_, _) => Changed();
+        grid.RowsRemoved += (_, _) => Changed();
+        grid.DataError += (_, e) => e.ThrowException = false;
+        return grid;
+
+        static DataGridViewComboBoxColumn Choices(string header, int weight, IEnumerable<string> items)
+        {
+            var column = new DataGridViewComboBoxColumn { HeaderText = header, FillWeight = weight, FlatStyle = FlatStyle.Flat };
+            column.Items.AddRange(items.Cast<object>().ToArray());
+            return column;
+        }
+    }
+
+    private ComboBox DropDown(string[] items)
+    {
+        var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 250, Anchor = AnchorStyles.Left };
+        combo.Items.AddRange(items);
+        combo.SelectedIndexChanged += (_, _) => RunTest();
+        return combo;
+    }
+
+    /// <summary>窓を開いている実行中のアプリの一覧を出し、選んだものをアプリ別設定の表に足す (既に表にあれば、その行を選ぶ)。</summary>
+    private static void ShowRunningApps(DataGridView grid, Control anchor)
+    {
+        var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var process in System.Diagnostics.Process.GetProcesses())
+        {
+            try
+            {
+                if (process.MainWindowHandle != IntPtr.Zero && process.Id != Environment.ProcessId) names.Add(process.ProcessName + ".exe");
+            }
+            catch
+            {
+                // 終わったばかりのプロセスなど
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+        var menu = new ContextMenuStrip();
+        foreach (var name in names)
+        {
+            menu.Items.Add(name, null, (_, _) =>
+            {
+                var existing = grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => !r.IsNewRow && string.Equals(r.Cells[0].Value as string, name, StringComparison.OrdinalIgnoreCase));
+                var row = existing ?? grid.Rows[grid.Rows.Add(name, On, EnumName(typeof(AppProfile), AppProfile.General))];
+                grid.ClearSelection();
+                row.Selected = true;
+                grid.FirstDisplayedScrollingRowIndex = row.Index;
+                grid.CurrentCell = row.Cells[2];
+            });
+        }
+        if (menu.Items.Count == 0) menu.Items.Add("(窓を開いているアプリがありません)").Enabled = false;
+        menu.Show(anchor, new Point(0, anchor.Height));
+    }
+
+    private static DataGridView AppRulesGrid()
+    {
+        var grid = new DataGridView
+        {
+            Height = 200,
+            Dock = DockStyle.Fill,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            RowHeadersWidth = 24,
+            BackgroundColor = SystemColors.Window,
+            AllowUserToAddRows = true,
+            AllowUserToDeleteRows = true,
+        };
+        grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "プロセス名 (例: code.exe)", FillWeight = 55 });
+        var enabled = new DataGridViewComboBoxColumn { HeaderText = "自動切替", FillWeight = 22, FlatStyle = FlatStyle.Flat };
+        enabled.Items.AddRange(On, Off);
+        grid.Columns.Add(enabled);
+        // 種類: 一般 / コード (コメント・文字列の中だけ日本語)
+        var profile = new DataGridViewComboBoxColumn { HeaderText = "種類", FillWeight = 23, FlatStyle = FlatStyle.Flat };
+        profile.Items.AddRange(Enum.GetValues<AppProfile>().Select(p => (object)EnumName(typeof(AppProfile), p)).ToArray());
+        grid.Columns.Add(profile);
+        grid.DefaultValuesNeeded += (_, e) =>
+        {
+            e.Row.Cells[1].Value = On;
+            e.Row.Cells[2].Value = EnumName(typeof(AppProfile), AppProfile.General);
+        };
+        grid.DataError += (_, e) => e.ThrowException = false;
+        return grid;
+    }
+
+    private static string EnumName(Type type, object value) =>
+        type.GetField(value.ToString()!)?.GetCustomAttribute<DescriptionAttribute>()?.Description ?? value.ToString()!;
+
+    /// <summary>"1. 全般" → "全般"</summary>
+    private static string StripNumber(string category)
+    {
+        var dot = category.IndexOf(". ", StringComparison.Ordinal);
+        return dot >= 0 && category[..dot].All(char.IsAsciiDigit) ? category[(dot + 2)..] : category;
+    }
+
+    private void ShowHelpFor(Control control, string name, string description)
+    {
+        if (description.Length > 0) _toolTip.SetToolTip(control, description);
+        void Show(object? sender, EventArgs e)
+        {
+            _help.Text = description.Length > 0 ? $"{name}: {description}" : name;
+            FitHelp();
+        }
+        control.Enter += Show;
+        control.MouseEnter += Show;
+    }
+
+    /// <summary>説明の欄の高さを、説明が全部見える高さにする (上限を超える分はツールチップで見られる)。</summary>
+    private void FitHelp()
+    {
+        var width = Math.Max(100, _helpPanel.ClientSize.Width - _help.Padding.Horizontal);
+        var size = TextRenderer.MeasureText(_help.Text, _help.Font, new Size(width, int.MaxValue), TextFormatFlags.WordBreak);
+        var height = Math.Clamp(size.Height + _help.Padding.Vertical + 6, HelpMinHeight, HelpMaxHeight);
+        if (_helpPanel.Height != height) _helpPanel.Height = height;
+    }
+
+    private void LoadFrom(Settings settings)
+    {
+        foreach (var binding in _bindings) binding.Load(settings);
+    }
+
+    /// <summary>画面の内容を設定にする。画面に出していない項目 (SettingsVersion・プロファイルの一覧など) は今の値を引き継ぐ。</summary>
+    private Settings Collect()
+    {
+        var settings = _draft.Clone();
+        foreach (var binding in _bindings) binding.Store(settings);
+        return settings.Normalize();
+    }
+
+    private void RunTest()
+    {
+        if (_bindings.Count == 0) return;
+        var words = _testInput.Text.ToLowerInvariant().Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length == 0)
+        {
+            _testResult.Text = "";
+            return;
+        }
+        var settings = Collect();
+        var lines = new List<string>();
+        foreach (var word in words)
+        {
+            var letters = new string(word.Where(c => c is >= 'a' and <= 'z').ToArray());
+            if (letters.Length == 0) continue;
+            // 実際の動作と同じく 1 文字ずつ判定し、最初に結論が出た時点の結果を表示する。
+            for (var i = 1; i <= letters.Length; i++)
+            {
+                var result = _engine.Evaluate(letters[..i], settings);
+                if (result.Verdict != Detection.Verdict.Undecided || i == letters.Length)
+                {
+                    var verdict = result.Verdict == Detection.Verdict.Undecided ? "Unknown (Space で確定)" : result.Verdict.ToString();
+                    lines.Add($"{word}: {verdict} — \"{letters[..i]}\" の時点, JP={result.JapaneseScore} EN={result.EnglishScore}\r\n    " +
+                              string.Join("\r\n    ", result.Contributions.Select(c => c.ToString())));
+                    break;
+                }
+            }
+        }
+        _testResult.Text = string.Join("\r\n", lines);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) _toolTip.Dispose();
+        base.Dispose(disposing);
+    }
+}

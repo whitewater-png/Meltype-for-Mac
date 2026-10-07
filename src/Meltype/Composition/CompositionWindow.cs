@@ -1,0 +1,372 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
+using System.Drawing.Drawing2D;
+
+namespace Meltype.Composition;
+
+/// <summary>
+/// 変換ボックス。フォーカスを奪わない最前面のウィンドウで、カーソル (キャレット) の下に出す。
+/// 未確定の文字列に下線を引き、変換中は候補の一覧を出す。
+/// </summary>
+internal sealed class CompositionWindow : Form
+{
+    private const int WS_EX_NOACTIVATE = 0x08000000, WS_EX_TOOLWINDOW = 0x00000080, WS_EX_TOPMOST = 0x00000008;
+    private static readonly Color Background = Color.FromArgb(32, 34, 40);
+    private static readonly Color Accent = Color.FromArgb(76, 160, 255);
+    private Font _textFont = new("Yu Gothic UI", 13F);
+    private Font _candidateFont = new("Yu Gothic UI", 11F);
+    private Font _hintFont = new("Yu Gothic UI", 8.5F);
+    private float _scale = 1F;
+
+    /// <summary>文字の大きさの倍率 (1 = 打った文字が 13pt)。変わったときだけ作り直す。</summary>
+    public void SetScale(float scale)
+    {
+        scale = Math.Clamp(scale, 0.6F, 2F);
+        if (Math.Abs(scale - _scale) < 0.01F) return;
+        _scale = scale;
+        _textFont.Dispose();
+        _candidateFont.Dispose();
+        _hintFont.Dispose();
+        _textFont = new Font("Yu Gothic UI", 13F * scale);
+        _candidateFont = new Font("Yu Gothic UI", 11F * scale);
+        // 案内の文字は小さくしすぎると読めないので、縮めるのは少しだけ
+        _hintFont = new Font("Yu Gothic UI", 8.5F * Math.Max(scale, 0.9F));
+    }
+
+    /// <summary>倍率 1 のときの、打った文字の行の高さ (ピクセル)。</summary>
+    public int BaseTextHeight { get; } = MeasureBaseHeight();
+
+    private static int MeasureBaseHeight()
+    {
+        using var font = new Font("Yu Gothic UI", 13F);
+        return font.Height;
+    }
+    private CompositionView? _view;
+    private readonly ColorTextRenderer _color = new();
+
+    public CompositionWindow()
+    {
+        FormBorderStyle = FormBorderStyle.None;
+        ShowInTaskbar = false;
+        TopMost = true;
+        StartPosition = FormStartPosition.Manual;
+        BackColor = Background;
+        DoubleBuffered = true;
+        Size = new Size(200, 40);
+        _meaningTimer.Tick += (_, _) => ShowMeaning();
+    }
+
+    protected override bool ShowWithoutActivation => true;
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST;
+            return cp;
+        }
+    }
+
+    /// <summary>表示内容を更新する。anchor は表示位置 (キャレットの左下)。null なら今の位置のまま。</summary>
+    /// <summary>変換ボックスの中で、打った文字の行の左端と、行の高さの真ん中の位置 (入力位置に重ねるときに使う)。</summary>
+    public Point TextOffset => new(10, 8 + _textFont.Height / 2);
+
+    /// <param name="overlay">anchor が入力位置に重ねる位置か。画面の下からはみ出すときは、候補の一覧が入るだけ上にずらす。</param>
+    public void ShowView(CompositionView view, Point? anchor, bool overlay = false)
+    {
+        _view = view;
+        var size = Measure(view);
+        var location = anchor ?? Location;
+        // 画面からはみ出さないようにする。
+        var screen = Screen.FromPoint(location).WorkingArea;
+        if (location.X + size.Width > screen.Right) location.X = Math.Max(screen.Left, screen.Right - size.Width);
+        if (location.Y + size.Height > screen.Bottom) location.Y = overlay ? Math.Max(screen.Top, screen.Bottom - size.Height) : Math.Max(screen.Top, location.Y - size.Height - 28);
+        SetBounds(location.X, location.Y, size.Width, size.Height);
+        if (!Visible) Show();
+        Invalidate();
+        UpdateMeaning(view);
+    }
+
+    /// <summary>「もしかして」の行の高さ。</summary>
+    private int SuggestionHeight => _candidateFont.Height + 10;
+
+    /// <summary>候補の一覧に一度に出す数 (Microsoft IME と同じく 9 個)。</summary>
+    private const int PageSize = 9;
+
+    /// <summary>候補で止まってから意味を出すまでの時間。</summary>
+    private const int MeaningDelayMs = 1500;
+    private readonly System.Windows.Forms.Timer _meaningTimer = new() { Interval = MeaningDelayMs };
+    private MeaningPopup? _meaningPopup;
+    private string? _meaningKey;
+
+    /// <summary>選んでいる候補が変わったら意味を消し、同じ候補のまましばらく止まったら意味を出す。</summary>
+    private void UpdateMeaning(CompositionView view)
+    {
+        var key = view is { Converting: true, Meaning: not null } && view.SelectedIndex >= 0 ? $"{view.SelectedIndex}\n{view.Candidates[view.SelectedIndex]}\n{view.Meaning}" : null;
+        if (key == _meaningKey)
+        {
+            if (_meaningPopup is { Visible: true }) PlaceMeaning(view);
+            return;
+        }
+        _meaningKey = key;
+        _meaningTimer.Stop();
+        _meaningPopup?.Hide();
+        if (key is not null) _meaningTimer.Start();
+    }
+
+    private void ShowMeaning()
+    {
+        _meaningTimer.Stop();
+        if (_view is not { Meaning: { } meaning } view || !Visible) return;
+        _meaningPopup ??= new MeaningPopup();
+        _meaningPopup.SetText(meaning, _candidateFont);
+        PlaceMeaning(view);
+        if (!_meaningPopup.Visible) _meaningPopup.Show();
+    }
+
+    /// <summary>意味の枠を、変換ボックスの右 (はみ出すなら左) の、選んでいる候補の行の高さに置く。</summary>
+    private void PlaceMeaning(CompositionView view)
+    {
+        if (_meaningPopup is null) return;
+        var row = Math.Max(0, view.SelectedIndex) % PageSize;
+        var y = Top + 8 + _textFont.Height + 8 + (view.Suggestion is null ? 0 : SuggestionHeight) + row * (_candidateFont.Height + 4) - 4;
+        var size = _meaningPopup.Size;
+        var screen = Screen.FromControl(this).WorkingArea;
+        var x = Right + 4;
+        if (x + size.Width > screen.Right) x = Math.Max(screen.Left, Left - size.Width - 4);
+        y = Math.Clamp(y, screen.Top, Math.Max(screen.Top, screen.Bottom - size.Height));
+        _meaningPopup.Location = new Point(x, y);
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (Visible) return;
+        _meaningTimer.Stop();
+        _meaningKey = null;
+        _meaningPopup?.Hide();
+    }
+
+    /// <summary>候補の意味を出す小さな枠 (フォーカスを奪わない)。</summary>
+    private sealed class MeaningPopup : Form
+    {
+        private string _text = "";
+        private Font? _font;
+
+        public MeaningPopup()
+        {
+            FormBorderStyle = FormBorderStyle.None;
+            ShowInTaskbar = false;
+            TopMost = true;
+            StartPosition = FormStartPosition.Manual;
+            BackColor = Color.FromArgb(44, 47, 56);
+            DoubleBuffered = true;
+        }
+
+        protected override bool ShowWithoutActivation => true;
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                var cp = base.CreateParams;
+                cp.ExStyle |= WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST;
+                return cp;
+            }
+        }
+
+        public void SetText(string text, Font font)
+        {
+            _text = text;
+            _font = font;
+            var size = TextRenderer.MeasureText(text, font, new Size(420, 0), TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak);
+            Size = new Size(size.Width + 16, size.Height + 10);
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            using (var border = new Pen(Color.FromArgb(110, 76, 160, 255))) e.Graphics.DrawRectangle(border, 0, 0, Width - 1, Height - 1);
+            if (_font is null) return;
+            TextRenderer.DrawText(e.Graphics, _text, _font, new Rectangle(8, 5, Width - 16, Height - 10), Color.FromArgb(225, 225, 225),
+                TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak);
+        }
+    }
+
+    private Size Measure(CompositionView view)
+    {
+        using var g = CreateGraphics();
+        var width = TextRenderer.MeasureText(g, view.Text, _textFont).Width + 20;
+        if (view.Clauses is { Count: > 0 } clauses)
+        {
+            var clausesWidth = clauses.Sum(c => TextRenderer.MeasureText(g, c, _textFont, Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Width + 4);
+            width = Math.Max(width, clausesWidth + 20);
+        }
+        var height = _textFont.Height + 16;
+        if (view.Suggestion is { } suggestion)
+        {
+            width = Math.Max(width, TextRenderer.MeasureText(g, suggestion, _candidateFont).Width + 32);
+            height += SuggestionHeight;
+        }
+        if (view.Converting)
+        {
+            for (var i = 0; i < view.Candidates.Count; i++)
+            {
+                // 英訳の候補は、右に「英訳」と出す分だけ広くする
+                var note = view.Notes?.ElementAtOrDefault(i) is { } n ? TextRenderer.MeasureText(g, n, _hintFont).Width + 12 : 0;
+                width = Math.Max(width, TextRenderer.MeasureText(g, $"9  {view.Candidates[i]}", _candidateFont).Width + 28 + note);
+            }
+            height += Math.Min(view.Candidates.Count, PageSize) * (_candidateFont.Height + 4) + 6;
+            // 2 ページ以上あるときは、下に「3 / 27」を出す分
+            if (view.Candidates.Count > PageSize) height += _hintFont.Height + 2;
+        }
+        width = Math.Max(width, TextRenderer.MeasureText(g, view.Hint, _hintFont).Width + 16);
+        height += _hintFont.Height + 6;
+        return new Size(Math.Min(width, 900), height);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var view = _view;
+        if (view is null) return;
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using (var border = new Pen(Accent)) g.DrawRectangle(border, 0, 0, Width - 1, Height - 1);
+
+        var y = 8;
+        if (view.Clauses is { Count: > 0 } clauses)
+        {
+            // 変換中: 文節ごとに下線を引き、選択中の文節は背景を付けて太線にする。
+            const TextFormatFlags flags = TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+            var x = 10;
+            for (var i = 0; i < clauses.Count; i++)
+            {
+                var width = TextRenderer.MeasureText(g, clauses[i], _textFont, Size.Empty, flags).Width;
+                var selected = i == view.SelectedClause;
+                if (selected)
+                {
+                    using var highlight = new SolidBrush(Color.FromArgb(90, 76, 160, 255));
+                    g.FillRectangle(highlight, x - 1, y - 1, width + 2, _textFont.Height + 2);
+                }
+                DrawText(g, clauses[i], _textFont, new Point(x, y), Color.White, selected ? Blend(Background, Color.FromArgb(90, 76, 160, 255)) : Background, flags);
+                using (var underline = new Pen(selected ? Accent : Color.FromArgb(170, 170, 170), selected ? 3 : 1))
+                {
+                    g.DrawLine(underline, x + 1, y + _textFont.Height + 1, x + width - 2, y + _textFont.Height + 1);
+                }
+                x += width + 4;
+            }
+            y += _textFont.Height + 8;
+        }
+        else
+        {
+            DrawText(g, view.Text, _textFont, new Point(10, y), Color.White, Background, TextFormatFlags.NoPrefix);
+            var textWidth = TextRenderer.MeasureText(g, view.Text, _textFont).Width;
+            y += _textFont.Height;
+            using (var underline = new Pen(Color.White, 1) { DashStyle = DashStyle.Dot })
+            {
+                g.DrawLine(underline, 12, y, 10 + textWidth - 4, y);
+            }
+            y += 8;
+        }
+
+        if (view.Suggestion is { } suggestion)
+        {
+            // もしかして: 打った文字のすぐ下に目立つように (Tab で直せる)
+            var box = new Rectangle(6, y - 2, Width - 12, SuggestionHeight - 4);
+            using (var fill = new SolidBrush(Color.FromArgb(70, 255, 196, 0))) g.FillRectangle(fill, box);
+            using (var edge = new Pen(Color.FromArgb(255, 196, 0))) g.DrawRectangle(edge, box);
+            TextRenderer.DrawText(g, suggestion, _candidateFont, new Point(12, y + 1), Color.FromArgb(255, 220, 120), TextFormatFlags.NoPrefix);
+            y += SuggestionHeight;
+        }
+
+        if (view.Converting)
+        {
+            // 9 個ずつのページに分けて、選んでいる候補のページだけを出す (候補が多いと画面に収まらないため)。
+            var first = Math.Max(0, view.SelectedIndex) / PageSize * PageSize;
+            var listTop = y;
+            for (var i = first; i < Math.Min(view.Candidates.Count, first + PageSize); i++)
+            {
+                var rowHeight = _candidateFont.Height + 4;
+                if (i == view.SelectedIndex)
+                {
+                    using var highlight = new SolidBrush(Color.FromArgb(60, 76, 160, 255));
+                    g.FillRectangle(highlight, 4, y - 2, Width - 8, rowHeight);
+                }
+                DrawText(g, $"{i - first + 1}  {view.Candidates[i]}", _candidateFont, new Point(12, y),
+                    i == view.SelectedIndex ? Color.White : Color.FromArgb(200, 200, 200),
+                    i == view.SelectedIndex ? Blend(Background, Color.FromArgb(60, 76, 160, 255)) : Background, TextFormatFlags.NoPrefix);
+                if (view.Notes?.ElementAtOrDefault(i) is { } note)
+                {
+                    // 英訳の候補: 右端に小さく「英訳」
+                    var noteWidth = TextRenderer.MeasureText(g, note, _hintFont).Width;
+                    TextRenderer.DrawText(g, note, _hintFont, new Point(Width - noteWidth - 10, y + (_candidateFont.Height - _hintFont.Height) / 2), Accent, TextFormatFlags.NoPrefix);
+                }
+                y += rowHeight;
+            }
+            if (view.Candidates.Count > PageSize)
+            {
+                // 最後のページで候補が少なくても、ページ番号と案内は同じ位置に (ページを送っても窓の大きさが変わらないように)
+                y = listTop + PageSize * (_candidateFont.Height + 4);
+                var page = $"{Math.Max(0, view.SelectedIndex) + 1} / {view.Candidates.Count}";
+                var pageWidth = TextRenderer.MeasureText(g, page, _hintFont).Width;
+                TextRenderer.DrawText(g, page, _hintFont, new Point(Width - pageWidth - 10, y + 1), Color.FromArgb(150, 150, 150), TextFormatFlags.NoPrefix);
+                y += _hintFont.Height + 2;
+            }
+            y += 6;
+        }
+        TextRenderer.DrawText(g, view.Hint, _hintFont, new Point(8, y), Color.FromArgb(150, 150, 150), TextFormatFlags.NoPrefix);
+    }
+
+    /// <summary>
+    /// 文字列を描く。絵文字を含むならカラーで描く (GDI だと白黒になるため)。back はその場所の背景色 (半透明の強調を重ねた後の色)。
+    /// </summary>
+    private void DrawText(Graphics g, string text, Font font, Point location, Color fore, Color back, TextFormatFlags flags)
+    {
+        if (_color.Available && ColorTextRenderer.ContainsEmoji(text))
+        {
+            var size = TextRenderer.MeasureText(g, text, font, Size.Empty, flags);
+            var width = Math.Min(size.Width + 8, Math.Max(1, Width - location.X - 2));
+            var bounds = new Rectangle(location.X, location.Y, width, Math.Max(size.Height, font.Height));
+            // GetHdc の間は Graphics のプロパティを読めないので、先に文字の大きさを求める。
+            var pixels = font.SizeInPoints * g.DpiY / 72f;
+            var hdc = g.GetHdc();
+            try
+            {
+                if (_color.Draw(hdc, bounds, text, font.Name, pixels, fore, back)) return;
+            }
+            catch (Exception ex)
+            {
+                // カラーで描けなくても、変換ボックスは止めずに白黒で描く。
+                Diagnostics.Log.Warn($"カラー絵文字を描けませんでした: {ex.Message}");
+            }
+            finally
+            {
+                g.ReleaseHdc(hdc);
+            }
+        }
+        TextRenderer.DrawText(g, text, font, location, fore, flags);
+    }
+
+    /// <summary>背景に半透明の色を重ねた後の色。</summary>
+    private static Color Blend(Color back, Color overlay) => Color.FromArgb(
+        back.R + (overlay.R - back.R) * overlay.A / 255,
+        back.G + (overlay.G - back.G) * overlay.A / 255,
+        back.B + (overlay.B - back.B) * overlay.A / 255);
+
+    protected override void Dispose(bool disposing)
+
+    {
+        if (disposing)
+        {
+            _textFont.Dispose();
+            _candidateFont.Dispose();
+            _hintFont.Dispose();
+            _color.Dispose();
+            _meaningTimer.Dispose();
+            _meaningPopup?.Dispose();
+        }
+        base.Dispose(disposing);
+    }
+}

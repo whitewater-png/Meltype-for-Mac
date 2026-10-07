@@ -1,0 +1,25 @@
+# ビルド成果物・配布物 (ソースから作り直せるもの)
+bin/
+obj/
+.build/
+mac/build/
+mac/dist/
+*.zip
+*.dmg
+*.pkg
+
+# エディター・OS
+.DS_Store
+.vs/
+.idea/
+*.user
+*.suo
+
+# 署名・秘密情報 (誤ってコミットしないため)
+*.p12
+*.pem
+*.key
+*.cer
+*.mobileprovision
+.env
+.env.*

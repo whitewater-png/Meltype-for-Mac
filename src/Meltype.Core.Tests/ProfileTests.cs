@@ -1,0 +1,115 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
+using Meltype.Config;
+
+namespace Meltype.Tests;
+
+/// <summary>プロファイル (仕事用・趣味用・SNS 用など): 設定の値をまとめて切り替える。</summary>
+internal static class ProfileTests
+{
+    [Test]
+    public static void Profiles_SwitchValuesAndKeepSharedOnes()
+    {
+        var settings = new Settings().Normalize();
+        Assert.Equal("標準", settings.ActiveProfile, "最初は「標準」だけ");
+        Assert.Equal(1, settings.Profiles.Count);
+
+        // 「仕事用」を足す (今の値を写す) → 仕事用だけ慎重・ライブ変換 OFF にする
+        var work = settings.AddProfile("仕事用")!;
+        Assert.Equal("仕事用", work.ActiveProfile);
+        work.DetectionLevel = DetectionLevel.Conservative;
+        work.LiveConversion = false;
+        work.AppKinds.Add(new AppKind { Name = "チャット" });
+
+        // 標準に戻すと、標準の値に戻る。共通の項目 (ログ・更新) は切り替えても変わらない
+        work.FileLog = true;
+        var standard = work.SwitchProfile("標準");
+        Assert.Equal("標準", standard.ActiveProfile);
+        Assert.Equal(DetectionLevel.Balanced, standard.DetectionLevel);
+        Assert.True(standard.LiveConversion, "標準はライブ変換 ON のまま");
+        Assert.Equal(0, standard.AppKinds.Count, "表 (独自の種類) もプロファイルごと");
+        Assert.True(standard.FileLog, "ログはどのプロファイルでも共通");
+
+        // もう一度 仕事用 にすると、仕事用で変えた値が戻ってくる
+        var back = standard.SwitchProfile("仕事用");
+        Assert.Equal(DetectionLevel.Conservative, back.DetectionLevel);
+        Assert.True(!back.LiveConversion, "仕事用はライブ変換 OFF");
+        Assert.Equal("チャット", back.AppKinds.Single().Name);
+
+        // 保存して読み直しても同じ
+        var path = Path.Combine(Path.GetTempPath(), $"meltype-profile-{Environment.ProcessId}.json");
+        try
+        {
+            back.Save(path);
+            var loaded = Settings.Load(path);
+            Assert.Equal("仕事用", loaded.ActiveProfile);
+            Assert.Equal(DetectionLevel.Balanced, loaded.SwitchProfile("標準").DetectionLevel);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
+    public static void Profiles_RenameAndRemove()
+    {
+        var settings = new Settings().Normalize().AddProfile("SNS")!;
+        Assert.True(settings.AddProfile("SNS") is null, "同じ名前は足せない");
+        Assert.True(settings.AddProfile("  ") is null, "空の名前は足せない");
+
+        var renamed = settings.RenameProfile("SNS", "SNS 用")!;
+        Assert.Equal("SNS 用", renamed.ActiveProfile, "使っているものの名前を変えたら、使っている名前も変わる");
+
+        // 使っているものを消すと、残りの最初のものに切り替わる。最後の 1 つは消せない
+        var removed = renamed.RemoveProfile("SNS 用")!;
+        Assert.Equal("標準", removed.ActiveProfile);
+        Assert.Equal(1, removed.Profiles.Count);
+        Assert.True(removed.RemoveProfile("標準") is null, "最後の 1 つは消せない");
+    }
+    [Test]
+    public static void Profiles_ExportAndImportBetweenUsers()
+    {
+        // A さんが「配信用」を作って書き出す
+        var a = new Settings().Normalize().AddProfile("配信用")!;
+        a.DetectionLevel = DetectionLevel.Conservative;
+        a.LiveConversion = false;
+        a.AppKinds.Add(new AppKind { Name = "チャット" });
+        a.FileLog = true;
+        var file = a.ExportProfile();
+
+        // B さんが読み込む: 新しいプロファイルとして足して切り替える。共通の項目 (ログ) は B さんのまま
+        var b = new Settings().Normalize();
+        var imported = b.ImportProfile(file)!;
+        Assert.Equal("配信用", imported.ActiveProfile);
+        Assert.Equal(DetectionLevel.Conservative, imported.DetectionLevel);
+        Assert.True(!imported.LiveConversion, "ライブ変換 OFF も入る");
+        Assert.Equal("チャット", imported.AppKinds.Single().Name);
+        Assert.True(!imported.FileLog, "ログは共通の項目なので読み込まない");
+        Assert.True(imported.SwitchProfile("標準").LiveConversion, "前からのプロファイルはそのまま");
+
+        // 同じ名前があれば (2) を付ける
+        Assert.Equal("配信用 (2)", imported.ImportProfile(file)!.ActiveProfile);
+
+        // 読めないファイル・別の JSON は読み込まない
+        Assert.True(b.ImportProfile("not json") is null, "JSON でない");
+        Assert.True(b.ImportProfile("{\"Enabled\": false}") is null, "config.json など別のファイル");
+        Assert.True(b.ImportProfile("{\"format\":\"meltype-profile\",\"values\":{\"LiveConversion\":\"yes\"}}") is null, "型の違う値");
+
+        // 知らない項目・共通の項目は無視し、範囲外の値は収める
+        var odd = b.ImportProfile("{\"format\":\"meltype-profile\",\"name\":\"x\",\"values\":{\"Enabled\":false,\"Unknown\":1,\"IdleFlushMs\":999999}}")!;
+        Assert.True(odd.Enabled, "ON/OFF は読み込まない");
+        Assert.Equal(3000, odd.IdleFlushMs, "範囲に収める");
+    }
+    [Test]
+    public static void PasteApps_MatchProcessNames()
+    {
+        // #5: DaVinci Resolve は 1 文字ずつ送ると取り違えるので、最初から貼り付けで入れる
+        var settings = new Settings().Normalize();
+        Assert.True(settings.UsesPaste("Resolve.exe") && settings.UsesPaste("resolve.EXE"), "Resolve は最初から (大文字小文字は問わない)");
+        Assert.True(!settings.UsesPaste("notepad.exe") && !settings.UsesPaste(null), "ほかのアプリは今までどおり");
+        settings.PasteApps = "Resolve.exe, LINE.exe ;foo.exe";
+        Assert.True(settings.UsesPaste("LINE.exe") && settings.UsesPaste("foo.exe"), "カンマ・セミコロン区切り");
+    }
+}
