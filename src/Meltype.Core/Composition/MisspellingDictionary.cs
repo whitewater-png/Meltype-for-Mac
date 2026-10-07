@@ -33,7 +33,7 @@ public sealed class MisspellingDictionary
             var path = Path.Combine(userDirectory, "misspellings.txt");
             try
             {
-                if (File.Exists(path)) dictionary.AddText(File.ReadAllText(path));
+                if (File.Exists(path)) dictionary.AddText(Config.SafeFile.ReadAllText(path) ?? "");
             }
             catch (Exception ex)
             {

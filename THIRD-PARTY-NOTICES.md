@@ -14,7 +14,17 @@ Meltype のソースコード (このリポジトリ) には、他者の著作�
 | 部品 | ライセンス | 使い方 |
 | --- | --- | --- |
 | [AzooKeyKanaKanjiConverter](https://github.com/azooKey/AzooKeyKanaKanjiConverter) (azooKey の変換エンジンと辞書) | MIT License | Swift Package として取り込み、Meltype.app に組み込む (漢字変換)。Meltype.app を配布するときは、azooKey のライセンス表示も同梱する |
+| azooKey の同梱辞書 (AzooKeyKanaKanjiConverter の `azooKey_dictionary_storage`。Copyright 2024 Miwa / ensan) | Apache License 2.0 | AzooKeyKanaKanjiConverter と一緒に Meltype.app の `Contents/Resources` に入る辞書データ (変換に使う)。ライセンス全文はその辞書のフォルダーの `LICENSE` |
+| azooKey の絵文字辞書 (`azooKey_emoji_dictionary_storage`) | このフォルダーに LICENSE ファイルは無く、README には元データとして Mozc の `emoji_data.tsv`・Unicode の emoji データ・CLDR の日本語注釈を使うと書かれている (各元データのライセンスは、配布前に確認する) | 同じく `Contents/Resources` に入る (変換結果に絵文字を出す) |
+| [swift-tokenizers](https://github.com/ensan-hcl/swift-tokenizers) (Copyright 2022 Hugging Face SAS) | Apache License 2.0 | AzooKeyKanaKanjiConverter の依存として取得され、Meltype.app に組み込まれる |
+| [Jinja](https://github.com/johnmai-dev/Jinja) (Copyright (c) 2024 John Mai) | MIT License | swift-tokenizers の依存として取得され、Meltype.app に組み込まれる |
+| [swift-collections](https://github.com/apple/swift-collections) | Apache License 2.0 (Runtime Library Exception 付き) | AzooKeyKanaKanjiConverter の依存として取得され、Meltype.app に組み込まれる |
+| [swift-algorithms](https://github.com/apple/swift-algorithms) | Apache License 2.0 (Runtime Library Exception 付き) | 同上 |
+| [swift-numerics](https://github.com/apple/swift-numerics) | Apache License 2.0 (Runtime Library Exception 付き) | 同上 |
 | .NET ランタイム (NativeAOT) | MIT License | libMeltypeNative.dylib に組み込まれる |
+
+上の Swift の部品のライセンスは、ビルド時に取得される `mac/.build/checkouts/<部品名>/LICENSE` (または `LICENSE.txt`) を読んで書いています。
+Meltype.app を配布するときは、これらのライセンス全文 (MIT / Apache License 2.0) と、Apache License 2.0 の部品の著作権表示を同梱してください。
 
 ## 実行時に使う Windows の機能 (同梱しない)
 

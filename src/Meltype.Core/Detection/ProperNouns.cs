@@ -21,7 +21,7 @@ public sealed class ProperNouns
             var path = Path.Combine(userDirectory, "propernouns.txt");
             try
             {
-                if (File.Exists(path)) nouns.AddText(File.ReadAllText(path));
+                if (File.Exists(path)) nouns.AddText(Config.SafeFile.ReadAllText(path) ?? "");
             }
             catch (Exception ex)
             {

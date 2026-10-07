@@ -38,6 +38,27 @@ cd mac
 ログアウトするまで入力メニューに出なくなります (`build.sh` / `install.sh` は Meltype.app を消さずに中身だけを入れ替えます)。
 `mac/.build` (Swift のビルド結果) は azooKey の辞書の置き場所として使われることがあるので、消さないでください。
 
+## 配布物の確認とインストールの影響範囲
+
+テスト版の zip は Apple の公証を受けていません。受け取ったら、まず SHA-256 をリリースページ (または渡した人) の値と見比べてください。
+
+```bash
+shasum -a 256 ~/Downloads/Meltype-mac.zip   # ファイル名は実際のものに合わせる
+```
+
+`install.sh` (zip の「Install Meltype.command」から呼ばれる) は、次のことをします。これ以外 (管理者権限・ネットワーク通信) はしません。
+
+1. `codesign --verify --deep --strict` で Meltype.app が壊れていないか確かめる (壊れていたら何も入れずに中止)
+2. 実行ファイルと `libMeltypeNative.dylib` の SHA-256 を表示する (リリースページの値と見比べる)
+3. `~/Library/Input Methods/Meltype.app` に入れる (入れ直しのときは `rsync -a --delete` で中身だけ入れ替え、動いている Meltype を `pkill -x Meltype` で止める)
+4. 隔離属性 `com.apple.quarantine` を外す。**macOS の Gatekeeper の検査をこの Meltype.app について回避する**操作なので、端末では `[y/N]` を聞きます (`--yes` で省略。端末でなく `--yes` も無いときは外さない)
+5. 入力ソースとして登録し、`killall imklaunchagent TextInputMenuAgent` で入力メニューと IME の起動役を起動し直す
+6. 登録できなかったときだけ `defaults write com.apple.HIToolbox AppleEnabledInputSources -array-add …` で入力ソースの一覧に書き込む
+7. 同じバンドル ID の別の Meltype.app を `lsregister -u` で LaunchServices の登録から外す (ファイルは消さない)
+
+`build.sh` は、ビルドした実行ファイルの RPATH からビルドしたマシンの絶対パス (`/Library/Developer/CommandLineTools/...`) を `install_name_tool -delete_rpath` で除いてから署名します。
+組み立てたあとの `otool -l build/Meltype.app/Contents/MacOS/Meltype` で、`LC_RPATH` に `/usr/lib/swift`・`@loader_path`・`@executable_path/../Frameworks` だけが残っていることを確かめられます。
+
 ## 使い方
 
 - ふつうにローマ字で打つと、下線付きの変換中の文字になります。英単語 (google, github …) は英字のまま
@@ -46,7 +67,9 @@ cd mac
 - 変換ボックスが出ているときは Ctrl キーでも同じ: Ctrl+J ひらがな / Ctrl+K カタカナ / Ctrl+; 半角カナ / Ctrl+L 全角英数 / Ctrl+' 半角英数 (JIS は Ctrl+:)
 - JIS キーボードの「英数」キーで英数 (直接入力)、「かな」キーで日本語に戻ります (入力メニューの表示も「英数 (Meltype)」「Meltype」に変わります)
 - Caps Lock で「Meltype」と「英数 (Meltype)」を切り替えられます (効かないときは入力メニューから選んでください)。US 配列では Caps Lock か入力メニューで切り替えます
-- 設定・学習データ・ユーザー辞書は `~/Library/Application Support/Meltype` (入力メニューの「Meltype のデータフォルダを開く」)。
+- 入力メニューの「学習データをすべて消去…」で、変換・予測・登録提案・英語/日本語・英訳・ユーザーモデル・azooKey の学習を消せます (確認あり。ユーザー辞書と設定は消えません)
+- パスワード欄など macOS が「秘匿入力」にしている欄 (`IsSecureEventInputEnabled`) では、キーを扱わずアプリに素通しします (アプリが秘匿入力と知らせていない欄は検知できません)
+- 設定・学習データ・ユーザー辞書は `~/Library/Application Support/Meltype` (入力メニューの「Meltype のデータフォルダを開く」)。学習データは本人だけが読める権限 (ファイル 0600・フォルダー 0700) で保存します。
   設定は Windows 版と同じ `config.json` です (自動判定の強さ `DetectionLevel` など)
 
 ## 困ったとき

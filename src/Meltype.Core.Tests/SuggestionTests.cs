@@ -82,8 +82,11 @@ internal static class SuggestionTests
         Assert.True(!suggestions.Record("ありがとう", "ありがとー", 3), "ひらがなだけの語は数えない (別の綴り)");
         Assert.True(!suggestions.Record("き", "記", 3), "読みが短い");
         Assert.True(!suggestions.Record("abc", "ABC", 3), "読みがひらがなでない");
-        Assert.True(!suggestions.Record("ぱすわーど", "Abcd1234Efgh5678", 3), "16 文字以上の英数字だけの語はパスワードかもしれない");
-        Assert.True(suggestions.Record("ぱすわーど", "Abcd1234Efgh567", 3), "15 文字なら数える");
+        Assert.True(!suggestions.Record("ぱすわーど", "Abcd1234Efgh5678", 3), "12 文字以上の英数字だけの語はパスワードかもしれない");
+        Assert.True(!suggestions.Record("ぱすわーど", "Abcd1234Efgh", 3), "ちょうど 12 文字も数えない");
+        Assert.True(suggestions.Record("ぱすわーど", "Abcd1234Efg", 3), "11 文字なら数える");
+        Assert.True(!suggestions.Record("ぱすわーど", "P@ssw0rd!", 3), "記号を含む語は数えない");
+        Assert.True(!suggestions.Record("ぱすわーど", "Pass-word", 3), "ハイフンも記号なので数えない");
         Assert.True(suggestions.Record("ぐーぐる", "Google", 3), "英字を含む語は数える");
         Assert.True(suggestions.Record("こーひー", "コーヒー", 3), "カタカナを含む語は数える");
         Assert.Equal(3, suggestions.Count, "数えた組");

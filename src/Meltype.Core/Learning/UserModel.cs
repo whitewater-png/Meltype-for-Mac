@@ -159,10 +159,7 @@ public sealed class UserModel
         }
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            var temp = _path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(new ModelFile { Version = 1, Prefixes = snapshot }, JsonOptions));
-            File.Move(temp, _path, overwrite: true);
+            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(new ModelFile { Version = 1, Prefixes = snapshot }, JsonOptions));
         }
         catch (Exception ex)
         {
@@ -176,7 +173,8 @@ public sealed class UserModel
         if (_path is null || !File.Exists(_path)) return;
         try
         {
-            var file = JsonSerializer.Deserialize<ModelFile>(File.ReadAllText(_path));
+            if (Config.SafeFile.ReadAllText(_path) is not { } json) return;
+            var file = JsonSerializer.Deserialize<ModelFile>(json);
             if (file?.Prefixes is null) return;
             foreach (var (key, stats) in file.Prefixes)
             {

@@ -15,8 +15,14 @@ public sealed class DictionarySuggestions
     /// <summary>覚えておく組の上限。超えたら古いものから捨てる。</summary>
     public const int MaxEntries = 500;
 
-    /// <summary>この長さ以上の英数字だけの語はパスワードの可能性が高いので数えない。</summary>
-    private const int PasswordLikeLength = 16;
+    /// <summary>この長さ以上の英数字だけの語はパスワードの可能性が高いので数えない (以前は 16 文字。短めのパスワードも拾うため 12 に下げた)。</summary>
+    private const int PasswordLikeLength = 12;
+
+    /// <summary>メニューに出す語の長さの上限。超えたら「…」で省略する (長い語でメニューが画面からはみ出さないように)。</summary>
+    public const int MaxDisplayLength = 20;
+
+    /// <summary>メニューに出す表示用の語。<see cref="MaxDisplayLength"/> 文字を超えたら先頭だけにして「…」を付ける。</summary>
+    public static string DisplayWord(string word) => word.Length <= MaxDisplayLength ? word : word[..MaxDisplayLength] + "…";
 
     private sealed class Entry
     {
@@ -66,7 +72,8 @@ public sealed class DictionarySuggestions
         if (path is null || !File.Exists(path)) return;
         try
         {
-            var loaded = JsonSerializer.Deserialize<Data>(File.ReadAllText(path));
+            if (Config.SafeFile.ReadAllText(path) is not { } json) return;
+            var loaded = JsonSerializer.Deserialize<Data>(json);
             if (loaded is null) return;
             _data.LastHint = loaded.LastHint;
             _data.Items = loaded.Items?.Where(e => e is { Reading.Length: > 0, Word.Length: > 0 }).ToList() ?? [];
@@ -92,6 +99,8 @@ public sealed class DictionarySuggestions
         // 改行・タブは FFI の行区切り (読み\t語 を改行でつなぐ) や辞書ファイルの形式と衝突するので除く。
         if (word.Length == 0 || word == reading || word.Any(c => c is '\n' or '\r' or '\t')) return false;
         if (word.Length >= PasswordLikeLength && word.All(char.IsAsciiLetterOrDigit)) return false;
+        // 記号を含む語 (P@ssw0rd! のような) はパスワードかもしれないので数えない。ただし日本語の語で普通に使う ・ は許す。
+        if (word.Any(c => (char.IsPunctuation(c) || char.IsSymbol(c)) && c != '・')) return false;
         return word.Any(c => IsKanji(c) || IsKatakana(c) || char.IsAsciiLetter(c));
     }
 
@@ -208,10 +217,7 @@ public sealed class DictionarySuggestions
         if (_path is null) return;
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            var temp = _path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(_data));
-            File.Move(temp, _path, overwrite: true);
+            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_data));
         }
         catch (Exception ex)
         {

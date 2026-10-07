@@ -31,7 +31,7 @@ public sealed class CandidateDictionary
             var emoji = Path.Combine(userDirectory, "emoji.txt");
             try
             {
-                if (File.Exists(emoji)) dictionary.AddTabText(File.ReadAllText(emoji));
+                if (File.Exists(emoji)) dictionary.AddTabText(Config.SafeFile.ReadAllText(emoji) ?? "");
             }
             catch (Exception ex)
             {
@@ -40,7 +40,7 @@ public sealed class CandidateDictionary
             var path = Path.Combine(userDirectory, "candidates.txt");
             try
             {
-                if (File.Exists(path)) dictionary.AddText(File.ReadAllText(path));
+                if (File.Exists(path)) dictionary.AddText(Config.SafeFile.ReadAllText(path) ?? "");
             }
             catch (Exception ex)
             {

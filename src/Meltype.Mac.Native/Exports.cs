@@ -42,6 +42,33 @@ public static unsafe class Exports
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_reader")]
     public static void SetReader(delegate* unmanaged<byte*, byte*> reading) => s_reading = reading;
 
+    /// <summary>
+    /// FFI の版数。関数の引数や意味を変えたら上げ、Swift の NativeCore.expectedAbiVersion も同じ値にする
+    /// (別の版の libMeltypeNative.dylib が混ざったとき、引数の食い違いで落ちる代わりに初期化を止めるため)。
+    /// </summary>
+    public const int AbiVersion = 2;
+
+    [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
+    public static int GetAbiVersion() => AbiVersion;
+
+    /// <summary>
+    /// 学習データ (変換・登録提案・英語/日本語・英訳・ユーザーモデル) をすべて消す。ユーザー辞書と設定は消さない。
+    /// メモリ上の共有インスタンスも空にする。全部消せたら 1、一部でも失敗したら 0 (失敗はログに残る)。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_clear_learning")]
+    public static int ClearLearning()
+    {
+        try
+        {
+            return LearningData.ClearAll() ? 1 : 0;
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"Mac: 学習データを消せませんでした: {ex}");
+            return 0;
+        }
+    }
+
     /// <summary>Swift 側の関数を登録する (最初に 1 回)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_init")]
     public static int Init(delegate* unmanaged<byte*, byte*, byte*> clauses, delegate* unmanaged<byte*, byte*> candidates, delegate* unmanaged<byte*, int> isWord, delegate* unmanaged<byte*, byte*, void> learn, delegate* unmanaged<byte*, byte*> predictions)
@@ -102,7 +129,15 @@ public static unsafe class Exports
     [UnmanagedCallersOnly(EntryPoint = "meltype_destroy")]
     public static void Destroy(IntPtr handle)
     {
-        if (handle != IntPtr.Zero) GCHandle.FromIntPtr(handle).Free();
+        // 二重解放・不正なハンドルで InvalidOperationException になっても、IME のプロセスごと落とさない (例外は UnmanagedCallersOnly の外へ出せない)。
+        try
+        {
+            if (handle != IntPtr.Zero) GCHandle.FromIntPtr(handle).Free();
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"Mac: 入力の後始末で例外: {ex.Message}");
+        }
     }
 
     /// <summary>

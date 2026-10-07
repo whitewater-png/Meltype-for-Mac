@@ -29,6 +29,8 @@ private typealias SuggestClearFunction = @convention(c) (UnsafeMutableRawPointer
 private typealias DataDirectoryFunction = @convention(c) () -> UnsafeMutablePointer<CChar>?
 private typealias ReportUrlFunction = @convention(c) (UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 private typealias FreeFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
+private typealias AbiVersionFunction = @convention(c) () -> Int32
+private typealias ClearLearningFunction = @convention(c) () -> Int32
 
 // ---- 本体から呼ばれる関数 (文字列は strdup したものを返し、本体が free する) ----
 
@@ -142,6 +144,13 @@ enum AppKind: Int {
 final class NativeCore {
     static let shared = NativeCore()
 
+    /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion と必ず同じにする。
+    /// 食い違う dylib (別の版が混ざった) を読むと関数の引数が合わずに落ちるので、食い違ったら初期化を止める。
+    static let expectedAbiVersion: Int32 = 2
+
+    /// dylib の版数が expectedAbiVersion と合っているか (initialize で確かめる)。合わなければ入力を一切扱わない (キーはアプリに渡る)。
+    private(set) var isCompatible = false
+
     private let library: UnsafeMutableRawPointer?
     private let initFunction: InitFunction?
     private let setReaderFunction: SetReaderFunction?
@@ -163,6 +172,8 @@ final class NativeCore {
     private let dataDirectoryFunction: DataDirectoryFunction?
     private let reportUrlFunction: ReportUrlFunction?
     private let freeFunction: FreeFunction?
+    private let abiVersionFunction: AbiVersionFunction?
+    private let clearLearningFunction: ClearLearningFunction?
 
     private init() {
         let path = (Bundle.main.privateFrameworksPath ?? "") + "/libMeltypeNative.dylib"
@@ -196,19 +207,32 @@ final class NativeCore {
         dataDirectoryFunction = symbol("meltype_data_directory", as: DataDirectoryFunction.self)
         reportUrlFunction = symbol("meltype_report_url", as: ReportUrlFunction.self)
         freeFunction = symbol("meltype_free", as: FreeFunction.self)
+        abiVersionFunction = symbol("meltype_abi_version", as: AbiVersionFunction.self)
+        clearLearningFunction = symbol("meltype_clear_learning", as: ClearLearningFunction.self)
     }
 
     func initialize() {
+        // 版数が合わないときはクラッシュさせず、ログを残して初期化しない (createSession も nil を返し、キーはアプリに素通しになる)。
+        guard let abiVersionFunction else {
+            NSLog("Meltype: libMeltypeNative.dylib に meltype_abi_version がありません (古い版か、読み込めていません)。初期化を中止します。")
+            return
+        }
+        let actual = abiVersionFunction()
+        guard actual == Self.expectedAbiVersion else {
+            NSLog("Meltype: libMeltypeNative.dylib の版数が合いません (期待 %d / 実際 %d)。初期化を中止します。", Self.expectedAbiVersion, actual)
+            return
+        }
+        isCompatible = true
         _ = initFunction?(clausesCallback, candidatesCallback, isWordCallback, learnCallback, predictionsCallback)
         setReaderFunction?(readingCallback)
     }
 
-    func createSession() -> UnsafeMutableRawPointer? { createFunction?() }
+    func createSession() -> UnsafeMutableRawPointer? { isCompatible ? createFunction?() : nil }
 
     func destroySession(_ session: UnsafeMutableRawPointer?) { destroyFunction?(session) }
 
     func handleKey(_ session: UnsafeMutableRawPointer?, vk: Int32, character: Int32, modifiers: Int32, before: String?, after: String?) -> SessionResult? {
-        guard let handleKeyFunction else { return nil }
+        guard isCompatible, let handleKeyFunction else { return nil }
         return withOptionalCString(before) { beforePointer in
             withOptionalCString(after) { afterPointer in
                 decode(handleKeyFunction(session, vk, character, modifiers, beforePointer, afterPointer))
@@ -217,40 +241,41 @@ final class NativeCore {
     }
 
     func commit(_ session: UnsafeMutableRawPointer?) -> SessionResult? {
-        guard let commitFunction else { return nil }
+        guard isCompatible, let commitFunction else { return nil }
         return decode(commitFunction(session))
     }
 
     func selectCandidate(_ session: UnsafeMutableRawPointer?, index: Int) -> SessionResult? {
-        guard let selectFunction else { return nil }
+        guard isCompatible, let selectFunction else { return nil }
         return decode(selectFunction(session, Int32(index)))
     }
 
     func selectPrediction(_ session: UnsafeMutableRawPointer?, index: Int) -> SessionResult? {
-        guard let selectPredictionFunction else { return nil }
+        guard isCompatible, let selectPredictionFunction else { return nil }
         return decode(selectPredictionFunction(session, Int32(index)))
     }
 
     /// 確定済みの文字列を読みに戻して変換を始める。読みに戻せなければ consumed が false の結果 (または nil)。
     func reconvert(_ session: UnsafeMutableRawPointer?, text: String) -> SessionResult? {
-        guard let reconvertFunction else { return nil }
+        guard isCompatible, let reconvertFunction else { return nil }
         return text.withCString { decode(reconvertFunction(session, $0)) }
     }
 
     /// 入力欄のアプリ (bundle ID) を本体に伝え、種類を受け取る。取れなければ .general (何も変えない)。
     func setApp(_ session: UnsafeMutableRawPointer?, bundleIdentifier: String?) -> AppKind {
-        guard let setAppFunction else { return .general }
+        guard isCompatible, let setAppFunction else { return .general }
         let raw = withOptionalCString(bundleIdentifier) { setAppFunction(session, $0) }
         return AppKind(rawValue: Int(raw)) ?? .general
     }
 
     func setDirect(_ session: UnsafeMutableRawPointer?, _ direct: Bool) {
+        guard isCompatible else { return }
         setDirectFunction?(session, direct ? 1 : 0)
     }
 
     /// ユーザー辞書に登録する。登録できなければ理由を返し、できたら nil。
     func addUserWord(_ session: UnsafeMutableRawPointer?, reading: String, word: String) -> String? {
-        guard let addUserWordFunction else { return "この版では登録に対応していません。" }
+        guard isCompatible, let addUserWordFunction else { return "この版では登録に対応していません。" }
         let pointer = reading.withCString { readingPointer in
             word.withCString { addUserWordFunction(session, readingPointer, $0) }
         }
@@ -261,7 +286,7 @@ final class NativeCore {
 
     /// 入力メニューに出す登録の提案 (読みと語。最大 3 件)。無ければ空。
     func suggestions(_ session: UnsafeMutableRawPointer?) -> [(reading: String, word: String)] {
-        guard let pointer = suggestionsFunction?(session) else { return [] }
+        guard isCompatible, let pointer = suggestionsFunction?(session) else { return [] }
         defer { freeFunction?(pointer) }
         let pairs: [(reading: String, word: String)] = String(cString: pointer)
             .split(separator: "\n", omittingEmptySubsequences: true)
@@ -274,7 +299,7 @@ final class NativeCore {
 
     /// 提案を受けてユーザー辞書に登録し、提案待ちから消す。登録できなければ理由を返し、できたら nil。
     func acceptSuggestion(_ session: UnsafeMutableRawPointer?, reading: String, word: String) -> String? {
-        guard let suggestAcceptFunction else { return "この版では登録に対応していません。" }
+        guard isCompatible, let suggestAcceptFunction else { return "この版では登録に対応していません。" }
         let pointer = reading.withCString { readingPointer in
             word.withCString { suggestAcceptFunction(session, readingPointer, $0) }
         }
@@ -285,6 +310,7 @@ final class NativeCore {
 
     /// 提案を「登録しない」にする。
     func rejectSuggestion(_ session: UnsafeMutableRawPointer?, reading: String, word: String) {
+        guard isCompatible else { return }
         reading.withCString { readingPointer in
             word.withCString { suggestRejectFunction?(session, readingPointer, $0) }
         }
@@ -292,14 +318,21 @@ final class NativeCore {
 
     /// 提案の履歴をすべて消す。
     func clearSuggestions(_ session: UnsafeMutableRawPointer?) {
+        guard isCompatible else { return }
         suggestClearFunction?(session)
     }
 
     /// 提案待ちができた直後の 1 行のヒント (1 日 1 回まで)。出さないときは nil。
     func suggestionHint(_ session: UnsafeMutableRawPointer?) -> String? {
-        guard let pointer = suggestHintFunction?(session) else { return nil }
+        guard isCompatible, let pointer = suggestHintFunction?(session) else { return nil }
         defer { freeFunction?(pointer) }
         return String(cString: pointer)
+    }
+
+    /// 学習データ (変換・登録提案・英語/日本語・英訳・ユーザーモデル) をすべて消す。ユーザー辞書と設定は消さない。全部消せたら true。
+    func clearLearning() -> Bool {
+        guard isCompatible, let clearLearningFunction else { return false }
+        return clearLearningFunction() == 1
     }
 
     /// 設定・学習データ・ユーザー辞書の保存場所。

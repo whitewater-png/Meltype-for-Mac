@@ -98,6 +98,18 @@ cp -R Resources/ja.lproj Resources/en.lproj "$APP/Contents/Resources/"
 for bundle in "$BIN"/*.bundle; do
     [[ -e "$bundle" ]] && cp -R "$bundle" "$APP/Contents/Resources/"
 done
+# 実行ファイルの RPATH に、ビルドしたマシンの絶対パス (/Library/Developer/CommandLineTools/... など) が残っていると、
+# 配布先の Mac でそのパスを探しに行く (ビルドした人の環境が漏れ、同じパスに置かれたライブラリを読み込まされる余地も残る)。
+# 署名すると中身を変えられなくなるので、署名の前に外す。無いときに失敗しないよう || true。
+# 外さないのは、OS の標準の場所 (/usr/lib/swift・/System/...) と @ で始まる同梱側のパス (@loader_path・@executable_path/../Frameworks)。
+# /usr/lib/swift は OS 同梱の Swift の置き場所で、これを外すと起動できなくなるので残す。
+# (外したあとに動くかは、組み立て後の Meltype.app で otool -l を見て確かめる)
+while read -r rpath; do
+    case "$rpath" in
+        /usr/lib/*|/System/*|@*) ;;
+        /*) install_name_tool -delete_rpath "$rpath" "$APP/Contents/MacOS/Meltype" 2>/dev/null || true ;;
+    esac
+done < <(otool -l "$APP/Contents/MacOS/Meltype" | awk '$1=="cmd"&&$2=="LC_RPATH"{r=1;next} r&&$1=="path"{print $2;r=0}')
 # 署名: 環境変数 MELTYPE_MAC_IDENTITY (Developer ID Application の証明書の名前) があれば配布用に署名する
 # (Hardened Runtime・タイムスタンプ付き。公証 (notarization) は mac.yml で行う)。無ければ自分の Mac で使うための署名。
 if [[ -n "${MELTYPE_MAC_IDENTITY:-}" ]]; then

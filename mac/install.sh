@@ -3,14 +3,56 @@
 # Copyright (C) 2026 Yukishiro
 #
 # テスト版の Meltype.app を ~/Library/Input Methods に入れる。zip を展開したフォルダーで実行する:
-#   bash install.sh
+#   bash install.sh          途中で、確認が要る操作 (隔離属性を外す) だけ y/N を聞く
+#   bash install.sh --yes    確認を聞かずに進める (自動実行用。内容を確かめたうえで使う)
+#
+# このスクリプトがやること (影響範囲):
+#   - Meltype.app の署名が壊れていないか確かめる (壊れていたら何も入れずに中止)
+#   - ~/Library/Input Methods/Meltype.app に入れる (cp / 入れ直しのときは rsync --delete で中身だけ入れ替える)
+#   - 入れ直しのとき、動いている Meltype を止める (pkill -x Meltype)
+#   - 隔離属性 (com.apple.quarantine) を外す (確認してから。下を読むこと)
+#   - 入力ソースとして登録し (Meltype --register)、入力メニューと IME の起動役を起動し直す (killall imklaunchagent TextInputMenuAgent)
+#   - 登録できなかったときだけ、入力ソースの一覧に書き込む (defaults write com.apple.HIToolbox AppleEnabledInputSources)
+#   - 同じバンドル ID の別の Meltype.app を LaunchServices の登録から外す (lsregister -u。ファイルは消さない)
+# それ以外 (管理者権限・ネットワーク通信・ほかのアプリの設定) には触れない。
 set -euo pipefail
 cd "$(dirname "$0")"
+
+ASSUME_YES=0
+for arg in "$@"; do
+    case "$arg" in
+        --yes|-y) ASSUME_YES=1 ;;
+        *) echo "使えない引数です: $arg (使えるのは --yes だけです)" >&2; exit 1 ;;
+    esac
+done
 
 if [[ ! -d Meltype.app ]]; then
     echo "Meltype.app が見つかりません。zip を展開したフォルダーで実行してください。" >&2
     exit 1
 fi
+
+# 展開した Meltype.app が壊れていないか (ダウンロードの途中切れ・展開の失敗・書き換え) を、入れる前に確かめる。
+# 配布用の署名 (公証) が無い版でも、署名の封印 (全ファイルの検査値) は付いているので、1 バイトでも違えば失敗する。
+echo "Meltype.app の署名を確かめています…"
+if ! codesign --verify --deep --strict Meltype.app 2>&1; then
+    echo "Meltype.app が壊れているか、書き換えられています。何も入れずに中止します。zip をダウンロードし直してください。" >&2
+    exit 1
+fi
+echo "署名の検査: 問題ありません"
+
+# 主なファイルの SHA-256。リリースページ (または配布した人) が載せた値と見比べられる。違うときは Ctrl+C で止めること。
+# (署名の検査は「zip の中で整合している」ことしか分からないので、入手元が本物かは、この値の一致で確かめる)
+echo
+echo "SHA-256 (リリースページに載っている値と同じか、見比べてください。違うときは Ctrl+C で中止):"
+for file in Meltype.app/Contents/MacOS/Meltype Meltype.app/Contents/Frameworks/libMeltypeNative.dylib; do
+    if [[ -f "$file" ]]; then
+        shasum -a 256 "$file"
+    else
+        echo "見つかりません: $file" >&2
+        exit 1
+    fi
+done
+echo
 
 ID=io.github.yksr-melt.inputmethod.Meltype
 
@@ -59,8 +101,28 @@ else
     cp -R Meltype.app "$TARGET/"
     FIRST_INSTALL=1
 fi
-# インターネットから取ってきた印 (隔離属性) を外す。署名が自分用なので、外さないと macOS が起動させない。
-xattr -dr com.apple.quarantine "$TARGET/Meltype.app" 2>/dev/null || true
+# インターネットから取ってきた印 (隔離属性 com.apple.quarantine) を外す。
+# これは macOS の Gatekeeper (ダウンロードしたものを初回に検査する仕組み) を、この Meltype.app については回避することになる。
+# テスト版は Apple の公証を受けていない (署名が自分用) ので、外さないと macOS が起動させない。
+# 入手元と SHA-256 を確かめたものだけに行う。対話できる端末では y/N を聞き、--yes のときは聞かない。
+# 端末でなく --yes も無いとき (自動実行) は、黙って検査を回避しないよう外さない。
+remove_quarantine=0
+if [[ $ASSUME_YES -eq 1 ]]; then
+    remove_quarantine=1
+elif [[ -t 0 ]]; then
+    echo "隔離属性 (com.apple.quarantine) を外します。これは macOS の Gatekeeper の検査を、この Meltype.app について回避することです。"
+    echo "上の SHA-256 がリリースページの値と一致していて、入手元が信頼できるときだけ「y」を押してください。"
+    read -r -p "外しますか? [y/N] " answer
+    [[ "$answer" == [yY] || "$answer" == [yY][eE][sS] ]] && remove_quarantine=1
+fi
+if [[ $remove_quarantine -eq 1 ]]; then
+    echo "隔離属性を外しています (Gatekeeper の検査を回避します)…"
+    xattr -dr com.apple.quarantine "$TARGET/Meltype.app" 2>/dev/null || true
+else
+    echo "隔離属性は外しませんでした。このままだと macOS が Meltype を起動させないことがあります。"
+    echo "内容を確かめたうえで外すなら、次を実行してください (または bash install.sh --yes):"
+    echo "  xattr -dr com.apple.quarantine \"$HOME/Library/Input Methods/Meltype.app\""
+fi
 # Meltype.app が無かったのに、もう入力ソースの一覧にある: 前の Meltype.app を消したあと、まだログアウトしていない。
 # その一覧はそのうち消えるので、ここで登録しても使えない (登録が二重になることもある)。ログアウトしてもらう。
 STALE=0

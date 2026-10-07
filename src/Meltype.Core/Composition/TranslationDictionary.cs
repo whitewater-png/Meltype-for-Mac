@@ -107,6 +107,22 @@ public sealed class TranslationHistory
 {
     private readonly string? _path;
     private readonly Dictionary<string, Dictionary<string, int>> _counts = new(StringComparer.Ordinal);
+    private readonly object _gate = new();
+
+    // パスごとの共有インスタンス (LanguageMemory と同じ理由: 全消去をメモリ上にも効かせるため)。
+    private static readonly Dictionary<string, TranslationHistory> Shared_ = new(StringComparer.Ordinal);
+
+    /// <summary>同じパスなら同じインスタンスを返す (プロセス内で共有)。path が null なら共有せず毎回新しく作る。</summary>
+    public static TranslationHistory Shared(string? path)
+    {
+        if (path is null) return new TranslationHistory(null);
+        lock (Shared_)
+        {
+            var key = Path.GetFullPath(path);
+            if (!Shared_.TryGetValue(key, out var history)) Shared_[key] = history = new TranslationHistory(path);
+            return history;
+        }
+    }
 
     public TranslationHistory(string? path)
     {
@@ -114,7 +130,8 @@ public sealed class TranslationHistory
         if (path is null || !File.Exists(path)) return;
         try
         {
-            var loaded = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, int>>>(File.ReadAllText(path));
+            if (Config.SafeFile.ReadAllText(path) is not { } json) return;
+            var loaded = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, int>>>(json);
             if (loaded is not null) foreach (var (key, value) in loaded) _counts[key] = value;
         }
         catch (Exception ex)
@@ -124,14 +141,32 @@ public sealed class TranslationHistory
     }
 
     /// <summary>読みに対して選んだ回数 (多い順)。</summary>
-    public IReadOnlyList<(string Word, int Count)> Get(string reading) =>
-        _counts.TryGetValue(reading, out var words) ? words.OrderByDescending(w => w.Value).Select(w => (w.Key, w.Value)).ToList() : [];
+    public IReadOnlyList<(string Word, int Count)> Get(string reading)
+    {
+        lock (_gate)
+        {
+            return _counts.TryGetValue(reading, out var words) ? words.OrderByDescending(w => w.Value).Select(w => (w.Key, w.Value)).ToList() : [];
+        }
+    }
 
     public void Remember(string reading, string word)
     {
-        if (!_counts.TryGetValue(reading, out var words)) _counts[reading] = words = new(StringComparer.Ordinal);
-        words[word] = words.GetValueOrDefault(word) + 1;
-        Save();
+        lock (_gate)
+        {
+            if (!_counts.TryGetValue(reading, out var words)) _counts[reading] = words = new(StringComparer.Ordinal);
+            words[word] = words.GetValueOrDefault(word) + 1;
+            Save();
+        }
+    }
+
+    /// <summary>選んだ英訳の記録をすべて消す。</summary>
+    public void Clear()
+    {
+        lock (_gate)
+        {
+            _counts.Clear();
+            Save();
+        }
     }
 
     private void Save()
@@ -139,10 +174,7 @@ public sealed class TranslationHistory
         if (_path is null) return;
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            var temp = _path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(_counts));
-            File.Move(temp, _path, overwrite: true);
+            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_counts));
         }
         catch (Exception ex)
         {

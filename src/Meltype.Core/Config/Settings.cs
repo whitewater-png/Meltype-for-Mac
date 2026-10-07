@@ -461,7 +461,7 @@ public sealed class Settings
     [Category("8. ログ"), DisplayName("ファイルにログを書く"), Description("%LOCALAPPDATA%\\Meltype\\meltype.log にログを書きます (OFF でも、トレイの「ログ / 判定理由」で見られるログは Meltype が動いている間だけメモリに残ります)。判定した語の先頭の数文字・アプリ名・入力欄の名前が含まれます。確定した文字列などは「ログに入力した文字を残す」が ON のときだけ残ります。")]
     public bool FileLog { get; set; }
 
-    [Category("8. ログ"), DisplayName("ログに入力した文字を残す"), Description("確定した文字列・打った英字・読み・直した語をログに残します (不具合を調べるとき用)。OFF なら文字数だけを残します。パスワード欄では入力を扱わないので残りません。")]
+    [Category("8. ログ"), DisplayName("ログに入力した文字を残す"), Description("確定した文字列・打った英字・読み・直した語をログに残します (不具合を調べるとき用)。OFF なら文字数だけを残します。OS が「秘匿入力」(パスワード欄など) と知らせている欄では入力を扱わないので残りません (アプリが知らせていない欄は対象外です)。")]
     public bool LogTypedText { get; set; }
 
     public static List<AppRule> DefaultAppRules() =>
@@ -597,7 +597,8 @@ public sealed class Settings
         try
         {
             if (!File.Exists(path)) return new Settings();
-            var json = File.ReadAllText(path);
+            // 大きすぎる設定ファイルは読まず既定値で動く (元のファイルは触らない)。
+            if (SafeFile.ReadAllText(path) is not { } json) return new Settings();
             var settings = JsonSerializer.Deserialize<Settings>(json, JsonOptions) ?? new Settings();
             if (!json.Contains(nameof(SettingsVersion))) settings.SettingsVersion = 1;
             if (settings.Migrate()) settings.Save(path);
@@ -617,9 +618,6 @@ public sealed class Settings
 
     public void Save(string path)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(this, JsonOptions));
-        File.Move(temp, path, overwrite: true);
+        SafeFile.WriteAllText(path, JsonSerializer.Serialize(this, JsonOptions));
     }
 }

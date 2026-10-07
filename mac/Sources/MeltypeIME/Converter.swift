@@ -35,7 +35,9 @@ final class MeltypeConverter {
         // azooKey の学習データ・ユーザー辞書の置き場所 (学習は確定のたびに learn で書き、再起動しても残る)。
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Meltype/azooKey", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // 学習データには打った語が入るので、本人だけが読める権限 (0700) にする。前の版が 0755 で作ったフォルダーも直す。
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         options = ConvertRequestOptions(
             requireJapanesePrediction: .disabled,
             requireEnglishPrediction: .disabled,
@@ -76,6 +78,13 @@ final class MeltypeConverter {
         let filtered = results.mainResults.filter { $0.composingCount == .inputCount(count) || $0.composingCount == .surfaceCount(count) }
         remember(filtered, for: hiragana)
         return filtered
+    }
+
+    /// azooKey の学習データ (メモリ上と学習のファイル) をすべて消す (メインスレッドから呼ぶ)。azooKey 側のユーザー辞書は消さない。
+    func resetLearning() {
+        converter.resetMemory()
+        recentCandidates.removeAll()
+        recentOrder.removeAll()
     }
 
     /// 確定した文節を azooKey に学習させる (メインスレッドから呼ぶ。KanaKanjiConverter はスレッドセーフではない)。

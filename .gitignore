@@ -23,3 +23,10 @@ mac/dist/
 *.mobileprovision
 .env
 .env.*
+
+# ログ・署名の鍵・退避ファイル (打った文字や秘密鍵が入りうるので、誤ってコミットしない)
+*.log
+*.pfx
+*.p8
+*.keychain
+*.before-restore

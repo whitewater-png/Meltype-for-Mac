@@ -126,7 +126,7 @@ public sealed class MeltypeSession
         Func<string, IReadOnlyList<string>>? predictions = null, Func<string, string?>? reader = null)
     {
         AppPaths.MigrateFromOldName();
-        Directory.CreateDirectory(AppPaths.DataDirectory);
+        Config.SafeFile.EnsureDirectory(AppPaths.DataDirectory);
         var settings = Settings.Load(AppPaths.ConfigFile);
         // 設定で「ファイルにログを書く」を ON にしていれば、Mac でも meltype.log に書く (動かないときの調査用)。
         Diagnostics.Log.SetFileOutput(settings.FileLog ? AppPaths.LogFile : null);
@@ -135,7 +135,7 @@ public sealed class MeltypeSession
         var detector = CompositionDetector.CreateDefault(userDirectory);
         // OS のスペルチェッカーが無ければ (Linux)、同梱のよく使う英単語の一覧を使う (meeting を英語と分かるように)。
         detector.SpellChecker = wordChecker is { IsAvailable: true } ? wordChecker : Detection.BuiltInWordChecker.Shared;
-        var languages = new LanguageMemory(AppPaths.LanguageMemoryFile);
+        var languages = LanguageMemory.Shared(AppPaths.LanguageMemoryFile);
         detector.Memory = languages;
         var options = new CompositionOptions
         {
@@ -164,7 +164,7 @@ public sealed class MeltypeSession
             SpaceAroundEnglish = () => settings.SpaceAroundEnglish,
             Punctuation = () => settings.Punctuation,
             FullWidthSymbols = () => settings.FullWidthSymbols,
-            TranslationHistory = new TranslationHistory(AppPaths.TranslationHistoryFile),
+            TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
         return new MeltypeSession(detector, converter, options, () => settings) { ReadingProvider = reader };
     }
@@ -242,7 +242,7 @@ public sealed class MeltypeSession
     public string? TakeSuggestionHint()
     {
         if (_options.Suggestions is not { } suggestions || !_settings().DictionarySuggest) return null;
-        return suggestions.TakeHint() is { } word ? $"『{word.Word}』を辞書に登録できます (入力メニューから)" : null;
+        return suggestions.TakeHint() is { } word ? $"『{DictionarySuggestions.DisplayWord(word.Word)}』を辞書に登録できます (入力メニューから)" : null;
     }
 
     /// <summary>
@@ -251,6 +251,9 @@ public sealed class MeltypeSession
     /// </summary>
     public Func<string, string?>? ReadingProvider { get; set; }
 
+    /// <summary>再変換できる選択の長さの上限 (文字数)。Swift 側 (InputController) でも同じ値で先に弾く。</summary>
+    public const int MaxReconvertLength = 200;
+
     /// <summary>
     /// 確定済みの文字列 (入力欄で選択されているもの) を読みに戻して変換を始める (Mac の選択 + Shift+Space)。
     /// 読みに戻せないとき・入力中・直接入力のときは Consumed = false (キーはアプリに渡す)。
@@ -258,6 +261,8 @@ public sealed class MeltypeSession
     public SessionResult Reconvert(string text)
     {
         _host.Begin(null, false, null, null);
+        // 段落のような長い選択を誤って再変換にかけない (読みに戻す処理と変換が重くなるため)。
+        if (text.Length > MaxReconvertLength) return _host.Result(consumed: false);
         if (Direct || !AppEnabled || !_settings().Enabled || _controller.IsComposing || ReadingOf(text) is not { } reading ||
             !_controller.ReconvertKana(reading, text))
         {

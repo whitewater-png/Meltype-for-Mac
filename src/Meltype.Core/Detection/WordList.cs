@@ -67,7 +67,7 @@ public static class DictionarySource
         try
         {
             if (!File.Exists(userFile)) yield break;
-            text = File.ReadAllText(userFile);
+            text = Config.SafeFile.ReadAllText(userFile) ?? "";
         }
         catch
         {

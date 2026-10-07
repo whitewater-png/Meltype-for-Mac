@@ -95,8 +95,14 @@ public static class Backup
             var path = Path.GetFullPath(Path.Combine(dataDirectory, name));
             if (!path.StartsWith(Path.GetFullPath(dataDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            if (File.Exists(path)) File.Copy(path, path + ".before-restore", overwrite: true);
+            if (File.Exists(path))
+            {
+                File.Copy(path, path + ".before-restore", overwrite: true);
+                SafeFile.Restrict(path + ".before-restore");
+            }
             File.WriteAllBytes(path, Convert.FromBase64String(file.Value.GetString() ?? ""));
+            // 戻した学習データも、ふつうに保存したときと同じく本人だけが読める権限にする。
+            SafeFile.Restrict(path);
             count++;
         }
         return count;

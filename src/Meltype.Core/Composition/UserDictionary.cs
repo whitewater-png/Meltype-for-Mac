@@ -19,6 +19,20 @@ public sealed class UserDictionary
     /// <summary>1 文字の読みは、ほかの語の中にも現れやすく巻き込みが大きいので登録させない。</summary>
     public const int MinReadingLength = 2;
 
+    /// <summary>読み・語の長さの上限。選択範囲をそのまま登録できるので、段落全体のような巨大な語が入って変換のたびに照合されるのを防ぐ。</summary>
+    public const int MaxLength = 100;
+
+    /// <summary>読みと語として登録してよいか。だめなら理由を返す (Add / AddRange / 画面の入力チェックで共通)。</summary>
+    public static string? Validate(string reading, string word)
+    {
+        if (reading.Length < MinReadingLength) return $"読みは {MinReadingLength} 文字以上にしてください。";
+        if (word.Length == 0) return "単語を入力してください。";
+        if (reading.Length > MaxLength || word.Length > MaxLength) return $"読みも単語も {MaxLength} 文字までにしてください。";
+        // 改行はファイルの 1 行に収まらず、タブは「読み<Tab>単語」の区切りと衝突する。
+        if (reading.Any(c => c is '\t' or '\r' or '\n') || word.Any(c => c is '\t' or '\r' or '\n')) return "改行・タブ文字は使えません。";
+        return null;
+    }
+
     private readonly string? _path;
     private readonly List<UserWord> _words = [];
     // 同梱の語句 (dictionaries/phrases.txt)。変換エンジンが苦手な語句を補う。ユーザーの登録より後回しで、保存も表示もしない。
@@ -51,7 +65,7 @@ public sealed class UserDictionary
         if (builtIn) Parse(Detection.DictionarySource.ReadEmbedded("phrases.txt").Split('\n'), _builtIn);
         try
         {
-            if (path is not null && File.Exists(path)) Parse(File.ReadAllLines(path, Encoding.UTF8), _words);
+            if (path is not null && File.Exists(path) && Config.SafeFile.ReadAllText(path) is { } text) Parse(text.Split('\n'), _words);
         }
         catch (Exception ex)
         {
@@ -85,9 +99,7 @@ public sealed class UserDictionary
     {
         reading = reading.Trim();
         word = word.Trim();
-        if (reading.Length < MinReadingLength) return $"読みは {MinReadingLength} 文字以上にしてください。";
-        if (word.Length == 0) return "単語を入力してください。";
-        if (reading.Contains('\t') || word.Contains('\t')) return "タブ文字は使えません。";
+        if (Validate(reading, word) is { } error) return error;
         lock (_gate)
         {
             if (_words.Any(w => w.Reading == reading && w.Word == word)) return null;
@@ -105,7 +117,7 @@ public sealed class UserDictionary
             var added = 0;
             foreach (var word in words)
             {
-                if (word.Reading.Length < MinReadingLength || word.Word.Length == 0 || word.Reading.Contains('\t') || word.Word.Contains('\t')) continue;
+                if (Validate(word.Reading, word.Word) is not null) continue;
                 if (_words.Any(w => w.Reading == word.Reading && w.Word == word.Word)) continue;
                 _words.Add(word);
                 added++;
@@ -193,12 +205,9 @@ public sealed class UserDictionary
         if (_path is null) return;
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
             var lines = new List<string> { "# Meltype ユーザー辞書: 1 行に「読み<Tab>単語」" };
             lines.AddRange(_words.Select(w => $"{w.Reading}\t{w.Word}"));
-            var temp = _path + ".tmp";
-            File.WriteAllLines(temp, lines, new UTF8Encoding(true));
-            File.Move(temp, _path, overwrite: true);
+            Config.SafeFile.WriteAllLines(_path, lines, new UTF8Encoding(true));
         }
         catch (Exception ex)
         {

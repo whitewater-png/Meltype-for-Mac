@@ -25,7 +25,7 @@ public sealed class ContextRules
             var path = Path.Combine(userDirectory, "contexts.txt");
             try
             {
-                if (File.Exists(path)) rules.AddText(File.ReadAllText(path));
+                if (File.Exists(path)) rules.AddText(Config.SafeFile.ReadAllText(path) ?? "");
             }
             catch (Exception ex)
             {
@@ -161,7 +161,8 @@ public sealed class ConversionHistory
         if (path is null || !File.Exists(path)) return;
         try
         {
-            var loaded = JsonSerializer.Deserialize<Dictionary<string, Entry?>>(File.ReadAllText(path));
+            if (Config.SafeFile.ReadAllText(path) is not { } json) return;
+            var loaded = JsonSerializer.Deserialize<Dictionary<string, Entry?>>(json);
             // 1 文字の読み (き → 記) は、以前の版で覚えてしまったものも使わない (関係ない変換を巻き込むため)。
             // 壊れた項目 (値が null・Text が null か空) は読み飛ばす (後の Score / Get で落ちないように)。
             if (loaded is not null)
@@ -288,10 +289,7 @@ public sealed class ConversionHistory
         _dirty = false;
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            var temp = _path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(_entries));
-            File.Move(temp, _path, overwrite: true);
+            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_entries));
         }
         catch (Exception ex)
         {

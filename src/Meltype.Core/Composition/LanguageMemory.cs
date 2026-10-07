@@ -15,6 +15,8 @@ public sealed class LanguageMemory
     private const int MaxEntries = 3000;
     private readonly string? _path;
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
+    // 全消去 (メニュー) と入力中の学習が別スレッドになりうるので直列にする。
+    private readonly object _gate = new();
 
     private sealed class Entry
     {
@@ -48,13 +50,30 @@ public sealed class LanguageMemory
         entry.English && Math.Max(1, entry.Count) < 2 &&
         (IsCommonJapanese?.Invoke(word) == true || (!entry.Explicit && word.Length <= 2 && IsReadableRomaji?.Invoke(word) == true));
 
+    // パスごとの共有インスタンス (入力欄ごとのセッションが別々に持つと、「学習データをすべて消去」が他のセッションの
+    // メモリ上の内容を消せず、次の保存で消したはずの語がファイルに戻ってしまうため。ほかの学習データと同じ)。
+    private static readonly Dictionary<string, LanguageMemory> Shared_ = new(StringComparer.Ordinal);
+
+    /// <summary>同じパスなら同じインスタンスを返す (プロセス内で共有)。path が null なら共有せず毎回新しく作る。</summary>
+    public static LanguageMemory Shared(string? path)
+    {
+        if (path is null) return new LanguageMemory(null);
+        lock (Shared_)
+        {
+            var key = Path.GetFullPath(path);
+            if (!Shared_.TryGetValue(key, out var memory)) Shared_[key] = memory = new LanguageMemory(path);
+            return memory;
+        }
+    }
+
     public LanguageMemory(string? path)
     {
         _path = path;
         if (path is null || !File.Exists(path)) return;
         try
         {
-            var loaded = JsonSerializer.Deserialize<Dictionary<string, Entry>>(File.ReadAllText(path));
+            if (Config.SafeFile.ReadAllText(path) is not { } json) return;
+            var loaded = JsonSerializer.Deserialize<Dictionary<string, Entry>>(json);
             if (loaded is not null) foreach (var (word, entry) in loaded) _entries[word] = entry;
         }
         catch (Exception ex)
@@ -63,13 +82,18 @@ public sealed class LanguageMemory
         }
     }
 
-    public int Count => _entries.Count;
+    public int Count { get { lock (_gate) return _entries.Count; } }
 
     /// <summary>覚えている内容が変わるたびに増える (判定の結果を使い回してよいかを見るのに使う)。</summary>
     public int Version { get; private set; }
 
     /// <summary>覚えている語なら英語か (true) 日本語か (false)。覚えていなければ null。word は小文字の英字。</summary>
     public bool? Get(string word)
+    {
+        lock (_gate) return GetCore(word);
+    }
+
+    private bool? GetCore(string word)
     {
         if (!_entries.TryGetValue(word, out var entry)) return null;
         if (NeedsTwice(word, entry)) return null;
@@ -81,6 +105,11 @@ public sealed class LanguageMemory
     /// explicitChoice は F10 / F6 / Tab ではっきり直したとき (変換の候補から選んだだけなら false)。
     /// </summary>
     public void Remember(string word, bool english, bool explicitChoice = false)
+    {
+        lock (_gate) RememberCore(word, english, explicitChoice);
+    }
+
+    private void RememberCore(string word, bool english, bool explicitChoice)
     {
         word = word.ToLowerInvariant();
         if (word.Length < 2 || !word.All(char.IsAsciiLetterLower)) return;
@@ -112,26 +141,37 @@ public sealed class LanguageMemory
     }
 
     /// <summary>学習した語の一覧 (新しく使ったものから)。</summary>
-    public IReadOnlyList<Learned> Entries() =>
-        _entries.OrderByDescending(e => e.Value.Used)
-            .Select(e => new Learned(e.Key, e.Value.English, Math.Max(1, e.Value.Count), e.Value.Used, !NeedsTwice(e.Key, e.Value)))
-            .ToList();
+    public IReadOnlyList<Learned> Entries()
+    {
+        lock (_gate)
+        {
+            return _entries.OrderByDescending(e => e.Value.Used)
+                .Select(e => new Learned(e.Key, e.Value.English, Math.Max(1, e.Value.Count), e.Value.Used, !NeedsTwice(e.Key, e.Value)))
+                .ToList();
+        }
+    }
 
     /// <summary>学習した語を忘れる (設定の「学習した語」から消したとき)。</summary>
     public void Remove(IEnumerable<string> words)
     {
-        var removed = false;
-        foreach (var word in words) removed |= _entries.Remove(word);
-        if (!removed) return;
-        Version++;
-        Save();
+        lock (_gate)
+        {
+            var removed = false;
+            foreach (var word in words) removed |= _entries.Remove(word);
+            if (!removed) return;
+            Version++;
+            Save();
+        }
     }
 
     public void Clear()
     {
-        _entries.Clear();
-        Version++;
-        Save();
+        lock (_gate)
+        {
+            _entries.Clear();
+            Version++;
+            Save();
+        }
     }
 
     private void Save()
@@ -139,10 +179,7 @@ public sealed class LanguageMemory
         if (_path is null) return;
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            var temp = _path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(_entries));
-            File.Move(temp, _path, overwrite: true);
+            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_entries));
         }
         catch (Exception ex)
         {

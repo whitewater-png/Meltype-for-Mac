@@ -22,6 +22,12 @@ final class MeltypeInputController: IMKInputController {
     /// 入力メニューで今選ばれているモードの ID。IMKTextInput に「今のモードを読む」API が無いので、setValue で受け取って覚える。
     private var currentMode: String?
 
+    /// 再変換する選択の長さの上限 (Core の MeltypeSession.MaxReconvertLength と同じ値)。
+    private static let maxReconvertLength = 200
+
+    /// ユーザー辞書に登録する読み・語の長さの上限 (Core の UserDictionary.MaxLength と同じ値)。
+    private static let maxWordLength = 100
+
     /// 今のアプリの種類 (activateServer で bundle ID から決める)。候補ウィンドウの注釈に出す。
     private var appKind: AppKind = .general
 
@@ -40,6 +46,14 @@ final class MeltypeInputController: IMKInputController {
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, event.type == .keyDown, let client = sender as? IMKTextInput else { return false }
+
+        // パスワード欄など、macOS が「秘匿入力」にしているとき (IsSecureEventInputEnabled) は、キーを一切扱わずアプリに素通しする。
+        // 本体 (学習・提案・ログ) にも何も渡さず、周りの文字 (surroundingText) も読まない。未確定の文字が残っていれば先に確定する。
+        // 注意: この判定はシステム全体の状態なので、ほかのアプリが秘匿入力を付けたままにしていると、そのあいだ Meltype はどこでも素通しになる。
+        if IsSecureEventInputEnabled() {
+            if hasMarkedText { apply(NativeCore.shared.commit(session), to: client) }
+            return false
+        }
 
         // アプリ別設定で OFF・ゲームのアプリ (setApp の戻り値 .disabled) は、英数/かなキーも含めて全てアプリに素通しする。
         if appKind == .disabled { return false }
@@ -73,9 +87,10 @@ final class MeltypeInputController: IMKInputController {
         if flags.contains(.command) { modifiers |= 8 }
 
         // 確定済みの文字列を選択して Shift + Space: 読みに戻して再変換する (選択範囲を変換中の文字に置き換える)。読みに戻せなければ通常の処理へ。
+        // 選択が長いとき (段落など) は読みに戻せないので、中身を読まずに通常の処理へ (本体の MaxReconvertLength と同じ 200 文字)。
         if Int(event.keyCode) == kVK_Space, modifiers == 1, !hasMarkedText {
             let selection = client.selectedRange()
-            if selection.location != NSNotFound, selection.length > 0,
+            if selection.location != NSNotFound, selection.length > 0, selection.length <= Self.maxReconvertLength,
                let selected = client.attributedSubstring(from: selection)?.string,
                let result = NativeCore.shared.reconvert(session, text: selected), result.consumed {
                 apply(result, to: client, replacing: selection)
@@ -181,14 +196,17 @@ final class MeltypeInputController: IMKInputController {
         // 何度も選び直した語の登録提案 (最大 3 件)。選ぶと辞書に登録、「登録しない」で以後提案しない。
         let suggestions = NativeCore.shared.suggestions(session)
         for suggestion in suggestions {
-            let accept = menu.addItem(withTitle: "『\(suggestion.word)』を辞書に登録 (\(suggestion.reading))", action: #selector(acceptSuggestion(_:)), keyEquivalent: "")
+            // 長い語は 20 文字で省略する (メニューが画面からはみ出さないように。登録する語自体は省略しない)
+            let shown = suggestion.word.count > 20 ? String(suggestion.word.prefix(20)) + "…" : suggestion.word
+            let accept = menu.addItem(withTitle: "『\(shown)』を辞書に登録 (\(suggestion.reading))", action: #selector(acceptSuggestion(_:)), keyEquivalent: "")
             accept.representedObject = [suggestion.reading, suggestion.word]
-            let reject = menu.addItem(withTitle: "    『\(suggestion.word)』は登録しない", action: #selector(rejectSuggestion(_:)), keyEquivalent: "")
+            let reject = menu.addItem(withTitle: "    『\(shown)』は登録しない", action: #selector(rejectSuggestion(_:)), keyEquivalent: "")
             reject.representedObject = [suggestion.reading, suggestion.word]
         }
         if !suggestions.isEmpty { menu.addItem(.separator()) }
         menu.addItem(withTitle: "選択中の文字をユーザー辞書に登録…", action: #selector(registerWord(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "辞書の登録提案の履歴を消去", action: #selector(clearSuggestions(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: "学習データをすべて消去…", action: #selector(clearLearningData(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "Meltype のデータフォルダを開く (設定・ユーザー辞書)", action: #selector(openDataFolder(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "不具合の報告・提案… (Mac 版はプレビュー版です)", action: #selector(openReport(_:)), keyEquivalent: "")
         return menu
@@ -214,13 +232,48 @@ final class MeltypeInputController: IMKInputController {
         NativeCore.shared.clearSuggestions(session)
     }
 
+    /// 学習データをすべて消す (確認あり)。ユーザー辞書と設定は消さない。
+    @objc private func clearLearningData(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "学習データをすべて消去しますか？"
+        alert.informativeText = "変換の学習・辞書の登録提案の履歴・英語/日本語の学習・英訳の学習・ユーザーモデル・azooKey の学習を消します。元に戻せません。\nユーザー辞書と設定は消えません。"
+        // 取り消せない操作なので、Return で押される先頭のボタンはキャンセルにする。
+        alert.addButton(withTitle: "キャンセル")
+        alert.addButton(withTitle: "消去")
+        // IME は背面のアプリなので、ダイアログを前に出す。
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        let coreCleared = NativeCore.shared.clearLearning()
+        MeltypeConverter.shared.resetLearning()
+        let done = NSAlert()
+        if NativeCore.shared.isCompatible {
+            done.messageText = coreCleared ? "学習データを消去しました" : "消去できなかったものがあります"
+            done.informativeText = coreCleared ? "ユーザー辞書と設定はそのままです。" : "Meltype のデータフォルダーの meltype.log (設定でログを ON にしたとき) を確認してください。"
+        } else {
+            // 本体 (libMeltypeNative.dylib) の版が合わず読み込んでいないので、本体側の学習データには触れていない。
+            done.messageText = "azooKey の学習だけを消去しました"
+            done.informativeText = "Meltype 本体の版が合わないため、変換・提案などの学習データは消せていません。Meltype を入れ直してから、もう一度実行してください。"
+        }
+        done.runModal()
+    }
+
     /// 選択中の文字を語にして、読みを聞いてユーザー辞書に登録する。選択が無ければ語も空欄で開く。
     @objc private func registerWord(_ sender: Any?) {
         var selected = ""
         if let client = client() {
             let range = client.selectedRange()
             if range.location != NSNotFound, range.length > 0 {
-                selected = client.attributedSubstring(from: range)?.string ?? ""
+                // 長い選択は中身を読む前に断る (段落全体が語として登録されるのを防ぐ)。
+                if range.length > Self.maxWordLength {
+                    showSelectionError("選択している文字が長すぎます (\(Self.maxWordLength) 文字まで)。短く選び直してください。")
+                    return
+                }
+                selected = (client.attributedSubstring(from: range)?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if selected.contains(where: { $0.isNewline }) {
+                    showSelectionError("選択している文字に改行が含まれているので登録できません。1 行で選び直してください。")
+                    return
+                }
             }
         }
         let alert = NSAlert()
@@ -247,6 +300,14 @@ final class MeltypeInputController: IMKInputController {
             failure.informativeText = error
             failure.runModal()
         }
+    }
+
+    private func showSelectionError(_ message: String) {
+        let failure = NSAlert()
+        failure.messageText = "登録できませんでした"
+        failure.informativeText = message
+        NSApp.activate(ignoringOtherApps: true)
+        failure.runModal()
     }
 
     @objc private func openReport(_ sender: Any?) {
