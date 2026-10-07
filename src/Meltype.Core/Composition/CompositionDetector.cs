@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Yukishiro
 
+using System.Text;
 using Meltype.Config;
 using Meltype.Detection;
 
@@ -120,6 +121,7 @@ public sealed class CompositionDetector
         var n = units.Count;
         var segments = new List<CompositionSegment>();
         var japaneseStart = 0;
+        var table = new SpanTable(units);
         // 区間の前が英語か: 先頭なら入力欄の確定済みの文字、途中なら直前の区間 (英語区間の直後なら英語、それ以外は日本語)。
         bool? PrecededByEnglish(int start) => start == 0 ? precedingEnglish : segments.Count > 0 && segments[^1].IsEnglish && japaneseStart == start;
         // 前の文脈の点数: 英文の続きなら +2、英語なら +1、日本語なら -1、分からなければ 0。
@@ -150,8 +152,14 @@ public sealed class CompositionDetector
             // 英語の語 + 数字のすぐ後ろの英単語 (part1026|beta、win11|pro) は、ローマ字として読めても英語 (ベタ にしない)。
             // 助詞で始まるなら日本語 (PS5|wokaitai)。
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual && AlphanumericSuffixEnd(units, i, pending, segments, japaneseStart) is var suffix and > 0) found = suffix;
-            for (var j = n; j > i && found < 0; j--)
+            // 英語の区間になれるのは、英字 (と ') だけでできた、長すぎない区間 (IsEnglishSpan を参照)。
+            // それ以外の区間は判定するまでもなく英語ではないので、判定を飛ばす (長い文で、打つたびに全部の区間を調べて遅くなっていた)。
+            var upperStart = table.StartsWithUpper(i);
+            // 学習した語 (Memory) は、長くても今までどおり調べる
+            var lengthLimit = Math.Max(MaxEnglishSpanLength, Memory?.MaxWordLength ?? 0);
+            for (var j = ReferenceMode ? n : kanaInput ? table.LastLetterEnd(i) : table.LastEnglishEnd(i); j > i && found < 0; j--)
             {
+                if (!ReferenceMode && table.Length(i, j, pending) > lengthLimit && !(j == n && upperStart) && !table.HasApostrophe(i, j)) continue;
                 // 区間の後ろ: 末尾まで打っているならキャレットの後ろの文字、途中なら続きの日本語。
                 // 後ろが記号だけ (let's go! の !) なら、語はそこで打ち終わっている: Enter で確定するときと同じく末尾の語として見る
                 // (記号を日本語の続きとみなして、英文の中の go・no を ご・の にしていた)。
@@ -160,11 +168,11 @@ public sealed class CompositionDetector
                 var after = j == n || symbolsAfter ? followingEnglish : false;
                 // 英単語のすぐ後ろの する の活用 (push + site = して、commit + sita = した) は、英単語 (site) でも日本語
                 // (末尾だと pushsite 全体が英字になっていた)。
-                if (!kanaInput && PrecededByEnglish(i) == true && IsSuruForm(Kana(units, i, j))) continue;
+                if (!kanaInput && PrecededByEnglish(i) == true && IsSuruForm(table.Kana(i, j))) continue;
                 var english = kanaInput
-                    ? IsEnglishSpanKana(Raw(units, i, j), Kana(units, i, j), atEnd: j == n, BeforeScore(i), after, level, final)
-                    : IsEnglishSpan(Raw(units, i, j) + (j == n ? pending : ""), atEnd: j == n, BeforeScore(i), after, startOfInput: i == 0, level, final, endsWord: symbolsAfter,
-                        unreadable: HasUnreadable(units, i, j) || EndsWithLoneSokuon(units, j), next: j < n ? units[j].Raw + (j + 1 == n ? pending : "") : null);
+                    ? IsEnglishSpanKana(table.Raw(i, j), table.Kana(i, j), atEnd: j == n, BeforeScore(i), after, level, final)
+                    : IsEnglishSpan(table.Raw(i, j) + (j == n ? pending : ""), atEnd: j == n, BeforeScore(i), after, startOfInput: i == 0, level, final, endsWord: symbolsAfter,
+                        unreadable: table.HasUnreadable(i, j) || EndsWithLoneSokuon(units, j), next: j < n ? units[j].Raw + (j + 1 == n ? pending : "") : null);
                 if (english)
                 {
                     found = j;
@@ -179,9 +187,10 @@ public sealed class CompositionDetector
                 var foundLength = Raw(units, i, found).Length;
                 for (var k = i + 1; k < found && found >= 0; k++)
                 {
-                    for (var e = n; e > found; e--)
+                    for (var e = ReferenceMode ? n : table.LastLetterEnd(k); e > found; e--)
                     {
-                        var word = Raw(units, k, e) + (e == n ? pending : "");
+                        if (table.Length(k, e, pending) < foundLength || !ReferenceMode && table.Length(k, e, pending) > lengthLimit) continue;
+                        var word = table.Raw(k, e) + (e == n ? pending : "");
                         if (word.Length >= foundLength && IsLongEnglishWord(word))
                         {
                             found = -1;
@@ -220,6 +229,102 @@ public sealed class CompositionDetector
             segments.Add(Japanese(units, japaneseStart, n, pending));
         }
         return segments;
+    }
+
+    /// <summary>
+    /// これより長い英字の並びは、1 語の英単語 (辞書・スペルチェッカーの語、固有名詞、短縮形) にならない。
+    /// 打った内容が長くなっても区間分けが遅くならないよう、これを超える区間は判定しない。
+    /// (大文字で始めて末尾まで打った区間だけは、長さに関係なく英語なので、今までどおり判定する)
+    /// </summary>
+    internal const int MaxEnglishSpanLength = 48;
+
+    /// <summary>テスト用: true なら区間を飛ばす最適化と判定の覚えを使わない (素朴な全探索。最適化が結果を変えないことの照合用)。</summary>
+    internal static bool ReferenceMode { get; set; }
+
+    /// <summary>区間の判定の覚えを捨てる (変換ボックスが空になったとき・リセットのとき)。</summary>
+    public void ClearSpanCache()
+    {
+        lock (_spanCache) _spanCache.Clear();
+    }
+
+    /// <summary>
+    /// FindSpans が区間 [i, j) の読み・打った英字・長さを何度も使うので、単位列から 1 度だけ作る表。
+    /// 区間のたびに単位を 1 つずつつなぎ直すと、長さの 3 乗で遅くなる。
+    /// </summary>
+    private sealed class SpanTable
+    {
+        private readonly IReadOnlyList<CompositionUnit> _units;
+        private readonly int _n;
+        private readonly string _raw;
+        private readonly string _kana;
+        private readonly int[] _rawOffset;
+        private readonly int[] _kanaOffset;
+        // k 以降で最初に「英字と ' だけ」でない単位 / 「英字だけ」でない単位の位置 (無ければ n)
+        private readonly int[] _nextNonEnglish;
+        private readonly int[] _nextNonLetter;
+        private readonly int[] _unreadable;
+        private readonly int[] _apostrophes;
+
+        public SpanTable(IReadOnlyList<CompositionUnit> units)
+        {
+            _units = units;
+            _n = units.Count;
+            _rawOffset = new int[_n + 1];
+            _kanaOffset = new int[_n + 1];
+            _nextNonEnglish = new int[_n + 1];
+            _nextNonLetter = new int[_n + 1];
+            _unreadable = new int[_n + 1];
+            _apostrophes = new int[_n + 1];
+            var raw = new StringBuilder();
+            var kana = new StringBuilder();
+            for (var k = 0; k < _n; k++)
+            {
+                _rawOffset[k] = raw.Length;
+                _kanaOffset[k] = kana.Length;
+                raw.Append(units[k].Raw);
+                kana.Append(units[k].Kana);
+            }
+            _rawOffset[_n] = raw.Length;
+            _kanaOffset[_n] = kana.Length;
+            _raw = raw.ToString();
+            _kana = kana.ToString();
+            _nextNonEnglish[_n] = _n;
+            _nextNonLetter[_n] = _n;
+            for (var k = _n - 1; k >= 0; k--)
+            {
+                var text = units[k].Raw;
+                _nextNonEnglish[k] = text.All(c => char.IsAsciiLetter(c) || c == '\'') ? _nextNonEnglish[k + 1] : k;
+                _nextNonLetter[k] = text.All(char.IsAsciiLetter) ? _nextNonLetter[k + 1] : k;
+            }
+            for (var k = 0; k < _n; k++)
+            {
+                _apostrophes[k + 1] = _apostrophes[k] + (units[k].Raw.Contains('\'') ? 1 : 0);
+                // 読めなかった英字 (読みが打った英字のまま) の数。笑いの w は数えない
+                var unreadable = units[k] is { Raw.Length: 1 } unit && unit.Kana == unit.Raw && char.IsAsciiLetter(unit.Raw[0]) && !IsLaughter(units, k);
+                _unreadable[k + 1] = _unreadable[k] + (unreadable ? 1 : 0);
+            }
+        }
+
+        /// <summary>[i, j) の打った英字 (pending は含まない)。</summary>
+        public string Raw(int i, int j) => _raw.Substring(_rawOffset[i], _rawOffset[j] - _rawOffset[i]);
+
+        public string Kana(int i, int j) => _kana.Substring(_kanaOffset[i], _kanaOffset[j] - _kanaOffset[i]);
+
+        /// <summary>[i, j) の打った英字の長さ。j が末尾なら入力途中の子音 (pending) も含む。</summary>
+        public int Length(int i, int j, string pending) => _rawOffset[j] - _rawOffset[i] + (j == _n ? pending.Length : 0);
+
+        /// <summary>[i, j) に ' がある (短縮形 don't の判定は、語の長さを見ないので、長さで飛ばさない)。</summary>
+        public bool HasApostrophe(int i, int j) => _apostrophes[j] - _apostrophes[i] > 0;
+
+        public bool HasUnreadable(int i, int j) => _unreadable[j] - _unreadable[i] > 0;
+
+        public bool StartsWithUpper(int i) => i < _n && _units[i].Raw.Length > 0 && char.IsAsciiLetterUpper(_units[i].Raw[0]);
+
+        /// <summary>i から始まる区間の終わりの最大値 (これより後ろは英字と ' 以外の単位を含むので英語にならない)。</summary>
+        public int LastEnglishEnd(int i) => _nextNonEnglish[i] < _n ? _nextNonEnglish[i] : _n;
+
+        /// <summary>同じく、英字だけの区間 (かな入力の判定・長い英単語の判定用)。</summary>
+        public int LastLetterEnd(int i) => _nextNonLetter[i] < _n ? _nextNonLetter[i] : _n;
     }
 
     /// <summary>
@@ -308,6 +413,35 @@ public sealed class CompositionDetector
     /// <param name="unreadable">区間にローマ字として読めなかった英字がある (zoom + de の m、bug + wo の g)。</param>
     /// <param name="endsWord">区間の後ろが記号だけ (let's go! の go)。語はそこで打ち終わっているので、短い語も末尾の語と同じく見る。</param>
     private bool IsEnglishSpan(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final = false, bool unreadable = false, string? next = null, bool endsWord = false)
+    {
+        // 1 キー打つたびに、ほぼ同じ区間 (前のキーまでに調べた区間) を何度も判定するので、結果を覚えておく。
+        // 判定は引数と、学習した語 (Memory) とスペルチェッカーだけで決まる。それらが変わったら捨てる。
+        var flags = (atEnd ? 1 : 0) | (startOfInput ? 2 : 0) | (final ? 4 : 0) | (unreadable ? 8 : 0) | (endsWord ? 16 : 0) |
+                    ((after is null ? 0 : after.Value ? 1 : 2) << 5) | ((int)level << 7) | ((before + 8) << 10);
+        if (ReferenceMode) return IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord);
+        var key = (span, next, flags);
+        lock (_spanCache)
+        {
+            if (!ReferenceEquals(_spanCacheMemory, Memory) || _spanCacheMemoryVersion != (Memory?.Version ?? -1) || !ReferenceEquals(_spanCacheChecker, SpellChecker) || _spanCache.Count > 20000)
+            {
+                _spanCache.Clear();
+                _spanCacheMemory = Memory;
+                _spanCacheMemoryVersion = Memory?.Version ?? -1;
+                _spanCacheChecker = SpellChecker;
+            }
+            if (_spanCache.TryGetValue(key, out var cached)) return cached;
+        }
+        var result = IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord);
+        lock (_spanCache) _spanCache[key] = result;
+        return result;
+    }
+
+    private readonly Dictionary<(string Span, string? Next, int Flags), bool> _spanCache = [];
+    private LanguageMemory? _spanCacheMemory;
+    private int _spanCacheMemoryVersion;
+    private Detection.IWordChecker? _spanCacheChecker;
+
+    private bool IsEnglishSpanCore(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final, bool unreadable, string? next, bool endsWord)
     {
         // まだ続きを打つかもしれない末尾の区間 (打ちかけの英単語を英語と見てよい)。
         var growing = atEnd && !final;

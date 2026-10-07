@@ -378,6 +378,7 @@ public sealed class CompositionController
         _reconvertOriginal = null;
         _converting = false;
         _clauses = [];
+        ClearConversionCaches();
         ResetPrediction();
         ClearHeld();
         _swallowedShift.Clear();
@@ -1076,13 +1077,113 @@ public sealed class CompositionController
     /// </summary>
     private List<Clause> ConvertWithEngine(string kana)
     {
+        if (kana.Length <= ConvertChunkLength) return ConvertWithEngineOnce(kana);
+        // 長い読みは区切って変換する (変換エンジンの時間は読みの長さに比例するので、1 文字打つたびに全体を変換し直すと、長くなるほど重くなる)。
+        // 区切りは「読みの前の部分」だけで決まるので、続きを打っても前の区切りは変わらず、前の部分の変換結果は覚えてあるものを使える。
+        var clauses = new List<Clause>();
+        var previous = "";
+        try
+        {
+            foreach (var chunk in SplitForConversion(kana))
+            {
+                // 2 つ目以降の区切りには、前の区切りの変換結果が文脈 (キャレットの前の文字) になる。
+                if (previous.Length > 0) _chunkContext = (true, ContextOf(previous));
+                var converted = ConvertWithEngineOnce(chunk);
+                clauses.AddRange(converted);
+                previous += string.Concat(converted.Select(c => c.Text));
+            }
+        }
+        finally
+        {
+            _chunkContext = (false, null);
+        }
+        return clauses;
+    }
+
+    /// <summary>この長さ (文字数) を超える読みは区切って変換する。</summary>
+    internal const int ConvertChunkLength = 50;
+
+    /// <summary>変換エンジンに渡す文脈を、区切りの途中だけ前の区切りの変換結果にする。</summary>
+    private (bool Active, string? Text) _chunkContext;
+
+    /// <summary>
+    /// 長い読みを区切る。区切る位置は、先頭から見て決まる (後ろに文字が増えても、すでに区切った位置は動かない):
+    /// 文末 (。！？) の後ろ、読点 (、) の後ろ (12 文字以上たまっていれば)、無ければ変換エンジンが文節に分けた位置 (最後の文節は窓の端で切れているので除く)、
+    /// それも無ければ長さの上限。小さい ゃ ゅ ょ や っ の途中では切らない。
+    /// </summary>
+    private List<string> SplitForConversion(string kana)
+    {
+        var chunks = new List<string>();
+        var start = 0;
+        while (kana.Length - start > ConvertChunkLength)
+        {
+            var cut = -1;
+            for (var i = start; i < start + ConvertChunkLength && cut < 0; i++)
+            {
+                if (kana[i] is '。' or '！' or '？' || kana[i] is '、' or '，' && i + 1 - start >= 12) cut = i + 1;
+            }
+            if (cut < 0)
+            {
+                var window = kana.Substring(start, ConvertChunkLength);
+                var parts = EngineClauses(window, null);
+                if (parts is { Count: >= 2 } && string.Concat(parts.Select(p => p.Reading)) == window)
+                {
+                    var length = window.Length - parts[^1].Reading.Length;
+                    if (length >= ConvertChunkLength / 4) cut = start + length;
+                }
+            }
+            if (cut < 0) cut = start + ConvertChunkLength;
+            while (cut > start + 1 && cut < kana.Length && (SmallKana.Contains(kana[cut]) || kana[cut] == 'ー' || kana[cut - 1] == 'っ')) cut--;
+            chunks.Add(kana[start..cut]);
+            start = cut;
+        }
+        chunks.Add(kana[start..]);
+        return chunks;
+    }
+
+    /// <summary>
+    /// 同じ読み・文脈の変換エンジンの結果を覚えておく (打つたびの変換で、変わっていない前の部分をまた変換しないため)。
+    /// 変換ボックスを閉じたら捨てる。いっぱいになったら、使ってから一番長いものから捨てる
+    /// (今の区切りは打つたびに使うので残り、一度に全部が変換し直しになる山はできない)。
+    /// </summary>
+    private readonly Dictionary<(string Kana, string? Context), (IReadOnlyList<ConversionClause> Parts, long Used)> _clauseCache = [];
+    private long _clauseCacheClock;
+    private const int ClauseCacheLimit = 512;
+
+    private IReadOnlyList<ConversionClause>? EngineClauses(string kana, string? context)
+    {
+        var key = (kana, context);
+        if (_clauseCache.TryGetValue(key, out var cached))
+        {
+            _clauseCache[key] = (cached.Parts, ++_clauseCacheClock);
+            return cached.Parts;
+        }
+        var parts = _converter.ConvertClauses(kana, context);
+        // 失敗 (null) は覚えない: 次のキー・Space・Backspace でもう一度試せるように
+        if (parts is null) return null;
+        if (_clauseCache.Count >= ClauseCacheLimit)
+        {
+            foreach (var old in _clauseCache.OrderBy(e => e.Value.Used).Take(ClauseCacheLimit / 8).Select(e => e.Key).ToList()) _clauseCache.Remove(old);
+        }
+        _clauseCache[key] = (parts, ++_clauseCacheClock);
+        return parts;
+    }
+
+    private void ClearConversionCaches()
+    {
+        _clauseCache.Clear();
+        _detector.ClearSpanCache();
+    }
+
+    private List<Clause> ConvertWithEngineOnce(string kana)
+    {
         // 文脈が無いまま「に」で始まる読みを変換すると、変換エンジンは「に」を語の頭と読む (になってしまう → 担ってしまう)。
         // 前の文脈が取れないときは、仮の文脈「これ」を付けて助詞として読ませる (これ + になってしまう → になってしまう)。
         // 「は」「で」なども助詞になりうるが、仮の文脈を付けると はしる → は知る のように崩れるので「に」だけ。
         var context = ConversionContext();
         var parts = context is not null
             ? ConvertWithContext(kana, context)
-            : _converter.ConvertClauses(kana, kana.Length >= 3 && kana[0] == 'に' ? "これ" : null);
+            : EngineClauses(kana, kana.Length >= 3 && kana[0] == 'に' ? "これ" : null);
         parts ??= [new ConversionClause(kana, _converter.Convert(kana) ?? kana)];
         // 読み全体が補助辞書・絵文字の辞書の語 (かんがえるかお → 🤔) なら、文節に分けずに 1 つの文節にして候補を出す。
         if (parts.Count > 1 && _options.Candidates?.Contains(kana) == true)
@@ -1171,16 +1272,17 @@ public sealed class CompositionController
     /// </summary>
     private IReadOnlyList<ConversionClause>? ConvertWithContext(string kana, string context)
     {
-        var withContext = _converter.ConvertClauses(kana, context);
-        var plain = _converter.ConvertClauses(kana);
+        var withContext = EngineClauses(kana, context);
+        var plain = EngineClauses(kana, null);
         if (withContext is null || plain is null) return withContext ?? plain;
         return withContext.Select(c => c.Reading).SequenceEqual(plain.Select(c => c.Reading)) ? withContext : plain;
     }
 
     /// <summary>変換エンジンに渡す文脈: キャレットの前の確定済みの文字のうち、同じ文の日本語の部分 (最大 10 文字)。</summary>
-    private string? ConversionContext()
+    private string? ConversionContext() => _chunkContext.Active ? _chunkContext.Text : ContextOf(_precedingText);
+
+    private string? ContextOf(string? text)
     {
-        var text = _precedingText;
         if (string.IsNullOrEmpty(text) || LanguageOf(text) != false) return null;
         var start = text.LastIndexOfAny(SentenceEnds);
         text = text[(start + 1)..].Trim();
@@ -1691,6 +1793,7 @@ public sealed class CompositionController
     {
         if (_text.IsEmpty)
         {
+            ClearConversionCaches();
             ResetPrediction();
             // 英数状態の判定中は何も表示しない (英語ならそのまま出るだけ)。
             _host.Hide();
@@ -1761,7 +1864,7 @@ public sealed class CompositionController
             {
                 foreach (var word in dictionary.Words.Where(w => w.Reading.StartsWith(reading, StringComparison.Ordinal)).Select(w => w.Word).OrderByDescending(Used)) yield return word;
             }
-            if (_options.Predictions?.Invoke(reading) is { } engine)
+            if (reading.Length <= MaxPredictionReadingLength && _options.Predictions?.Invoke(reading) is { } engine)
             {
                 foreach (var word in engine.OrderByDescending(Used)) yield return word;
             }
@@ -1774,6 +1877,12 @@ public sealed class CompositionController
     }
 
     private const int MaxPredictions = 8;
+
+    /// <summary>
+    /// 予測変換を出す読みの長さの上限 (文字数)。変換エンジンの予測は読みの長さに比例して時間がかかり、
+    /// 長い読みの続きが予測で当たることはまず無いので、文章が長くなったら出さない (1 文字打つたびに重くなるのを避ける)。
+    /// </summary>
+    internal const int MaxPredictionReadingLength = 40;
 
     /// <summary>
     /// Tab で予測候補に入っている間のキー。処理したら true。↓ Tab で次、↑ で前 (先頭から上は入力に戻る)、Enter で確定、

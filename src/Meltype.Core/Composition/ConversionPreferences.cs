@@ -140,10 +140,16 @@ public sealed class ConversionHistory
     /// 語 (text) ごとの使用頻度スコア (履歴に無い語は含まれない)。変換エンジンの予測のうち、使った実績のある語を上に引き上げるのに使う。
     /// 同じ語が複数の読みで覚えられていれば、いちばん高いものを取る。
     /// </summary>
+    private (int Version, DateTime At, Dictionary<string, double> Usage)? _usageCache;
+
     public Dictionary<string, double> Usage()
     {
         lock (_gate)
         {
+            // 予測のために 1 キーごとに呼ばれる。覚えた内容が同じなら、1 分以内は前の結果を使い回す
+            // (スコアは日数で減るだけなので、1 分では並びは変わらない)。呼び出し側は読むだけ。
+            var now = Clock();
+            if (_usageCache is { } cached && cached.Version == Version && Math.Abs((now - cached.At).TotalSeconds) < 60) return cached.Usage;
             var usage = new Dictionary<string, double>(StringComparer.Ordinal);
             foreach (var entry in _entries.Values)
             {
@@ -151,6 +157,7 @@ public sealed class ConversionHistory
                 var score = Score(entry);
                 if (!usage.TryGetValue(entry.Text, out var best) || score > best) usage[entry.Text] = score;
             }
+            _usageCache = (Version, now, usage);
             return usage;
         }
     }
@@ -240,6 +247,7 @@ public sealed class ConversionHistory
             if (!_entries.TryGetValue(reading, out var entry) || entry.Text != text) return;
             entry.Count = Math.Max(1, entry.Count) + 1;
             entry.Used = Clock();
+            _usageCache = null;
             if (_path is null) return;
             _dirty = true;
             _saveTimer ??= new Timer(_ => Flush(), null, Timeout.Infinite, Timeout.Infinite);

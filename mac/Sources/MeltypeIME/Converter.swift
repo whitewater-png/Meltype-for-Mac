@@ -47,7 +47,7 @@ final class MeltypeConverter {
             sharedContainerURL: directory,
             textReplacer: TextReplacer(emojiDataProvider: { MeltypeConverter.emojiDictionary() }),
             specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
-            metadata: .init(versionString: "Meltype 1.0.4")
+            metadata: .init(versionString: "Meltype 1.0.5")
         )
     }
 
@@ -67,8 +67,29 @@ final class MeltypeConverter {
         recentCandidates[reading] = candidates
     }
 
+    /// 直近に変換した読み → 変換結果。同じ読みを続けて変換するとき (文脈付きと文脈なしで同じ読みを 2 度渡す、変換のあとの候補の一覧など)
+    /// に azooKey を呼び直さない。azooKey の変換は読みの長さに比例して時間がかかるので、同じ読みの 2 度目を省く。
+    /// 学習 (updateLearningData) や学習の消去で結果が変わるので、そのときは捨てる。
+    private var resultCache: [String: [Candidate]] = [:]
+    private var resultCacheOrder: [String] = []
+    private static let resultCacheLimit = 16
+
     /// ひらがな全体に対する変換結果 (入力をすべて使ったものだけ、よい順)。
     private func results(for hiragana: String) -> [Candidate] {
+        if let cached = resultCache[hiragana] {
+            remember(cached, for: hiragana)
+            return cached
+        }
+        let filtered = requestResults(for: hiragana)
+        if resultCacheOrder.count >= MeltypeConverter.resultCacheLimit {
+            resultCache.removeValue(forKey: resultCacheOrder.removeFirst())
+        }
+        resultCacheOrder.append(hiragana)
+        resultCache[hiragana] = filtered
+        return filtered
+    }
+
+    private func requestResults(for hiragana: String) -> [Candidate] {
         var composing = ComposingText()
         composing.insertAtCursorPosition(hiragana, inputStyle: .direct)
         let results = converter.requestCandidates(composing, options: options)
@@ -83,6 +104,8 @@ final class MeltypeConverter {
     /// azooKey の学習データ (メモリ上と学習のファイル) をすべて消す (メインスレッドから呼ぶ)。azooKey 側のユーザー辞書は消さない。
     func resetLearning() {
         converter.resetMemory()
+        resultCache.removeAll()
+        resultCacheOrder.removeAll()
         recentCandidates.removeAll()
         recentOrder.removeAll()
     }
@@ -98,7 +121,12 @@ final class MeltypeConverter {
             learned = true
         }
         // commitUpdateLearningData を呼ぶまで保存されない。
-        if learned { converter.commitUpdateLearningData() }
+        if learned {
+            converter.commitUpdateLearningData()
+            // 学習で候補の並びが変わるので、覚えていた変換結果は捨てる。
+            resultCache.removeAll()
+            resultCacheOrder.removeAll()
+        }
     }
 
     /// 文節に区切った変換結果 (読みをつなげると元のひらがなになる)。変換できなければ空。
