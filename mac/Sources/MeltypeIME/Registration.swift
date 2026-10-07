@@ -83,6 +83,17 @@ enum InputSourceRegistration {
         return 0
     }
 
+    /// `--unregister`: Meltype の入力ソース (日本語・英数) を無効にする。uninstall.sh がアプリを消す前に呼ぶ。
+    /// 先に外しておかないと、アプリを消したあとも入力メニューに Meltype が残ることがある。成功したら 0。
+    static func disable() -> Int32 {
+        var failed = false
+        for id in [modeID, romanModeID, "io.github.yksr-melt.inputmethod.Meltype"] {
+            guard let source = find(id) else { continue }
+            if TISDisableInputSource(source) != noErr { failed = true }
+        }
+        return failed ? 1 : 0
+    }
+
     /// 自分 (Meltype) を新しいプロセスとして起動し、終了コードを返す。15 秒で終わらないとき・シグナルで終わったときは -1。
     private static func runChild(_ argument: String) -> Int32 {
         guard let executable = Bundle.main.executableURL else { return -1 }

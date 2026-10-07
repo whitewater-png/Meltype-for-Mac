@@ -59,6 +59,16 @@ shasum -a 256 ~/Downloads/Meltype-mac.zip   # ファイル名は実際のもの�
 `build.sh` は、ビルドした実行ファイルの RPATH からビルドしたマシンの絶対パス (`/Library/Developer/CommandLineTools/...`) を `install_name_tool -delete_rpath` で除いてから署名します。
 組み立てたあとの `otool -l build/Meltype.app/Contents/MacOS/Meltype` で、`LC_RPATH` に `/usr/lib/swift`・`@loader_path`・`@executable_path/../Frameworks` だけが残っていることを確かめられます。
 
+## アンインストール
+
+```bash
+bash uninstall.sh      # zip の「Uninstall Meltype.command」のダブルクリックでも同じ
+```
+
+入力ソースを外して `~/Library/Input Methods/Meltype.app` を削除します。設定・学習データ・ユーザー辞書 (`~/Library/Application Support/Meltype`) は、聞かれたときに残すか消すかを選べます
+(消すときは、ユーザー辞書をデスクトップにバックアップします。`--yes` で確認を省略、`--remove-data` / `--keep-data` でデータの扱いを指定)。
+そのあと、いったんログアウトしてログインし直してください。
+
 ## 使い方
 
 - ふつうにローマ字で打つと、下線付きの変換中の文字になります。英単語 (google, github …) は英字のまま

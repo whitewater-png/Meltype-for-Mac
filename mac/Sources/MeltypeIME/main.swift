@@ -6,12 +6,13 @@ import InputMethodKit
 
 // `Meltype --register`: 入力ソースとして登録するだけで終わる (build.sh / install.sh が初めて入れたときに呼ぶ)。
 // `--register-check` / `--register-add` / `--register-enable` は、--register が新しいプロセスで確かめる・登録する・
-// 有効にするのに使う (Registration.swift)。
+// 有効にするのに使う (Registration.swift)。`--unregister` は uninstall.sh が入力ソースを外すのに使う。
 switch CommandLine.arguments.dropFirst().first {
 case "--register": exit(InputSourceRegistration.register() ? 0 : 1)
 case "--register-check": exit(InputSourceRegistration.check())
 case "--register-add": exit(InputSourceRegistration.add())
 case "--register-enable": exit(InputSourceRegistration.enable())
+case "--unregister": exit(InputSourceRegistration.disable())
 default: break
 }
 
