@@ -44,9 +44,9 @@
 	<true/>
 	<key>tsInputMethodIconFileKey</key>
 	<string>icon.tiff</string>
-	<!-- 黒い M の形だけを使い、ダークモードでは白く出す (黒のままだと見えない) -->
+	<!-- 氷の M・英数の氷の A はカラーのまま出す (true にすると形だけの白黒になる) -->
 	<key>TISIconIsTemplate</key>
-	<true/>
+	<false/>
 	<key>tsInputMethodCharacterRepertoireKey</key>
 	<array>
 		<string>Hira</string>
@@ -71,7 +71,7 @@
 				<key>tsInputModeAlternateMenuIconFileKey</key>
 				<string>icon.tiff</string>
 				<key>TISIconIsTemplate</key>
-				<true/>
+				<false/>
 				<key>tsInputModePrimaryInScriptKey</key>
 				<true/>
 				<key>tsInputModeIsVisibleKey</key>
@@ -100,7 +100,7 @@
 			<key>tsInputModeAlternateMenuIconFileKey</key>
 			<string>icon-roman.tiff</string>
 			<key>TISIconIsTemplate</key>
-			<true/>
+			<false/>
 			<key>tsInputModePrimaryInScriptKey</key>
 			<true/>
 			<key>tsInputModeIsVisibleKey</key>
