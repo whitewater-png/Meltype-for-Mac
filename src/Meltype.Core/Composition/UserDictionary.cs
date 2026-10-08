@@ -42,9 +42,39 @@ public sealed class UserDictionary
         if (reading.Length < MinReadingLength) return $"読みは {MinReadingLength} 文字以上にしてください。";
         if (word.Length == 0) return "単語を入力してください。";
         if (reading.Length > MaxLength || word.Length > MaxLength) return $"読みも単語も {MaxLength} 文字までにしてください。";
+        // 変換はひらがなで引くので、ひらがなを 1 文字も含まない読み (ローマ字・カタカナだけ) は、登録しても変換に一度も出ない。
+        if (!reading.Any(IsHiragana) || !reading.All(IsReadingChar)) return "読みはひらがなで入力してください (カタカナは自動でひらがなになります)。";
         // 改行はファイルの 1 行に収まらず、タブは「読み<Tab>単語」の区切りと衝突する。
         if (reading.Any(c => c is '\t' or '\r' or '\n') || word.Any(c => c is '\t' or '\r' or '\n')) return "改行・タブ文字は使えません。";
+        // 制御文字 (ESC・Ctrl+O など) は、確定した先がターミナルだと「行の実行」や画面の書き換えになりうる。
+        // 書式文字 (右から左に並べ替える U+202E など) は、見えている語と確定する語を食い違わせる。どちらも候補欄では見えない。
+        if (reading.Any(IsUnsafeChar) || word.Any(IsUnsafeChar)) return "制御文字・書式文字は使えません。";
         return null;
+    }
+
+    private static bool IsHiragana(char c) => c is >= 'ぁ' and <= 'ゖ' or 'ゔ';
+
+    // 読みに使える文字: ひらがな・長音・中点・数字・英字 (50cc のように、数字や英字を含むかなの並びの読みがある)
+    private static bool IsReadingChar(char c) => IsHiragana(c) || c is 'ー' or '・' or >= '0' and <= '9' or >= 'a' and <= 'z' or >= 'A' and <= 'Z';
+
+    /// <summary>登録・編集・確認の前に読みをそろえる: 前後の空白を取り、カタカナをひらがなにする (変換側はひらがなで引くため。取り込みと同じ考え方)。</summary>
+    public static string NormalizeReading(string reading)
+    {
+        reading = reading.Trim();
+        return reading.Any(c => c is >= 'ァ' and <= 'ヶ') ? new string(reading.Select(c => c is >= 'ァ' and <= 'ヶ' ? (char)(c - 0x60) : c).ToArray()) : reading;
+    }
+
+    /// <summary>
+    /// 語に入れてはいけない文字か: 制御文字 (Cc)・書式文字 (Cf)・行/段落区切り (Zl・Zp)。
+    /// 絵文字をつなぐ ZWJ (U+200D) だけは許す。異体字選択子 (U+FE00 台・U+E0100 台) は Mn なので対象外。
+    /// </summary>
+    private static bool IsUnsafeChar(char c)
+    {
+        if (c == '‍') return false;
+        return char.GetUnicodeCategory(c) is System.Globalization.UnicodeCategory.Control
+            or System.Globalization.UnicodeCategory.Format
+            or System.Globalization.UnicodeCategory.LineSeparator
+            or System.Globalization.UnicodeCategory.ParagraphSeparator;
     }
 
     /// <summary>ファイルが書き換わっていないかを確かめる間隔 (ミリ秒)。テストが 0 にする。</summary>
@@ -131,7 +161,9 @@ public sealed class UserDictionary
         {
             if (line.StartsWith('#')) continue;
             var parts = line.TrimEnd('\r').Split('\t');
-            if (parts.Length >= 2 && parts[0].Trim().Length >= MinReadingLength && parts[1].Trim().Length > 0)
+            // 取り込み・登録は Validate を通るが、ファイルを直接編集・復元した場合はここが唯一の入口なので、制御文字・書式文字の語は読み込まない。
+            if (parts.Length >= 2 && parts[0].Trim().Length >= MinReadingLength && parts[1].Trim().Length > 0
+                && !parts[0].Any(IsUnsafeChar) && !parts[1].Any(IsUnsafeChar))
             {
                 words.Add(new UserWord(parts[0].Trim(), parts[1].Trim()));
             }
@@ -246,9 +278,9 @@ public sealed class UserDictionary
     /// 専門用語集を、渡したテキスト (terms-*.txt の中身) で置き換える。同梱の読み込みはコンストラクターが済ませるので、
     /// これは主にテスト用の入口。不正な行は飛ばす。変換結果のキャッシュを捨てるため Version を進める。
     /// </summary>
-    public TermDictionary LoadTerms(IEnumerable<string> texts)
+    public TermDictionary LoadTerms(IEnumerable<string> texts, IReadOnlySet<string>? commonReadings = null)
     {
-        var terms = TermDictionary.Parse(texts);
+        var terms = TermDictionary.Parse(texts, null, commonReadings);
         lock (_gate)
         {
             Volatile.Write(ref _terms, new TermSnapshot(terms, -1, false));
@@ -273,7 +305,7 @@ public sealed class UserDictionary
 
     private string? Add(string reading, string word, bool failOnDuplicate)
     {
-        reading = reading.Trim();
+        reading = NormalizeReading(reading);
         word = word.Trim();
         if (Validate(reading, word) is { } error) return error;
         var entry = new UserWord(reading, word);
@@ -302,7 +334,7 @@ public sealed class UserDictionary
     /// </summary>
     public string? AddMany(IEnumerable<UserWord> words, out IReadOnlyList<UserWord> added)
     {
-        var incoming = words.Select(w => new UserWord(w.Reading.Trim(), w.Word.Trim())).Where(w => Validate(w.Reading, w.Word) is null).ToList();
+        var incoming = words.Select(w => new UserWord(NormalizeReading(w.Reading), w.Word.Trim())).Where(w => Validate(w.Reading, w.Word) is null).ToList();
         var list = new List<UserWord>();
         var error = Mutate(current =>
         {
@@ -375,7 +407,7 @@ public sealed class UserDictionary
     /// </summary>
     public string? Update(UserWord old, string reading, string word)
     {
-        reading = reading.Trim();
+        reading = NormalizeReading(reading);
         word = word.Trim();
         if (Validate(reading, word) is { } invalid) return invalid;
         var replacement = new UserWord(reading, word);
@@ -396,7 +428,7 @@ public sealed class UserDictionary
     /// </summary>
     public string? Check(string reading, string word, UserWord? except = null)
     {
-        reading = reading.Trim();
+        reading = NormalizeReading(reading);
         word = word.Trim();
         if (Validate(reading, word) is { } invalid) return invalid;
         var entry = new UserWord(reading, word);

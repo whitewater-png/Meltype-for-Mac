@@ -38,6 +38,59 @@ internal static class TermDictionaryTests
     }
 
     [Test]
+    public static void Terms_CommonReadings_AreCandidatesOnly_UnlessMarked()
+    {
+        // 日常語と同じ読みの語は、4 文字以上でも強制しない (こうせい → 構成 が こうせいろうどうしょう を 構成|ろうどうしょう にしない)。4 つ目の欄「強制」で残せる
+        HashSet<string> common = ["こうせいろうどうしょう", "かいとう", "ちょうかん"];
+        var text = "こうせいろうどうしょう\t構成労働省\nかいとう\t解凍\t注記\t強制\nちょうかん\t鳥瞰\t\t強制\nぎょうれつしき\t行列式\n";
+        var terms = TermDictionary.Parse([text], null, common);
+        Assert.Equal(3, terms.ForcedCount, "日常語の読みでない語・「強制」の印のある語は強制型");
+        Assert.Equal(1, terms.CandidateCount, "日常語の読みの語は候補追加型");
+        Assert.Equal(0, terms.LookupForced("こうせいろうどうしょう").Count, "強制型に入らない");
+        Assert.Equal("構成労働省", terms.LookupCandidates("こうせいろうどうしょう").SingleOrDefault() ?? "", "候補には出る");
+        Assert.Equal("解凍", terms.LookupForced("かいとう").SingleOrDefault() ?? "", "4 つ目の欄が「強制」なら強制型のまま");
+        Assert.Equal("鳥瞰", terms.LookupForced("ちょうかん").SingleOrDefault() ?? "", "注記が空でも 4 つ目の欄は読む");
+        Assert.Equal(4, TermDictionary.Parse([text]).ForcedCount, "日常語の読みを渡さなければ落とさない (今までどおり)");
+        // 注記だけ (3 つ目) の語や、4 つ目が「強制」以外の語は、印にならない
+        var notMarked = TermDictionary.Parse(["かいとう\t解凍\t強制\n", "かいとう\t解凍\t注記\tはい\n"], null, common);
+        Assert.Equal(0, notMarked.ForcedCount, "3 つ目の欄の「強制」は注記。4 つ目だけが印");
+    }
+
+    [Test]
+    public static void Terms_Bundled_DoNotHijackEverydayWords()
+    {
+        // 同梱の分野 (video) を、日常語の読みを渡して読む: 強制型の読みに日常語の読みが残らない
+        var video = Detection.DictionarySource.ReadEmbedded("terms-video.txt");
+        var common = CommonReadings.Set;
+        Assert.True(common.Contains("こうせい") && common.Contains("かいてん"), "readings.txt の見出しを読めている");
+        var without = TermDictionary.Parse([video]);
+        var with = TermDictionary.Parse([video], null, common);
+        Assert.True(with.ForcedCount < without.ForcedCount, "日常語と衝突する語が強制型から外れる");
+        Assert.True(with.Count == without.Count, "語数は変わらない (候補には残る)");
+        var dictionary = new UserDictionary(null, builtIn: false);
+        dictionary.LoadTerms([video], common);
+        var split = dictionary.Split("こうせいろうどうしょう");
+        Assert.True(split is null || !split.Any(p => p.Word == "構成"), "こうせいろうどうしょう が 構成|ろうどうしょう にならない");
+        Assert.True(dictionary.Split("きかいてんけん") is null, "語の途中の かいてん → 回転 にならない");
+        // 衝突しない語は強制のまま
+        Assert.True(!common.Contains("あふれこ"), "あふれこ は日常語の読みでない");
+        Assert.Equal("アフレコ", dictionary.Lookup("あふれこ").FirstOrDefault() ?? "", "あふれこ → アフレコ は日常語でないので強制型のまま");
+        Assert.Equal("テロップ", (dictionary.LookupTermCandidates("てろっぷ").FirstOrDefault() ?? ""), "日常語の読みの語も、読みがちょうど同じなら候補には出る");
+        // 全分野で、強制型の読みが日常語の読みと同じものが残っていない (「強制」の印のある語を除く)
+        foreach (var text in Detection.DictionarySource.ReadEmbeddedWithPrefix("terms-"))
+        {
+            var parsed = TermDictionary.Parse([text], null, common);
+            foreach (var entry in TermDictionary.Entries(text))
+            {
+                if (!common.Contains(entry.Reading)) continue;
+                var line = text.Split('\n').First(l => l.StartsWith(entry.Reading + "\t", StringComparison.Ordinal) && l.Contains(entry.Word));
+                if (line.Split('\t') is { Length: >= 4 } f && f[3].Trim() == TermDictionary.KeepForcedMark) continue;
+                Assert.True(!parsed.LookupForced(entry.Reading).Contains(entry.Word), $"{entry.Reading}→{entry.Word} が日常語の読みなのに強制型");
+            }
+        }
+    }
+
+    [Test]
     public static void Terms_AsciiWords_AreCandidatesOnly()
     {
         // 語が ASCII だけの語は、読みが 4 文字以上でも強制しない (「あいこんをくりっく」が「icon|を|click」にならない)

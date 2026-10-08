@@ -245,6 +245,25 @@ internal static class SecurityTests
         Assert.True(!File.Exists(model), "Mac には無い model.json を作らない");
     }
 
+    [Test]
+    public static void ClearLeftovers_RemovesBrokenOversizeAndLogs_ButNotUserData()
+    {
+        var directory = TempDirectory();
+        string P(string name) => Path.Combine(directory, name);
+        var learning = new[] { P("conversions.json"), P("model.json") };
+        // 消す: 退避コピー・ログ
+        foreach (var name in new[] { "conversions.json.broken", "conversions.json.oversize", "conversions.json.oversize.1", "conversions.json.oversize.2", "model.json.broken", "meltype.log", "meltype.log.old", "crash.log" })
+            File.WriteAllText(P(name), "打った文字");
+        // 消さない: ユーザー辞書とそのバックアップ・設定・除外・別の学習データ・似た名前
+        var keep = new[] { "userdict.txt", "userdict.txt.bak", "userdict.txt.oversize", "config.json", "config.json.broken", "terms-excluded.txt", "suggest.json.broken", "conversions.json" };
+        foreach (var name in keep) File.WriteAllText(P(name), "残す");
+        Assert.True(LearningData.ClearLeftovers(learning, [P("meltype.log"), P("crash.log")]), "消せる");
+        foreach (var name in new[] { "conversions.json.broken", "conversions.json.oversize", "conversions.json.oversize.1", "conversions.json.oversize.2", "model.json.broken", "meltype.log", "meltype.log.old", "crash.log" })
+            Assert.True(!File.Exists(P(name)), $"{name} が消える");
+        foreach (var name in keep) Assert.True(File.Exists(P(name)), $"{name} は消さない");
+        Assert.True(LearningData.ClearLeftovers(learning, [P("meltype.log")]), "何も無くても成功する");
+    }
+
     // ---- L4 ユーザー辞書の入力チェック ----
 
     [Test]

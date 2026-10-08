@@ -223,7 +223,15 @@ public static unsafe class Exports
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_direct")]
     public static void SetDirect(IntPtr handle, int direct)
     {
-        if (handle != IntPtr.Zero && GCHandle.FromIntPtr(handle).Target is MeltypeSession session) session.Direct = direct != 0;
+        // 例外が UnmanagedCallersOnly の外へ出るとプロセスごと落ちるので、ほかの関数と同じく包む
+        try
+        {
+            if (handle != IntPtr.Zero && GCHandle.FromIntPtr(handle).Target is MeltypeSession session) session.Direct = direct != 0;
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Warn($"直接入力の切り替えに失敗しました: {ex.Message}");
+        }
     }
 
     /// <summary>

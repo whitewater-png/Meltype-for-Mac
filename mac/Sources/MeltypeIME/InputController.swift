@@ -16,6 +16,8 @@ final class MeltypeInputController: IMKInputController {
     /// IMK はメニュー項目の action に NSMenuItem ではなく infoDictionary を渡すので、representedObject には頼らず、tag で引く。
     private var menuPayloads: [[String]] = []
     private var menuPayloadsByTitle: [String: [String]] = [:]
+    /// 同じタイトルの項目が 2 つ以上あるタイトル (タイトルでは引数を決められない)
+    private var ambiguousMenuTitles: Set<String> = []
     private var hasMarkedText = false
     /// 直前に本体から受け取った表示。候補ウィンドウのクリックが変換の候補か予測かを見分けるのに使う。
     private var lastView: CompositionView?
@@ -196,10 +198,17 @@ final class MeltypeInputController: IMKInputController {
     // ---- メニュー (メニューバーの入力メニュー) ----
 
     /// メニュー項目に引数を結びつける (tag に番号を入れ、menuPayloads に保存)。
+    /// tag は 1 から数える: IMK が項目を複製するとタグが 0 に戻るので、0 は「タグが落ちた」の目印にする。
     private func attach(_ payload: [String], to item: NSMenuItem) {
-        item.tag = menuPayloads.count
         menuPayloads.append(payload)
-        menuPayloadsByTitle[item.title] = payload
+        item.tag = menuPayloads.count
+        // タイトルでも引けるようにしておく (タグが落ちたときの備え)。同じタイトルが 2 つ以上あると取り違えるので、その場合はタイトルでは引かない。
+        if menuPayloadsByTitle[item.title] != nil || ambiguousMenuTitles.contains(item.title) {
+            menuPayloadsByTitle[item.title] = nil
+            ambiguousMenuTitles.insert(item.title)
+        } else {
+            menuPayloadsByTitle[item.title] = payload
+        }
     }
 
     /// action の sender (IMK は [kIMKCommandMenuItemName: NSMenuItem] の辞書を渡す。NSMenuItem が直接来ても読む) から、項目の引数を取り出す。
@@ -216,16 +225,17 @@ final class MeltypeInputController: IMKInputController {
             NSLog("Meltype: メニュー項目を読めませんでした (sender: %@)", String(describing: sender))
             return nil
         }
-        // IMK が項目を複製してタグを落とすことがあるので、タイトルでも引く
-        if let byTitle = menuPayloadsByTitle[item.title] { return byTitle }
-        guard item.tag >= 0, item.tag < menuPayloads.count else { return nil }
-        return menuPayloads[item.tag]
+        // タグを優先する (タイトルは先頭 20 文字で省略するので、別の語が同じタイトルになりうる)。
+        if item.tag >= 1, item.tag <= menuPayloads.count { return menuPayloads[item.tag - 1] }
+        // IMK が項目を複製してタグを落とすことがあるので、そのときだけタイトルで引く (同じタイトルが複数ある項目は、取り違えるより何もしない)
+        return menuPayloadsByTitle[item.title]
     }
 
     override func menu() -> NSMenu! {
         let menu = NSMenu()
         menuPayloads = []
         menuPayloadsByTitle = [:]
+        ambiguousMenuTitles = []
         // メニューを開いたとき、前の確認から 24 時間たっていれば裏で確認する (OFF のときは何もしない。メニューは待たせない)
         UpdateManager.shared.checkIfDue()
         // 新しい版が見つかっていれば先頭に出す (選ぶと確認のダイアログ。自動では入れない)
@@ -343,7 +353,7 @@ final class MeltypeInputController: IMKInputController {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "学習データをすべて消去しますか？"
-        alert.informativeText = "変換の学習・辞書の登録提案の履歴・英語/日本語の学習・英訳の学習・ユーザーモデル・azooKey の学習を消します。元に戻せません。\nユーザー辞書と設定は消えません。"
+        alert.informativeText = "変換の学習・辞書の登録提案の履歴・英語/日本語の学習・英訳の学習・ユーザーモデル・azooKey の学習を消します。ログ (meltype.log・crash.log) と、読めない・大きすぎるために退避したコピー (.broken・.oversize) も消します。元に戻せません。\n不具合を報告する予定があれば、先にログを保存してください。ユーザー辞書と設定は消えません。"
         // 取り消せない操作なので、Return で押される先頭のボタンはキャンセルにする。
         alert.addButton(withTitle: "キャンセル")
         alert.addButton(withTitle: "消去")

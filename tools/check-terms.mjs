@@ -4,11 +4,14 @@
 // 専門用語集 (dictionaries/terms-*.txt) の品質を検査する。
 //   node tools/check-terms.mjs [ファイル …]   … 省略すると dictionaries/terms-*.txt をすべて
 //   node tools/check-terms.mjs --self-test    … この検査自身の自己テスト
+//   node tools/check-terms.mjs --collisions [ファイル …] … 強制型の読みが日常語の読みと同じ語の全件を、ファイル:行 読み→語 で表示 (印を付ける語を選ぶ材料)
 // エラーがあれば終了コード 1。警告・情報は表示だけ (終了コードは 0)。
 // 読み込む側の決まり (src/Meltype.Core/Composition/TermDictionary.cs、UserDictionary.Validate) と、ここでの上乗せの決まり:
-//   エラー  先頭の `# 名称:` (入力メニュー「専門用語集」に出る分野の名前) `# 出典:` `# ライセンス:` の行が無い / 欄の数が 2〜3 でない / 読みがひらがな (ぁ-ゖ・ゔ・長音ー) だけでない
+//   エラー  先頭の `# 名称:` (入力メニュー「専門用語集」に出る分野の名前) `# 出典:` `# ライセンス:` の行が無い / 欄の数が 2〜4 でない / 読みがひらがな (ぁ-ゖ・ゔ・長音ー) だけでない
 //           (カタカナ・数字・英字・中点「・」・空白は不可) / 読みが 2 文字未満・100 文字超 / 語が空・100 文字超
 //   警告    同じ読み+語の重複 (読み込みでは 1 つにまとめられる) / 同じ読みに語が 20 を超える / 欄の前後に空白 / 先頭が長音の読み / 語が読みと同じ / BOM
+//   警告    (追加) 強制型になる語の読みが日常語の読み (dictionaries/readings.txt) と同じ → 読み込み時に候補追加型へ落ちる (件数と例を表示。全件は --collisions)。
+//           4 つ目の欄が「強制」なら強制型のまま残す。4 つ目の欄が「強制」以外ならエラー、強制型にならない語の「強制」は効果がないので警告
 //   情報    読みが 3 文字以下の語と、語が ASCII だけの語 (読みが長くても) は「候補追加型」(変換候補に足すだけ。強制しない) になる / 総語数・強制型の数
 import fs from 'node:fs';
 import os from 'node:os';
@@ -20,16 +23,33 @@ export const FORCED_MIN_READING_LENGTH = 4; // TermDictionary.ForcedMinReadingLe
 const MIN_READING = 2;
 const MAX_LENGTH = 100;
 const readingChars = /^[ぁ-ゖゔー]+$/;
+export const KEEP_FORCED_MARK = '強制'; // TermDictionary.KeepForcedMark と同じ (4 つ目の欄)
+
+/** 日常語の読み (dictionaries/readings.txt の見出し)。TermDictionary の CommonReadings と同じ。読めなければ null (衝突の検査を飛ばす)。 */
+export function loadCommonReadings(file) {
+  try {
+    const set = new Set();
+    for (const raw of fs.readFileSync(file, 'utf8').split('\n')) {
+      const line = raw.replace(/\r$/, '');
+      if (line === '' || line.startsWith('#')) continue;
+      set.add(line.split('\t')[0]);
+    }
+    return set;
+  } catch { return null; }
+}
+const defaultReadingsFile = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dictionaries', 'readings.txt');
 
 /**
  * 1 つのファイルの中身を検査する。seen (同じ読み+語) と readings (読みごとの語の数) は複数ファイルをまたいで共有する。
  * 戻り値: { problems: [{ level, line, message }], stats }
  */
-export function checkText(text, seen = new Map(), readings = new Map()) {
+export function checkText(text, seen = new Map(), readings = new Map(), common = null, fileName = '') {
   const problems = [];
   const add = (level, line, message) => problems.push({ level, line, message });
-  const stats = { words: 0, forced: 0, candidate: 0, skipped: 0, four: 0, ascii: 0 };
+  const stats = { words: 0, forced: 0, candidate: 0, skipped: 0, four: 0, ascii: 0, collisions: 0, kept: 0 };
   const fourSamples = [];
+  const collisionSamples = [];
+  const collisionList = []; // 全件 ({ line, reading, word })
   let placeholder = false;
   if (text.charCodeAt(0) === 0xfeff) {
     add('warning', 1, '先頭に BOM がある');
@@ -53,8 +73,8 @@ export function checkText(text, seen = new Map(), readings = new Map()) {
     }
     header = false;
     const fields = line.split('\t');
-    if (fields.length < 2 || fields.length > 3) {
-      add('error', lineNo, `タブ区切りの欄が ${fields.length} 個 (読み<Tab>語<Tab>注記(任意) の 2〜3 個のはず)`);
+    if (fields.length < 2 || fields.length > 4) {
+      add('error', lineNo, `タブ区切りの欄が ${fields.length} 個 (読み<Tab>語<Tab>注記(任意)<Tab>強制(任意) の 2〜4 個のはず)`);
       stats.skipped++;
       return;
     }
@@ -70,6 +90,8 @@ export function checkText(text, seen = new Map(), readings = new Map()) {
       add('error', lineNo, `読み「${reading}」にひらがな・長音ー以外の文字「${found}」がある${hint}`);
       bad = true;
     }
+    const mark = fields.length === 4 ? fields[3].trim() : '';
+    if (fields.length === 4 && mark !== KEEP_FORCED_MARK) { add('error', lineNo, `4 つ目の欄は「${KEEP_FORCED_MARK}」だけ (「${mark}」では印にならない。注記は 3 つ目の欄)`); bad = true; }
     if (word.length === 0) { add('error', lineNo, '語が空'); bad = true; }
     else if (word.length > MAX_LENGTH) { add('error', lineNo, `語が ${MAX_LENGTH} 文字を超えている (${word.length} 文字)`); bad = true; }
     if (bad) { stats.skipped++; return; }
@@ -77,22 +99,34 @@ export function checkText(text, seen = new Map(), readings = new Map()) {
     if (word === reading) add('warning', lineNo, `語が読みと同じ (「${word}」)`);
     const key = `${reading}\t${word}`;
     if (seen.has(key)) { add('warning', lineNo, `${seen.get(key)} と同じ読み+語 (「${reading}」→「${word}」)`); return; }
-    seen.set(key, `${lineNo} 行目`);
+    seen.set(key, `${fileName ? `${fileName} の ` : ''}${lineNo} 行目`); // 別のファイルとの重複でも、どこにあるか分かるようにファイル名を付ける
     readings.set(reading, (readings.get(reading) ?? 0) + 1);
     stats.words++;
     // 語が ASCII だけの語は、読みが長くても候補追加型 (TermDictionary.IsAscii と同じ。日常語を英単語に置き換えないため)
     const ascii = /^[\x00-\x7f]+$/.test(word);
     if (ascii && reading.length >= FORCED_MIN_READING_LENGTH) stats.ascii++;
-    if (reading.length >= FORCED_MIN_READING_LENGTH && !ascii) stats.forced++; else stats.candidate++;
-    if (reading.length === FORCED_MIN_READING_LENGTH && !ascii) { stats.four++; if (fourSamples.length < 5) fourSamples.push(`${reading}→${word}`); }
+    const forcedByLength = reading.length >= FORCED_MIN_READING_LENGTH && !ascii;
+    if (mark === KEEP_FORCED_MARK && !forcedByLength) add('warning', lineNo, `読み「${reading}」は読みが短い・語が ASCII だけのため、もともと強制型にならない (「${KEEP_FORCED_MARK}」の印は効果がない)`);
+    // 日常語の読みと同じなら、読み込み時に候補追加型へ落ちる (印があれば強制型のまま)
+    const collides = forcedByLength && common !== null && common.has(reading);
+    if (collides && mark === KEEP_FORCED_MARK) stats.kept++;
+    const demoted = collides && mark !== KEEP_FORCED_MARK;
+    if (demoted) {
+      stats.collisions++;
+      collisionList.push({ line: lineNo, reading, word });
+      if (collisionSamples.length < 5) collisionSamples.push(`${reading}→${word}`);
+    }
+    if (forcedByLength && !demoted) stats.forced++; else stats.candidate++;
+    if (reading.length === FORCED_MIN_READING_LENGTH && !ascii && !demoted) { stats.four++; if (fourSamples.length < 5) fourSamples.push(`${reading}→${word}`); }
   });
   if (!label) add('error', 1, '先頭のコメントに「# 名称: …」の行が無い (入力メニュー「専門用語集」に出る分野の名前。例: # 名称: 土木・建設)');
   if (!source) add('error', 1, '先頭のコメントに「# 出典: …」の行が無い (自作なら「# 出典: 自作」でよい)');
   if (!license) add('error', 1, '先頭のコメントに「# ライセンス: …」の行が無い (自作なら「# ライセンス: 自作」でよい)');
   if (stats.candidate > 0) add('info', 0, `読みが ${FORCED_MIN_READING_LENGTH - 1} 文字以下の ${stats.candidate - stats.ascii} 語と、語が ASCII だけの ${stats.ascii} 語 (読みが ${FORCED_MIN_READING_LENGTH} 文字以上でも) は「候補追加型」になる (変換候補に足すだけで、強制しない)`);
   if (stats.four > 0) add('info', 0, `読みがちょうど ${FORCED_MIN_READING_LENGTH} 文字 (強制型の最短) の語が ${stats.four} 語ある。日常語の途中に現れて巻き込む恐れがあるので注意 (例: ${fourSamples.join('、')})`);
+  if (stats.collisions > 0) add('warning', 0, `強制型になる読みが日常語の読み (readings.txt) と同じ語が ${stats.collisions} 語ある。読み込み時に候補追加型へ落ちる (変換候補には出るが、文の中で語を固定しない)。日常語と同じ読みでも固定したい語は、4 つ目の欄に「${KEEP_FORCED_MARK}」と書く (例: ${collisionSamples.join('、')}。全件は --collisions)`);
   if (placeholder && stats.words > 0) add('warning', 1, '名称・出典・ライセンスの行が、雛形の「(例: …)」のまま (実際の内容に書き換える)');
-  return { problems, stats };
+  return { problems, stats, collisions: collisionList };
 }
 
 /** 読みごとの語の数が多すぎるものを警告にする (複数ファイルの合計で数える)。 */
@@ -100,14 +134,16 @@ export function tooMany(readings) {
   return [...readings].filter(([, n]) => n > MAX_SAME_READING).map(([reading, n]) => ({ level: 'warning', line: 0, message: `読み「${reading}」に語が ${n} 個ある (${MAX_SAME_READING} 個以下を目安に)` }));
 }
 
-function run(files) {
+function run(files, listCollisions = false) {
   const seen = new Map();
   const readings = new Map();
   let errors = 0, warnings = 0;
-  const total = { words: 0, forced: 0, candidate: 0, skipped: 0, four: 0 };
+  const total = { words: 0, forced: 0, candidate: 0, skipped: 0, four: 0, collisions: 0, kept: 0 };
+  const common = loadCommonReadings(defaultReadingsFile);
   const out = [];
+  if (common === null) { warnings++; out.push(`::warning::日常語の読み (${defaultReadingsFile}) を読めないので、日常語との衝突は検査していない`); }
   for (const file of files) {
-    const { problems, stats } = checkText(fs.readFileSync(file, 'utf8'), seen, readings);
+    const { problems, stats, collisions } = checkText(fs.readFileSync(file, 'utf8'), seen, readings, common, path.basename(file));
     const shown = path.relative(process.cwd(), file) || file;
     for (const p of problems) {
       const where = `file=${shown}${p.line > 0 ? `,line=${p.line}` : ''}`;
@@ -115,12 +151,13 @@ function run(files) {
       else if (p.level === 'warning') warnings++;
       out.push(`::${p.level === 'info' ? 'notice' : p.level} ${where}::${p.message}`);
     }
+    if (listCollisions) for (const c of collisions) out.push(`${shown}:${c.line} ${c.reading}→${c.word}`);
     for (const k of Object.keys(total)) total[k] += stats[k];
     out.push(`${path.basename(file)}: ${stats.words} 語 (強制型 ${stats.forced} / 候補追加型 ${stats.candidate})`);
   }
   for (const p of tooMany(readings)) { warnings++; out.push(`::warning::${p.message}`); }
   console.log(out.join('\n'));
-  console.log(`専門用語集: ${files.length} ファイル、総語数 ${total.words} (強制型 ${total.forced} / 候補追加型 ${total.candidate})、飛ばす行 ${total.skipped}、エラー ${errors}、警告 ${warnings}`);
+  console.log(`専門用語集: ${files.length} ファイル、総語数 ${total.words} (強制型 ${total.forced} / 候補追加型 ${total.candidate}。うち日常語と衝突して候補追加型に落ちる ${total.collisions}、「${KEEP_FORCED_MARK}」の印で残す ${total.kept})、飛ばす行 ${total.skipped}、エラー ${errors}、警告 ${warnings}`);
   return errors > 0 ? 1 : 0;
 }
 
@@ -131,6 +168,12 @@ function selfTest() {
     ['読みがちょうど 4 文字は情報', () => levels(header + 'こうけつ\t硬結\nぎょうれつしき\t行列式\n', 'info').some(m => m.includes('ちょうど 4 文字'))],
     ['雛形の (例: が残り、語があれば警告', () => checkText('# 名称: テスト\n# 出典: (例: 自作)\n# ライセンス: 自作\nぎょうれつしき\t行列式\n').problems.some(p => p.level === 'warning' && p.message.includes('雛形'))],
     ['雛形のままでも語 0 件なら警告なし', () => !checkText('# 名称: (例: 土木)\n# 出典: (例: 自作)\n# ライセンス: (例: 自作)\n').problems.some(p => p.level === 'warning')],
+    ['日常語の読みと同じ強制型は警告 (候補追加型に落ちる)', () => { const c = checkText(header + 'こうせい\t構成\nぎょうれつしき\t行列式\n', new Map(), new Map(), new Set(['こうせい'])); return c.problems.some(p => p.level === 'warning' && p.message.includes('日常語の読み')) && c.stats.collisions === 1 && c.stats.forced === 1; }],
+    ['4 つ目の欄「強制」なら警告なし・強制型のまま', () => { const c = checkText(header + 'こうせいろうどう\t構成労働\t\t強制\n', new Map(), new Map(), new Set(['こうせいろうどう'])); return !c.problems.some(p => p.level !== 'info') && c.stats.forced === 1 && c.stats.kept === 1 && c.stats.collisions === 0; }],
+    ['4 つ目の欄が「強制」以外はエラー', () => levels(header + 'ぎょうれつしき\t行列式\t注記\tはい\n', 'error').some(m => m.includes('4 つ目の欄'))],
+    ['強制型にならない語の「強制」は警告', () => checkText(header + 'かっと\tカット\t\t強制\n').problems.some(p => p.level === 'warning' && p.message.includes('効果がない'))],
+    ['日常語の読みを渡さなければ衝突の検査はしない', () => !checkText(header + 'こうせい\t構成\n').problems.some(p => p.message.includes('日常語の読み'))],
+    ['ファイルをまたぐ重複は、相手のファイル名を出す', () => { const seen = new Map(); checkText(header + 'ぎょうれつしき\t行列式\n', seen, new Map(), null, 'terms-a.txt'); return checkText(header + 'ぎょうれつしき\t行列式\n', seen, new Map(), null, 'terms-b.txt').problems.some(p => p.level === 'warning' && p.message.includes('terms-a.txt の 4 行目')); }],
     ['正常な用語集はエラーなし', () => levels(header + 'ぎょうれつしき\t行列式\t数学\n', 'error').length === 0],
     ['統計 (強制型・候補追加型)', () => { const s = checkText(header + 'ぎょうれつしき\t行列式\nすう\t数\n').stats; return s.words === 2 && s.forced === 1 && s.candidate === 1; }],
     ['語が ASCII だけなら読みが長くても候補追加型', () => { const s = checkText(header + 'あいこんをくりっく\ticon\nぎょうれつしき\t行列式\n').stats; return s.forced === 1 && s.candidate === 1 && s.ascii === 1; }],
@@ -185,7 +228,7 @@ function selfTest() {
 }
 
 /** 引数のファイルを検査する。存在しない引数はエラー (黙って除外すると、打ち間違いが exit 0 になる)。 */
-function runArgs(args) {
+function runArgs(args, listCollisions = false) {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dictionaries');
   const files = [];
   let missing = 0;
@@ -194,7 +237,7 @@ function runArgs(args) {
     if (found) files.push(found);
     else { console.log(`::error::ファイルが見つからない: ${arg}`); missing++; }
   }
-  return Math.max(run(files), missing > 0 ? 1 : 0);
+  return Math.max(run(files, listCollisions), missing > 0 ? 1 : 0);
 }
 
 function isDirectRun() {
@@ -207,10 +250,12 @@ function isDirectRun() {
 
 if (isDirectRun()) {
   const args = process.argv.slice(2);
+  const listCollisions = args[0] === '--collisions';
+  const rest = listCollisions ? args.slice(1) : args;
   if (args[0] === '--self-test') process.exitCode = selfTest();
-  else if (args.length > 0) process.exitCode = runArgs(args);
+  else if (rest.length > 0) process.exitCode = runArgs(rest, listCollisions);
   else {
     const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dictionaries');
-    process.exitCode = run(fs.readdirSync(root).filter(f => /^terms-.*\.txt$/.test(f)).sort().map(f => path.join(root, f)));
+    process.exitCode = run(fs.readdirSync(root).filter(f => /^terms-.*\.txt$/.test(f)).sort().map(f => path.join(root, f)), listCollisions);
   }
 }

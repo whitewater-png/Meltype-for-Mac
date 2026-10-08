@@ -10,6 +10,8 @@ public sealed record TermEntry(string Reading, string Word, string Note);
 /// 専門用語集 (dictionaries/terms-*.txt、アプリに同梱する。分野ごとに有効/無効を切り替える: TermDomains)。1 行に「読み[Tab]語[Tab]注記(任意)」。# で始まる行と空行はコメント。
 /// 読みが ForcedMinReadingLength 文字以上で、語が ASCII だけではない語は「強制型」(ユーザー辞書の組み込み語句と同じ。変換する読みの中に含まれていれば、
 /// その部分を語にする)、それより短い語と、語が ASCII だけ (英単語など。日常語を英語に置き換えないため) の語は「候補追加型」(変換候補に足すだけ。日常語の途中に現れる短い読みを巻き込まないため)。
+/// 読みが日常語の読み (dictionaries/readings.txt。<see cref="CommonReadings"/>) と同じ語も「候補追加型」にする (こうせい → 構成 を強制すると、こうせいろうどうしょう が 構成|ろうどうしょう になるため)。
+/// 日常語と同じ読みでも強制したい語は、4 つ目の欄に「強制」と書く (<see cref="KeepForcedMark"/>)。
 /// 数万語でも起動が重くならないよう、読み込み後は変更しない配列と辞書にして、探す側は文字列を作らずに引く。
 /// ユーザー辞書の保存・表示・書き出しには混ぜない (UserDictionary が持つだけ)。
 /// </summary>
@@ -17,6 +19,9 @@ public sealed class TermDictionary
 {
     /// <summary>この文字数以上の読みの語を強制型にする (しきい値はここ 1 か所)。</summary>
     public const int ForcedMinReadingLength = 4;
+
+    /// <summary>4 つ目の欄にこの文字列があれば、日常語と同じ読みでも強制型にする (tools/check-terms.mjs と同じ)。</summary>
+    public const string KeepForcedMark = "強制";
 
     /// <summary>予測変換のために、読みの前方一致を数える上限 (数千語が一致する短い読みでも 1 キーを重くしない)。</summary>
     internal const int PredictionScanLimit = 64;
@@ -77,8 +82,9 @@ public sealed class TermDictionary
     /// <summary>
     /// テキスト (ファイルの中身。複数可) を読む。不正な行は飛ばす (例外にしない)。同じ読み・同じ語は 1 つにする。
     /// excluded (正規化した読み・語の組) に入っている語は入れない (利用者が除外した語。強制型・候補追加型・予測のどれにも出さない)。
+    /// commonReadings (日常語の読み。<see cref="CommonReadings.Set"/>) に読みが入っている語は、強制型にせず候補追加型にする (4 つ目の欄が「強制」の語を除く)。省略すると落とさない。
     /// </summary>
-    public static TermDictionary Parse(IEnumerable<string> texts, IReadOnlySet<(string Reading, string Word)>? excluded = null)
+    public static TermDictionary Parse(IEnumerable<string> texts, IReadOnlySet<(string Reading, string Word)>? excluded = null, IReadOnlySet<string>? commonReadings = null)
     {
         var intern = new Dictionary<string, string>(StringComparer.Ordinal);
         var seen = new HashSet<(string, string)>();
@@ -99,7 +105,7 @@ public sealed class TermDictionary
                 if (line.Length > 0 && line[^1] == '\r') line = line[..^1];
                 if (line.Length > 0 && line[0] == '﻿') line = line[1..];
                 if (line.Length == 0 || line.TrimStart().Length == 0 || line.TrimStart()[0] == '#') continue;
-                if (!TryParseLine(line, out var reading, out var word))
+                if (!TryParseLine(line, out var reading, out var word, out _, out var keepForced))
                 {
                     skipped++;
                     continue;
@@ -114,7 +120,10 @@ public sealed class TermDictionary
                 }
                 // 語が ASCII だけ (英数字・記号) のときは、読みが長くても強制型にしない。強制すると、日常語を英単語に置き換えてしまう
                 // (例: IT 用語の「あいこん→icon」「くりっく→click」で、「あいこんをくりっく」が「icon|を|click」になる)。候補には出る。
-                var target = shared.Length >= ForcedMinReadingLength && !IsAscii(word) ? forced : candidates;
+                // 読みが日常語の読みと同じ語も強制型にしない (keepForced=4 つ目の欄が「強制」のときだけ強制する)
+                var isForced = shared.Length >= ForcedMinReadingLength && !IsAscii(word)
+                    && (keepForced || commonReadings is null || !commonReadings.Contains(shared));
+                var target = isForced ? forced : candidates;
                 if (!target.TryGetValue(shared, out var list)) target[shared] = list = [];
                 list.Add(word);
                 all.Add((shared, word));
@@ -151,9 +160,14 @@ public sealed class TermDictionary
     internal static bool TryParseLine(ReadOnlySpan<char> line, out string reading, out string word) => TryParseLine(line, out reading, out word, out _);
 
     /// <summary>1 行を読み・語・注記 (3 つ目の欄。無ければ空) に分ける。</summary>
-    internal static bool TryParseLine(ReadOnlySpan<char> line, out string reading, out string word, out string note)
+    internal static bool TryParseLine(ReadOnlySpan<char> line, out string reading, out string word, out string note) =>
+        TryParseLine(line, out reading, out word, out note, out _);
+
+    /// <summary>1 行を読み・語・注記・強制の印 (4 つ目の欄が「強制」) に分ける。</summary>
+    internal static bool TryParseLine(ReadOnlySpan<char> line, out string reading, out string word, out string note, out bool keepForced)
     {
         reading = word = note = "";
+        keepForced = false;
         var first = line.IndexOf('\t');
         if (first < 0) return false;
         var rest = line[(first + 1)..];
@@ -163,12 +177,18 @@ public sealed class TermDictionary
             var noteSpan = rest[(second + 1)..];
             var third = noteSpan.IndexOf('\t');
             note = (third < 0 ? noteSpan : noteSpan[..third]).Trim().ToString();
+            if (third >= 0)
+            {
+                var markSpan = noteSpan[(third + 1)..];
+                var fourth = markSpan.IndexOf('\t');
+                keepForced = (fourth < 0 ? markSpan : markSpan[..fourth]).Trim().SequenceEqual(KeepForcedMark);
+            }
         }
         var wordSpan = (second < 0 ? rest : rest[..second]).Trim();
         var readingSpan = line[..first].Trim();
         if (readingSpan.Length < UserDictionary.MinReadingLength || readingSpan.Length > UserDictionary.MaxLength) return false;
         if (wordSpan.Length == 0 || wordSpan.Length > UserDictionary.MaxLength) return false;
-        // 注記の欄 (3 つ目) は読まない。改行・タブは、欄の区切りで切っているのでここでは入らない (\r・\n は念のため)。
+        // 注記の欄 (3 つ目) は読まない (4 つ目は「強制」の印だけ読む)。改行・タブは、欄の区切りで切っているのでここでは入らない (\r・\n は念のため)。
         if (wordSpan.IndexOfAny('\r', '\n') >= 0 || readingSpan.IndexOfAny('\r', '\n') >= 0) return false;
         reading = Normalize(readingSpan);
         word = wordSpan.ToString();
@@ -237,5 +257,30 @@ public sealed class TermDictionary
         {
             yield return _sortedWords[i];
         }
+    }
+}
+
+/// <summary>
+/// 日常語の読みの集合 (dictionaries/readings.txt の見出し。JMdict のよく使う語)。専門用語集の強制型を、日常語と衝突させないために使う。
+/// 活用した形は含めない (「読み + 活用」を日常語と数えると、衝突の判定が広がりすぎるため)。初回の利用で 1 回だけ読む。
+/// </summary>
+public static class CommonReadings
+{
+    private static readonly Lazy<HashSet<string>> Shared = new(Load);
+
+    /// <summary>日常語の読み (ひらがな)。</summary>
+    public static IReadOnlySet<string> Set => Shared.Value;
+
+    private static HashSet<string> Load()
+    {
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rawLine in Detection.DictionarySource.ReadEmbedded("readings.txt").Split('\n'))
+        {
+            var line = rawLine.TrimEnd('\r');
+            if (line.Length == 0 || line[0] == '#') continue;
+            var tab = line.IndexOf('\t');
+            set.Add(tab < 0 ? line : line[..tab]);
+        }
+        return set;
     }
 }

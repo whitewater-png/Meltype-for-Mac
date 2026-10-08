@@ -31,6 +31,15 @@ internal static class DetectionTests
 
     // ---- 設計書 §30 テスト方針 ----
 
+    [Test]
+    public static void WordList_ParseWords_SkipsOverlongWords()
+    {
+        // 自分で置く単語リストに巨大な 1 語があっても、先頭部分の保存でメモリが 2 乗で増えない (語の長さに上限を置く)
+        var huge = new string('a', 100_000);
+        var words = WordList.ParseWords($"hello {huge} world {new string('b', WordList.MaxWordLength)} {new string('c', WordList.MaxWordLength + 1)}").ToList();
+        Assert.Equal("hello,world," + new string('b', WordList.MaxWordLength), string.Join(",", words), "上限を超える語だけ飛ばす");
+    }
+
     [Test] public static void Design_Japanese() => ExpectJapanese("konnichiwa", "arigatou", "ohayou", "watashi", "ashita");
 
     [Test] public static void Design_Typo() => ExpectJapanese("konnitiwa", "konnichia", "arigatouu");

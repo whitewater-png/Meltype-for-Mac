@@ -636,7 +636,27 @@ public sealed class Settings
             if (SafeFile.ReadAllText(path) is not { } json) return new Settings();
             var settings = JsonSerializer.Deserialize(json, SettingsJsonContext.Default.Settings) ?? new Settings();
             if (!json.Contains(nameof(SettingsVersion))) settings.SettingsVersion = 1;
-            if (settings.Migrate()) settings.Save(path);
+            if (settings.Migrate())
+            {
+                // 古い版の設定を新しい形で保存し直す。Mac では IME と「Meltype 辞書」の画面 (別のプロセス) が同じ config.json を書くので、
+                // 読んだ内容をそのまま書き戻さず、ロックの中で読み直してから書く (相手の変更を古い内容で上書きして消さないため)。
+                try
+                {
+                    using (FileLock.Acquire(path))
+                    {
+                        if (LoadForUpdate(path) is { } fresh)
+                        {
+                            fresh.Save(path);
+                            return fresh;
+                        }
+                    }
+                }
+                catch (FileLockTimeoutException ex)
+                {
+                    // ロックを取れなくても、設定は読めている。今回は保存し直さず (次の起動でやり直す)、読んだ値で動く。壊れたファイルとして退避しない。
+                    Diagnostics.Log.Warn($"config.json の移行後の保存を見送りました: {ex.Message}");
+                }
+            }
             return settings.Normalize();
         }
         catch (Exception ex)

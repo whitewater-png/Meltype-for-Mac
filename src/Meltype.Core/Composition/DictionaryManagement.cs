@@ -89,7 +89,7 @@ internal static class DictionaryManagement
     public static string? EditTerm(UserDictionary dictionary, UserWord original, string reading, string word, out bool added)
     {
         added = false;
-        reading = reading.Trim();
+        reading = UserDictionary.NormalizeReading(reading);
         word = word.Trim();
         if (UserDictionary.Validate(reading, word) is { } invalid) return invalid;
         switch (dictionary.AddNew(reading, word))

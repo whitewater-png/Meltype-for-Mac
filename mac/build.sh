@@ -112,6 +112,23 @@ cp -R Resources/ja.lproj Resources/en.lproj "$APP/Contents/Resources/"
 for bundle in "$BIN"/*.bundle; do
     [[ -e "$bundle" ]] && cp -R "$bundle" "$APP/Contents/Resources/"
 done
+# ライセンス表示: Meltype.app を配布するとき、GPL-3.0・MIT・Apache-2.0 の部品の著作権表示とライセンス全文を一緒に渡す義務がある。
+# 署名すると中身を変えられなくなるので、署名の前に入れる。部品のライセンスは取得済みのソース (.build/checkouts) から写す。
+LICENSES="$APP/Contents/Resources/Licenses"
+mkdir -p "$LICENSES"
+cp ../LICENSE "$LICENSES/LICENSE-Meltype-GPL-3.0.txt"
+cp ../THIRD-PARTY-NOTICES.md "$LICENSES/THIRD-PARTY-NOTICES.md"
+for dep in AzooKeyKanaKanjiConverter Jinja swift-algorithms swift-collections swift-numerics swift-tokenizers; do
+    found=
+    for name in LICENSE LICENSE.txt NOTICE NOTICE.txt; do
+        if [[ -f ".build/checkouts/$dep/$name" ]]; then cp ".build/checkouts/$dep/$name" "$LICENSES/$dep-$name"; found=1; fi
+    done
+    [[ -n "$found" ]] || { echo "$dep のライセンスファイルが見つかりません (.build/checkouts/$dep)。ライセンス表示なしでは配布できません。" >&2; exit 1; }
+done
+# azooKey の辞書 (Apache-2.0)
+AZ_DICT_LICENSE=".build/checkouts/AzooKeyKanaKanjiConverter/Sources/KanaKanjiConverterModuleWithDefaultDictionary/azooKey_dictionary_storage/LICENSE"
+[[ -f "$AZ_DICT_LICENSE" ]] || { echo "azooKey 辞書のライセンスファイルが見つかりません。" >&2; exit 1; }
+cp "$AZ_DICT_LICENSE" "$LICENSES/azooKey_dictionary_storage-LICENSE"
 # 実行ファイルの RPATH に、ビルドしたマシンの絶対パス (/Library/Developer/CommandLineTools/... など) が残っていると、
 # 配布先の Mac でそのパスを探しに行く (ビルドした人の環境が漏れ、同じパスに置かれたライブラリを読み込まされる余地も残る)。
 # 署名すると中身を変えられなくなるので、署名の前に外す。無いときに失敗しないよう || true。

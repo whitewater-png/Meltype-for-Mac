@@ -3,13 +3,14 @@
 
 using Meltype.Composition;
 using Meltype.Config;
+using Meltype.Input;
 
 namespace Meltype.Tests;
 
 /// <summary>専門用語集の分野ごとの有効/無効 (TermDomains)。既定 OFF・切り替えの即時反映・config.json への保存・壊れた設定を上書きしない。</summary>
 internal static class TermDomainTests
 {
-    private const string Civil = "# 名称: 土木・建設\n# 出典: テスト\nこうぞうぶつ\t構造物\nほそう\t舗装\n";
+    private const string Civil = "# 名称: 土木・建設\n# 出典: テスト\nこうぞうぶつ\t構造物\t\t強制\nほそう\t舗装\n";
     private const string Medical = "# 出典: テスト\n# 名称: 医療\nけつあつそくてい\t血圧測定\n";
     private const string NoName = "# 出典: テスト\nむめいのごい\t無名の語\n";
 
@@ -215,5 +216,32 @@ internal static class TermDomainTests
         Assert.True(list.Count > 0, "同梱の分野が 1 つ以上ある (無ければ、このテストは何も確かめていないことになる)");
         Assert.True(!list.Any(d => d.Id == "template"), "雛形は分野に出さない");
         Assert.True(list.All(d => d.Name != d.Id && d.Count > 0 && !d.Enabled), "同梱の分野には名称と語がある (既定は OFF)");
+    }
+
+    [Test]
+    public static void Domains_Off_LearnedChoicesStillApply()
+    {
+        // 学習 (選び直した変換・予測の履歴) は conversions.json にあり、専門用語集の ON/OFF とは別。OFF の分野の語でも、選んで覚えた語は出る。
+        Use(out var restore);
+        try
+        {
+            var history = new ConversionHistory(null);
+            history.Remember("こうぞうぶつ", "構造物");
+            var dictionary = new UserDictionary(null);
+            Assert.True(TermDomains.List().All(d => !d.Enabled), "前提: 全分野 OFF");
+            var k = new CompositionTests.Keyboard(history: history, userDictionary: dictionary);
+            k.Type("kouzoubutu ");
+            Assert.Equal("構造物", k.Host.View!.Candidates[0], "OFF でも学習した語が 1 番目");
+            k.Press(VirtualKeys.Escape);
+
+            // ON にしてから OFF に戻しても、学習は消えない
+            Assert.True(TermDomains.Set("civil", true), "確認");
+            Assert.True(TermDomains.Set("civil", false), "確認");
+            Assert.Equal("構造物", history.Get("こうぞうぶつ") ?? "(なし)", "分野の切り替えで学習は消えない");
+            var p = new CompositionTests.Keyboard(history: history, userDictionary: dictionary);
+            p.Type("kouzou");
+            Assert.True(p.Host.View!.Predictions!.Contains("構造物"), "予測にも出る (履歴から)");
+        }
+        finally { restore(); }
     }
 }

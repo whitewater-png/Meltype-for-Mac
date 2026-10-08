@@ -29,7 +29,13 @@ public sealed class WordList
     public IReadOnlyList<string> WordsStartingWith(char first) =>
         _byFirstLetter.TryGetValue(first, out var bucket) ? bucket : [];
 
-    /// <summary>空白・改行区切り。# 以降はコメント。英小文字以外を含む語は無視する。</summary>
+    /// <summary>
+    /// 1 語の長さの上限。Add は語の先頭部分 (prefix) をすべて覚えるので、メモリは語の長さの 2 乗で増える
+    /// (自分で置いた english.txt / japanese.txt に、十数万文字の 1 語があると足りなくなる)。実際の語は 45 文字ほどが最長。
+    /// </summary>
+    public const int MaxWordLength = 64;
+
+    /// <summary>空白・改行区切り。# 以降はコメント。英小文字以外を含む語と、<see cref="MaxWordLength"/> を超える語は無視する。</summary>
     public static IEnumerable<string> ParseWords(string text)
     {
         foreach (var rawLine in text.Split('\n'))
@@ -40,7 +46,7 @@ public sealed class WordList
             foreach (var token in line.Split([' ', '\t', '\r', ','], StringSplitOptions.RemoveEmptyEntries))
             {
                 var word = token.Trim().ToLowerInvariant();
-                if (word.Length > 0 && word.All(c => c is >= 'a' and <= 'z')) yield return word;
+                if (word.Length is > 0 and <= MaxWordLength && word.All(c => c is >= 'a' and <= 'z')) yield return word;
             }
         }
     }

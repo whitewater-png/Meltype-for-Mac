@@ -6,7 +6,9 @@
 #   初めて入れたとき: 入力ソースとして登録し、入力メニューと IME を起動する imklaunchagent を起動し直す
 #   入れ替えたとき: 動いていた Meltype を止める (次にキーを打ったときに新しい版が起動する)
 # インストーラーは root で動くことがあるので、ログイン中のユーザーとして実行する。
-exec >>/tmp/meltype-pkg-install.log 2>&1
+# ログは専用のファイルに書かない: Installer がこのスクリプトの出力を /var/log/install.log に残す。
+# (/tmp の固定名ファイルへ root で追記すると、ほかのユーザーが先に置いたシンボリックリンクをたどってしまう。
+#  ユーザー名やホームのパスを含むログを、誰でも読める場所に残さないためでもある。)
 echo "== postinstall $(date)"
 
 CONSOLE_USER="$(stat -f%Su /dev/console)"
@@ -40,9 +42,10 @@ as_user() {
 
 if as_user "$BIN" --register-check; then
     echo "入力ソースは登録済み: 入れ替えのみ"
-    pkill -x Meltype 2>/dev/null || true
+    # ほかのログイン中のユーザーの Meltype まで止めないよう、このユーザーのものだけ止める
+    pkill -U "$CONSOLE_UID" -x Meltype 2>/dev/null || true
     # 開いていた辞書の管理画面も閉じる (古い版のまま残さない。実行ファイル名が長く pkill -x では合わないので、パスで探す)
-    pkill -f "$APP/Contents/Helpers/MeltypeDictionary.app/" 2>/dev/null || true
+    pkill -U "$CONSOLE_UID" -f "$APP/Contents/Helpers/MeltypeDictionary.app/" 2>/dev/null || true
 else
     echo "初回: 入力ソースに登録します"
     as_user "$BIN" --register || echo "登録に失敗しました (ログアウトして入り直すと出ることがあります)"

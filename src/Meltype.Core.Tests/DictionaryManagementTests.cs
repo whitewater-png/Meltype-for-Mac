@@ -15,7 +15,7 @@ namespace Meltype.Tests;
 /// </summary>
 internal static class DictionaryManagementTests
 {
-    private const string Civil = "# 名称: 土木・建設\nこうぞうぶつ\t構造物\nほそう\t舗装\nこうぞうけいさん\t構造計算\tメモ\n";
+    private const string Civil = "# 名称: 土木・建設\nこうぞうぶつ\t構造物\t\t強制\nほそう\t舗装\nこうぞうけいさん\t構造計算\tメモ\n";
     private const string Medical = "# 名称: 医療\nけつあつそくてい\t血圧測定\n";
 
     private static string TempDirectory()
@@ -81,6 +81,61 @@ internal static class DictionaryManagementTests
             Assert.Equal(0, ime.Count, "語数も");
         }
         finally { restore(); }
+    }
+
+    [Test]
+    public static void UserDict_ControlAndFormatChars_AreRejected_EverywhereTheyCanEnter()
+    {
+        // 制御文字 (ESC・Ctrl+O・BEL)・書式文字 (右から左に並べ替える U+202E)・行/段落区切りは、読みにも語にも使えない
+        foreach (var bad in new[] { "\u000f", "\u001b", "\u0007", "\u007f", "\u0085", "\u202e", "\u200b", "\ufeff", "\u2028", "\u2029" })
+        {
+            Assert.True(UserDictionary.Validate("ありがとう", "語" + bad) is not null, $"語に U+{(int)bad[0]:X4}");
+            Assert.True(UserDictionary.Validate("あり" + bad + "がとう", "語") is not null, $"読みに U+{(int)bad[0]:X4}");
+        }
+        // 通常の語・絵文字をつなぐ ZWJ・異体字選択子は通る
+        Assert.True(UserDictionary.Validate("ありがとう", "感謝") is null, "通常の語");
+        Assert.True(UserDictionary.Validate("かぞく", "👨\u200d👩\u200d👧") is null, "ZWJ でつないだ絵文字");
+        Assert.True(UserDictionary.Validate("つじ", "辻\ufe00") is null, "異体字選択子");
+
+        var directory = Use(out var restore);
+        try
+        {
+            var path = Path.Combine(directory, "userdict.txt");
+            // 1. 登録・取り込み (AddMany) の経路
+            var dictionary = new UserDictionary(path, builtIn: false);
+            Assert.True(dictionary.AddNew("ありがとう", "echo pwned\u000f\u001b[2K") is not null, "画面からの登録は断る");
+            Assert.True(dictionary.AddMany([new UserWord("ありがとう", "悪\u202e語"), new UserWord("たろう", "太郎")], out var added) is null, "取り込みは正常な語だけ入る");
+            Assert.Equal(1, added.Count, "不正な語は取り込まない");
+            Assert.Equal(0, dictionary.Lookup("ありがとう").Count, "不正な語は引けない");
+
+            // 2. ファイルを直接編集・復元した経路 (読み込み時にも落とす)
+            File.WriteAllText(path, "ありがとう\tx\u000fy\nありがとう\t感謝\nたろう\t太郎\n", new System.Text.UTF8Encoding(false));
+            var loaded = new UserDictionary(path, builtIn: false);
+            Assert.Equal("感謝", string.Join(",", loaded.Lookup("ありがとう")), "制御文字入りの行だけ読み込まない");
+            Assert.Equal(1, loaded.Lookup("たろう").Count, "ほかの行は読む");
+        }
+        finally { restore(); }
+    }
+
+    [Test]
+    public static void UserDict_Reading_IsNormalizedToHiragana_AndNonKanaReadingsAreRejected()
+    {
+        // カタカナの読みは、ひらがなにそろえて登録する (変換側はひらがなで引く)。ローマ字・漢字だけの読みは、変換に一度も出ないので断る
+        Assert.True(UserDictionary.Validate("kigoutou", "記号等") is not null, "ローマ字だけの読みは登録できない");
+        Assert.True(UserDictionary.Validate("123", "数") is not null, "数字だけの読みも");
+        Assert.True(UserDictionary.Validate("記号とう", "記号等") is not null, "漢字を含む読みも");
+        Assert.True(UserDictionary.Validate("きごう とう", "記号等") is not null, "空白を含む読みも");
+        Assert.True(UserDictionary.Validate("ごーる", "GOAL") is null, "長音は可");
+        Assert.True(UserDictionary.Validate("ごじゅっcc", "50cc") is null, "ひらがなと英数字が混ざった読みは可");
+        Assert.Equal("きごうとう", UserDictionary.NormalizeReading(" キゴウトウ "), "カタカナ → ひらがな、前後の空白を取る");
+        var dictionary = new UserDictionary(null, builtIn: false);
+        Assert.True(dictionary.AddNew("キゴウトウ", "記号等") is null, "カタカナの読みで登録できる");
+        Assert.Equal("記号等", dictionary.Lookup("きごうとう").SingleOrDefault() ?? "", "ひらがなで引ける");
+        Assert.Equal(UserDictionary.DuplicateMessage, dictionary.Check("キゴウトウ", "記号等"), "カタカナで確かめても重複と分かる");
+        Assert.True(dictionary.Update(new UserWord("きごうとう", "記号等"), "キゴウトウ", "記号党") is null, "編集もそろえる");
+        Assert.Equal("記号党", dictionary.Lookup("きごうとう").SingleOrDefault() ?? "", "編集後もひらがなで引ける");
+        Assert.True(dictionary.AddMany([new UserWord("タロウ", "太郎"), new UserWord("jiro", "次郎")], out var added) is null && added.Count == 1, "取り込み・複製もそろえる (ローマ字は入れない)");
+        Assert.Equal("太郎", dictionary.Lookup("たろう").SingleOrDefault() ?? "", "取り込みもひらがなで引ける");
     }
 
     [Test]

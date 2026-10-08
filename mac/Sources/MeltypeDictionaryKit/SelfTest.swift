@@ -223,7 +223,7 @@ public enum SelfTest {
         check(dictionary.userProblem() == nil, "読めているときは問題なし")
 
         let domains = dictionary.termDomains()
-        check(Set(domains.map(\.id)) == ["ai", "civil", "it", "medical", "netslang"], "同梱の分野 (\(domains.map(\.id)))")
+        check(Set(domains.map(\.id)) == ["ai", "civil", "it", "medical", "netslang", "video"], "同梱の分野 (\(domains.map(\.id)))")
         check(domains.allSatisfy { !$0.enabled }, "既定はすべて OFF")
         let revision = dictionary.termRevision()
         check(dictionary.setTermDomain(id: "civil", enabled: true), "分野を有効にできる")

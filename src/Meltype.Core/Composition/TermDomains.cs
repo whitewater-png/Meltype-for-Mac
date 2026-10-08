@@ -95,7 +95,7 @@ internal static class TermDomains
                 {
                     try
                     {
-                        terms = TermDictionary.Parse(Source().Where(d => ids.Contains(d.Id)).Select(d => d.ReadText()).ToList(), excluded);
+                        terms = TermDictionary.Parse(Source().Where(d => ids.Contains(d.Id)).Select(d => d.ReadText()).ToList(), excluded, CommonReadings.Set);
                     }
                     catch (Exception ex)
                     {

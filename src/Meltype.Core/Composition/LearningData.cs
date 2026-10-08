@@ -8,7 +8,7 @@ namespace Meltype.Composition;
 
 /// <summary>
 /// 学習データをまとめて消す (Mac の入力メニュー「学習データをすべて消去…」)。
-/// 消すのは、変換の学習・登録提案の履歴・英語/日本語の学習・英訳の学習・ユーザーモデル。ユーザー辞書 (userdict.txt) と設定 (config.json) は消さない。
+/// 消すのは、変換の学習・登録提案の履歴・英語/日本語の学習・英訳の学習・ユーザーモデルと、その退避コピー (.broken・.oversize) とログ。ユーザー辞書 (userdict.txt) と設定 (config.json) は消さない。
 /// </summary>
 public static class LearningData
 {
@@ -44,10 +44,50 @@ public static class LearningData
     /// 既定の保存場所 (<see cref="AppPaths"/>) の学習データをすべて消す。入力欄のセッションがなくても呼べる
     /// (共有インスタンスはパスごとにプロセス内で 1 つなので、ここで取り直しても同じものが消える)。成功したら true。
     /// </summary>
-    public static bool ClearAll() => ClearAll(
-        ConversionHistory.Shared(AppPaths.ConversionHistoryFile),
-        DictionarySuggestions.Shared(AppPaths.DictionarySuggestionFile),
-        LanguageMemory.Shared(AppPaths.LanguageMemoryFile),
-        TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
-        AppPaths.ModelFile);
+    public static bool ClearAll()
+    {
+        var ok = ClearAll(
+            ConversionHistory.Shared(AppPaths.ConversionHistoryFile),
+            DictionarySuggestions.Shared(AppPaths.DictionarySuggestionFile),
+            LanguageMemory.Shared(AppPaths.LanguageMemoryFile),
+            TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
+            AppPaths.ModelFile);
+        var leftoversCleared = ClearLeftovers(
+            [AppPaths.ModelFile, AppPaths.ConversionHistoryFile, AppPaths.DictionarySuggestionFile, AppPaths.TranslationHistoryFile, AppPaths.LanguageMemoryFile],
+            [AppPaths.LogFile, AppPaths.CrashLogFile]);
+        return ok && leftoversCleared;
+    }
+
+    /// <summary>
+    /// 学習データの「残りもの」を消す: 読めなくて退避したコピー (名前.broken)・大きすぎて退避したコピー (名前.oversize、.oversize.1 …) と、
+    /// ログ (名前、名前.old。「入力した文字を残す」設定が ON だと、打った文字が入っている)。ユーザー辞書・設定・専門用語集の除外とそのバックアップは対象外。
+    /// 消せないものがあっても残りは消す (失敗はログに残し、false を返す)。
+    /// </summary>
+    internal static bool ClearLeftovers(IEnumerable<string> learningFiles, IEnumerable<string> logFiles)
+    {
+        var ok = true;
+        void Delete(string path)
+        {
+            try { if (File.Exists(path)) File.Delete(path); }
+            catch (Exception ex)
+            {
+                ok = false;
+                Diagnostics.Log.Warn($"{Path.GetFileName(path)} を消せませんでした: {ex.Message}");
+            }
+        }
+        foreach (var file in learningFiles)
+        {
+            Delete(file + ".broken");
+            var directory = Path.GetDirectoryName(Path.GetFullPath(file));
+            if (directory is null || !Directory.Exists(directory)) continue;
+            // 名前.oversize と 名前.oversize.<番号> (SafeFile が退避したもの)
+            foreach (var path in Directory.EnumerateFiles(directory, Path.GetFileName(file) + ".oversize*")) Delete(path);
+        }
+        foreach (var file in logFiles)
+        {
+            Delete(file);
+            Delete(file + ".old");
+        }
+        return ok;
+    }
 }
