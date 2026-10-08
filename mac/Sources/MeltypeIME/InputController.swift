@@ -252,14 +252,14 @@ final class MeltypeInputController: IMKInputController {
         if !domains.isEmpty {
             // IMK のメニューではサブメニューの項目が action に届かないことがあるので、メニュー直下に並べる
             for domain in domains {
-                let item = menu.addItem(withTitle: "専門用語集: \(domain.name) (\(domain.count) 語)", action: #selector(toggleTermDomain(_:)), keyEquivalent: "")
+                let item = menu.addItem(withTitle: "専門用語集(サンプル): \(domain.name) (\(domain.count) 語)", action: #selector(toggleTermDomain(_:)), keyEquivalent: "")
                 item.state = domain.enabled ? .on : .off
                 attach([domain.id, domain.enabled ? "on" : "off"], to: item)
             }
         }
         menu.addItem(.separator())
         // ユーザー辞書・専門用語集の一覧・登録・編集・削除と、専門用語集の分野の ON/OFF (別のアプリ「Meltype 辞書」で開く)
-        menu.addItem(withTitle: "辞書を管理… (ユーザー辞書・専門用語集)", action: #selector(openDictionaryManager(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: "辞書を管理… (ユーザー辞書・専門用語集(サンプル))", action: #selector(openDictionaryManager(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "選択中の文字をユーザー辞書に登録…", action: #selector(registerWord(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "辞書の登録提案の履歴を消去", action: #selector(clearSuggestions(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "学習データをすべて消去…", action: #selector(clearLearningData(_:)), keyEquivalent: "")

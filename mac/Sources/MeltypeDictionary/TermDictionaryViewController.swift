@@ -50,7 +50,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     init(dictionary: NativeDictionary) {
         self.dictionary = dictionary
         super.init(nibName: nil, bundle: nil)
-        title = "専門用語集"
+        title = "専門用語集(サンプル)"
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
@@ -77,7 +77,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         sourceScroll.widthAnchor.constraint(equalToConstant: 260).isActive = true
 
         // 右: 語
-        let info = UI.wrapping("同梱の専門用語は書き換えられません。「除外」はその語を変換に使わないこと (元に戻せます)、「直す」は元の語を除外して直した語をユーザー辞書に登録すること、「複製」はそのままユーザー辞書にコピーすることです。ユーザー辞書の語は専門用語集より優先されます。")
+        let info = UI.wrapping("ここにある専門用語集はサンプルです。ご自身の用途に合わせて育てていくための出発点として使ってください (不要な語は「除外」、直したい語は「直す」、使いたい語は「複製」、足したい語はユーザー辞書への登録で、自分の辞書にできます)。同梱の専門用語は書き換えられません。「除外」はその語を変換に使わないこと (元に戻せます)、「直す」は元の語を除外して直した語をユーザー辞書に登録すること、「複製」はそのままユーザー辞書にコピーすることです。ユーザー辞書の語は専門用語集より優先されます。")
         offLabel.textColor = .systemOrange
         offLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         offLabel.isHidden = true

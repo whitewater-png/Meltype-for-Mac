@@ -32,7 +32,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let userTab = NSTabViewItem(viewController: userController)
         userTab.label = "ユーザー辞書"
         let termTab = NSTabViewItem(viewController: termController)
-        termTab.label = "専門用語集"
+        termTab.label = "専門用語集(サンプル)"
         tabs.addTabViewItem(userTab)
         tabs.addTabViewItem(termTab)
         window.contentViewController = tabs
