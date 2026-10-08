@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Yukishiro
 
 using System.Text;
+using Meltype.Config;
 
 namespace Meltype.Composition;
 
@@ -12,7 +13,14 @@ public sealed record UserWord(string Reading, string Word);
 /// ユーザー辞書 (%LOCALAPPDATA%\Meltype\userdict.txt、1 行に「読み[Tab]単語」)。
 /// 変換で最優先に使う: 変換する読みの中に登録した読みが含まれていれば、その部分は変換エンジンの区切りに関係なく
 /// 登録した単語にする (きごうとう → 記号等 を登録すると、きごうとうふくめ → 記号等|含め)。
-/// トレイの「ユーザー辞書...」から登録・削除する。
+/// トレイの「ユーザー辞書...」(Windows)・「Meltype 辞書」の画面 (Mac) から登録・編集・削除する。
+///
+/// ファイルが正: Mac では IME と「Meltype 辞書」の画面が別のプロセスで同じファイルを扱うので、
+///   - 変更 (登録・編集・削除・取り込み) は、プロセスをまたぐロック (<see cref="FileLock"/>) の中でファイルを読み直してから行い、すぐ保存する
+///     (相手の変更を古い内容で上書きして消さないため)。読めないファイル (権限・壊れた文字コード) には書かない。
+///   - 読む側 (変換) は、ファイルの版 (<see cref="FileStamp"/>) を <see cref="FileCheckIntervalMs"/> ごとに確かめ、変わっていれば読み直して
+///     <see cref="Version"/> を進める (変換結果のキャッシュを捨てる)。1 キーごとに増えるのは整数の比較だけ。
+/// 検索用の索引は、読み直し・変更のたびに作り直した不変のもの (<see cref="Index"/>) を参照ごと入れ替える (読む側はロックしない)。
 /// </summary>
 public sealed class UserDictionary
 {
@@ -21,6 +29,12 @@ public sealed class UserDictionary
 
     /// <summary>読み・語の長さの上限。選択範囲をそのまま登録できるので、段落全体のような巨大な語が入って変換のたびに照合されるのを防ぐ。</summary>
     public const int MaxLength = 100;
+
+    /// <summary>同じ読み・同じ単語がすでにあるとき (管理画面の登録・編集で使う。入力メニューの登録は、黙って成功にする)。</summary>
+    public const string DuplicateMessage = "同じ読みと単語が、すでに登録されています。";
+
+    /// <summary>編集しようとした語が、ファイルに無くなっていたとき。</summary>
+    public const string NotFoundMessage = "元の語が見つかりません (ほかの画面で変更・削除された可能性があります)。一覧を読み直してください。";
 
     /// <summary>読みと語として登録してよいか。だめなら理由を返す (Add / AddRange / 画面の入力チェックで共通)。</summary>
     public static string? Validate(string reading, string word)
@@ -33,12 +47,33 @@ public sealed class UserDictionary
         return null;
     }
 
+    /// <summary>ファイルが書き換わっていないかを確かめる間隔 (ミリ秒)。テストが 0 にする。</summary>
+    internal static int FileCheckIntervalMs { get; set; } = 500;
+
     private readonly string? _path;
-    private readonly List<UserWord> _words = [];
     // 同梱の語句 (dictionaries/phrases.txt)。変換エンジンが苦手な語句を補う。ユーザーの登録より後回しで、保存も表示もしない。
-    private readonly List<UserWord> _builtIn = [];
-    private Dictionary<string, List<string>> _byReading = new(StringComparer.Ordinal);
-    private Dictionary<string, List<string>>.AlternateLookup<ReadOnlySpan<char>> _byReadingLookup;
+    private readonly UserWord[] _builtIn = [];
+
+    /// <summary>
+    /// 登録した語 (ファイルの順) と、そこから作った検索用の辞書。作ったあとは変えない (参照ごと入れ替える)。
+    /// ByReading は読み → 単語 (後から登録したものが先。同梱の語句はユーザーの登録の後)。
+    /// </summary>
+    private sealed class Index
+    {
+        public required UserWord[] Words { get; init; }
+        public required Dictionary<string, List<string>> ByReading { get; init; }
+        public required Dictionary<string, List<string>>.AlternateLookup<ReadOnlySpan<char>> Lookup { get; init; }
+        public required int MaxReadingLength { get; init; }
+    }
+
+    private Index _index;
+    // 今の索引の元にしたファイルの版 (ファイルが無いときは Missing)。
+    private FileStamp _stamp = FileStamp.Missing;
+    // 次にファイルの版を確かめる時刻 (Environment.TickCount64)。
+    private long _nextFileCheck;
+    // ファイルを読めなかった・大きすぎて読まなかったときの理由 (読めていれば null)。管理画面が警告に出す。
+    private string? _problem;
+
     // 専門用語集 (dictionaries/terms-*.txt)。ユーザー辞書の後・変換エンジンの前。保存も表示もしない。差し替えは参照ごと (読む側は止めない)。
     // 同梱の語は、利用者が有効にした分野だけ (TermDomains)。分野の切り替えは、プロセス内のすべてのインスタンス
     // (共有・非共有を問わない) に届けたいので、各インスタンスが TermDomains.Revision を見て、変わっていれば入れ替える (Terms)。
@@ -46,10 +81,9 @@ public sealed class UserDictionary
     // 辞書と Revision の食い違いを見ない)。従わないのは builtIn: false と、LoadTerms で語を直接渡した辞書。
     private sealed record TermSnapshot(TermDictionary Terms, int Revision, bool Follows);
     private TermSnapshot _terms = new(TermDictionary.Empty, -1, false);
-    private int _maxReadingLength;
 
-    // パスごとの共有インスタンス。セッションごとに別インスタンスだと、登録が他セッションに見えず、
-    // 後からの Save でファイルを古い内容で上書きして登録が消えるため、同じファイルは 1 つのインスタンスで持つ。
+    // パスごとの共有インスタンス。セッションごとに別インスタンスだと、登録が他セッションに見えるまで待つことになるので、
+    // 同じファイルはプロセスで 1 つのインスタンスで持つ (別インスタンス・別プロセスでも、ファイルを正にしているので登録は消えない)。
     private static readonly Dictionary<string, UserDictionary> Shared_ = new(StringComparer.Ordinal);
 
     /// <summary>同じパスなら同じインスタンスを返す (プロセス内で共有)。path が null なら共有せず毎回新しく作る。</summary>
@@ -72,20 +106,23 @@ public sealed class UserDictionary
         _path = path;
         if (builtIn)
         {
-            Parse(Detection.DictionarySource.ReadEmbedded("phrases.txt").Split('\n'), _builtIn);
+            var phrases = new List<UserWord>();
+            Parse(Detection.DictionarySource.ReadEmbedded("phrases.txt").Split('\n'), phrases);
+            _builtIn = [.. phrases];
             // 取る前の Revision を覚える (取っている間に切り替わっても、次の確認でもう一度入れ替わる)
             var revision = TermDomains.Revision;
             _terms = new TermSnapshot(TermDomains.Current, revision, true);
         }
-        try
+        var words = new List<UserWord>();
+        if (path is not null)
         {
-            if (path is not null && File.Exists(path) && Config.SafeFile.ReadAllText(path) is { } text) Parse(text.Split('\n'), _words);
+            if (TryRead(out var read, out var stamp, out var error)) words = read;
+            else Diagnostics.Log.Warn(error!);
+            _stamp = stamp;
+            _problem = error ?? OversizeProblem(stamp);
         }
-        catch (Exception ex)
-        {
-            Diagnostics.Log.Warn($"ユーザー辞書を読めませんでした: {ex.Message}");
-        }
-        Rebuild();
+        _index = BuildIndex([.. words]);
+        _nextFileCheck = Environment.TickCount64 + FileCheckIntervalMs;
     }
 
     private static void Parse(IEnumerable<string> lines, List<UserWord> words)
@@ -101,12 +138,16 @@ public sealed class UserDictionary
         }
     }
 
-    /// <summary>登録内容が変わるたびに増える (変換結果のキャッシュを捨てるため)。</summary>
+    /// <summary>登録内容が変わるたびに増える (変換結果のキャッシュを捨てるため)。ほかのプロセスがファイルを書き換えたときも増える。</summary>
     public int Version
     {
-        // 専門用語集の分野が切り替わっていれば、ここで入れ替えて Version を進める (読む側はまず Version でキャッシュを確かめるため)。
-        get { SyncTerms(); return Volatile.Read(ref _version); }
-        private set => _version = value;
+        // 専門用語集の分野・ファイルが変わっていれば、ここで入れ替えて Version を進める (読む側はまず Version でキャッシュを確かめるため)。
+        get
+        {
+            SyncTerms();
+            SyncFile(force: false);
+            return Volatile.Read(ref _version);
+        }
     }
 
     private int _version;
@@ -114,6 +155,16 @@ public sealed class UserDictionary
     private TermDictionary Terms
     {
         get { SyncTerms(); return Volatile.Read(ref _terms).Terms; }
+    }
+
+    /// <summary>今の索引 (ファイルが書き換わっていれば読み直したもの)。</summary>
+    private Index Current
+    {
+        get
+        {
+            SyncFile(force: false);
+            return Volatile.Read(ref _index);
+        }
     }
 
     private void SyncTerms()
@@ -127,13 +178,66 @@ public sealed class UserDictionary
             var revision = TermDomains.Revision;
             if (!snapshot.Follows || snapshot.Revision == revision) return;
             Volatile.Write(ref _terms, new TermSnapshot(TermDomains.Current, revision, true));
-            Version++;
+            Interlocked.Increment(ref _version);
         }
     }
 
-    public int Count => _words.Count;
+    /// <summary>
+    /// ほかのプロセス (Mac の「Meltype 辞書」の画面など) がファイルを書き換えていれば読み直す。force でなければ
+    /// <see cref="FileCheckIntervalMs"/> に 1 回だけ確かめる。読めなかったときは今の内容のまま (次に書き換わるまで読み直さない)。
+    /// </summary>
+    private void SyncFile(bool force)
+    {
+        if (_path is null) return;
+        var now = Environment.TickCount64;
+        if (!force && now < Volatile.Read(ref _nextFileCheck)) return;
+        Volatile.Write(ref _nextFileCheck, now + FileCheckIntervalMs);
+        if (FileStamp.Of(_path).Equals(Volatile.Read(ref _stamp))) return;
+        lock (_gate)
+        {
+            if (FileStamp.Of(_path).Equals(_stamp)) return;
+            if (TryRead(out var words, out var stamp, out var error))
+            {
+                Adopt(words, stamp);
+                _problem = OversizeProblem(stamp);
+            }
+            else
+            {
+                Diagnostics.Log.Warn(error!);
+                Volatile.Write(ref _stamp, stamp);
+                _problem = error;
+            }
+        }
+    }
 
-    public IReadOnlyList<UserWord> Words => _words;
+    /// <summary>
+    /// ファイルが書き換わっていないかを今すぐ確かめ、変わっていれば読み直す (管理画面が一覧を出す前など)。読み直したら true。
+    /// </summary>
+    public bool Refresh()
+    {
+        var before = Volatile.Read(ref _version);
+        SyncTerms();
+        SyncFile(force: true);
+        return Volatile.Read(ref _version) != before;
+    }
+
+    /// <summary>
+    /// ファイルを読めなかった (権限・文字コード) か、大きすぎて読み込まなかったときの理由。読めていれば null。
+    /// 読めないファイルには書かない (変更は理由を返す)。大きすぎたファイルは .oversize に退避済みで、ここで登録するとその語だけのファイルになる。
+    /// </summary>
+    public string? Problem
+    {
+        get
+        {
+            SyncFile(force: false);
+            return Volatile.Read(ref _problem);
+        }
+    }
+
+    public int Count => Current.Words.Length;
+
+    /// <summary>登録した語 (ファイルの順 = 登録した順。後のものほど新しい)。変更のたびに別の配列になる (受け取った一覧は変わらない)。</summary>
+    public IReadOnlyList<UserWord> Words => Current.Words;
 
     /// <summary>専門用語集の語数 (強制型 + 候補追加型)。ユーザー辞書の Count・Words には含めない。</summary>
     public int TermCount => Terms.Count;
@@ -148,7 +252,7 @@ public sealed class UserDictionary
         lock (_gate)
         {
             Volatile.Write(ref _terms, new TermSnapshot(terms, -1, false));
-            Version++;
+            Interlocked.Increment(ref _version);
         }
         return terms;
     }
@@ -159,51 +263,151 @@ public sealed class UserDictionary
     /// <summary>読みが reading で始まる専門用語 (予測変換用。強制型・候補追加型の両方)。</summary>
     public IEnumerable<string> PredictTerms(string reading) => Terms.StartingWith(reading);
 
-    /// <summary>登録する。同じ読み・同じ単語が既にあれば何もしない。登録できなければ理由を返す。</summary>
-    public string? Add(string reading, string word)
+    // ---- 変更 (どれもファイルを読み直してから行い、すぐ保存する) ----
+
+    /// <summary>登録する。同じ読み・同じ単語が既にあれば何もしない (成功)。登録できなければ理由を返す。</summary>
+    public string? Add(string reading, string word) => Add(reading, word, failOnDuplicate: false);
+
+    /// <summary>登録する。同じ読み・同じ単語が既にあれば <see cref="DuplicateMessage"/> (管理画面用)。登録できなければ理由を返す。</summary>
+    public string? AddNew(string reading, string word) => Add(reading, word, failOnDuplicate: true);
+
+    private string? Add(string reading, string word, bool failOnDuplicate)
     {
         reading = reading.Trim();
         word = word.Trim();
         if (Validate(reading, word) is { } error) return error;
-        lock (_gate)
+        var entry = new UserWord(reading, word);
+        return Mutate(words =>
         {
-            if (_words.Any(w => w.Reading == reading && w.Word == word)) return null;
-            _words.Add(new UserWord(reading, word));
-            Changed();
-        }
-        return null;
+            if (words.Contains(entry)) return (false, failOnDuplicate ? DuplicateMessage : null);
+            words.Add(entry);
+            return (true, null);
+        }, backup: false);
     }
 
-    /// <summary>まとめて登録する (取り込み)。読みと単語が同じものが既にあれば飛ばす。登録した数を返す。</summary>
-    public int AddRange(IEnumerable<UserWord> words)
+    /// <summary>まとめて登録する (取り込み)。読みと単語が同じものが既にあれば飛ばす。登録した数を返す (保存できなければ 0)。</summary>
+    public int AddRange(IEnumerable<UserWord> words) => AddRange(words, out _);
+
+    /// <summary>まとめて登録する (取り込み)。登録した数を返す。保存できなければ 0 で、error に理由。</summary>
+    public int AddRange(IEnumerable<UserWord> words, out string? error)
     {
-        lock (_gate)
-        {
-            var added = 0;
-            foreach (var word in words)
-            {
-                if (Validate(word.Reading, word.Word) is not null) continue;
-                if (_words.Any(w => w.Reading == word.Reading && w.Word == word.Word)) continue;
-                _words.Add(word);
-                added++;
-            }
-            if (added > 0) Changed();
-            return added;
-        }
+        error = AddMany(words, out var added);
+        return added.Count;
     }
 
+    /// <summary>
+    /// まとめて登録する (取り込み・管理画面の「複製」)。読みと単語が同じものが既にあれば飛ばし、不正なものも飛ばす。
+    /// 1 回の読み直し・1 回の保存で済ませる (1 語ずつ登録すると、語数の 2 乗の時間がかかる)。新しく登録した語を added に返す (取り消すときに使う)。
+    /// 保存できなければ理由を返し、added は空。
+    /// </summary>
+    public string? AddMany(IEnumerable<UserWord> words, out IReadOnlyList<UserWord> added)
+    {
+        var incoming = words.Select(w => new UserWord(w.Reading.Trim(), w.Word.Trim())).Where(w => Validate(w.Reading, w.Word) is null).ToList();
+        var list = new List<UserWord>();
+        var error = Mutate(current =>
+        {
+            list.Clear();
+            var seen = current.ToHashSet();
+            foreach (var word in incoming)
+            {
+                if (!seen.Add(word)) continue;
+                current.Add(word);
+                list.Add(word);
+            }
+            return (list.Count > 0, null);
+        }, backup: false);
+        added = error is null ? list : [];
+        return error;
+    }
+
+    /// <summary>1 語を消す (同じ読み・単語が複数あれば最初の 1 つ)。消す前の内容は userdict.txt.bak に残す。</summary>
     public void Remove(UserWord word)
     {
-        lock (_gate)
+        if (Mutate(words => (words.Remove(word), null), backup: true) is { } error) Diagnostics.Log.Warn(error);
+    }
+
+    /// <summary>
+    /// 渡した語をすべて消す (同じ読み・単語が複数あれば全部)。消した語と、消す前の位置 (0 始まり) を removed に返す (元に戻すときに使う)。
+    /// 消す前の内容は userdict.txt.bak に残す。消せなければ理由を返す。
+    /// </summary>
+    public string? RemoveRange(IEnumerable<UserWord> words, out IReadOnlyList<(int Index, UserWord Word)> removed)
+    {
+        var targets = words.Select(w => new UserWord(w.Reading.Trim(), w.Word.Trim())).ToHashSet();
+        var list = new List<(int, UserWord)>();
+        var error = Mutate(current =>
         {
-            if (_words.Remove(word)) Changed();
-        }
+            for (var i = 0; i < current.Count; i++)
+            {
+                if (targets.Contains(current[i])) list.Add((i, current[i]));
+            }
+            if (list.Count == 0) return (false, null);
+            current.RemoveAll(targets.Contains);
+            return (true, null);
+        }, backup: true);
+        removed = error is null ? list : [];
+        return error;
+    }
+
+    /// <summary>
+    /// 消した語を元の位置に戻す (RemoveRange の removed をそのまま渡す)。位置が今の数より後ろなら末尾に足す。
+    /// 同じ読み・単語がもうあれば飛ばす。戻せなければ理由を返す。
+    /// </summary>
+    public string? Restore(IEnumerable<(int Index, UserWord Word)> entries)
+    {
+        var ordered = entries.Where(e => Validate(e.Word.Reading, e.Word.Word) is null).OrderBy(e => e.Index).ToList();
+        return Mutate(current =>
+        {
+            var changed = false;
+            foreach (var (index, word) in ordered)
+            {
+                if (current.Contains(word)) continue;
+                current.Insert(Math.Clamp(index, 0, current.Count), word);
+                changed = true;
+            }
+            return (changed, null);
+        }, backup: false);
+    }
+
+    /// <summary>
+    /// 登録した語を直す (位置はそのまま。同じ読みの語の中での優先順を変えない)。直せなければ理由を返す:
+    /// 入力が不正 (<see cref="Validate"/>)、元の語が無い (<see cref="NotFoundMessage"/>)、ほかの語と重なる (<see cref="DuplicateMessage"/>)。
+    /// 直す前の内容は userdict.txt.bak に残す。
+    /// </summary>
+    public string? Update(UserWord old, string reading, string word)
+    {
+        reading = reading.Trim();
+        word = word.Trim();
+        if (Validate(reading, word) is { } invalid) return invalid;
+        var replacement = new UserWord(reading, word);
+        return Mutate(current =>
+        {
+            var index = current.IndexOf(old);
+            if (index < 0) return (false, NotFoundMessage);
+            if (replacement == old) return (false, null);
+            if (current.Contains(replacement)) return (false, DuplicateMessage);
+            current[index] = replacement;
+            return (true, null);
+        }, backup: true);
+    }
+
+    /// <summary>
+    /// 登録・編集してよいかを確かめる (管理画面が入力のたびに呼ぶ。保存はしない)。不正な入力と、ほかの語との重なりを理由で返す。
+    /// except は編集中の元の語 (それと同じなのは重なりとみなさない)。
+    /// </summary>
+    public string? Check(string reading, string word, UserWord? except = null)
+    {
+        reading = reading.Trim();
+        word = word.Trim();
+        if (Validate(reading, word) is { } invalid) return invalid;
+        var entry = new UserWord(reading, word);
+        if (entry == except) return null;
+        return Current.Words.Contains(entry) ? DuplicateMessage : null;
     }
 
     /// <summary>読みに登録されている単語 (新しく登録したものが先)。</summary>
     public IReadOnlyList<string> Lookup(string reading)
     {
-        var words = _byReading.TryGetValue(reading, out var own) ? own : null;
+        var words = Current.ByReading.TryGetValue(reading, out var own) ? own : null;
         // 読みがちょうど同じ強制型の専門用語は、ユーザー辞書・組み込み語句の後ろに足す (重複は除く)。
         var terms = Terms.LookupForced(reading);
         if (terms.Count == 0) return words ?? [];
@@ -219,7 +423,10 @@ public sealed class UserDictionary
     public List<(string Reading, string? Word)>? Split(string kana)
     {
         var terms = Terms;
-        if ((_byReading.Count == 0 && terms.ForcedCount == 0) || kana.Length < MinReadingLength) return null;
+        var index = Current;
+        var maxReadingLength = index.MaxReadingLength;
+        var lookup = index.Lookup;
+        if ((index.ByReading.Count == 0 && terms.ForcedCount == 0) || kana.Length < MinReadingLength) return null;
         var pieces = new List<(string Reading, string? Word)>();
         var plain = new StringBuilder();
         var found = false;
@@ -230,10 +437,10 @@ public sealed class UserDictionary
             var termMax = terms.MaxForcedLengthAt(kana, i);
             var matchedLength = 0;
             string? matchedWord = null;
-            for (var length = Math.Min(Math.Max(_maxReadingLength, termMax), kana.Length - i); length >= MinReadingLength; length--)
+            for (var length = Math.Min(Math.Max(maxReadingLength, termMax), kana.Length - i); length >= MinReadingLength; length--)
             {
                 var span = kana.AsSpan(i, length);
-                if (length <= _maxReadingLength && _byReadingLookup.TryGetValue(span, out var own))
+                if (length <= maxReadingLength && lookup.TryGetValue(span, out var own))
                 {
                     matchedLength = length;
                     matchedWord = own[0];
@@ -266,39 +473,136 @@ public sealed class UserDictionary
         return found ? pieces : null;
     }
 
-    private void Changed()
+    // ---- 読み込み・保存 ----
+
+    /// <summary>
+    /// 変更の共通処理: (ファイルがあれば) プロセスをまたぐロックを取り、ファイルを読み直して change を当て、変わったら保存する。
+    /// change は (変わったか, 理由) を返す。読めないファイルには書かない (上書きして元の内容を失わないため)。
+    /// backup なら、保存の前の内容を「userdict.txt.bak」に残す (削除・編集の直前の状態。1 世代だけ)。
+    /// 保存できなかったときは、メモリ上の内容も変えずに理由を返す (ファイルと食い違わないように)。
+    /// </summary>
+    private string? Mutate(Func<List<UserWord>, (bool Changed, string? Error)> change, bool backup)
     {
-        Rebuild();
-        Version++;
-        Save();
+        lock (_gate)
+        {
+            if (_path is null)
+            {
+                var words = new List<UserWord>(_index.Words);
+                var (changed, error) = change(words);
+                if (changed) Adopt(words, null);
+                return error;
+            }
+            try
+            {
+                using var _ = FileLock.Acquire(_path);
+                if (!TryRead(out var words, out var stamp, out var readError))
+                {
+                    _problem = readError;
+                    return readError;
+                }
+                var (changed, error) = change(words);
+                if (!changed)
+                {
+                    // 変更は無くても、読み直した内容 (ほかのプロセスの変更) は取り込む。
+                    if (!stamp.Equals(_stamp)) Adopt(words, stamp);
+                    _problem = OversizeProblem(stamp);
+                    return error;
+                }
+                if (SafeFile.IsBlocked(_path)) return "ユーザー辞書のファイルが大きすぎて退避できなかったため、保存を止めています (元のファイルを守るため)。";
+                if (backup && stamp.Exists && stamp.Length <= SafeFile.MaxReadBytes) SafeFile.WriteAllBytes(_path + ".bak", File.ReadAllBytes(_path));
+                var lines = new List<string> { "# Meltype ユーザー辞書: 1 行に「読み<Tab>単語」" };
+                lines.AddRange(words.Select(w => $"{w.Reading}\t{w.Word}"));
+                SafeFile.WriteAllLines(_path, lines, new UTF8Encoding(true));
+                // ロックを持ったまま版を取るので、ここで見る版は自分が書いたもの。
+                Adopt(words, FileStamp.Of(_path));
+                _problem = null;
+                return error;
+            }
+            catch (FileLockTimeoutException ex)
+            {
+                Diagnostics.Log.Warn($"ユーザー辞書: {ex.Message}");
+                return ex.Message;
+            }
+            catch (Exception ex)
+            {
+                Diagnostics.Log.Warn($"ユーザー辞書を保存できませんでした: {ex.Message}");
+                return $"ユーザー辞書を保存できませんでした: {ex.Message}";
+            }
+        }
     }
 
-    private void Rebuild()
+    /// <summary>
+    /// ファイルを読む。無ければ空 (成功)。大きすぎるときは SafeFile が退避して null を返すので、空 (成功。既存の作法: 退避できなければ保存も止まる)。
+    /// 読めないとき (権限・文字コード) は false と理由。stamp は読む前に取った版 (読む間に書き換わっても、次の確認でもう一度読む)。
+    /// </summary>
+    private bool TryRead(out List<UserWord> words, out FileStamp stamp, out string? error)
+    {
+        words = [];
+        error = null;
+        stamp = FileStamp.Of(_path!);
+        // 前はあったのに今は無い: ロックを守らないエディター (消してから作り直す) の途中かもしれないので、少し待ってもう一度だけ見る
+        // (空として読んで保存すると、その語だけのファイルになるため)。それでも無ければ、消されたとみなす。
+        if (!stamp.Exists && Volatile.Read(ref _stamp).Exists)
+        {
+            Thread.Sleep(50);
+            stamp = FileStamp.Of(_path!);
+        }
+        if (!stamp.Exists) return true;
+        try
+        {
+            // 文字コードは厳密に読む (不正なバイトを U+FFFD にして書き戻すと、元のバイト列を失う)
+            if (SafeFile.ReadAllTextStrict(_path!) is { } text) Parse(text.Split('\n'), words);
+            return true;
+        }
+        catch (FileNotFoundException)
+        {
+            return true;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return true;
+        }
+        catch (DecoderFallbackException)
+        {
+            error = "ユーザー辞書 (userdict.txt) の文字コードが UTF-8 / UTF-16 ではないため読めません。上書きして元の内容を失わないよう、変更しませんでした (テキストエディターで UTF-8 で保存し直してください)。";
+            return false;
+        }
+        catch (Exception ex)
+        {
+            error = $"ユーザー辞書を読めないため、変更しませんでした (上書きして元の内容を失わないため): {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>大きすぎて読み込まなかった (SafeFile が .oversize に退避した) ときの理由。そうでなければ null。</summary>
+    private static string? OversizeProblem(FileStamp stamp) =>
+        stamp.Exists && stamp.Length > SafeFile.MaxReadBytes
+            ? $"ユーザー辞書 (userdict.txt) が大きすぎる (上限 {SafeFile.MaxReadBytes / 1024 / 1024} MB) ため読み込んでいません。元のファイルは userdict.txt.oversize に退避しています。ここで登録すると、userdict.txt はその語だけになります。"
+            : null;
+
+    /// <summary>読み直した・変更した内容に索引を入れ替え、Version を進める。_gate の中で呼ぶ。</summary>
+    private void Adopt(List<UserWord> words, FileStamp? stamp)
+    {
+        Volatile.Write(ref _index, BuildIndex([.. words]));
+        if (stamp is not null) Volatile.Write(ref _stamp, stamp);
+        Interlocked.Increment(ref _version);
+    }
+
+    private Index BuildIndex(UserWord[] words)
     {
         var byReading = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         // 後から登録したものを先にする。同梱の語句はユーザーの登録の後。
-        foreach (var word in Enumerable.Reverse(_words).Concat(_builtIn))
+        foreach (var word in Enumerable.Reverse(words).Concat(_builtIn))
         {
             if (!byReading.TryGetValue(word.Reading, out var list)) byReading[word.Reading] = list = [];
             if (!list.Contains(word.Word)) list.Add(word.Word);
         }
-        _byReading = byReading;
-        _byReadingLookup = byReading.GetAlternateLookup<ReadOnlySpan<char>>();
-        _maxReadingLength = byReading.Count == 0 ? 0 : byReading.Keys.Max(k => k.Length);
-    }
-
-    private void Save()
-    {
-        if (_path is null) return;
-        try
+        return new Index
         {
-            var lines = new List<string> { "# Meltype ユーザー辞書: 1 行に「読み<Tab>単語」" };
-            lines.AddRange(_words.Select(w => $"{w.Reading}\t{w.Word}"));
-            Config.SafeFile.WriteAllLines(_path, lines, new UTF8Encoding(true));
-        }
-        catch (Exception ex)
-        {
-            Diagnostics.Log.Warn($"ユーザー辞書を保存できませんでした: {ex.Message}");
-        }
+            Words = words,
+            ByReading = byReading,
+            Lookup = byReading.GetAlternateLookup<ReadOnlySpan<char>>(),
+            MaxReadingLength = byReading.Count == 0 ? 0 : byReading.Keys.Max(k => k.Length),
+        };
     }
 }

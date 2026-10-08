@@ -156,8 +156,10 @@ internal sealed class UserDictionaryForm : Form
         try
         {
             var result = UserDictionaryFile.Parse(File.ReadAllBytes(dialog.FileName));
-            var added = _service.UserDictionary.AddRange(result.Words);
+            var added = _service.UserDictionary.AddRange(result.Words, out var error);
             Reload();
+            // 保存できなかった (ロックが取れない・読めないファイル) ときは、登録した数の代わりに理由を出す
+            if (error is not null) throw new IOException(error);
             Diagnostics.Log.Info($"ユーザー辞書を取り込みました: {added} 語 ({result.Encoding})");
             var skipped = result.Skipped > 0 ? $"\n読みがかなでない・短すぎるなどで飛ばした行: {result.Skipped}" : "";
             var duplicates = result.Words.Count - added;
@@ -193,10 +195,12 @@ internal sealed class UserDictionaryForm : Form
 
     private void RemoveSelected()
     {
-        foreach (DataGridViewRow row in _grid.SelectedRows)
-        {
-            if (row.Tag is UserWord word) _service.UserDictionary.Remove(word);
-        }
+        // まとめて 1 回で消す (1 語ずつだと、削除の直前の内容 userdict.txt.bak が最後の 1 語の分しか残らない)
+        var words = _grid.SelectedRows.Cast<DataGridViewRow>().Select(row => row.Tag).OfType<UserWord>().ToList();
+        if (words.Count == 0) return;
+        var error = _service.UserDictionary.RemoveRange(words, out _);
+        _message.Text = error ?? "";
+        _message.ForeColor = Color.Firebrick;
         Reload();
     }
 

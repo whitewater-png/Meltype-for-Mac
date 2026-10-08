@@ -64,13 +64,24 @@ echo "== 3/3 Meltype.app を組み立て"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 BIN="$(swift build -c release --show-bin-path)"
 cp "$BIN/MeltypeIME" "$APP/Contents/MacOS/Meltype"
+# 辞書の管理画面「Meltype 辞書」(ふつうのアプリ)。IME は背面専用 (LSBackgroundOnly) で自分のウインドウがキーボード入力を受けられないので、
+# 別のアプリにして Meltype.app の中 (Contents/Helpers。codesign が入れ子のコードとして扱う場所) に入れ、入力メニューの「辞書を管理…」から開く。
+# Meltype.app を消すと一緒に消える (アンインストールで別に消すものは無い)。
+HELPER="$APP/Contents/Helpers/MeltypeDictionary.app"
+mkdir -p "$HELPER/Contents/MacOS" "$HELPER/Contents/Resources"
+cp "$BIN/MeltypeDictionary" "$HELPER/Contents/MacOS/MeltypeDictionary"
+cp Resources/Dictionary/Info.plist "$HELPER/Contents/Info.plist"
+cp -R Resources/Dictionary/ja.lproj "$HELPER/Contents/Resources/"
+# 版は Meltype.app と同じにする (Info.plist は 1 か所で管理する)
+plutil -replace CFBundleShortVersionString -string "$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)" "$HELPER/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$(plutil -extract CFBundleVersion raw Resources/Info.plist)" "$HELPER/Contents/Info.plist"
 # azooKey が使う llama.framework などの動的なフレームワークも同梱する。
 # 入れていなかったため、1.0.0 は起動できなかった (dyld: Library not loaded: @rpath/llama.framework、#13)。
 for framework in "$BIN"/*.framework; do
     [[ -e "$framework" ]] && cp -R "$framework" "$APP/Contents/Frameworks/"
 done
 # Swift 6.2 以降は、古い macOS 向けの互換ライブラリ (libswiftCompatibilitySpan.dylib など) を @rpath で読む。
-# macOS 26 は OS に入っているが、13〜15 では無いので、ツールチェーンから同梱する (#20)。
+# macOS 26 は OS に入っているが、13〜15 では無いので、ツールチェーンから同梱する (#20)。辞書の管理画面も同じものを使う (二重に入れない)。
 TOOLCHAIN_SWIFT_LIBS="$(dirname "$(xcrun --find swift)")/../lib"
 while read -r lib; do
     name="${lib#@rpath/}"
@@ -78,15 +89,18 @@ while read -r lib; do
     for dylib in "$TOOLCHAIN_SWIFT_LIBS"/swift-*/macosx/"$name" "$TOOLCHAIN_SWIFT_LIBS"/swift/macosx/"$name"; do
         [[ -e "$dylib" ]] && { cp "$dylib" "$APP/Contents/Frameworks/"; break; }
     done
-done < <(otool -L "$BIN/MeltypeIME" | awk '/@rpath\//{print $1}')
+done < <( (otool -L "$BIN/MeltypeIME"; otool -L "$BIN/MeltypeDictionary") | awk '/@rpath\//{print $1}')
 # 実行ファイルの隣 (@loader_path) だけでなく、Contents/Frameworks も探すようにする
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Meltype" 2>/dev/null || true
+# 辞書の管理画面は、外側の Meltype.app/Contents/Frameworks を探す (MacOS → Contents → .app → Helpers → Meltype.app/Contents)。
+# libMeltypeNative.dylib も同じ場所のものを dlopen する (NativeDictionary.defaultLibraryPath)。
+install_name_tool -add_rpath "@executable_path/../../../../Frameworks" "$HELPER/Contents/MacOS/MeltypeDictionary" 2>/dev/null || true
 # @rpath で読み込むライブラリが全部 Contents/Frameworks にあるか確かめる (無ければ配布しない)
 missing=0
 while read -r lib; do
     name="${lib#@rpath/}"
     if [[ ! -e "$APP/Contents/Frameworks/$name" ]]; then echo "同梱されていないライブラリ: $lib" >&2; missing=1; fi
-done < <(otool -L "$APP/Contents/MacOS/Meltype" | awk '/@rpath\//{print $1}')
+done < <( (otool -L "$APP/Contents/MacOS/Meltype"; otool -L "$HELPER/Contents/MacOS/MeltypeDictionary") | awk '/@rpath\//{print $1}')
 [[ $missing -eq 0 ]] || { echo "Meltype.app に必要なライブラリが足りません" >&2; exit 1; }
 cp "$BUILD/native/MeltypeNative.dylib" "$APP/Contents/Frameworks/libMeltypeNative.dylib"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
@@ -104,23 +118,32 @@ done
 # 外さないのは、OS の標準の場所 (/usr/lib/swift・/System/...) と @ で始まる同梱側のパス (@loader_path・@executable_path/../Frameworks)。
 # /usr/lib/swift は OS 同梱の Swift の置き場所で、これを外すと起動できなくなるので残す。
 # (外したあとに動くかは、組み立て後の Meltype.app で otool -l を見て確かめる)
-while read -r rpath; do
-    case "$rpath" in
-        /usr/lib/*|/System/*|@*) ;;
-        /*) install_name_tool -delete_rpath "$rpath" "$APP/Contents/MacOS/Meltype" 2>/dev/null || true ;;
-    esac
-done < <(otool -l "$APP/Contents/MacOS/Meltype" | awk '$1=="cmd"&&$2=="LC_RPATH"{r=1;next} r&&$1=="path"{print $2;r=0}')
+for executable in "$APP/Contents/MacOS/Meltype" "$HELPER/Contents/MacOS/MeltypeDictionary"; do
+    while read -r rpath; do
+        case "$rpath" in
+            /usr/lib/*|/System/*|@*) ;;
+            /*) install_name_tool -delete_rpath "$rpath" "$executable" 2>/dev/null || true ;;
+        esac
+    done < <(otool -l "$executable" | awk '$1=="cmd"&&$2=="LC_RPATH"{r=1;next} r&&$1=="path"{print $2;r=0}')
+done
 # 署名: 環境変数 MELTYPE_MAC_IDENTITY (Developer ID Application の証明書の名前) があれば配布用に署名する
 # (Hardened Runtime・タイムスタンプ付き。公証 (notarization) は mac.yml で行う)。無ければ自分の Mac で使うための署名。
+# 中から外へ: Frameworks の中身 → 辞書の管理画面 (Contents/Helpers) → Meltype.app。
+# 辞書の管理画面は外側の Frameworks の libMeltypeNative.dylib を読むので、配布用の署名ではどちらも同じ証明書 (同じ Team ID) で署名する
+# (Hardened Runtime のライブラリの検証は、同じ Team ID のものだけを読み込ませる)。
 if [[ -n "${MELTYPE_MAC_IDENTITY:-}" ]]; then
     for item in "$APP/Contents/Frameworks/"*; do
         codesign --force --sign "$MELTYPE_MAC_IDENTITY" --options runtime --timestamp "$item"
     done
+    codesign --force --sign "$MELTYPE_MAC_IDENTITY" --options runtime --timestamp "$HELPER"
     codesign --force --deep --sign "$MELTYPE_MAC_IDENTITY" --options runtime --timestamp "$APP"
     echo "配布用に署名しました: $MELTYPE_MAC_IDENTITY"
 else
+    codesign --force --sign - "$HELPER"
     codesign --force --deep --sign - "$APP"
 fi
+# 入れ子の辞書の管理画面まで含めて、署名の封印が壊れていないか (install.sh・自動更新と同じ検査)
+codesign --verify --deep --strict "$APP" || { echo "Meltype.app の署名の検査に失敗しました" >&2; exit 1; }
 echo "作成しました: $APP"
 
 if [[ $INSTALL -eq 1 ]]; then
@@ -134,6 +157,9 @@ if [[ $INSTALL -eq 1 ]]; then
         # 入れ替えてから、動いていた Meltype を止める (次にキーを打ったときに macOS が新しい Meltype を起動する)。
         # 先に止めると、入れ替えの途中でキーを打ったときに、新旧が混ざった Meltype が起動されてしまう。
         pkill -x Meltype 2>/dev/null || true
+        # 開いていた辞書の管理画面も閉じる (古い版のまま残さない。変更はその都度保存済み)。
+        # 実行ファイル名が 16 文字を超え pkill -x では合わないので、入れ替えた Meltype.app の中のパスで探す。
+        pkill -f "$TARGET/Meltype.app/Contents/Helpers/MeltypeDictionary.app/" 2>/dev/null || true
         FIRST_INSTALL=0
     else
         cp -R "$APP" "$TARGET/"

@@ -41,6 +41,8 @@ as_user() {
 if as_user "$BIN" --register-check; then
     echo "入力ソースは登録済み: 入れ替えのみ"
     pkill -x Meltype 2>/dev/null || true
+    # 開いていた辞書の管理画面も閉じる (古い版のまま残さない。実行ファイル名が長く pkill -x では合わないので、パスで探す)
+    pkill -f "$APP/Contents/Helpers/MeltypeDictionary.app/" 2>/dev/null || true
 else
     echo "初回: 入力ソースに登録します"
     as_user "$BIN" --register || echo "登録に失敗しました (ログアウトして入り直すと出ることがあります)"

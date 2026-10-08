@@ -17,6 +17,8 @@ internal static class Program
     {
         // 専門用語集の分野の設定は、利用者の本物の config.json を読まない (有効な分野があると、ほかのテストや --eval・--repro の結果が変わる)。全モード共通。
         Meltype.Composition.TermDomains.ConfigPath = () => Path.Combine(Path.GetTempPath(), "meltype-tests-no-config", "config.json");
+        // 除外した専門用語 (terms-excluded.txt) も、利用者の本物のファイルを読まない。
+        Meltype.Composition.TermDomains.ExclusionPath = () => Path.Combine(Path.GetTempPath(), "meltype-tests-no-config", "terms-excluded.txt");
         switch (args.FirstOrDefault())
         {
             case "--eval":

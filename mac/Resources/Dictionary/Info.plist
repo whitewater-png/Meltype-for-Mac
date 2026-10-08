@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  辞書の管理画面「Meltype 辞書」(Meltype.app/Contents/Helpers/MeltypeDictionary.app)。build.sh が組み立てる。
+  IME (背面専用) とは別のふつうのアプリ (LSBackgroundOnly を付けない) なので、ウインドウでキーボード入力を受けられる。
+  版 (CFBundleShortVersionString・CFBundleVersion) は build.sh が Meltype.app の Info.plist と同じ値に書き換える。
+  バンドル ID は IME (io.github.yksr-melt.inputmethod.Meltype) と前方一致しない別の ID にする (入力ソースの登録・mdfind と混ざらないように)。
+-->
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ja</string>
+	<key>CFBundleExecutable</key>
+	<string>MeltypeDictionary</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.yksr-melt.Meltype.Dictionary</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Meltype 辞書</string>
+	<key>CFBundleDisplayName</key>
+	<string>Meltype 辞書</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0</string>
+	<key>CFBundleVersion</key>
+	<string>0</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright (C) 2026 雪代 / Yukishiro. GPL-3.0-or-later</string>
+</dict>
+</plist>

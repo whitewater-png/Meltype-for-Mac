@@ -1,0 +1,299 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
+import Foundation
+
+/// 「Meltype 辞書」の画面のロジックの確認 (`MeltypeDictionary --self-test`)。画面 (AppKit) は出さない。
+/// コマンドライン ツールだけの環境では Swift のテスト (XCTest / swift-testing) が動かないので、実行ファイルに組み込んでおく。
+///   1. ロジック: FFI の文字列の形式・検索のそろえ方・一覧の検索と並べ替え・元に戻す (偽の操作で)
+///   2. 本体 (libMeltypeNative.dylib) を通した操作: 環境変数 MELTYPE_DATA_DIR が一時フォルダー (の中の空のフォルダー) を指すときだけ。
+///      実際の ~/Library/Application Support/Meltype には書かない (保存場所が一時フォルダーでなければ、本体の確認は飛ばす)。
+public enum SelfTest {
+    /// 失敗の一覧 (空なら成功) と、出力した行。
+    public static func run(libraryPath: String?, environment: [String: String] = ProcessInfo.processInfo.environment, log: (String) -> Void) -> Bool {
+        var failures: [String] = []
+        var checks = 0
+        func check(_ condition: Bool, _ message: String) {
+            checks += 1
+            if !condition { failures.append(message) }
+        }
+        checkLogic(check)
+        log("ロジック: \(checks) 件")
+
+        let before = checks
+        if let directory = environment["MELTYPE_DATA_DIR"], isSafeTemporary(directory) {
+            do {
+                let native = try NativeDictionary(libraryPath: libraryPath)
+                checkNative(native, directory: directory, check)
+                log("本体を通した操作: \(checks - before) 件 (保存場所 \(directory))")
+            } catch {
+                failures.append("本体を読み込めない: \(error)")
+            }
+        } else {
+            log("本体を通した操作: 飛ばした (MELTYPE_DATA_DIR に、一時フォルダーの中の空のフォルダーを指定すると確かめる)")
+        }
+        for failure in failures { log("FAIL: \(failure)") }
+        log(failures.isEmpty ? "PASS: \(checks) 件" : "FAIL: \(failures.count) / \(checks) 件")
+        return failures.isEmpty
+    }
+
+    /// 一時フォルダーの中で、まだ何も無い (か空の) フォルダーか。実際のデータに書かないための確認。
+    static func isSafeTemporary(_ path: String) -> Bool {
+        let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        let temporary = URL(fileURLWithPath: NSTemporaryDirectory()).resolvingSymlinksInPath().path
+        let roots = [temporary, "/private/tmp", "/private/var/folders"]
+        guard roots.contains(where: { resolved.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }) else { return false }
+        let contents = (try? FileManager.default.contentsOfDirectory(atPath: resolved)) ?? []
+        return contents.isEmpty
+    }
+
+    // ---- 1. ロジック ----
+
+    static func checkLogic(_ check: (Bool, String) -> Void) {
+        // FFI の形式
+        let keys = [WordKey(reading: "きごう", word: "記号"), WordKey(reading: "めるたいぷ", word: "Meltype")]
+        check(FfiFormat.parseKeys(FfiFormat.formatKeys(keys)) == keys, "読み Tab 語 の往復")
+        check(FfiFormat.parseKeys("きごう\t記号\n\n欄なし\n\t空の読み\n").count == 1, "欄が足りない行・空の読みは飛ばす")
+        check(FfiFormat.parseUserEntries("あ\tA\nい\tI").map(\.order) == [0, 1], "登録順はファイルの順")
+        let removed = [RemovedEntry(index: 3, key: keys[0]), RemovedEntry(index: 10, key: keys[1])]
+        check(FfiFormat.parseRemoved(FfiFormat.formatRemoved(removed)) == removed, "位置 Tab 読み Tab 語 の往復")
+        check(FfiFormat.parseRemoved("x\tあ\tA\n-1\tい\tI").isEmpty, "位置が数でない・負なら飛ばす")
+        check(FfiFormat.parseDomains("civil\t土木・建設\t2902\t1\nai\tAI\t1111\t0\n壊れた行") ==
+              [TermDomainInfo(id: "civil", name: "土木・建設", count: 2902, enabled: true), TermDomainInfo(id: "ai", name: "AI", count: 1111, enabled: false)], "分野の一覧")
+        let terms = FfiFormat.parseTermWords("こうぞうぶつ\t構造物\t\t0\nほそう\t舗装\t道路\t1\n欄が足りない\t語")
+        check(terms.count == 2 && terms[1].note == "道路" && terms[1].excluded && !terms[0].excluded && terms[1].order == 1, "専門用語の一覧")
+        check(FfiFormat.parseImportSummary("3\t1\t2\tUTF-16") == ImportSummary(added: 3, duplicates: 1, skipped: 2, encoding: "UTF-16"), "取り込みの結果")
+        check(FfiFormat.parseImportSummary("壊れた") == nil, "取り込みの結果 (不正)")
+
+        // 検索のそろえ方
+        check(SearchText.normalize("カタカナＡＢＣabc") == "かたかなabcabc", "カタカナ → ひらがな、全角 → 半角、大文字 → 小文字")
+
+        // 一覧の検索・並べ替え
+        let rows = FfiFormat.parseUserEntries("かきくけこ\t書\nあいうえお\t愛\nさしすせそ\tSAS\nあいう\t藍")
+        let list = RowList<UserEntry>(sort: SortSpec(column: .order, ascending: false))
+        list.replace(rows)
+        check(list.visible.map(\.word) == ["藍", "SAS", "愛", "書"], "既定は新しい順")
+        list.sort = SortSpec(column: .reading, ascending: true)
+        list.apply()
+        check(list.visible.map(\.reading) == ["あいう", "あいうえお", "かきくけこ", "さしすせそ"], "読みの順 (五十音)")
+        list.sort.ascending = false
+        list.apply()
+        check(list.visible.first?.reading == "さしすせそ", "読みの逆順")
+        list.query = "アイウ"
+        list.apply()
+        check(list.visible.count == 2, "カタカナで探しても、ひらがなの読みが見つかる")
+        list.query = "sas"
+        list.apply()
+        check(list.visible.map(\.word) == ["SAS"], "英字は大文字・小文字を区別しない")
+        list.query = ""
+        list.include = { $0.word != "書" }
+        list.apply()
+        check(list.visible.count == 3, "絞り込み")
+
+        // 複数キーワード (AND)・関連度順・カタカナ/全角
+        let search = RowList<UserEntry>(sort: SortSpec(column: .order, ascending: false))
+        search.replace(FfiFormat.parseUserEntries("ほけんがいしゃ\t保険会社\nほけん\t保険\nしんほけん\t新保険\nほけんしょう\t保険証\nかいごほけん\t介護保険\nほご\t保護"))
+        search.query = "ほけん"
+        search.apply()
+        check(search.visible.count == 5, "「ほけん」は 5 件 (保護は含まない)")
+        check(search.visible.first?.word == "保険", "読みが完全一致する語が先頭")
+        check(Set(search.visible.prefix(3).map(\.word)) == ["保険", "保険証", "保険会社"], "前方一致の 3 件が上位")
+        check(Set(search.visible.suffix(2).map(\.word)) == ["新保険", "介護保険"], "途中だけの一致は後ろ")
+        search.query = "ほけん 保険"
+        search.apply()
+        check(search.visible.count == 5 && search.visible.first?.word == "保険", "空白区切りは AND (半角)")
+        search.query = "ほけん\u{3000}会社"
+        search.apply()
+        check(search.visible.map(\.word) == ["保険会社"], "全角の空白でも AND")
+        search.query = "ホケン　ｶｲｺﾞ"
+        search.apply()
+        check(search.visible.isEmpty, "半角カナは対象外 (どれも含まない)")
+        search.query = "ＨＯ　ほけん"
+        search.apply()
+        check(search.visible.isEmpty, "全角英字は半角にそろえるが、読みに無ければ 0 件")
+        search.query = "ホケン 介護"
+        search.apply()
+        check(search.visible.map(\.word) == ["介護保険"], "カタカナ + 語の AND")
+        search.query = "   "
+        search.apply()
+        check(search.visible.count == 6, "空白だけの検索は全部")
+        search.query = "ほけん"
+        search.sort = SortSpec(column: .word, ascending: true)
+        search.apply()
+        check(search.visible.map(\.word) == search.visible.map(\.word).sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }, "並べ替えの列を選んでいる間は、その指定を優先")
+        check(RowList<UserEntry>.keywords(" ほけん\u{3000}ＡＢ  ") == ["ほけん", "ab"], "キーワードの分け方")
+        let fullWidth = RowList<UserEntry>(sort: SortSpec(column: .order, ascending: false))
+        fullWidth.replace(FfiFormat.parseUserEntries("えーびーしー\tABC\nえーびー\tAB"))
+        fullWidth.query = "ＡＢ"
+        fullWidth.apply()
+        check(fullWidth.visible.map(\.word) == ["AB", "ABC"], "全角で探しても半角の語が見つかり、完全一致が先")
+
+        let termList = RowList<TermWord>(sort: SortSpec(column: .state, ascending: false))
+        termList.replace(terms)
+        check(termList.visible.first?.excluded == true, "状態の列で並べると、除外中が先 (逆順)")
+        termList.query = "道路"
+        termList.apply()
+        check(termList.visible.map(\.word) == ["舗装"], "注記でも探せる")
+
+        // 大きな一覧 (専門用語集の IT は約 1.5 万語) でも軽いこと
+        var big: [TermWord] = []
+        for i in 0..<20000 { big.append(TermWord(key: WordKey(reading: "よみ\(i % 997)ばん\(i)", word: "語\(i)"), note: "", excluded: i % 7 == 0, order: i)) }
+        let start = Date()
+        let bigList = RowList<TermWord>(sort: SortSpec(column: .reading, ascending: true))
+        bigList.replace(big)
+        bigList.query = "ばん1"
+        bigList.apply()
+        bigList.sort = SortSpec(column: .word, ascending: false)
+        bigList.apply()
+        let elapsed = Date().timeIntervalSince(start)
+        check(bigList.visible.count > 1000 && elapsed < 3.0, "2 万語の読み込み・検索・並べ替えが 3 秒以内 (実際 \(String(format: "%.2f", elapsed)) 秒)")
+
+        // 元に戻す (偽の操作で)
+        let fake = FakeOperations()
+        let a = WordKey(reading: "えー", word: "A"), b = WordKey(reading: "びー", word: "B"), c = WordKey(reading: "しー", word: "C")
+        for key in [a, b, c] { _ = DictionaryChange.add(key).perform(on: fake) }
+        let removal = DictionaryChange.remove([b, WordKey(reading: "ない", word: "無")]).perform(on: fake)
+        check(removal.error == nil && fake.words == [a, c], "削除")
+        check(removal.undo == .restore([RemovedEntry(index: 1, key: b)]), "削除の取り消しは、元の位置への復元")
+        let restore = removal.undo!.perform(on: fake)
+        check(fake.words == [a, b, c], "取り消すと元の位置に戻る")
+        check(restore.undo == .remove([b]), "やり直しは、もう一度の削除")
+        let update = DictionaryChange.update(from: a, to: WordKey(reading: "えー", word: "Ａ")).perform(on: fake)
+        check(fake.words.first?.word == "Ａ" && update.undo == .update(from: WordKey(reading: "えー", word: "Ａ"), to: a), "編集と、その取り消し")
+        _ = update.undo!.perform(on: fake)
+        check(fake.words.first == a, "編集の取り消し")
+        let duplicate = DictionaryChange.add(a).perform(on: fake)
+        check(duplicate.error != nil && duplicate.undo == nil, "だめなら理由を返し、取り消しを積まない")
+
+        let original = WordKey(reading: "こうぞうぶつ", word: "構造物"), fixed = WordKey(reading: "こうぞうぶつ", word: "構造仏")
+        let edit = DictionaryChange.editTerm(original: original, to: fixed, originalExcluded: false).perform(on: fake)
+        check(fake.excluded.contains(original) && fake.words.contains(fixed), "専門用語の編集 = 元を除外 + ユーザー辞書に登録")
+        _ = edit.undo!.perform(on: fake)
+        check(!fake.excluded.contains(original) && !fake.words.contains(fixed), "専門用語の編集の取り消し")
+        fake.excluded.insert(original)
+        let editExcluded = DictionaryChange.editTerm(original: original, to: fixed, originalExcluded: true).perform(on: fake)
+        _ = editExcluded.undo!.perform(on: fake)
+        check(fake.excluded.contains(original), "直す前から除外していた語は、取り消しても除外のまま")
+        fake.words.append(fixed)
+        let editExisting = DictionaryChange.editTerm(original: WordKey(reading: "ほそう", word: "舗装"), to: fixed, originalExcluded: false).perform(on: fake)
+        _ = editExisting.undo!.perform(on: fake)
+        check(fake.words.contains(fixed), "前からユーザー辞書にあった語は、取り消しても消さない")
+        let exclude = DictionaryChange.exclude([original, fixed]).perform(on: fake)
+        check(exclude.undo == .include([original, fixed]), "除外の取り消しは、除外をやめること")
+        let d = WordKey(reading: "でぃー", word: "D")
+        let many = DictionaryChange.addMany([a, d]).perform(on: fake)
+        check(many.undo == .remove([d]), "まとめての登録の取り消しは、新しく登録した語だけを消す")
+        let none = DictionaryChange.addMany([a]).perform(on: fake)
+        check(none.error == nil && none.undo == nil, "1 語も増えなければ、取り消しを積まない")
+    }
+
+    // ---- 2. 本体を通した操作 ----
+
+    static func checkNative(_ dictionary: NativeDictionary, directory: String, _ check: (Bool, String) -> Void) {
+        let resolved = URL(fileURLWithPath: directory).resolvingSymlinksInPath().path
+        let reported = dictionary.dataDirectory.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }
+        check(reported == resolved, "本体の保存場所が MELTYPE_DATA_DIR (\(reported ?? "nil"))")
+        guard reported == resolved else { return }   // 実際のデータには書かない
+
+        check(dictionary.userEntries() == [], "最初は空")
+        let version = dictionary.userVersion()
+        let key = WordKey(reading: "きごうとう", word: "記号等")
+        check(dictionary.add(key) == nil, "登録")
+        check(dictionary.userVersion() != version, "版が進む")
+        check(dictionary.add(key) != nil, "重複は理由を返す")
+        check(dictionary.check(WordKey(reading: "き", word: "記"), except: nil) != nil, "短い読みは理由を返す")
+        check(dictionary.check(key, except: key) == nil, "編集中の元の語は重複ではない")
+        let changed = WordKey(reading: "きごうとう", word: "記号党")
+        check(dictionary.update(from: key, to: changed) == nil, "編集")
+        check(dictionary.userEntries()?.map(\.key) == [changed], "編集が保存される")
+        _ = dictionary.add(WordKey(reading: "あたらしい", word: "新しい"))
+        let removal = dictionary.remove([changed])
+        check(removal.error == nil && removal.removed == [RemovedEntry(index: 0, key: changed)], "削除 (元の位置つき)")
+        check(dictionary.restore(removal.removed) == nil && dictionary.userEntries()?.first?.key == changed, "元の位置に戻る")
+        check(dictionary.toReading("kigoutou") == "きごうとう", "ローマ字の読みをひらがなに")
+        check(FileManager.default.fileExists(atPath: resolved + "/userdict.txt.bak"), "削除の直前の内容が .bak に残る")
+
+        let exported = resolved + "/export.txt"
+        let export = dictionary.exportFile(path: exported)
+        check(export.error == nil && export.count == 2, "書き出し")
+        let imported = dictionary.importFile(path: exported)
+        check(imported.error == nil && imported.summary?.added == 0 && imported.summary?.duplicates == 2 && imported.added.isEmpty, "取り込み (登録済みは増やさない)")
+        let bulk = dictionary.addMany([WordKey(reading: "まとめて", word: "纏めて"), changed, WordKey(reading: "x", word: "短い")])
+        check(bulk.error == nil && bulk.added == [WordKey(reading: "まとめて", word: "纏めて")], "まとめての登録は、新しい語だけを返す")
+        check(dictionary.userProblem() == nil, "読めているときは問題なし")
+
+        let domains = dictionary.termDomains()
+        check(Set(domains.map(\.id)) == ["ai", "civil", "it", "medical", "netslang"], "同梱の分野 (\(domains.map(\.id)))")
+        check(domains.allSatisfy { !$0.enabled }, "既定はすべて OFF")
+        let revision = dictionary.termRevision()
+        check(dictionary.setTermDomain(id: "civil", enabled: true), "分野を有効にできる")
+        check(dictionary.termDomains().first { $0.id == "civil" }?.enabled == true, "有効になる")
+        guard let words = dictionary.termWords(domain: "civil"), words.count > 1000 else {
+            check(false, "土木の語を取れる")
+            return
+        }
+        check(dictionary.termWords(domain: "nosuch") == nil, "未知の分野は nil")
+        let first = words[0].key
+        check(dictionary.setExcluded([first], excluded: true) == nil, "除外できる")
+        check(dictionary.termRevision() != revision, "専門用語集の版が進む")
+        check(dictionary.termWords(domain: "civil")?.first?.excluded == true, "一覧に除外の印")
+        check(dictionary.excludedTerms() == [first], "除外の一覧")
+        let fixed = WordKey(reading: words[1].reading, word: words[1].word + "（直し）")
+        let edit = DictionaryChange.editTerm(original: words[1].key, to: fixed, originalExcluded: false).perform(on: dictionary)
+        check(edit.error == nil && dictionary.userEntries()?.contains { $0.key == fixed } == true, "専門用語を直すと、ユーザー辞書に入る")
+        check(dictionary.excludedTerms().contains(words[1].key), "元の語は除外")
+        _ = edit.undo?.perform(on: dictionary)
+        check(!dictionary.excludedTerms().contains(words[1].key) && dictionary.userEntries()?.contains { $0.key == fixed } == false, "専門用語の編集を取り消せる")
+        check(dictionary.setExcluded([first], excluded: false) == nil && dictionary.excludedTerms().isEmpty, "除外をやめられる")
+        check(dictionary.setTermDomain(id: "civil", enabled: false), "分野を無効に戻せる")
+    }
+}
+
+/// --self-test 用の、メモリの上だけの偽の操作 (本体の UserDictionary・TermDomains と同じ決まり)。
+final class FakeOperations: DictionaryOperations {
+    var words: [WordKey] = []
+    var excluded: Set<WordKey> = []
+
+    func add(_ key: WordKey) -> String? {
+        if words.contains(key) { return "同じ読みと単語が、すでに登録されています。" }
+        words.append(key)
+        return nil
+    }
+
+    func addMany(_ keys: [WordKey]) -> (error: String?, added: [WordKey]) {
+        let added = keys.filter { add($0) == nil }
+        return (nil, added)
+    }
+
+    func update(from old: WordKey, to new: WordKey) -> String? {
+        guard let index = words.firstIndex(of: old) else { return "元の語が見つかりません" }
+        if old != new && words.contains(new) { return "同じ読みと単語が、すでに登録されています。" }
+        words[index] = new
+        return nil
+    }
+
+    func remove(_ keys: [WordKey]) -> (error: String?, removed: [RemovedEntry]) {
+        let targets = Set(keys)
+        let removed = words.enumerated().filter { targets.contains($0.element) }.map { RemovedEntry(index: $0.offset, key: $0.element) }
+        words.removeAll { targets.contains($0) }
+        return (nil, removed)
+    }
+
+    func restore(_ entries: [RemovedEntry]) -> String? {
+        for entry in entries.sorted(by: { $0.index < $1.index }) where !words.contains(entry.key) {
+            words.insert(entry.key, at: min(entry.index, words.count))
+        }
+        return nil
+    }
+
+    func setExcluded(_ keys: [WordKey], excluded: Bool) -> String? {
+        if excluded { self.excluded.formUnion(keys) } else { self.excluded.subtract(keys) }
+        return nil
+    }
+
+    func editTerm(original: WordKey, to new: WordKey) -> (error: String?, added: Bool) {
+        let added = add(new) == nil
+        if original != new { excluded.insert(original) }
+        return (nil, added)
+    }
+}

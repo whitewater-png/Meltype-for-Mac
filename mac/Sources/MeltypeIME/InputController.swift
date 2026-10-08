@@ -258,6 +258,8 @@ final class MeltypeInputController: IMKInputController {
             }
         }
         menu.addItem(.separator())
+        // ユーザー辞書・専門用語集の一覧・登録・編集・削除と、専門用語集の分野の ON/OFF (別のアプリ「Meltype 辞書」で開く)
+        menu.addItem(withTitle: "辞書を管理… (ユーザー辞書・専門用語集)", action: #selector(openDictionaryManager(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "選択中の文字をユーザー辞書に登録…", action: #selector(registerWord(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "辞書の登録提案の履歴を消去", action: #selector(clearSuggestions(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "学習データをすべて消去…", action: #selector(clearLearningData(_:)), keyEquivalent: "")
@@ -289,6 +291,18 @@ final class MeltypeInputController: IMKInputController {
         failure.informativeText = "Meltype のデータフォルダーの config.json を確認してください (読めない・書けないときは、設定を変えません)。"
         NSApp.activate(ignoringOtherApps: true)
         failure.runModal()
+    }
+
+    /// 「辞書を管理…」: 辞書の管理画面 (別のふつうのアプリ) を開いて前に出す。変更は画面がすぐ保存し、この IME はファイルの版を見て読み直す。
+    @objc private func openDictionaryManager(_ sender: Any?) {
+        DictionaryApp.open { error in
+            guard let error else { return }
+            let failure = NSAlert()
+            failure.messageText = "辞書の管理画面を開けませんでした"
+            failure.informativeText = error
+            NSApp.activate(ignoringOtherApps: true)
+            failure.runModal()
+        }
     }
 
     @objc private func startUpdate(_ sender: Any?) {

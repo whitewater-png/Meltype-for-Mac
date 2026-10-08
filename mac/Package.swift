@@ -27,6 +27,21 @@ let package = Package(
                 .linkedFramework("Carbon"),
             ]
         ),
+        // 辞書の管理画面「Meltype 辞書」(MeltypeDictionary.app。build.sh が Meltype.app/Contents/Helpers に入れる) のロジック。
+        // AppKit を使わない部分 (FFI・一覧の検索と並べ替え・元に戻す) をここに分け、`MeltypeDictionary --self-test` で確かめる。
+        .target(
+            name: "MeltypeDictionaryKit",
+            path: "Sources/MeltypeDictionaryKit"
+        ),
+        // 辞書の管理画面 (AppKit)。IME (背面専用) のウインドウはキーボード入力を受けられないので、別のふつうのアプリにしている。
+        .executableTarget(
+            name: "MeltypeDictionary",
+            dependencies: ["MeltypeDictionaryKit"],
+            path: "Sources/MeltypeDictionary",
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+            ]
+        ),
     ],
     swiftLanguageVersions: [.v5]
 )

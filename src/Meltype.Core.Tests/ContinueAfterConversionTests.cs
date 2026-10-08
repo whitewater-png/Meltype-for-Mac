@@ -660,12 +660,23 @@ internal static class ContinueAfterConversionTests
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "mac", "Sources", "MeltypeIME", "NativeCore.swift"))) directory = directory.Parent;
         if (directory is null) return;
         var swift = File.ReadAllText(Path.Combine(directory.FullName, "mac", "Sources", "MeltypeIME", "NativeCore.swift"));
+        var manager = File.ReadAllText(Path.Combine(directory.FullName, "mac", "Sources", "MeltypeDictionaryKit", "NativeDictionary.swift"));
         var exports = File.ReadAllText(Path.Combine(directory.FullName, "src", "Meltype.Mac.Native", "Exports.cs"));
         var swiftVersion = System.Text.RegularExpressions.Regex.Match(swift, @"expectedAbiVersion: Int32 = (\d+)").Groups[1].Value;
+        var managerVersion = System.Text.RegularExpressions.Regex.Match(manager, @"expectedAbiVersion: Int32 = (\d+)").Groups[1].Value;
         var csharpVersion = System.Text.RegularExpressions.Regex.Match(exports, @"AbiVersion = (\d+);").Groups[1].Value;
         // 5: 専門用語集の分野の切り替え (meltype_term_domains / meltype_set_term_domain) を足した。値そのものは、FFI を変えるたびに上がるので、両者が同じことと下限だけ確かめる。
-        Assert.Equal(csharpVersion, swiftVersion, "C# と Swift の版数が同じ");
-        Assert.True(int.Parse(csharpVersion) >= 5, "専門用語集の FFI を足した版 (5) 以上");
+        // 6: 辞書の管理画面 (MeltypeDictionary) の関数を足した。IME と管理画面の Swift の両方が、C# と同じ版数であること。
+        Assert.Equal(csharpVersion, swiftVersion, "C# と Swift (IME) の版数が同じ");
+        Assert.Equal(csharpVersion, managerVersion, "C# と Swift (辞書の管理画面) の版数が同じ");
+        Assert.True(int.Parse(csharpVersion) >= 6, "辞書の管理画面の FFI を足した版 (6) 以上");
+        foreach (var name in new[] { "meltype_userdict_words", "meltype_userdict_version", "meltype_userdict_check", "meltype_userdict_add", "meltype_userdict_add_many", "meltype_userdict_problem", "meltype_userdict_update",
+                     "meltype_userdict_remove", "meltype_userdict_restore", "meltype_userdict_import", "meltype_userdict_export", "meltype_to_reading",
+                     "meltype_term_words", "meltype_term_excluded", "meltype_term_set_excluded", "meltype_term_edit", "meltype_term_revision", "meltype_term_domains", "meltype_set_term_domain" })
+        {
+            Assert.True(exports.Contains($"\"{name}\""), $"FFI の入口 {name}");
+            Assert.True(manager.Contains($"\"{name}\""), $"辞書の管理画面からの呼び出し {name}");
+        }
         Assert.True(exports.Contains("meltype_term_domains") && exports.Contains("meltype_set_term_domain"), "専門用語集の FFI の入口");
         Assert.True(swift.Contains("meltype_term_domains") && swift.Contains("meltype_set_term_domain"), "専門用語集の Swift 側の呼び出し");
         Assert.True(exports.Contains("meltype_get_continue_after_conversion") && exports.Contains("meltype_set_continue_after_conversion"), "FFI の入口");

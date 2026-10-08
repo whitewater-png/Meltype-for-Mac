@@ -49,11 +49,15 @@ internal static class ContinueAfterConversionSetting
             try
             {
                 var path = ConfigPath();
-                // 読めない設定は、既定値で上書きして失わないよう、何もしない。
-                if (Settings.LoadForUpdate(path) is not { } settings) return false;
-                settings.ContinueAfterConversion = on;
-                Config.SafeFile.EnsureDirectory(Path.GetDirectoryName(path)!);
-                settings.Save(path);
+                Config.SafeFile.EnsureDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+                // Mac の「Meltype 辞書」の画面 (別のプロセス) も config.json を書く (専門用語集の分野) ので、ロックの中で読み直して書く。
+                using (FileLock.Acquire(path))
+                {
+                    // 読めない設定は、既定値で上書きして失わないよう、何もしない。
+                    if (Settings.LoadForUpdate(path) is not { } settings) return false;
+                    settings.ContinueAfterConversion = on;
+                    settings.Save(path);
+                }
                 s_value = on;
                 return true;
             }

@@ -45,6 +45,9 @@ else
     fi
     # 動いている Meltype を止めてから消す (次にキーを打っても起動し直されない)
     pkill -x Meltype 2>/dev/null || true
+    # 辞書の管理画面「Meltype 辞書」(Meltype.app の中の Contents/Helpers/MeltypeDictionary.app) も閉じる。
+    # アプリ自体は Meltype.app と一緒に消える。実行ファイル名が 16 文字を超え pkill -x では合わないので、パスで探す。
+    pkill -f "$APP/Contents/Helpers/MeltypeDictionary.app/" 2>/dev/null || true
     # 消す対象は ~/Library/Input Methods/Meltype.app だけ (パスを確かめてから)
     if [[ "$APP" == "$HOME/Library/Input Methods/Meltype.app" ]]; then
         rm -rf "$APP"

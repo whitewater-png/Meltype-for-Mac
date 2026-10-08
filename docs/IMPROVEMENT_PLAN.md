@@ -819,3 +819,89 @@ Core の 1 キーあたり (ms)。「末尾」は最後の 10% のキー (一番
 - **Swift**: 入力メニューに「専門用語集」サブメニュー。分野ごとにチェック付きの「名称 (N 語)」項目。保存できなかったときは、既存の「変換後も続けて入力できる」と同じ通知。
 - **テスト**: `TermDomainTests.cs` (7 件): 既定 OFF で出ない、ON で共有・非共有・新規の辞書すべてに出る (Version が進む)、OFF に戻すと出ない、複数分野の同時有効、config.json への保存と再読み込み・ほかの設定の保持、読めない config.json を上書きしない、未知 ID の無視と保持、名称・語数の取得、同梱ファイルに名称がある。テストランナー (Program) は、利用者の本物の config.json を読まないよう `TermDomains.ConfigPath` を一時の場所にする。
 - **出典・ライセンス**: 同梱の 5 分野は、ネット上の公開情報から収集した語彙。個別の原典・権利者は未特定で、メンテナーの判断で再配布可として同梱 (`THIRD-PARTY-NOTICES.md` に記載。申し出があれば削除・修正する)。
+
+## 追加項目 P20 (辞書の管理画面「Meltype 辞書」)
+
+**目的**: ユーザー辞書と専門用語集の語を、画面で閲覧・追加・編集・削除できるようにする (Mac)。今までは入力メニューの「選択中の文字を登録」(osascript のダイアログ) と、`userdict.txt` の手編集しか無かった。
+
+### 設計の要点
+
+- **採用: 別のふつうのアプリ** (`MeltypeDictionary.app`、AppKit。表示名「Meltype 辞書」)。`Meltype.app/Contents/Helpers/` に同梱し、入力メニューの「辞書を管理…」から `NSWorkspace.openApplication` で開く (すでに開いていれば前に出す。画面の側も `NSRunningApplication` で多重起動を止める)。
+  - 理由: IME は `LSBackgroundOnly` で、自分のウインドウがキーボード入力を受けられない (登録のダイアログが打てず osascript にした経緯: `InputController.registerWord`)。別のアプリなら、その画面でも Meltype で日本語を打てる。
+  - `Contents/Helpers` にしたのは、codesign の既定の規則 (`rules2`) で入れ子のコードとして扱われる場所だから (`Contents/Library/` 直下は資源ファイル扱い)。`codesign --verify --deep --strict` (install.sh・自動更新の検査) が入れ子の署名まで確かめる。pkg (`pkgbuild --analyze`) では Meltype.app の ChildBundles になり、置き場所の移動 (relocate) は Meltype.app の設定 (false) に従う。
+  - 却下: (a) IME のプロセスの中のウインドウ (キーボード入力を受けられない)、(b) osascript のダイアログを重ねる (一覧・検索・複数選択ができない)、(c) SwiftUI (`Table` の Return・Delete・取り消しの細かい制御が macOS 13 では足りず、2 万行の更新の重さを確かめられない)。
+- **辞書の読み書きは本体 (libMeltypeNative.dylib) を通す** (FFI。画面は外側の `Contents/Frameworks` のものを dlopen し、Swift の互換ライブラリも rpath `@executable_path/../../../../Frameworks` で共有する)。入力の規則 (`UserDictionary.Validate`)・ファイルの形式・ロック・正規化を C# の 1 か所にするため。Swift で直接ファイルを扱うと、規則とロックの作法が 2 重になって食い違う恐れがある。
+  - FFI の追加 (`AbiVersion` 5 → 6。C# `Exports.AbiVersion`・IME の `NativeCore.expectedAbiVersion`・画面の `NativeDictionary.expectedAbiVersion` を同時に。テストが 3 つの一致を確かめる): `meltype_userdict_words` / `_version` / `_problem` / `_check` / `_add` / `_add_many` / `_update` / `_remove` / `_restore` / `_import` / `_export`、`meltype_to_reading`、`meltype_term_words` / `_excluded` / `_set_excluded` / `_edit` / `_revision`。中身は Core の `DictionaryManagement` (managed のテストで確かめる)。文字列は既存と同じく 1 行 1 件・Tab 区切り (JSON を足していない = AOT の reflection の心配が無い)。
+- **ファイルを正にする** (IME と画面が別のプロセスなので):
+  - 変更は `FileLock` (対象の隣の隠しファイル `.名前.lock` を FileShare.None で開く = Mac / Linux は flock、0600、消さない) の中で、ファイルを読み直してから行い、すぐ保存する (`UserDictionary.Mutate`)。古い内容のインスタンスが保存しても、相手の登録を消さない。読めないファイル (権限・文字コード) には書かず理由を返す (前は読めないと空で始め、次の登録で上書きしていた)。保存できなかったときは、メモリも変えずに理由を返す。
+  - 読む側 (変換) は、ファイルの版 (`FileStamp` = 存在・大きさ・更新時刻) を 0.5 秒に 1 回だけ確かめ (`Version` / `Split` / `Lookup` / `Words` の入口。1 キーごとには整数の比較だけ)、変わっていれば読み直して `Version` を進める (ライブ変換のキャッシュの鍵に入っているので捨てられる)。
+  - 索引 (読み → 語) は不変のオブジェクトにまとめて参照ごと入れ替える (`Index`。前は 3 つの欄を別々に書き換えていた)。
+  - `config.json` も、`TermDomains.Set` と `ContinueAfterConversionSetting.Set` をロックの中の読み直し + 書き込みにした (画面と IME が同時に別の設定を変えても消し合わない)。`TermDomains` は `config.json` と `terms-excluded.txt` の版を 0.5 秒ごとに確かめ、ほかのプロセスが変えた分野・除外を読み直して `Revision` を進める。読めない設定のときは今の状態のまま。
+- **専門用語集の「削除」= 除外** (同梱のファイルは読み取り専用): 除外した語を `terms-excluded.txt` (データフォルダ、1 行に「読み[Tab]語」、SafeFile で 0600) に保存し、`TermDomains.Current` を作るときに `TermDictionary.Parse(texts, excluded)` で除く (強制型・候補追加型・予測のどれにも出ない)。`config.json` とは別にした (数千行になりうる・設定の保存のたびに書き直さない)。読みは `TermDictionary.Normalize` でそろえる。**「編集」= 元を除外 + 直した語をユーザー辞書へ** (`DictionaryManagement.EditTerm`。直した語がもうあれば除外だけ。読みも語も同じなら複製だけ)。**「複製」= ユーザー辞書へ登録**。優先順位は従来どおり ユーザー辞書 > 専門用語集 > エンジン。
+- **元に戻す**: 画面は `DictionaryChange` (Swift、AppKit を使わない `MeltypeDictionaryKit`) が「実行すると逆の操作を返す」形で、ウインドウの `NSUndoManager` に積む (⌘Z / ⇧⌘Z)。削除は本体が「消した語と元の位置」を返し、`Restore` で同じ位置に戻す (同じ読みの語の中の優先順を保つ)。削除・編集の直前の内容は `userdict.txt.bak` (1 世代、0600) にも残す。削除は確認のダイアログつき。
+- **入力チェック**: 入力のたびに `UserDictionary.Check` (Validate と同じ規則 + 重複。編集中は元の語を除く) を呼び、理由を赤字で出して確定のボタンを止める。重複は管理画面の登録では理由にする (`AddNew`)。入力メニューからの登録 (`Add`) は今までどおり黙って成功。
+- **画面**: 日本語、AppKit の `NSTableView` (表示する行だけを作るので 2 万語でも軽い。検索・並べ替えの鍵は読み込み時に 1 回だけ作る `RowList`)。キーボード: ⌘F 検索 (↓ で一覧へ)、Delete 削除/除外、Return 編集/直す、Space 分野の ON/OFF、⌘N 登録、⌘Z。VoiceOver: 一覧・検索・ボタン・チェックにラベル、状態とエラーは読み上げの通知。色はシステムの色だけ (ダークモード)。除外は色に加えて取り消し線と「除外中」。
+
+### リスクと対応
+
+| リスク | 対応 |
+| --- | --- |
+| 同時の書き込みで変更が消える | ロックの中で読み直して書く。テスト: 4 インスタンス × 25 語の同時登録 (managed)、4 プロセス × 25 語 (AOT の確認スクリプト)。ロックを無効にすると (`DOTNET_SYSTEM_IO_DISABLEFILELOCKING=1`) 100 語中 27 語しか残らず、テストが失敗することを確かめた |
+| 1 キーごとの stat で遅くなる | 0.5 秒に 1 回だけ (間隔の中は整数の比較だけ) |
+| ロックを持ったプロセスが固まる | 3 秒待っても取れなければ、変更せずに理由を返す (flock はプロセスが落ちれば外れる) |
+| 更新時刻の分解能が粗いファイルシステム | 大きさも比べる。APFS はナノ秒。置き換えで保存するので、書き換えれば更新時刻が変わる |
+| 画面と dylib の版の食い違い | 画面も `meltype_abi_version` を先に確かめ、違えば理由を出して終わる |
+| アンインストールで画面が残る | Meltype.app の中にあるので一緒に消える。uninstall.sh は消す前に `pkill -f …/MeltypeDictionary.app/` で閉じる (実行ファイル名が 16 文字を超えて `pkill -x` では合わない) |
+| 入れ替え (install.sh・build.sh・pkg・自動更新) で古い画面が残る | 入れ替えたあと同じく閉じる (変更はその都度保存済み) |
+
+### 変更したファイル
+
+| ファイル | 内容 |
+| --- | --- |
+| `src/Meltype.Core/Config/FileLock.cs` (新規) | プロセスをまたぐロック (`FileLock`)、ファイルの版 (`FileStamp`) |
+| `src/Meltype.Core/Composition/UserDictionary.cs` | ファイルを正にした変更 (`Mutate`)・版の確認と読み直し (`SyncFile` / `Refresh`)・不変の索引 (`Index`)。`AddNew` / `Update` / `RemoveRange` / `Restore` / `Check` / `AddRange(out error)` を追加 |
+| `src/Meltype.Core/Composition/TermDictionary.cs` | `Parse(texts, excluded)`、`Entries` (ファイルの順の語と注記)、`TermEntry`、`TryParseLine` の注記つき |
+| `src/Meltype.Core/Composition/TermDomains.cs` | 除外 (`Excluded` / `SetExcluded` / `ExclusionPath`)、分野の語の一覧 (`Words`)、ほかのプロセスの変更の確認 (`CheckExternal`)、`Set` をロックの中に |
+| `src/Meltype.Core/Composition/DictionaryManagement.cs` (新規) | 管理画面の操作 (`EditTerm` / `Import` / `Export` / `ToReading`) と FFI の文字列の形式 |
+| `src/Meltype.Core/Config/ContinueAfterConversionSetting.cs` | 保存をロックの中に |
+| `src/Meltype.Core/Config/AppPaths.cs`、`Backup.cs` | `terms-excluded.txt` (バックアップ・復元の対象にも) |
+| `src/Meltype.Mac.Native/Exports.cs` | 上の FFI、`AbiVersion` 6 |
+| `mac/Package.swift` | `MeltypeDictionaryKit` (ライブラリ)・`MeltypeDictionary` (実行ファイル) |
+| `mac/Sources/MeltypeDictionaryKit/*.swift` (新規) | FFI (`NativeDictionary`)、形式 (`FfiFormat`)、一覧 (`RowList`)、元に戻す (`DictionaryChange`)、`--self-test` (`SelfTest`) |
+| `mac/Sources/MeltypeDictionary/*.swift` (新規) | 画面 (AppKit) |
+| `mac/Sources/MeltypeIME/DictionaryApp.swift` (新規)、`InputController.swift`、`NativeCore.swift` | 入力メニューの「辞書を管理…」、`expectedAbiVersion` 6 |
+| `mac/Resources/Dictionary/Info.plist`・`ja.lproj` (新規) | 画面の Info.plist (版は build.sh が Meltype.app と同じにする) |
+| `mac/build.sh`、`install.sh`、`uninstall.sh`、`pkg/scripts/postinstall` | 組み立て・rpath・署名 (中から外へ)・署名の検査、SHA-256 の表示、入れ替え・削除の前後に画面を閉じる |
+| `src/Meltype.Core.Tests/DictionaryManagementTests.cs` (新規) | 30 件 (下) |
+| `src/Meltype.Core/Config/SafeFile.cs` | `ReadAllTextStrict` (文字コードを厳密に読む。下の「査読後の修正」) |
+| `src/Meltype/UI/UserDictionaryForm.cs` (Windows) | 削除を `RemoveRange` 1 回に (`.bak` が最後の 1 語の分だけにならない)、取り込みの保存失敗を理由で出す |
+| `src/Meltype.Core.Tests/ContinueAfterConversionTests.cs`・`TermDomainTests.cs`・`Program.cs` | ABI の 3 者の一致と FFI の入口、テストが本物の `terms-excluded.txt` を読まない |
+| `tools/check-mac-aot-settings.py` | AOT 版で、辞書の操作・別プロセスでの読み直し・4 プロセスの同時登録・動いている IME のつもりのプロセスへの反映 |
+
+### テスト
+
+- `DictionaryManagementTests` (30 件): ほかのインスタンス (= 別のプロセス) の登録・編集・削除がすぐ見える / 確認の間隔と `Refresh` / ライブ変換のキャッシュが捨てられる / 共有インスタンス (IME のセッション) にも反映 / 古いインスタンスが保存しても相手の登録を消さない / 4 インスタンスの同時登録で 100 語残る (0600・一時ファイルなし) / ロックが取れなければ変更しない / 読めないファイルを上書きしない (ユーザー辞書・除外) / 入力チェックが Validate と同じ + 重複 / 編集で位置を保つ・重なり・元が無い / 削除の位置と元に戻す (重複行・後ろすぎる位置) / 除外が強制型・候補・予測から消え、`terms-excluded.txt` (0600) に保存され、`config.json` に入らず、再起動後も残り、戻せる / 読みの正規化・不正な行 / ほかのプロセスの除外・分野の切り替え・壊れた設定 / 分野の語の一覧と除外の印・FFI の形式 / 専門用語の編集 (登録 + 除外、複製だけ、登録済み、不正) / `config.json` を 2 つの設定が同時に書いても両方残る / 取り込み・書き出し / 形式の往復 / ローマ字の読み / バックアップの対象。
+- 画面: `MeltypeDictionary --self-test` (ロジック 33 件 + 本体を通した操作 31 件。`MELTYPE_DATA_DIR` が一時フォルダーの中の空のフォルダーのときだけ本体を通す)。コマンドライン ツールだけの環境では swift-testing が動かない (マクロのプラグインで失敗) ので、実行ファイルに組み込んだ。画面の手動確認の手順は `mac/README.md`「辞書の管理」。
+
+### P20 査読後の修正 (別のエージェントの査読で見つかったもの)
+
+- **重大**: 「読めないファイルには書かない」が文字コードでは守られていなかった。`File.ReadAllText` は不正な UTF-8 (Shift_JIS で保存したファイルなど) を黙って U+FFFD に置き換えるので、次の登録・除外で元のバイト列を失っていた (前からの挙動だが、書く機会が増えた)。
+  `SafeFile.ReadAllTextStrict` (BOM があれば UTF-8 / UTF-16 LE・BE、無ければ厳密な UTF-8。不正なら例外) で読み、読めなければ書かずに理由を返す (`userdict.txt`・`terms-excluded.txt`)。テスト: Shift_JIS のファイルが 1 バイトも変わらない・UTF-16 (BOM) は読める (managed と AOT の確認スクリプト)。
+- **重大**: タブをまたいで ⌘Z すると、やり直し (⇧⌘Z) が積まれなかった (隠れたタブの `view.window` が nil)。取り消しの中のやり直しは、取り消しが持っている同じ `undoManager` に積み、シート・エラーはウインドウ (`hostWindow`) に出す。
+- **重大**: 「ユーザー辞書へ複製」を多くの語でやると、1 語ごとに読み直し・保存 (fsync) で語数の 2 乗の時間がかかり、IME も大きくなるファイルを読み直し続けた。`UserDictionary.AddMany` (`meltype_userdict_add_many`。1 回の読み直し・保存で、新しく登録した語を返す) にし、⌘Z 1 回で新しく登録した語だけを消す。
+- 専門用語の「直す」で、ユーザー辞書への登録のあと除外に失敗すると、登録だけが残り取り消せなかった。C# の側で登録を消して戻す (戻せないときだけ `added` を返し、画面がそれを消す取り消しを積む)。取り消し (`revertTermEdit`) は、除外をやめてから消す順にし、消せなければ除外をやり直す。
+- 分野を切り替えると、前の分野の選択 (行の番号) が残り、Delete で別の語を除外しえた。切り替えたら選択を外す。
+- 読めない・大きすぎる `userdict.txt` を、画面が黙って「0 語」と出していた。`UserDictionary.Problem` (`meltype_userdict_problem`) で理由を返し、一覧の上に注意を出す。
+- 取り込みの取り消しを、取り込みの前後の差ではなく、本体が返した「新しく登録した語」で行う (取り込みの間に IME が登録した語を消さない)。
+- `FileStamp` に作成時刻も入れた (置き換えで保存するので、更新時刻が 1 秒単位のファイルシステムで同じ大きさに 2 回書き換わっても気づける。テストは、作成時刻を外すと失敗することを確かめた)。前はあったファイルが読み直しのときに無ければ、50 ms 待ってもう一度だけ確かめる (ロックを守らないエディターが消してから作り直す途中で、空として書かないため)。
+- Windows のユーザー辞書の画面: 複数の削除を 1 回の `RemoveRange` に、取り込みの保存失敗を理由で出す。
+
+### 既知の制限 (対応しない)
+
+- 画面で除外を変えるたびに、IME は次の打鍵で、有効な分野の専門用語集を作り直す (全分野 ON で数十 ms。前は分野の切り替えのときだけ)。
+- 入力メニュー・画面から前に出す (`activate`) が、macOS 14 以降の協調的なアクティベーションで効かない場合があるかは、実機で未確認。
+- Windows 版・Linux 版には画面が無い (Core の変更 = ファイルを正にした保存・除外は共通に効く。除外は `terms-excluded.txt` を手で編集する)。
+- 取り消し (⌘Z) は画面を開いている間だけ (閉じると消える)。それより前の状態は `userdict.txt.bak` (削除・編集の直前の 1 世代)。
+- 画面は 1.5 秒ごとに版を確かめて読み直す (IME の側の登録がすぐには出ないことがある)。編集のシートを開いている間に、ほかのプロセスが元の語を消すと、保存のときに「元の語が見つかりません」と出る。
+- 除外は読みと語の組で、すべての分野に効く (分野ごとの除外はしない)。同梱の語が版の更新で無くなっても、除外の行は残る (「除外した語 (すべての分野)」から戻せる)。
+- アプリのアイコンは無い (汎用のアイコン)。

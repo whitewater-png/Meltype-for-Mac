@@ -20,13 +20,16 @@ internal static class TermDomainTests
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "config.json");
         var previousPath = TermDomains.ConfigPath;
+        var previousExclusion = TermDomains.ExclusionPath;
         var previousSource = TermDomains.Source;
         TermDomains.ConfigPath = () => path;
+        TermDomains.ExclusionPath = () => Path.Combine(directory, "terms-excluded.txt");
         TermDomains.Source = () => [("civil", () => Civil), ("medical", () => Medical), ("noname", () => NoName)];
         TermDomains.Reset();
         restore = () =>
         {
             TermDomains.ConfigPath = previousPath;
+            TermDomains.ExclusionPath = previousExclusion;
             TermDomains.Source = previousSource;
             TermDomains.Reset();
             try { Directory.Delete(directory, recursive: true); } catch { }

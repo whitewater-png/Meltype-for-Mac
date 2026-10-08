@@ -209,7 +209,9 @@ Win+Space などで韓国語・英語などに切り替えると、Meltype キ�
 | `config.json` | 設定 (トレイ → 設定... から編集) |
 | `model.json` | IME 自動切替の学習データ。判定に使った先頭 3〜6 文字ごとの回数だけで、入力内容そのものは保存しない |
 | `conversions.json` | 変換で選び直した結果 (文節の読み → 選んだ文字列)。次から最初の候補になる |
-| `userdict.txt` | ユーザー辞書 (1 行に「読み[Tab]単語」)。トレイの「ユーザー辞書...」で編集する |
+| `userdict.txt` | ユーザー辞書 (1 行に「読み[Tab]単語」)。トレイの「ユーザー辞書...」で編集する (Mac は「Meltype 辞書」の画面)。削除の直前の内容は `userdict.txt.bak` に残る |
+| `terms-excluded.txt` | 専門用語集のうち、使わないことにした語 (1 行に「読み[Tab]語」)。Mac は「Meltype 辞書」の画面で除外する。Windows は手で編集する ([DICTIONARY.md](DICTIONARY.md)) |
+| `.userdict.txt.lock` など | 2 つのプロセスが同時に書いても消し合わないためのロック (中身は空。消さなくてよい) |
 | `languages.json` | ユーザーが F10 / F6 などで英字 / かなに直して確定した語 (英語か日本語か) |
 | `meltype.log` | 設定で「ファイルにログを書く」を ON にしたときだけ |
 

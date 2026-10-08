@@ -140,18 +140,42 @@ internal static class SafeFile
     /// </summary>
     public static string? ReadAllText(string path)
     {
-        var length = new FileInfo(path).Length;
-        if (length > MaxReadBytes)
-        {
-            Diagnostics.Log.Warn($"{Path.GetFileName(path)} が大きすぎる ({length / 1024 / 1024} MB、上限 {MaxReadBytes / 1024 / 1024} MB) ので読み込まず、空で続けます。");
-            // 空で続けると次の保存で元のファイルが上書きされるので、先に .oversize へコピーして残す (元は消さない)。
-            // 退避できなかったときは、このパスへの保存を止める。
-            if (!BackUpOversize(path, length))
-            {
-                lock (Blocked) Blocked.Add(Path.GetFullPath(path));
-            }
-            return null;
-        }
+        if (IsOversize(path)) return null;
         return File.ReadAllText(path);
+    }
+
+    /// <summary>
+    /// <see cref="ReadAllText"/> と同じだが、文字コードを厳密に読む: BOM があれば UTF-8 / UTF-16 (LE・BE)、無ければ UTF-8 とみなし、
+    /// 不正なバイト (Shift_JIS で保存したファイルなど) があれば <see cref="DecoderFallbackException"/> を投げる。
+    /// File.ReadAllText は不正なバイトを黙って U+FFFD に置き換えるので、それを読み直して書き戻すと元のバイト列が失われる。
+    /// 読み直してから書き戻すファイル (ユーザー辞書・除外した専門用語) はこちらで読み、読めなければ書かない。
+    /// </summary>
+    public static string? ReadAllTextStrict(string path)
+    {
+        if (IsOversize(path)) return null;
+        return DecodeStrict(File.ReadAllBytes(path));
+    }
+
+    internal static string DecodeStrict(byte[] bytes)
+    {
+        if (bytes is [0xEF, 0xBB, 0xBF, ..]) return new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes, 3, bytes.Length - 3);
+        if (bytes is [0xFF, 0xFE, ..]) return new UnicodeEncoding(bigEndian: false, byteOrderMark: false, throwOnInvalidBytes: true).GetString(bytes, 2, bytes.Length - 2);
+        if (bytes is [0xFE, 0xFF, ..]) return new UnicodeEncoding(bigEndian: true, byteOrderMark: false, throwOnInvalidBytes: true).GetString(bytes, 2, bytes.Length - 2);
+        return new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes);
+    }
+
+    /// <summary>上限を超えていれば警告を出し、.oversize に退避して true (呼び出し側は空で続ける)。退避できなければ、このパスへの保存を止める。</summary>
+    private static bool IsOversize(string path)
+    {
+        var length = new FileInfo(path).Length;
+        if (length <= MaxReadBytes) return false;
+        Diagnostics.Log.Warn($"{Path.GetFileName(path)} が大きすぎる ({length / 1024 / 1024} MB、上限 {MaxReadBytes / 1024 / 1024} MB) ので読み込まず、空で続けます。");
+        // 空で続けると次の保存で元のファイルが上書きされるので、先に .oversize へコピーして残す (元は消さない)。
+        // 退避できなかったときは、このパスへの保存を止める。
+        if (!BackUpOversize(path, length))
+        {
+            lock (Blocked) Blocked.Add(Path.GetFullPath(path));
+        }
+        return true;
     }
 }

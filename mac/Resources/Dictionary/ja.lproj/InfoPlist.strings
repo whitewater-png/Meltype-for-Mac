@@ -1,0 +1,3 @@
+/* 「Meltype 辞書」の表示名 (日本語の地域設定。日本語のローカライズがあることを AppKit に伝え、標準のメニュー・ダイアログも日本語にする) */
+"CFBundleName" = "Meltype 辞書";
+"CFBundleDisplayName" = "Meltype 辞書";

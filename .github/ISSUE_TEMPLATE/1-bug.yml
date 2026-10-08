@@ -7,6 +7,11 @@ body:
       value: |
         ご報告ありがとうございます。**パスワード・個人的な文章・見られて困るログは、書かないでください。**
         (この Issue は誰でも読める公開の場所です)
+
+        **単語ではなく、文章で試してください。** Meltype は、文章として打ったときに、前後の流れから推論して英語・日本語を判定し、自動で変換します。
+        単語だけを打つと、手がかりが足りず、思った結果にならないことがあります。報告の前に、その語を文章の中で打って、きちんと自動変換されているか確認してください。
+        例: 単語だけ「`hosuthingu`」→ 「ほすthinぐ」。文章の中で打つ (「パソコンのホスティング」と打つ) と、「パソコンのホスティング」と変換されます。
+        文章にしても直らないときが、不具合です。その文章を報告してください。
   - type: input
     id: app
     attributes:
@@ -18,7 +23,7 @@ body:
     id: typed
     attributes:
       label: 何と打って
-      placeholder: "例: kyouhagoogle と打って Enter"
+      placeholder: "例: kyouhagoogle と打って Enter (単語だけでなく、前後の文章も書いてください)"
     validations:
       required: true
   - type: textarea

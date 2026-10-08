@@ -3,6 +3,9 @@
 
 namespace Meltype.Composition;
 
+/// <summary>専門用語集の 1 語 (ファイルの 1 行)。読みは正規化したもの (TermDictionary.Normalize)、注記は 3 つ目の欄 (無ければ空)。</summary>
+public sealed record TermEntry(string Reading, string Word, string Note);
+
 /// <summary>
 /// 専門用語集 (dictionaries/terms-*.txt、アプリに同梱する。分野ごとに有効/無効を切り替える: TermDomains)。1 行に「読み[Tab]語[Tab]注記(任意)」。# で始まる行と空行はコメント。
 /// 読みが ForcedMinReadingLength 文字以上で、語が ASCII だけではない語は「強制型」(ユーザー辞書の組み込み語句と同じ。変換する読みの中に含まれていれば、
@@ -34,16 +37,20 @@ public sealed class TermDictionary
     /// <summary>飛ばした不正な行の数。</summary>
     public int Skipped { get; }
 
+    /// <summary>利用者が除外した (terms-excluded.txt) ので入れなかった語の数。</summary>
+    public int Excluded { get; }
+
     public int ForcedCount { get; }
     public int CandidateCount { get; }
     public int Count => ForcedCount + CandidateCount;
 
-    private TermDictionary(Dictionary<string, string[]> forced, Dictionary<string, string[]> candidates, List<(string Reading, string Word)> all, int skipped)
+    private TermDictionary(Dictionary<string, string[]> forced, Dictionary<string, string[]> candidates, List<(string Reading, string Word)> all, int skipped, int excluded = 0)
     {
         _forced = forced;
         _forcedLookup = forced.GetAlternateLookup<ReadOnlySpan<char>>();
         _candidates = candidates;
         Skipped = skipped;
+        Excluded = excluded;
         foreach (var reading in forced.Keys)
         {
             _forcedMaxByFirst[reading[0]] = Math.Max(_forcedMaxByFirst.GetValueOrDefault(reading[0]), reading.Length);
@@ -67,8 +74,11 @@ public sealed class TermDictionary
         }
     }
 
-    /// <summary>テキスト (ファイルの中身。複数可) を読む。不正な行は飛ばす (例外にしない)。同じ読み・同じ語は 1 つにする。</summary>
-    public static TermDictionary Parse(IEnumerable<string> texts)
+    /// <summary>
+    /// テキスト (ファイルの中身。複数可) を読む。不正な行は飛ばす (例外にしない)。同じ読み・同じ語は 1 つにする。
+    /// excluded (正規化した読み・語の組) に入っている語は入れない (利用者が除外した語。強制型・候補追加型・予測のどれにも出さない)。
+    /// </summary>
+    public static TermDictionary Parse(IEnumerable<string> texts, IReadOnlySet<(string Reading, string Word)>? excluded = null)
     {
         var intern = new Dictionary<string, string>(StringComparer.Ordinal);
         var seen = new HashSet<(string, string)>();
@@ -76,6 +86,7 @@ public sealed class TermDictionary
         var candidates = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var all = new List<(string, string)>();
         var skipped = 0;
+        var excludedCount = 0;
         foreach (var text in texts)
         {
             // 1 行ずつ切り出す (Split で全行の配列を作らない)
@@ -96,6 +107,11 @@ public sealed class TermDictionary
                 // 読みは同じ文字列を共有する (同じ読みの語が多いので、メモリを節約する)
                 if (!intern.TryGetValue(reading, out var shared)) intern[reading] = shared = reading;
                 if (!seen.Add((shared, word))) continue;
+                if (excluded is { Count: > 0 } && excluded.Contains((shared, word)))
+                {
+                    excludedCount++;
+                    continue;
+                }
                 // 語が ASCII だけ (英数字・記号) のときは、読みが長くても強制型にしない。強制すると、日常語を英単語に置き換えてしまう
                 // (例: IT 用語の「あいこん→icon」「くりっく→click」で、「あいこんをくりっく」が「icon|を|click」になる)。候補には出る。
                 var target = shared.Length >= ForcedMinReadingLength && !IsAscii(word) ? forced : candidates;
@@ -107,20 +123,47 @@ public sealed class TermDictionary
         return new TermDictionary(
             forced.ToDictionary(p => p.Key, p => p.Value.ToArray(), StringComparer.Ordinal),
             candidates.ToDictionary(p => p.Key, p => p.Value.ToArray(), StringComparer.Ordinal),
-            all, skipped);
+            all, skipped, excludedCount);
+    }
+
+    /// <summary>
+    /// 1 つのファイルの語を、ファイルの順に並べる (管理画面の一覧用。除外した語も含める)。不正な行・コメントは飛ばし、同じ読み・語は最初の 1 つだけ。
+    /// </summary>
+    public static List<TermEntry> Entries(string text)
+    {
+        var entries = new List<TermEntry>();
+        var seen = new HashSet<(string, string)>();
+        foreach (var raw in text.Split('\n'))
+        {
+            var line = raw.AsSpan().TrimEnd('\r');
+            if (line.Length > 0 && line[0] == '﻿') line = line[1..];
+            if (line.Length == 0 || line.TrimStart().Length == 0 || line.TrimStart()[0] == '#') continue;
+            if (!TryParseLine(line, out var reading, out var word, out var note)) continue;
+            if (seen.Add((reading, word))) entries.Add(new TermEntry(reading, word, note));
+        }
+        return entries;
     }
 
     /// <summary>語が ASCII の文字 (英数字・記号・空白) だけか。</summary>
     internal static bool IsAscii(string word) => word.AsSpan().IndexOfAnyExceptInRange('\0', '\u007f') < 0;
 
     /// <summary>1 行を読み・語に分ける。UserDictionary.Validate に合わない行・欄が足りない行は false。</summary>
-    internal static bool TryParseLine(ReadOnlySpan<char> line, out string reading, out string word)
+    internal static bool TryParseLine(ReadOnlySpan<char> line, out string reading, out string word) => TryParseLine(line, out reading, out word, out _);
+
+    /// <summary>1 行を読み・語・注記 (3 つ目の欄。無ければ空) に分ける。</summary>
+    internal static bool TryParseLine(ReadOnlySpan<char> line, out string reading, out string word, out string note)
     {
-        reading = word = "";
+        reading = word = note = "";
         var first = line.IndexOf('\t');
         if (first < 0) return false;
         var rest = line[(first + 1)..];
         var second = rest.IndexOf('\t');
+        if (second >= 0)
+        {
+            var noteSpan = rest[(second + 1)..];
+            var third = noteSpan.IndexOf('\t');
+            note = (third < 0 ? noteSpan : noteSpan[..third]).Trim().ToString();
+        }
         var wordSpan = (second < 0 ? rest : rest[..second]).Trim();
         var readingSpan = line[..first].Trim();
         if (readingSpan.Length < UserDictionary.MinReadingLength || readingSpan.Length > UserDictionary.MaxLength) return false;
