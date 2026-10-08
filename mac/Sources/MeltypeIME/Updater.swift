@@ -461,8 +461,11 @@ enum Updater {
         defer { try? handle.close() }
         var hasher = SHA256()
         while true {
-            guard let chunk = try? handle.read(upToCount: 1024 * 1024) else { return nil }
-            if chunk.isEmpty { break }
+            // read(upToCount:) は、ファイルの終わりで空のデータではなく nil を返す (macOS)。nil は「終わり」、例外だけを「読めない」とする
+            // (以前は try? で両方を nil にまとめていたので、最後まで読むと必ず失敗し、1.0.4〜1.0.9 の「更新する」は動かなかった)
+            let chunk: Data?
+            do { chunk = try handle.read(upToCount: 1024 * 1024) } catch { return nil }
+            guard let chunk, !chunk.isEmpty else { break }
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
