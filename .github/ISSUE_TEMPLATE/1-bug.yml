@@ -42,7 +42,7 @@ body:
     id: version
     attributes:
       label: Meltype の版
-      placeholder: "1.0.7"
+      placeholder: "1.0.8"
   - type: textarea
     id: environment
     attributes:
