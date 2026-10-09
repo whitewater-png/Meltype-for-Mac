@@ -329,71 +329,20 @@ final class MeltypeInputController: IMKInputController {
             attach([suggestion.reading, suggestion.word], to: reject)
         }
         if !suggestions.isEmpty { menu.addItem(.separator()) }
-        // 既定は OFF。ON にすると、Space で変換したあとに文字を打っても確定せず、続けて編集・変換できる (設定は config.json に保存、全入力欄に反映)
-        let continueToggle = menu.addItem(withTitle: "変換後も続けて入力できる", action: #selector(toggleContinueAfterConversion(_:)), keyEquivalent: "")
-        continueToggle.state = NativeCore.shared.continueAfterConversion ? .on : .off
-        // 既定は ON。OFF にすると、変換中の Shift+Enter は Enter と同じく確定だけ (キーはアプリに渡さない)
-        if NativeCore.shared.supportsShiftEnterNewline {
-            let shiftEnterToggle = menu.addItem(withTitle: "Shift+Enter で確定して改行", action: #selector(toggleShiftEnterNewline(_:)), keyEquivalent: "")
-            shiftEnterToggle.state = NativeCore.shared.shiftEnterNewline ? .on : .off
-        }
-        // 専門用語集 (分野ごとに ON/OFF。既定はすべて OFF。設定は config.json に保存、全入力欄に反映)
-        let domains = NativeCore.shared.termDomains
-        if !domains.isEmpty {
-            // IMK のメニューではサブメニューの項目が action に届かないことがあるので、メニュー直下に並べる
-            for domain in domains {
-                let item = menu.addItem(withTitle: "専門用語集(サンプル): \(domain.name) (\(domain.count) 語)", action: #selector(toggleTermDomain(_:)), keyEquivalent: "")
-                item.state = domain.enabled ? .on : .off
-                attach([domain.id, domain.enabled ? "on" : "off"], to: item)
-            }
-        }
-        menu.addItem(.separator())
-        // ユーザー辞書・専門用語集の一覧・登録・編集・削除と、専門用語集の分野の ON/OFF (別のアプリ「Meltype 辞書」で開く)
-        menu.addItem(withTitle: "辞書を管理… (ユーザー辞書・専門用語集(サンプル))", action: #selector(openDictionaryManager(_:)), keyEquivalent: "")
+        // 設定 (変換後も続けて入力・Shift+Enter など)・専門用語集の分野の ON/OFF・データフォルダは「設定・辞書」の画面にまとめた (メニューの項目を減らす)。
+        // 画面は別のアプリ「Meltype 辞書」で開く。ユーザー辞書・専門用語集の一覧・登録・編集・削除もそこで行う
+        menu.addItem(withTitle: "設定・辞書…", action: #selector(openDictionaryManager(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "選択中の文字をユーザー辞書に登録…", action: #selector(registerWord(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "辞書の登録提案の履歴を消去", action: #selector(clearSuggestions(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "学習データをすべて消去…", action: #selector(clearLearningData(_:)), keyEquivalent: "")
         let updateToggle = menu.addItem(withTitle: "更新を確認する", action: #selector(toggleUpdateCheck(_:)), keyEquivalent: "")
         updateToggle.state = UpdateManager.shared.isEnabled ? .on : .off
         menu.addItem(withTitle: "今すぐ更新を確認する", action: #selector(checkUpdateNow(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Meltype のデータフォルダを開く (設定・ユーザー辞書)", action: #selector(openDataFolder(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "不具合の報告・提案… (Mac 版はプレビュー版です)", action: #selector(openReport(_:)), keyEquivalent: "")
         return menu
     }
 
-    /// 「変換後も続けて入力できる」の ON/OFF。保存できなかったときは、値は変わらないので、そのことを伝える。
-    @objc private func toggleContinueAfterConversion(_ sender: Any?) {
-        guard !NativeCore.shared.setContinueAfterConversion(!NativeCore.shared.continueAfterConversion) else { return }
-        let failure = NSAlert()
-        failure.messageText = "設定を保存できませんでした"
-        failure.informativeText = "Meltype のデータフォルダーの config.json を確認してください (読めない・書けないときは、設定を変えません)。"
-        NSApp.activate(ignoringOtherApps: true)
-        failure.runModal()
-    }
-
-    /// 「Shift+Enter で確定して改行」の ON/OFF。保存できなかったときは、値は変わらないので、そのことを伝える。
-    @objc private func toggleShiftEnterNewline(_ sender: Any?) {
-        guard !NativeCore.shared.setShiftEnterNewline(!NativeCore.shared.shiftEnterNewline) else { return }
-        let failure = NSAlert()
-        failure.messageText = "設定を保存できませんでした"
-        failure.informativeText = "Meltype のデータフォルダーの config.json を確認してください (読めない・書けないときは、設定を変えません)。"
-        NSApp.activate(ignoringOtherApps: true)
-        failure.runModal()
-    }
-
-    /// 専門用語集の分野の ON/OFF。保存できなかったときは、値は変わらないので、そのことを伝える。
-    @objc private func toggleTermDomain(_ sender: Any?) {
-        NSLog("Meltype: 専門用語集の切り替えを受け取りました (sender: %@)", String(describing: sender))
-        guard let pair = payload(from: sender), pair.count == 2 else { return }
-        guard !NativeCore.shared.setTermDomain(pair[0], enabled: pair[1] != "on") else { return }
-        let failure = NSAlert()
-        failure.messageText = "設定を保存できませんでした"
-        failure.informativeText = "Meltype のデータフォルダーの config.json を確認してください (読めない・書けないときは、設定を変えません)。"
-        NSApp.activate(ignoringOtherApps: true)
-        failure.runModal()
-    }
-
-    /// 「辞書を管理…」: 辞書の管理画面 (別のふつうのアプリ) を開いて前に出す。変更は画面がすぐ保存し、この IME はファイルの版を見て読み直す。
+    /// 「設定・辞書…」: 辞書の管理画面 (別のふつうのアプリ) を開いて前に出す。変更は画面がすぐ保存し、この IME はファイルの版を見て読み直す。
     @objc private func openDictionaryManager(_ sender: Any?) {
         DictionaryApp.open { error in
             guard let error else { return }
@@ -535,11 +484,6 @@ final class MeltypeInputController: IMKInputController {
     @objc private func openReport(_ sender: Any?) {
         guard let url = NativeCore.shared.reportUrl else { return }
         NSWorkspace.shared.open(url)
-    }
-
-    @objc private func openDataFolder(_ sender: Any?) {
-        guard let directory = NativeCore.shared.dataDirectory else { return }
-        NSWorkspace.shared.open(URL(fileURLWithPath: directory, isDirectory: true))
     }
 
     // ---- 結果を入力欄に反映する ----

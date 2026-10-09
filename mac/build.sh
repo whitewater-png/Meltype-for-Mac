@@ -65,7 +65,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Framewor
 BIN="$(swift build -c release --show-bin-path)"
 cp "$BIN/MeltypeIME" "$APP/Contents/MacOS/Meltype"
 # 辞書の管理画面「Meltype 辞書」(ふつうのアプリ)。IME は背面専用 (LSBackgroundOnly) で自分のウインドウがキーボード入力を受けられないので、
-# 別のアプリにして Meltype.app の中 (Contents/Helpers。codesign が入れ子のコードとして扱う場所) に入れ、入力メニューの「辞書を管理…」から開く。
+# 別のアプリにして Meltype.app の中 (Contents/Helpers。codesign が入れ子のコードとして扱う場所) に入れ、入力メニューの「設定・辞書…」から開く。
 # Meltype.app を消すと一緒に消える (アンインストールで別に消すものは無い)。
 HELPER="$APP/Contents/Helpers/MeltypeDictionary.app"
 mkdir -p "$HELPER/Contents/MacOS" "$HELPER/Contents/Resources"
