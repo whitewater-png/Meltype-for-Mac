@@ -61,6 +61,14 @@ public static unsafe class Exports
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_continue_after_conversion")]
     public static int SetContinueAfterConversion(int on) => Config.ContinueAfterConversionSetting.Set(on != 0) ? 1 : 0;
 
+    /// <summary>「Shift+Enter で確定して改行」が ON なら 1、OFF なら 0。入力メニューのチェック表示用。既定は ON。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_get_shift_enter_newline")]
+    public static int GetShiftEnterNewline() => Config.ShiftEnterNewlineSetting.IsOn ? 1 : 0;
+
+    /// <summary>「Shift+Enter で確定して改行」を切り替えて config.json に保存する。すべての入力欄にすぐ反映される。保存できたら 1、できなければ 0。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_set_shift_enter_newline")]
+    public static int SetShiftEnterNewline(int on) => Config.ShiftEnterNewlineSetting.Set(on != 0) ? 1 : 0;
+
     /// <summary>
     /// 専門用語集の分野の一覧。1 行 1 分野で「ID\t名称\t語数\t有効なら 1・そうでなければ 0」を改行でつないだ文字列 (meltype_free で解放する)。
     /// 分野が無い・取れないときは NULL。

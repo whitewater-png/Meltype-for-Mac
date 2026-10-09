@@ -332,6 +332,11 @@ final class MeltypeInputController: IMKInputController {
         // 既定は OFF。ON にすると、Space で変換したあとに文字を打っても確定せず、続けて編集・変換できる (設定は config.json に保存、全入力欄に反映)
         let continueToggle = menu.addItem(withTitle: "変換後も続けて入力できる", action: #selector(toggleContinueAfterConversion(_:)), keyEquivalent: "")
         continueToggle.state = NativeCore.shared.continueAfterConversion ? .on : .off
+        // 既定は ON。OFF にすると、変換中の Shift+Enter は Enter と同じく確定だけ (キーはアプリに渡さない)
+        if NativeCore.shared.supportsShiftEnterNewline {
+            let shiftEnterToggle = menu.addItem(withTitle: "Shift+Enter で確定して改行", action: #selector(toggleShiftEnterNewline(_:)), keyEquivalent: "")
+            shiftEnterToggle.state = NativeCore.shared.shiftEnterNewline ? .on : .off
+        }
         // 専門用語集 (分野ごとに ON/OFF。既定はすべて OFF。設定は config.json に保存、全入力欄に反映)
         let domains = NativeCore.shared.termDomains
         if !domains.isEmpty {
@@ -359,6 +364,16 @@ final class MeltypeInputController: IMKInputController {
     /// 「変換後も続けて入力できる」の ON/OFF。保存できなかったときは、値は変わらないので、そのことを伝える。
     @objc private func toggleContinueAfterConversion(_ sender: Any?) {
         guard !NativeCore.shared.setContinueAfterConversion(!NativeCore.shared.continueAfterConversion) else { return }
+        let failure = NSAlert()
+        failure.messageText = "設定を保存できませんでした"
+        failure.informativeText = "Meltype のデータフォルダーの config.json を確認してください (読めない・書けないときは、設定を変えません)。"
+        NSApp.activate(ignoringOtherApps: true)
+        failure.runModal()
+    }
+
+    /// 「Shift+Enter で確定して改行」の ON/OFF。保存できなかったときは、値は変わらないので、そのことを伝える。
+    @objc private func toggleShiftEnterNewline(_ sender: Any?) {
+        guard !NativeCore.shared.setShiftEnterNewline(!NativeCore.shared.shiftEnterNewline) else { return }
         let failure = NSAlert()
         failure.messageText = "設定を保存できませんでした"
         failure.informativeText = "Meltype のデータフォルダーの config.json を確認してください (読めない・書けないときは、設定を変えません)。"

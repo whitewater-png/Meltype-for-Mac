@@ -195,6 +195,8 @@ final class NativeCore {
     private let clearLearningFunction: ClearLearningFunction?
     private let getContinueAfterConversionFunction: GetFlagFunction?
     private let setContinueAfterConversionFunction: SetFlagFunction?
+    private let getShiftEnterNewlineFunction: GetFlagFunction?
+    private let setShiftEnterNewlineFunction: SetFlagFunction?
     private let termDomainsFunction: TermDomainsFunction?
     private let setTermDomainFunction: SetTermDomainFunction?
     private let updateEvaluateFunction: UpdateEvaluateFunction?
@@ -236,6 +238,9 @@ final class NativeCore {
         clearLearningFunction = symbol("meltype_clear_learning", as: ClearLearningFunction.self)
         getContinueAfterConversionFunction = symbol("meltype_get_continue_after_conversion", as: GetFlagFunction.self)
         setContinueAfterConversionFunction = symbol("meltype_set_continue_after_conversion", as: SetFlagFunction.self)
+        // ABI 版数は上げていない (古い本体には無い)。無ければ項目を出さず、本体の既定 (ON) と同じ扱いにする
+        getShiftEnterNewlineFunction = symbol("meltype_get_shift_enter_newline", as: GetFlagFunction.self)
+        setShiftEnterNewlineFunction = symbol("meltype_set_shift_enter_newline", as: SetFlagFunction.self)
         termDomainsFunction = symbol("meltype_term_domains", as: TermDomainsFunction.self)
         setTermDomainFunction = symbol("meltype_set_term_domain", as: SetTermDomainFunction.self)
         updateEvaluateFunction = symbol("meltype_update_evaluate", as: UpdateEvaluateFunction.self)
@@ -381,6 +386,23 @@ final class NativeCore {
     func setContinueAfterConversion(_ on: Bool) -> Bool {
         guard isCompatible, let setContinueAfterConversionFunction else { return false }
         return setContinueAfterConversionFunction(on ? 1 : 0) == 1
+    }
+
+    /// 「Shift+Enter で確定して改行」を切り替えられる本体か (古い本体には無い。その場合は入力メニューに出さない)。
+    var supportsShiftEnterNewline: Bool {
+        isCompatible && getShiftEnterNewlineFunction != nil && setShiftEnterNewlineFunction != nil
+    }
+
+    /// 「Shift+Enter で確定して改行」が ON か。設定はすべての入力欄で共通 (本体が持つ)。既定は ON。本体が古い・合わないときも true (従来の動作)。
+    var shiftEnterNewline: Bool {
+        guard isCompatible, let getShiftEnterNewlineFunction else { return true }
+        return getShiftEnterNewlineFunction() == 1
+    }
+
+    /// 「Shift+Enter で確定して改行」を切り替えて config.json に保存する。すべての入力欄にすぐ反映される。保存できたら true。
+    func setShiftEnterNewline(_ on: Bool) -> Bool {
+        guard isCompatible, let setShiftEnterNewlineFunction else { return false }
+        return setShiftEnterNewlineFunction(on ? 1 : 0) == 1
     }
 
     /// 専門用語集の分野の一覧 (ID・名称・語数・有効か)。設定はすべての入力欄で共通 (本体が持つ)。取れなければ空。

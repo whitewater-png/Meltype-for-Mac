@@ -77,6 +77,12 @@ public sealed class CompositionOptions
     /// </summary>
     public Func<bool> ContinueAfterConversion { get; init; } = () => false;
 
+    /// <summary>
+    /// 変換中の Shift+Enter を、確定したうえでキーをアプリに渡す (チャットや Web アプリで 1 回で確定 + 改行) か。
+    /// 既定は true。false のときは Enter 単体と同じく確定のみ。変換ボックスが空のときの Shift+Enter は、どちらでも素通し。
+    /// </summary>
+    public Func<bool> ShiftEnterNewline { get; init; } = () => true;
+
     /// <summary>英数 (直接入力) 状態か。</summary>
     public Func<bool> DirectMode { get; init; } = () => false;
 
@@ -510,7 +516,7 @@ public sealed class CompositionController
         }
 
         // Shift+Enter: 確定したうえで、Enter をアプリに渡す (Web アプリの改行用)。Enter 単体は確定のみ (チャット欄で送信されないように)。
-        if (vk == VirtualKeys.Return && (_swallowedShift.Count > 0 || _host.IsShiftDown()))
+        if (vk == VirtualKeys.Return && (_swallowedShift.Count > 0 || _host.IsShiftDown()) && _options.ShiftEnterNewline())
         {
             if (_predicting) CommitPrediction(_predictions[_predictionIndex]);
             else

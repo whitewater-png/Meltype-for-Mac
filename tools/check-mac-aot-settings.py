@@ -41,6 +41,8 @@ def load(lib_path):
         "meltype_set_term_domain": ([s, i], i),
         "meltype_set_continue_after_conversion": ([i], i),
         "meltype_get_continue_after_conversion": ([], i),
+        "meltype_set_shift_enter_newline": ([i], i),
+        "meltype_get_shift_enter_newline": ([], i),
         "meltype_userdict_words": ([], p),
         "meltype_userdict_version": ([], i),
         "meltype_userdict_check": ([s, s, s, s], p),
@@ -126,8 +128,10 @@ def child_settings(lib, step):
     if step == "write" and out["safe"]:
         out["set_term_domain"] = lib.meltype_set_term_domain(b"civil", 1)
         out["set_continue"] = lib.meltype_set_continue_after_conversion(1)
+        out["set_shift_enter"] = lib.meltype_set_shift_enter_newline(0)  # 既定は ON なので、OFF にして保たれるかを見る
     out["domains"] = domains(lib)
     out["continue"] = lib.meltype_get_continue_after_conversion()
+    out["shift_enter"] = lib.meltype_get_shift_enter_newline()
     return out
 
 
@@ -320,6 +324,8 @@ def check_settings(lib_path, failures):
             return False
         if first["set_term_domain"] != 1: failures.append("専門用語集の分野を保存できなかった")
         if first["set_continue"] != 1: failures.append("変換後も続けて入力の設定を保存できなかった")
+        if first["set_shift_enter"] != 1: failures.append("Shift+Enter で確定して改行の設定を保存できなかった")
+        if first["shift_enter"] != 0: failures.append("Shift+Enter で確定して改行を OFF にした直後に、OFF として見えない")
         if first["domains"].get("civil") != 1 or first["continue"] != 1: failures.append("保存した直後に、有効として見えない")
         # 保存場所は本体に尋ねる (HOME の下になっていること = 実際の設定に触っていないことも確かめる)
         config = os.path.join(first["data_directory"], "config.json")
@@ -329,10 +335,12 @@ def check_settings(lib_path, failures):
             saved = json.load(open(config, encoding="utf-8"))
             if saved.get("EnabledTermDomains") != ["civil"]: failures.append(f"EnabledTermDomains が違う: {saved.get('EnabledTermDomains')}")
             if saved.get("ContinueAfterConversion") is not True: failures.append("ContinueAfterConversion が保存されていない")
+            if saved.get("ShiftEnterNewline") is not False: failures.append("ShiftEnterNewline (OFF) が保存されていない")
             if not isinstance(saved.get("Mode"), str): failures.append(f"列挙型 (Mode) が文字列で保存されていない: {saved.get('Mode')}")
         again = run(lib_path, home, "read")  # 別プロセス (読み直し)
         if again["domains"].get("civil") != 1: failures.append("別プロセスで読み直すと、分野が有効でない")
         if again["continue"] != 1: failures.append("別プロセスで読み直すと、変換後も続けて入力が ON でない")
+        if again["shift_enter"] != 0: failures.append("別プロセスで読み直すと、Shift+Enter で確定して改行が OFF でない")
     return True
 
 

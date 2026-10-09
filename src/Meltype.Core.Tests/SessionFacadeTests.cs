@@ -219,6 +219,16 @@ internal static class SessionFacadeTests
     }
 
     [Test]
+    public static void ShiftEnter_SettingOff_CommitsAndIsConsumed()
+    {
+        var session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(), new CompositionOptions { ShiftEnterNewline = () => false }, () => new Settings());
+        Type(session, "aiueo");
+        var result = session.HandleKey(VirtualKeys.Return, '\r', true, false, false, false);
+        Assert.True(result.Consumed, "OFF のとき Shift+Enter は送り直さない");
+        Assert.True(result.Commits.Any(c => c.Text.Length > 0), "確定したテキストがある");
+    }
+
+    [Test]
     public static void Enter_Alone_IsConsumed()
     {
         var session = Create();

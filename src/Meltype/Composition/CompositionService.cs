@@ -44,6 +44,7 @@ internal sealed class CompositionService : ICompositionHost, IDisposable
         var resolved = new CompositionOptions
         {
             LiveConversion = options.LiveConversion,
+            ShiftEnterNewline = options.ShiftEnterNewline,
             DirectMode = options.DirectMode,
             ClassifyDirect = options.ClassifyDirect,
             DirectDecided = options.DirectDecided,

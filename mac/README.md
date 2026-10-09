@@ -40,6 +40,10 @@ cd mac
 ログアウトするまで入力メニューに出なくなります (`build.sh` / `install.sh` は Meltype.app を消さずに中身だけを入れ替えます)。
 `mac/.build` (Swift のビルド結果) は azooKey の辞書の置き場所として使われることがあるので、消さないでください。
 
+## 入力メニューの設定項目
+
+- 「変換後も続けて入力できる」(既定 OFF) と「Shift+Enter で確定して改行」(既定 ON) はチェック付き。どちらも `config.json` に保存され、開いているすべての入力欄にすぐ反映される。「Shift+Enter で確定して改行」を OFF にすると、変換中の Shift+Enter は Enter と同じく確定だけになる (変換ボックスが空のときは、どちらでもアプリにそのまま渡す)。
+
 ## 新しい版の通知と更新 (通信)
 
 - 既定 ON。入力メニューの「更新を確認する」(チェック付き) でいつでも ON/OFF。設定は `~/Library/Application Support/Meltype/update.json` (`enabled` / `lastCheck` / `notifiedVersion`、0600。`uninstall.sh --remove-data` でデータごと消える)。
@@ -202,7 +206,7 @@ cd mac && ./build.sh --no-install        # ビルドだけ (インストール�
 cd .. && python3 tools/check-mac-aot-settings.py
 ```
 
-`tools/check-mac-aot-settings.py` は、ビルドしたライブラリの関数を直接呼び (Meltype.app は起動しない)、専門用語集の分野と「変換後も続けて入力」を保存して `config.json` の中身を確かめ、別プロセスで読み直しても保たれることを確かめる。
+`tools/check-mac-aot-settings.py` は、ビルドしたライブラリの関数を直接呼び (Meltype.app は起動しない)、専門用語集の分野と「変換後も続けて入力」「Shift+Enter で確定して改行」(入力メニューの項目。後者は既定 ON) を保存して `config.json` の中身を確かめ、別プロセスで読み直しても保たれることを確かめる。
 辞書の管理画面の関数 (`meltype_userdict_*` / `meltype_term_*`) も、登録・重複・編集・削除と復元・取り込み・書き出し・除外・専門用語の編集をして、ファイル (0600) を別プロセスで読み直す。
 さらに、4 つのプロセスが同時に 25 語ずつ登録しても 100 語すべて残ること、IME のつもりのプロセス (`meltype_create` のセッション) が動いたまま、別のプロセスの登録が変換の結果に出る・除外と分野の切り替えで版が進むこと、IME の側の登録が画面の登録を消さないことを確かめる。
 保存場所は環境変数 `MELTYPE_DATA_DIR` で空の一時フォルダーに向ける (.NET は `HOME` ではなくアカウント情報から場所を決めるので、`HOME` の差し替えでは実際の設定に書いてしまう)。一時フォルダーの外を指しているときは、何も書かずに止まる。

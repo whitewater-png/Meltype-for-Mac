@@ -4,17 +4,17 @@
 namespace Meltype.Config;
 
 /// <summary>
-/// 「変換後も続けて入力できる」(Settings.ContinueAfterConversion) の、Mac の入力メニューから切り替える口。
-/// 各セッションは CompositionOptions.ContinueAfterConversion の Func で毎回ここを見る。保存の作法は <see cref="ConfigFlag"/>。既定は OFF。
+/// 「Shift+Enter で確定して改行」(Settings.ShiftEnterNewline) の、Mac の入力メニューから切り替える口。
+/// 各セッションは CompositionOptions.ShiftEnterNewline の Func で毎回ここを見る。保存の作法は <see cref="ConfigFlag"/>。既定は ON。
 /// </summary>
-internal static class ContinueAfterConversionSetting
+internal static class ShiftEnterNewlineSetting
 {
-    private static readonly ConfigFlag Flag = new("変換後も続けて入力", false, s => s.ContinueAfterConversion, (s, on) => s.ContinueAfterConversion = on);
+    private static readonly ConfigFlag Flag = new("Shift+Enter で確定して改行", true, s => s.ShiftEnterNewline, (s, on) => s.ShiftEnterNewline = on);
 
     /// <summary>設定ファイルの場所。テストが差し替える。</summary>
     internal static Func<string> ConfigPath { get => Flag.ConfigPath; set => Flag.ConfigPath = value; }
 
-    /// <summary>今の値。最初に使うときに config.json から読む (読めなければ OFF)。</summary>
+    /// <summary>今の値。最初に使うときに config.json から読む (項目が無い・読めなければ ON)。</summary>
     public static bool IsOn => Flag.IsOn;
 
     /// <summary>切り替えて config.json に保存する。保存できなければ false (値は変えない)。</summary>

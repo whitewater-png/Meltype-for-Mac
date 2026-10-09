@@ -1069,3 +1069,29 @@ Google ドキュメントで、確定済みの文字 (例: 「v1.1.2】Mel」の
 ### P23 実機確認 (2026-10-09)
 - Google ドキュメント (Chrome): 下線ありの Shift+Enter で確定 + 改行を確認。
 - Discord (Chrome の Web 版): 最初は下線なしでも Shift+Enter が効かなかったが、ページの再読み込みで解消。トレースでは Meltype は Shift+Enter をすべて素通ししていたので、P22 の修正前の版 (矢印キーの機能キー文字が変換ボックスに入っていた) での操作で Discord のページ側の状態が固まっていたと判断。再読み込み後は「下線あり Shift+Enter → 確定 + 改行」「続けて下線なし Shift+Enter → 改行」「Enter 確定 → Shift+Enter → 改行」のすべてが正常で、固まらない。コード変更なし。
+
+## 追加項目 P24 (Shift+Enter の確定と改行をオン・オフ)
+
+- **目的**: P23 の「変換中の Shift+Enter は確定してキーをアプリに渡す」を、設定で切れるようにする。アプリによっては Shift+Enter で確定だけしたい人がいるため。
+- **方針**: 設定 `ShiftEnterNewline` (bool、カテゴリ「1. 全般」、**既定 ON**)。既定 ON の理由は、1.1.1 の挙動を変えないため (既存の `config.json` に項目が無ければ ON)。OFF のときは、変換中の Shift+Enter は Enter 単体と同じ (確定のみ、キーはアプリに渡さない)。変換ボックスが空のときの Shift+Enter は ON/OFF にかかわらず素通し。プロファイルをまたいで共通にはしない (`ContinueAfterConversion` と同じ。`SharedKeys` に入れない)。Mac は入力メニューのチェック項目「Shift+Enter で確定して改行」、Windows は設定画面 (属性から自動生成) で切り替える。
+- **SettingsVersion**: 既定値を足しただけで、`Migrate` は不要 (項目が無い古い `config.json` を読むと既定の true になる。プロファイルの切り替えも、項目が無ければ今の値のまま)。
+- **共通化**: 「プロセスで 1 つの値を持ち、ロックの中で読み直して `config.json` に保存し、読めない `config.json` は上書きしない」作法を `ConfigFlag` に切り出した。`ContinueAfterConversionSetting` は `ConfigFlag` に委譲する薄い入口にして、公開している名前と挙動は変えていない。`ShiftEnterNewlineSetting` が同じ `ConfigFlag` (既定 ON) を使う。
+- **ABI**: 版数は上げない。Swift は新しい 2 つの symbol を optional に解決し、古い本体では項目を出さず、ON (従来の動作) 扱いにする。
+
+| ファイル | 内容 |
+| --- | --- |
+| `src/Meltype.Core/Config/Settings.cs` | `ShiftEnterNewline` (既定 true) |
+| `src/Meltype.Core/Config/ConfigFlag.cs` (新規) | 共有の bool 設定の読み書き (旧 `ContinueAfterConversionSetting` の中身) |
+| `src/Meltype.Core/Config/ContinueAfterConversionSetting.cs` | `ConfigFlag` への委譲に |
+| `src/Meltype.Core/Config/ShiftEnterNewlineSetting.cs` (新規) | `IsOn` / `Set` / `Reset` |
+| `src/Meltype.Core/Composition/CompositionController.cs` | `CompositionOptions.ShiftEnterNewline` (Func、既定 true)。Shift+Enter のブロックの条件に追加 |
+| `src/Meltype.Core/Composition/MeltypeSession.cs` | `ShiftEnterNewline = () => ShiftEnterNewlineSetting.IsOn` |
+| `src/Meltype.Mac.Native/Exports.cs` | `meltype_get_shift_enter_newline` / `meltype_set_shift_enter_newline` |
+| `mac/Sources/MeltypeIME/NativeCore.swift`・`InputController.swift` | getter/setter (optional symbol)、入力メニューのチェック項目、保存失敗時のアラート |
+| `src/Meltype/UI/TrayApplicationContext.cs`・`src/Meltype/Composition/CompositionService.cs` | Windows のオプションに `ShiftEnterNewline` を渡す |
+| `tools/check-mac-aot-settings.py` | AOT 版で OFF の保存と別プロセスでの読み直しを確かめる |
+| `docs/USAGE.md`・`mac/README.md` | キー表と説明 |
+| `src/Meltype.Core.Tests/ShiftEnterNewlineTests.cs` (新規)・`SessionFacadeTests.cs` | 下記 |
+
+- **テスト**: 設定が OFF のとき、未変換・変換中・予測中の Shift+Enter が確定のみ (`down:0D` なし)。設定の読み書き (項目が無ければ ON、`Set(false)` が保存される、読めない `config.json` は上書きしない)。`SessionFacadeTests` に OFF のとき `consumed:true` の 1 件。既存の Shift+Enter のテストは既定 ON のまま通る。
+- **未検証**: Mac 実機 (入力メニューの切り替えと、Chrome・Google ドキュメントでの挙動)、Windows 実機 (設定画面の表示とトレイでの反映)。

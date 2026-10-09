@@ -148,6 +148,9 @@ internal static class CompositionTests
         public bool FullWidthSymbols { get; set; } = true;
         public bool Prediction { get; set; } = true;
 
+        /// <summary>変換中の Shift+Enter で確定してキーをアプリに渡すか (CompositionOptions.ShiftEnterNewline)。既定は ON。</summary>
+        public bool ShiftEnterNewline { get; set; } = true;
+
         /// <summary>変換後も続けて入力できるか (CompositionOptions.ContinueAfterConversion)。既定は OFF (今までの動作)。</summary>
         public bool Continue { get; set; }
 
@@ -193,6 +196,7 @@ internal static class CompositionTests
             {
                 LiveConversion = () => live,
                 ContinueAfterConversion = () => Continue,
+                ShiftEnterNewline = () => ShiftEnterNewline,
                 DirectMode = () => Direct,
                 ClassifyDirect = (letters, final) => DirectEngine.Evaluate(new Detection.DetectionInput(letters, letters.Select(c => (int)char.ToUpperInvariant(c)).ToArray(), final)).Verdict,
                 DirectDecided = japanese => { if (japanese) Direct = false; else _directEnglishWord = true; },
@@ -1700,7 +1704,7 @@ internal static class CompositionTests
         }
     }
 
-    private static readonly Func<string, IReadOnlyList<string>> OsewaPredictions =
+    internal static readonly Func<string, IReadOnlyList<string>> OsewaPredictions =
         r => r.StartsWith("おせ", StringComparison.Ordinal) ? ["お世話になります"] : [];
 
     [Test]

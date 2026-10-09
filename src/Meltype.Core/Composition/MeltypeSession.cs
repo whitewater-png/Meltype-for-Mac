@@ -147,6 +147,7 @@ public sealed class MeltypeSession
             LiveConversion = () => settings.LiveConversion,
             // 入力メニューで切り替える。すべての入力欄にすぐ反映されるよう、各セッションの設定ではなく共有の値を毎回見る。
             ContinueAfterConversion = () => ContinueAfterConversionSetting.IsOn,
+            ShiftEnterNewline = () => ShiftEnterNewlineSetting.IsOn,
             AutoCorrect = () => settings.AutoCorrectAfterCommit && settings.DetectionLevel != DetectionLevel.Manual,
             Level = () => settings.DetectionLevel,
             Candidates = CandidateDictionary.Load(userDirectory),

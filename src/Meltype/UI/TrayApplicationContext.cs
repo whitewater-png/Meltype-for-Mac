@@ -46,6 +46,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _composition = new Composition.CompositionService(_invoker, detector, new Composition.CompositionOptions
         {
             LiveConversion = () => _engine.AppSettings.LiveConversion,
+            ShiftEnterNewline = () => _engine.AppSettings.ShiftEnterNewline,
             DirectMode = () => _engine.KeyboardDirect,
             ClassifyDirect = _engine.ClassifyDirect,
             DirectDecided = _engine.OnDirectDecided,
