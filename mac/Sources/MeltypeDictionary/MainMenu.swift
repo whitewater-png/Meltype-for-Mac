@@ -49,6 +49,7 @@ enum MainMenu {
         let view = submenu("表示", in: main)
         view.addItem(withTitle: "ユーザー辞書", action: #selector(MainWindowController.showUserDictionary(_:)), keyEquivalent: "1")
         view.addItem(withTitle: "専門用語集(サンプル)", action: #selector(MainWindowController.showTermDictionary(_:)), keyEquivalent: "2")
+        view.addItem(withTitle: "設定", action: #selector(MainWindowController.showSettings(_:)), keyEquivalent: "3")
 
         let window = submenu("ウインドウ", in: main)
         window.addItem(withTitle: "しまう", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

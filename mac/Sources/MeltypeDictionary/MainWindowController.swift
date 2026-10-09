@@ -4,18 +4,20 @@
 import AppKit
 import MeltypeDictionaryKit
 
-/// メインのウインドウ: 「ユーザー辞書」と「専門用語集」のタブ。メニューの独自の項目 (登録・取り込み・書き出し・検索・タブの切り替え) を受ける
+/// メインのウインドウ: 「ユーザー辞書」「専門用語集」「設定」のタブ。メニューの独自の項目 (登録・取り込み・書き出し・検索・タブの切り替え) を受ける
 /// (ウインドウの delegate はアクションの responder chain に入る)。取り消す (⌘Z) はウインドウの NSUndoManager を両方のタブで使う。
-final class MainWindowController: NSWindowController, NSWindowDelegate {
+final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     private let dictionary: NativeDictionary
     private let tabs = NSTabViewController()
     private let userController: UserDictionaryViewController
     private let termController: TermDictionaryViewController
+    private let settingsController: SettingsViewController
 
     init(dictionary: NativeDictionary) {
         self.dictionary = dictionary
         userController = UserDictionaryViewController(dictionary: dictionary)
         termController = TermDictionaryViewController(dictionary: dictionary)
+        settingsController = SettingsViewController(dictionary: dictionary)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 620),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = MainMenu.appName
@@ -35,12 +37,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         termTab.label = "専門用語集(サンプル)"
         tabs.addTabViewItem(userTab)
         tabs.addTabViewItem(termTab)
+        let settingsTab = NSTabViewItem(viewController: settingsController)
+        settingsTab.label = "設定"
+        tabs.addTabViewItem(settingsTab)
         window.contentViewController = tabs
         window.setContentSize(NSSize(width: 900, height: 620))
         window.delegate = self
         // 隠れているタブの view は window が nil になるので、シート・取り消しのためにウインドウを渡しておく
         userController.hostWindow = window
         termController.hostWindow = window
+        settingsController.hostWindow = window
         // 片方のタブの変更 (専門用語の「直す」でユーザー辞書が変わるなど) を、もう片方にもすぐ反映する
         userController.didChange = { [weak self] in self?.termController.pollChanges() }
         termController.didChange = { [weak self] in self?.userController.pollChanges() }
@@ -53,11 +59,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard window?.isVisible == true else { return }
         userController.pollChanges()
         termController.pollChanges()
+        settingsController.pollChanges()
     }
 
-    private var showingUserTab: Bool { tabs.selectedTabViewItemIndex == 0 }
-
     // ---- メニュー ----
+
+    /// 設定のタブには検索が無い。
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(focusSearch(_:)) { return tabs.selectedTabViewItemIndex != 2 }
+        return true
+    }
 
     @objc func addWord(_ sender: Any?) {
         tabs.selectedTabViewItemIndex = 0
@@ -75,12 +86,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func focusSearch(_ sender: Any?) {
-        if showingUserTab { userController.focusSearch() } else { termController.focusSearch() }
+        switch tabs.selectedTabViewItemIndex {
+        case 0: userController.focusSearch()
+        case 1: termController.focusSearch()
+        default: break   // 設定のタブに検索は無い
+        }
     }
 
     @objc func showUserDictionary(_ sender: Any?) { tabs.selectedTabViewItemIndex = 0 }
 
     @objc func showTermDictionary(_ sender: Any?) { tabs.selectedTabViewItemIndex = 1 }
+
+    @objc func showSettings(_ sender: Any?) { tabs.selectedTabViewItemIndex = 2 }
 
     @objc func openDataFolder(_ sender: Any?) {
         guard let directory = dictionary.dataDirectory else { return }

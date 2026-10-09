@@ -47,8 +47,9 @@ public static unsafe class Exports
     /// NativeDictionary.expectedAbiVersion (「Meltype 辞書」の画面) も同じ値にする
     /// (別の版の libMeltypeNative.dylib が混ざったとき、引数の食い違いで落ちる代わりに初期化を止めるため)。
     /// 6: 辞書の管理画面の関数 (meltype_userdict_* / meltype_term_words ほか) を足した。
+    /// 7: 設定タブの関数 (meltype_settings_get / meltype_settings_set / meltype_settings_reset) を足した。
     /// </summary>
-    public const int AbiVersion = 6;
+    public const int AbiVersion = 7;
 
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
@@ -602,6 +603,31 @@ public static unsafe class Exports
             return -1;
         }
     }
+
+    // ---- 「Meltype 辞書」の「設定」タブ用 (編集できる設定は Config.MacSettingsCatalog) ----
+
+    /// <summary>
+    /// 設定タブに出す項目と今の値の JSON (config.json から読み直す)。形は MacSettingsCatalog.ToJson。
+    /// config.json が読めない (壊れている・大きすぎる) ときは NULL。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_settings_get")]
+    public static byte* SettingsGet() => Text("設定の取得", Config.MacSettingsCatalog.Read);
+
+    /// <summary>
+    /// 設定を 1 つ変えて config.json に保存する (IME の入力欄にはすぐ反映される)。key は項目名、valueJson は JSON の値
+    /// (真偽は true / false、数は 3、選択肢は "Balanced" のように名前の文字列)。だめなら理由、できたら NULL。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_settings_set")]
+    public static byte* SettingsSet(byte* key, byte* valueJson)
+    {
+        var name = FromUtf8(key) ?? "";
+        var value = FromUtf8(valueJson) ?? "";
+        return Reason("設定の保存", () => Config.MacSettingsCatalog.Apply(name, value));
+    }
+
+    /// <summary>設定タブにある項目をすべて既定値に戻して保存する (ほかの設定は触らない)。だめなら理由、できたら NULL。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_settings_reset")]
+    public static byte* SettingsReset() => Reason("設定を既定値に戻す処理", Config.MacSettingsCatalog.ResetToDefaults);
 
     /// <summary>文字列を返す処理を、例外で落ちないように包む (例外は UnmanagedCallersOnly の外へ出せない)。null・失敗は NULL。</summary>
     private static byte* Text(string what, Func<string?> action)

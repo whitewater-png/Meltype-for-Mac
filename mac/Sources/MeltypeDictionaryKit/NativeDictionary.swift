@@ -34,7 +34,7 @@ public protocol DictionaryOperations: AnyObject {
 /// 関数はどれも、C# 側でロックしているので、どのスレッドから呼んでもよい (専門用語の一覧は重いので裏のスレッドで呼ぶ)。
 public final class NativeDictionary: DictionaryOperations {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion・IME の NativeCore.expectedAbiVersion と必ず同じにする。
-    public static let expectedAbiVersion: Int32 = 6
+    public static let expectedAbiVersion: Int32 = 7
 
     /// 読み込めなかった理由 (画面に出す)。
     public enum LoadError: Error, CustomStringConvertible {
@@ -83,6 +83,9 @@ public final class NativeDictionary: DictionaryOperations {
     private let termSetExcludedFunction: TextFlagFunction
     private let termEditFunction: TermEditFunction
     private let termRevisionFunction: IntFunction
+    private let settingsGetFunction: TextFunction
+    private let settingsSetFunction: Text2Function
+    private let settingsResetFunction: TextFunction
 
     public init(libraryPath: String?) throws {
         guard let libraryPath else { throw LoadError.notFound }
@@ -117,6 +120,9 @@ public final class NativeDictionary: DictionaryOperations {
         termSetExcludedFunction = try symbol("meltype_term_set_excluded", as: TextFlagFunction.self)
         termEditFunction = try symbol("meltype_term_edit", as: TermEditFunction.self)
         termRevisionFunction = try symbol("meltype_term_revision", as: IntFunction.self)
+        settingsGetFunction = try symbol("meltype_settings_get", as: TextFunction.self)
+        settingsSetFunction = try symbol("meltype_settings_set", as: Text2Function.self)
+        settingsResetFunction = try symbol("meltype_settings_reset", as: TextFunction.self)
     }
 
     /// 本体が返した文字列を Swift の文字列にして解放する。
@@ -248,6 +254,21 @@ public final class NativeDictionary: DictionaryOperations {
 
     /// 専門用語集の版 (有効な分野・除外した語が、ほかのプロセスで変わったときも増える)。
     public func termRevision() -> Int32 { termRevisionFunction() }
+
+    // ---- 設定 ----
+
+    /// 設定タブの項目と今の値 (config.json から読み直す)。config.json が読めない (壊れている)・取れないときは nil。
+    public func settings() -> SettingsCatalog? {
+        take(settingsGetFunction()).flatMap(SettingsCatalog.parse)
+    }
+
+    /// 設定を 1 つ変えて config.json に保存する (動いている IME の入力欄にもすぐ反映される)。だめなら理由 (画面にそのまま出す)。
+    public func setSetting(key: String, value: SettingValue) -> String? {
+        key.withCString { name in value.jsonLiteral.withCString { take(settingsSetFunction(name, $0)) } }
+    }
+
+    /// 設定タブにある項目をすべて既定値に戻す (ほかの設定は触らない)。だめなら理由。
+    public func resetSettings() -> String? { take(settingsResetFunction()) }
 }
 
 private func withOptionalCString<R>(_ text: String?, _ body: (UnsafePointer<CChar>?) -> R) -> R {

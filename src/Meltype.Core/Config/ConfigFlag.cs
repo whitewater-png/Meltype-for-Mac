@@ -12,28 +12,34 @@ namespace Meltype.Config;
 internal sealed class ConfigFlag(string label, bool defaultValue, Func<Settings, bool> read, Action<Settings, bool> write)
 {
     private readonly object _lock = new();
+    private readonly ConfigFileWatch _watch = new();
     private bool? _value;
 
     /// <summary>設定ファイルの場所。テストが差し替える。</summary>
     internal Func<string> ConfigPath { get; set; } = () => AppPaths.ConfigFile;
 
-    /// <summary>今の値。最初に使うときに config.json から読む (項目が無ければ既定値。読めなければ既定値)。</summary>
+    /// <summary>
+    /// 今の値。最初に使うときに config.json から読む (項目が無ければ既定値。読めなければ既定値)。
+    /// 以後も、別のプロセス (「Meltype 辞書」の「設定」タブ) が config.json を書き換えたら読み直す (調べるのは <see cref="ConfigFileWatch.IntervalMs"/> に 1 回まで)。
+    /// 読み直せないときは、前の値のまま。
+    /// </summary>
     public bool IsOn
     {
         get
         {
             lock (_lock)
             {
-                if (_value is { } value) return value;
+                var path = ConfigPath();
+                if (!_watch.Poll(path) && _value is { } value) return value;
                 bool on;
                 try
                 {
-                    on = Settings.LoadForUpdate(ConfigPath()) is { } settings ? read(settings) : defaultValue;
+                    on = Settings.LoadForUpdate(path) is { } settings ? read(settings) : _value ?? defaultValue;
                 }
                 catch (Exception ex)
                 {
-                    Diagnostics.Log.Warn($"{label}の設定を読めませんでした ({(defaultValue ? "ON" : "OFF")} にします): {ex.Message}");
-                    on = defaultValue;
+                    Diagnostics.Log.Warn($"{label}の設定を読めませんでした ({((_value ?? defaultValue) ? "ON" : "OFF")} にします): {ex.Message}");
+                    on = _value ?? defaultValue;
                 }
                 _value = on;
                 return on;

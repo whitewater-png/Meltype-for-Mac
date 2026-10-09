@@ -132,10 +132,10 @@ public sealed class MeltypeSession
     {
         AppPaths.MigrateFromOldName();
         Config.SafeFile.EnsureDirectory(AppPaths.DataDirectory);
-        var settings = Settings.Load(AppPaths.ConfigFile);
-        // 設定で「ファイルにログを書く」を ON にしていれば、Mac でも meltype.log に書く (動かないときの調査用)。
-        Diagnostics.Log.SetFileOutput(settings.FileLog ? AppPaths.LogFile : null);
-        Diagnostics.Log.RecordText = settings.LogTypedText;
+        // 設定は共有の入れ物 (SharedSettings) を毎回見る。config.json が変わると (「Meltype 辞書」の「設定」タブ)、開いたままの入力欄にも反映される。
+        // 最初に読むときに、設定で「ファイルにログを書く」を ON にしていれば、Mac でも meltype.log に書く (動かないときの調査用)。
+        var shared = SharedSettings.Shared;
+        _ = shared.Current;
         var userDirectory = AppPaths.UserDictionaryDirectory;
         var detector = CompositionDetector.CreateDefault(userDirectory);
         // OS のスペルチェッカーが無ければ (Linux)、同梱のよく使う英単語の一覧を使う (meeting を英語と分かるように)。
@@ -144,37 +144,37 @@ public sealed class MeltypeSession
         detector.Memory = languages;
         var options = new CompositionOptions
         {
-            LiveConversion = () => settings.LiveConversion,
+            LiveConversion = () => shared.Current.LiveConversion,
             // 入力メニューで切り替える。すべての入力欄にすぐ反映されるよう、各セッションの設定ではなく共有の値を毎回見る。
             ContinueAfterConversion = () => ContinueAfterConversionSetting.IsOn,
             ShiftEnterNewline = () => ShiftEnterNewlineSetting.IsOn,
-            AutoCorrect = () => settings.AutoCorrectAfterCommit && settings.DetectionLevel != DetectionLevel.Manual,
-            Level = () => settings.DetectionLevel,
+            AutoCorrect = () => shared.Current is { AutoCorrectAfterCommit: true, DetectionLevel: not DetectionLevel.Manual },
+            Level = () => shared.Current.DetectionLevel,
             Candidates = CandidateDictionary.Load(userDirectory),
             ContextRules = ContextRules.Load(userDirectory),
             History = ConversionHistory.Shared(AppPaths.ConversionHistoryFile),
             UserDictionary = UserDictionary.Shared(AppPaths.UserDictionaryFile),
             MoreCandidates = moreCandidates,
             Predictions = predictions,
-            Prediction = () => settings.Prediction,
-            PredictionMinLength = () => settings.PredictionMinLength,
+            Prediction = () => shared.Current.Prediction,
+            PredictionMinLength = () => shared.Current.PredictionMinLength,
             Suggestions = DictionarySuggestions.Shared(AppPaths.DictionarySuggestionFile),
-            DictionarySuggest = () => settings.DictionarySuggest,
-            DictionarySuggestThreshold = () => settings.DictionarySuggestThreshold,
+            DictionarySuggest = () => shared.Current.DictionarySuggest,
+            DictionarySuggestThreshold = () => shared.Current.DictionarySuggestThreshold,
             Misspellings = MisspellingDictionary.Load(userDirectory),
             Languages = languages,
             Translations = TranslationDictionary.Load(),
-            TranslationCandidates = () => settings.TranslationCandidates,
+            TranslationCandidates = () => shared.Current.TranslationCandidates,
             Meanings = MeaningDictionary.Load(),
-            CandidateMeanings = () => settings.ShowCandidateMeanings,
+            CandidateMeanings = () => shared.Current.ShowCandidateMeanings,
             RomajiTypos = RomajiTypoCorrector.Load(detector.Romaji),
-            CorrectTypos = () => settings.CorrectTypos,
-            SpaceAroundEnglish = () => settings.SpaceAroundEnglish,
-            Punctuation = () => settings.Punctuation,
-            FullWidthSymbols = () => settings.FullWidthSymbols,
+            CorrectTypos = () => shared.Current.CorrectTypos,
+            SpaceAroundEnglish = () => shared.Current.SpaceAroundEnglish,
+            Punctuation = () => shared.Current.Punctuation,
+            FullWidthSymbols = () => shared.Current.FullWidthSymbols,
             TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
-        return new MeltypeSession(detector, converter, options, () => settings) { ReadingProvider = reader };
+        return new MeltypeSession(detector, converter, options, () => shared.Current) { ReadingProvider = reader };
     }
 
     /// <summary>英数 (直接入力) か。true の間はキーをすべてアプリに渡す (Mac の「英数」キー、「かな」キーで戻す)。</summary>

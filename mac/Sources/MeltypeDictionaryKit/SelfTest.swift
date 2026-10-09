@@ -53,6 +53,19 @@ public enum SelfTest {
         // FFI の形式
         let keys = [WordKey(reading: "きごう", word: "記号"), WordKey(reading: "めるたいぷ", word: "Meltype")]
         check(FfiFormat.parseKeys(FfiFormat.formatKeys(keys)) == keys, "読み Tab 語 の往復")
+        // 設定タブの JSON
+        let settingsJson = """
+        {"items":[{"key":"LiveConversion","label":"ライブ変換","description":"説明","group":"入力","kind":"bool","value":true},
+        {"key":"DetectionLevel","label":"自動判定の強さ","description":"説明","group":"入力","kind":"choice","value":"Balanced","options":[{"value":"Balanced","label":"標準 (Balanced)"},{"value":"Manual","label":"手動 (提案のみ)"}]},
+        {"key":"PredictionMinLength","label":"最小の文字数","description":"説明","group":"変換・候補","kind":"int","value":2,"min":1,"max":5}]}
+        """
+        let catalog = SettingsCatalog.parse(settingsJson)
+        check(catalog?.items.count == 3, "設定の JSON を読める")
+        check(catalog?.items[0].value == .bool(true) && catalog?.items[1].value == .string("Balanced") && catalog?.items[2].value == .int(2), "値の型 (真偽・文字列・数)")
+        check(catalog?.items[1].options?.map(\.label) == ["標準 (Balanced)", "手動 (提案のみ)"] && catalog?.items[2].min == 1 && catalog?.items[2].max == 5, "選択肢・範囲")
+        check(catalog?.groups.map(\.name) == ["入力", "変換・候補"] && catalog?.groups[0].items.count == 2, "グループは出てきた順")
+        check(SettingsCatalog.parse("{ 壊れた") == nil, "壊れた JSON は nil")
+        check(SettingValue.bool(false).jsonLiteral == "false" && SettingValue.int(3).jsonLiteral == "3" && SettingValue.string("a\"b").jsonLiteral == "\"a\\\"b\"", "本体に渡す JSON の値")
         check(FfiFormat.parseKeys("きごう\t記号\n\n欄なし\n\t空の読み\n").count == 1, "欄が足りない行・空の読みは飛ばす")
         check(FfiFormat.parseUserEntries("あ\tA\nい\tI").map(\.order) == [0, 1], "登録順はファイルの順")
         let removed = [RemovedEntry(index: 3, key: keys[0]), RemovedEntry(index: 10, key: keys[1])]
@@ -246,6 +259,23 @@ public enum SelfTest {
         check(!dictionary.excludedTerms().contains(words[1].key) && dictionary.userEntries()?.contains { $0.key == fixed } == false, "専門用語の編集を取り消せる")
         check(dictionary.setExcluded([first], excluded: false) == nil && dictionary.excludedTerms().isEmpty, "除外をやめられる")
         check(dictionary.setTermDomain(id: "civil", enabled: false), "分野を無効に戻せる")
+
+        // 設定タブ
+        guard let catalog = dictionary.settings() else {
+            check(false, "設定の一覧を取れる")
+            return
+        }
+        check(catalog.items.count >= 15 && catalog.groups.map(\.name) == ["入力", "変換・候補", "辞書", "ログ"], "設定のグループ (\(catalog.groups.map(\.name)))")
+        func item(_ key: String) -> SettingItem? { dictionary.settings()?.items.first { $0.key == key } }
+        check(item("LiveConversion")?.value == .bool(true), "ライブ変換は既定で ON")
+        check(dictionary.setSetting(key: "LiveConversion", value: .bool(false)) == nil && item("LiveConversion")?.value == .bool(false), "設定(真偽)を変えられる")
+        check(dictionary.setSetting(key: "DetectionLevel", value: .string("Conservative")) == nil && item("DetectionLevel")?.value == .string("Conservative"), "設定(選択肢)を変えられる")
+        check(dictionary.setSetting(key: "PredictionMinLength", value: .int(4)) == nil && item("PredictionMinLength")?.value == .int(4), "設定(数)を変えられる")
+        check(dictionary.setSetting(key: "PredictionMinLength", value: .int(9)) != nil && item("PredictionMinLength")?.value == .int(4), "範囲の外は理由を返して変えない")
+        check(dictionary.setSetting(key: "DetectionLevel", value: .string("Nope")) != nil, "知らない選択肢は理由を返す")
+        check(dictionary.setSetting(key: "NoSuchKey", value: .bool(true)) != nil, "知らない項目は理由を返す")
+        check(dictionary.setSetting(key: "LiveConversion", value: .int(1)) != nil, "型の違う値は理由を返す")
+        check(dictionary.resetSettings() == nil && item("LiveConversion")?.value == .bool(true) && item("PredictionMinLength")?.value == .int(2), "既定値に戻せる")
     }
 }
 

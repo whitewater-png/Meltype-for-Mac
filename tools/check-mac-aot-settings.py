@@ -15,7 +15,9 @@
 #   2. 辞書の管理画面の関数 (meltype_userdict_* / meltype_term_*): 登録・重複・編集・削除と復元・取り込み・書き出し・除外・専門用語の編集。
 #      保存したファイル (0600) を、別のプロセスで読み直しても保たれる
 #   3. 別々のプロセスが同時にユーザー辞書へ登録しても、1 語も消えない (ロック + 読み直してから書く)
-#   4. IME のつもりのプロセス (meltype_create のセッション) が動いたまま、別のプロセス (管理画面のつもり) の登録・除外・分野の切り替えが
+#   4. 設定タブの関数 (meltype_settings_*): 一覧の取得・真偽/選択肢/数の保存・不正な値の拒否・既定値に戻す。別のプロセスで読み直しても保たれ、
+#      読めない config.json は上書きしない。IME のつもりのプロセス (meltype_create のセッション) が、作り直さずに設定の変更に追随する
+#   5. IME のつもりのプロセス (meltype_create のセッション) が動いたまま、別のプロセス (管理画面のつもり) の登録・除外・分野の切り替えが
 #      すぐ反映される (変換の結果に出る・版が進む)。IME の側の登録 (meltype_add_user_word) も、管理画面の登録を消さない
 # 終了コード: 0 = 通った、1 = 失敗。
 import ctypes
@@ -43,6 +45,9 @@ def load(lib_path):
         "meltype_get_continue_after_conversion": ([], i),
         "meltype_set_shift_enter_newline": ([i], i),
         "meltype_get_shift_enter_newline": ([], i),
+        "meltype_settings_get": ([], p),
+        "meltype_settings_set": ([s, s], p),
+        "meltype_settings_reset": ([], p),
         "meltype_userdict_words": ([], p),
         "meltype_userdict_version": ([], i),
         "meltype_userdict_check": ([s, s, s, s], p),
@@ -132,6 +137,110 @@ def child_settings(lib, step):
     out["domains"] = domains(lib)
     out["continue"] = lib.meltype_get_continue_after_conversion()
     out["shift_enter"] = lib.meltype_get_shift_enter_newline()
+    return out
+
+
+def settings_items(lib):
+    """設定タブの一覧 (key → 項目)。取れなければ None。"""
+    raw = text(lib, lib.meltype_settings_get())
+    if raw is None:
+        return None
+    return {item["key"]: item for item in json.loads(raw)["items"]}
+
+
+def setting(lib, key, value):
+    """設定を 1 つ変える (value は JSON の値として渡す)。だめなら理由、できたら None。"""
+    return text(lib, lib.meltype_settings_set(u(key), u(json.dumps(value, ensure_ascii=False))))
+
+
+def child_settings_ops(lib):
+    """設定タブがする操作を一通り行う。"""
+    out = {}
+    out["data_directory"], out["safe"] = data_directory(lib)
+    if not out["safe"]:
+        return out
+    out["abi"] = lib.meltype_abi_version()
+    items = settings_items(lib)
+    out["keys"] = list(items)
+    out["detection"] = items["DetectionLevel"]
+    out["min_length"] = items["PredictionMinLength"]
+    out["live_default"] = items["LiveConversion"]["value"]
+    out["set_bool"] = setting(lib, "LiveConversion", False)
+    out["set_enum"] = setting(lib, "DetectionLevel", "Conservative")
+    out["set_punct"] = setting(lib, "Punctuation", "CommaJapanese")
+    out["set_int"] = setting(lib, "PredictionMinLength", 4)
+    out["set_continue"] = setting(lib, "ContinueAfterConversion", True)
+    out["set_shift_enter"] = setting(lib, "ShiftEnterNewline", False)
+    out["set_log"] = setting(lib, "LogTypedText", True)
+    out["bad_unknown"] = setting(lib, "NoSuchKey", True)
+    out["bad_type"] = setting(lib, "LiveConversion", "yes")
+    out["bad_range"] = setting(lib, "PredictionMinLength", 99)
+    out["bad_enum"] = setting(lib, "DetectionLevel", "Nope")
+    out["bad_int_for_enum"] = setting(lib, "DetectionLevel", 2)
+    out["bad_json"] = text(lib, lib.meltype_settings_set(u("LiveConversion"), u("{ 壊れた")))
+    after = settings_items(lib)
+    out["after"] = {key: after[key]["value"] for key in ("LiveConversion", "DetectionLevel", "Punctuation", "PredictionMinLength", "ContinueAfterConversion", "ShiftEnterNewline", "LogTypedText")}
+    # 入力メニュー用の getter (ConfigFlag) にも、設定タブの変更が見える
+    out["flag_continue"] = lib.meltype_get_continue_after_conversion()
+    out["flag_shift_enter"] = lib.meltype_get_shift_enter_newline()
+    return out
+
+
+def child_settings_read(lib):
+    out = {}
+    out["data_directory"], out["safe"] = data_directory(lib)
+    items = settings_items(lib)
+    out["values"] = {key: item["value"] for key, item in items.items()} if items is not None else None
+    return out
+
+
+def child_settings_reset(lib):
+    out = {}
+    _, safe = data_directory(lib)
+    if safe:
+        out["reset"] = text(lib, lib.meltype_settings_reset())
+        out["values"] = {key: item["value"] for key, item in settings_items(lib).items()}
+        out["flag_continue"] = lib.meltype_get_continue_after_conversion()
+        out["flag_shift_enter"] = lib.meltype_get_shift_enter_newline()
+    return out
+
+
+def child_settings_broken(lib):
+    """読めない config.json に対して、取得は NULL・変更と既定値に戻すは理由を返し、書かないこと。"""
+    out = {}
+    _, safe = data_directory(lib)
+    if safe:
+        out["get"] = text(lib, lib.meltype_settings_get())
+        out["set"] = setting(lib, "LiveConversion", False)
+        out["reset"] = text(lib, lib.meltype_settings_reset())
+    return out
+
+
+def comma_result(lib, session):
+    """日本語の入力の途中で「,」を打ち、変換中の文字を返す (句読点の設定が見える)。"""
+    type_keys(lib, session, "a")
+    result = text(lib, lib.meltype_handle_key(session, 0xBC, ord(","), 0, None, None))
+    view = json.loads(result).get("view") if result else None
+    type_keys(lib, session, "\x1b\x1b\x1b")
+    return view.get("text") if view else None
+
+
+def child_settings_watch(lib):
+    """IME のつもり: セッションを作って打つ。親の合図のあと、作り直さずにもう一度打って、設定タブの変更が見えるかを返す。"""
+    out = {}
+    out["data_directory"], out["safe"] = data_directory(lib)
+    if not out["safe"]:
+        print(json.dumps(out), flush=True)
+        return None
+    session = lib.meltype_create()
+    out["session"] = bool(session)
+    out["before"] = comma_result(lib, session)
+    out["flag_continue_before"] = lib.meltype_get_continue_after_conversion()
+    print(json.dumps({"ready": True}), flush=True)
+    sys.stdin.readline()            # 親が、別のプロセスで設定を変え終えるまで待つ
+    time.sleep(0.8)                 # ファイルの確認の間隔 (0.5 秒) より長く待つ
+    out["after"] = comma_result(lib, session)
+    out["flag_continue_after"] = lib.meltype_get_continue_after_conversion()
     return out
 
 
@@ -273,6 +382,18 @@ def child(lib_path, step, args):
     lib = load(lib_path)
     if step in ("write", "read"):
         out = child_settings(lib, step)
+    elif step == "settings-ops":
+        out = child_settings_ops(lib)
+    elif step == "settings-read":
+        out = child_settings_read(lib)
+    elif step == "settings-reset":
+        out = child_settings_reset(lib)
+    elif step == "settings-broken":
+        out = child_settings_broken(lib)
+    elif step == "settings-watch":
+        out = child_settings_watch(lib)
+        if out is None:
+            return
     elif step == "dict-ops":
         out = child_dict_ops(lib)
     elif step == "dict-read":
@@ -342,6 +463,89 @@ def check_settings(lib_path, failures):
         if again["continue"] != 1: failures.append("別プロセスで読み直すと、変換後も続けて入力が ON でない")
         if again["shift_enter"] != 0: failures.append("別プロセスで読み直すと、Shift+Enter で確定して改行が OFF でない")
     return True
+
+
+def check_settings_tab(lib_path, failures):
+    def expect(condition, message):
+        if not condition:
+            failures.append(message)
+
+    with tempfile.TemporaryDirectory(prefix="meltype-aot-tab-") as home:
+        ops = run(lib_path, home, "settings-ops")
+        if not ops["safe"]:
+            failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
+            return
+        expect(ops["abi"] == 7, f"FFI の版数が 7 でない: {ops['abi']}")
+        expect(len(ops["keys"]) >= 15 and ops["keys"][0] == "LiveConversion" and "DetectionLevel" in ops["keys"], f"設定の一覧が違う: {ops['keys']}")
+        expect(not {"Mode", "InputStyle", "AutoUpdate", "AppRules", "Profiles"} & set(ops["keys"]), "Mac で効かない設定が一覧にある")
+        expect(ops["detection"]["kind"] == "choice" and [o["value"] for o in ops["detection"]["options"]] == ["Aggressive", "Balanced", "Conservative", "Manual"], f"選択肢が違う: {ops['detection']}")
+        expect(ops["detection"]["label"] == "自動判定の強さ" and ops["detection"]["group"] == "入力" and ops["detection"]["description"], "名前・グループ・説明が違う")
+        expect(ops["min_length"]["kind"] == "int" and (ops["min_length"]["min"], ops["min_length"]["max"]) == (1, 5) and ops["min_length"]["value"] == 2, f"数の項目が違う: {ops['min_length']}")
+        expect(ops["live_default"] is True, "ライブ変換が既定で ON でない")
+        for name in ("set_bool", "set_enum", "set_punct", "set_int", "set_continue", "set_shift_enter", "set_log"):
+            expect(ops[name] is None, f"設定を保存できない ({name}): {ops[name]}")
+        expect(ops["bad_unknown"] and "NoSuchKey" in ops["bad_unknown"], f"未知の項目を断らない: {ops['bad_unknown']}")
+        expect(ops["bad_type"], "型の違う値を断らない")
+        expect(ops["bad_range"] and "1〜5" in ops["bad_range"], f"範囲の外を断らない: {ops['bad_range']}")
+        expect(ops["bad_enum"] and ops["bad_int_for_enum"] and ops["bad_json"], "未知の選択肢・型の違う値・壊れた JSON を断らない")
+        expect(ops["after"] == {"LiveConversion": False, "DetectionLevel": "Conservative", "Punctuation": "CommaJapanese", "PredictionMinLength": 4,
+                                "ContinueAfterConversion": True, "ShiftEnterNewline": False, "LogTypedText": True}, f"保存後の値が違う: {ops['after']}")
+        expect(ops["flag_continue"] == 1 and ops["flag_shift_enter"] == 0, "入力メニュー用の getter に、設定タブの変更が見えない")
+
+        data = os.path.join(home, "data")
+        config = json.load(open(os.path.join(data, "config.json"), encoding="utf-8"))
+        expect(config.get("DetectionLevel") == "Conservative" and config.get("Punctuation") == "CommaJapanese", f"列挙型が名前の文字列で保存されていない: {config.get('DetectionLevel')}")
+        expect(config.get("LiveConversion") is False and config.get("PredictionMinLength") == 4 and config.get("FileLog") is False, "config.json の値が違う")
+        expect(mode(os.path.join(data, "config.json")) == 0o600, "config.json が 0600 でない")
+
+        # 別のプロセスで読み直す
+        again = run(lib_path, home, "settings-read")
+        expect(again["values"] == {**again["values"], **ops["after"]}, f"別のプロセスで読み直すと値が違う: {again['values']}")
+
+        # 既定値に戻す: 一覧の項目だけ。一覧にない設定は残す
+        saved = json.load(open(os.path.join(data, "config.json"), encoding="utf-8"))
+        saved["PasteApps"] = "Foo.exe"
+        saved["Mode"] = "AutoSwitch"
+        json.dump(saved, open(os.path.join(data, "config.json"), "w", encoding="utf-8"), ensure_ascii=False)
+        reset = run(lib_path, home, "settings-reset")
+        expect(reset["reset"] is None, f"既定値に戻せない: {reset['reset']}")
+        expect(reset["values"]["LiveConversion"] is True and reset["values"]["DetectionLevel"] == "Balanced" and reset["values"]["PredictionMinLength"] == 2
+               and reset["values"]["ContinueAfterConversion"] is False and reset["values"]["ShiftEnterNewline"] is True, f"既定値に戻っていない: {reset['values']}")
+        expect(reset["flag_continue"] == 0 and reset["flag_shift_enter"] == 1, "入力メニュー用の getter も既定値に戻らない")
+        after_reset = json.load(open(os.path.join(data, "config.json"), encoding="utf-8"))
+        expect(after_reset.get("PasteApps") == "Foo.exe" and after_reset.get("Mode") == "AutoSwitch", "既定値に戻すとき、一覧にない設定まで消した")
+
+    # 読めない config.json は上書きしない
+    with tempfile.TemporaryDirectory(prefix="meltype-aot-tab-broken-") as home:
+        data = os.path.join(home, "data")
+        os.makedirs(data)
+        broken_text = "{ これは壊れた設定"
+        with open(os.path.join(data, "config.json"), "w", encoding="utf-8") as f:
+            f.write(broken_text)
+        broken = run(lib_path, home, "settings-broken")
+        expect(broken.get("get") is None, f"読めない設定で一覧を返す: {broken.get('get')}")
+        expect(broken.get("set") and broken.get("reset"), f"読めない設定への変更を断らない: {broken}")
+        expect(open(os.path.join(data, "config.json"), encoding="utf-8").read() == broken_text, "読めない config.json が書き換わった")
+
+    # IME のつもりのプロセスが動いたまま、設定タブ (別のプロセス) の変更が反映される
+    with tempfile.TemporaryDirectory(prefix="meltype-aot-tab-live-") as home:
+        watcher = subprocess.Popen(command(lib_path, "settings-watch"), env=env_for(home), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        ready = json.loads(watcher.stdout.readline())
+        if not ready.get("ready"):
+            failures.append(f"IME のつもりのプロセスが始まらない (設定): {ready}")
+            watcher.kill()
+            return
+        changer = run(lib_path, home, "settings-ops")   # 設定タブのつもり (句読点 CommaJapanese・変換後も続けて入力 ON ほか)
+        expect(changer["set_punct"] is None and changer["set_continue"] is None, "設定タブのつもりの変更ができない")
+        stdout, stderr = watcher.communicate("go\n", timeout=120)
+        if watcher.returncode != 0:
+            failures.append(f"IME のつもりのプロセスが異常終了 (設定): {stderr.strip()[-500:]}")
+            return
+        live = json.loads(stdout.strip().splitlines()[-1])
+        expect(live["session"], "セッションを作れない (設定)")
+        expect(live["before"] == "あ、", f"変更前の句読点が既定の「、」でない: {live['before']}")
+        expect(live["after"] == "あ，", f"作り直さなくても、設定タブの変更 (句読点「，。」) が入力に反映される: {live['after']}")
+        expect(live["flag_continue_before"] == 0 and live["flag_continue_after"] == 1, f"変換後も続けて入力の変更が、動いている IME に見えない: {live}")
 
 
 def check_dictionary(lib_path, failures):
@@ -457,12 +661,14 @@ def main():
     failures = []
     if not check_settings(lib_path, failures):
         return 1
+    check_settings_tab(lib_path, failures)
     settings_failures = len(failures)
     check_dictionary(lib_path, failures)
     for message in failures:
         print("FAIL:", message)
     if not failures:
         print("PASS: AOT 版で設定を保存・読み直しできた")
+        print("PASS: AOT 版で設定タブの操作・不正な値の拒否・別プロセスへの反映ができた")
         print("PASS: AOT 版で辞書の管理画面の操作・別プロセスへの反映・同時の登録ができた")
     else:
         print(f"FAIL (設定 {settings_failures} 件・辞書 {len(failures) - settings_failures} 件)")

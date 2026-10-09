@@ -39,7 +39,8 @@ internal static class AppPaths
         }
     }
 
-    public static string ConfigFile => Path.Combine(DataDirectory, "config.json");
+    /// <summary>設定ファイル。入力のたびに何度も使うので、毎回パスを組み立てず 1 度だけ作る (DataDirectory は変わらない)。</summary>
+    public static string ConfigFile { get; } = Path.Combine(DataDirectory, "config.json");
     public static string ModelFile => Path.Combine(DataDirectory, "model.json");
     public static string ConversionHistoryFile => Path.Combine(DataDirectory, "conversions.json");
     public static string DictionarySuggestionFile => Path.Combine(DataDirectory, "suggest.json");
