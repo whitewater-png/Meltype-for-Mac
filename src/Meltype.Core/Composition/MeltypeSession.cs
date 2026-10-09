@@ -266,7 +266,9 @@ public sealed class MeltypeSession
     /// 確定済みの文字列 (入力欄で選択されているもの) を読みに戻して変換を始める (Mac の選択 + Shift+Space)。
     /// 読みに戻せないとき・入力中・直接入力のときは Consumed = false (キーはアプリに渡す)。
     /// </summary>
-    public SessionResult Reconvert(string text)
+    public SessionResult Reconvert(string text) => Safely(() => ReconvertCore(text));
+
+    private SessionResult ReconvertCore(string text)
     {
         _host.Begin(null, false, null, null);
         // 段落のような長い選択を誤って再変換にかけない (読みに戻す処理と変換が重くなるため)。
@@ -327,6 +329,12 @@ public sealed class MeltypeSession
     /// </summary>
     public SessionResult HandleKey(int vk, char? ch, bool shift, bool control, bool alt, bool command, string? before = null, string? after = null)
     {
+        var current = new KeyEvent(vk, ch ?? 0, false, false, false, 0);
+        return Safely(() => HandleKeyCore(vk, ch, shift, control, alt, command, before, after), current);
+    }
+
+    private SessionResult HandleKeyCore(int vk, char? ch, bool shift, bool control, bool alt, bool command, string? before, string? after)
+    {
         if (ch is >= '\uF700' and <= '\uF8FF') ch = null; // 機能キーの文字 (右矢印 = U+F703 など)
         _host.Begin(ch, shift, before, after);
         // Apple 日本語入力と同じ Ctrl キーで表示モードを切り替える (変換ボックスが出ているときだけ)。
@@ -376,28 +384,53 @@ public sealed class MeltypeSession
     public void ForgetLastCommit() => _controller.ForgetLastCommit();
 
     /// <summary>予測候補ウィンドウで候補をクリックしたとき。</summary>
-    public SessionResult SelectPrediction(int index)
+    public SessionResult SelectPrediction(int index) => Safely(() =>
     {
         _host.Begin(null, false, null, null);
         _controller.SelectPrediction(index);
         return _host.Result(consumed: true);
-    }
+    });
 
     /// <summary>フォーカスが外れたときなど。未確定の内容をそのまま確定する。</summary>
-    public SessionResult CommitPending()
+    public SessionResult CommitPending() => Safely(() =>
     {
         _host.Begin(null, false, null, null);
         _controller.CommitPending();
         _controller.ResetContext();
         return _host.Result(consumed: true);
-    }
+    });
 
     /// <summary>候補ウィンドウで候補をクリックしたとき。</summary>
-    public SessionResult SelectCandidate(int index)
+    public SessionResult SelectCandidate(int index) => Safely(() =>
     {
         _host.Begin(null, false, null, null);
         _controller.SelectCandidate(index);
         return _host.Result(consumed: true);
+    });
+
+    /// <summary>
+    /// 入力の処理で例外が起きたら、状態を捨てて立て直す (Windows 版の CompositionService.Safely と同じ考え方)。
+    /// 例外のまま放っておくと、未確定の表示・先読みしたキュー・確定しかけた文字が中途半端に残り、同じ例外が続くと入力欄で使えなくなる。
+    /// 結果は「キーはアプリに渡す・変換ボックスは閉じる」で、その回にすでに確定した文字は失わない。
+    /// Mac の IME にはキーを送り直す手段が無い。今の Mac の経路は 1 キーごとに Pump でキューを空にするので、ここで返るキューは通常は空
+    /// 画面に出ていた未確定の文字は Reset では捨てず、見えていたまま (変換せずに) 確定として返す。Windows 版は捨てるが、Mac は
+    /// 画面の marked text を閉じる代わりに確定しないと、打った文章が消えるため。万一キューに文字が残っていたら、それも同様に確定として返す
+    /// (current は今処理しているキーで、アプリに渡すので足さない)。
+    /// </summary>
+    private SessionResult Safely(Func<SessionResult> body, KeyEvent? current = null)
+    {
+        try
+        {
+            return body();
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"Mac: 入力の処理で例外が起きたので入力をリセットしました: {ex}");
+            try { _controller.Reset(); } catch { }
+            List<CapturedInput> rest;
+            try { rest = _gate.Abort(); } catch { rest = []; }
+            return _host.ResultAfterFailure(rest, current);
+        }
     }
 
     private bool Feed(KeyEvent e, Func<KeyEvent, bool>? starts = null)
@@ -427,6 +460,8 @@ public sealed class MeltypeSession
         private string? _before, _after;
         private CompositionView? _view;
         private bool _hidden;
+        /// <summary>直近に呼び出し側へ返した変換ボックスの表示 (画面の未確定の文字)。例外のとき、これを捨てずに確定するために覚えておく。</summary>
+        private CompositionView? _delivered;
 
         public bool ReplayedCurrent { get; private set; }
 
@@ -443,12 +478,33 @@ public sealed class MeltypeSession
             _hidden = false;
         }
 
+        /// <summary>例外のあとの結果。その回に積んだ確定は残し、キーはアプリに渡し、変換ボックスは閉じる。</summary>
+        public SessionResult ResultAfterFailure(IReadOnlyList<CapturedInput> rest, KeyEvent? current)
+        {
+            var text = new StringBuilder();
+            // 画面に出ていた未確定の文字は、捨てずに (変換せず、見えていたまま) 確定する。
+            // その回にすでに確定していたら (= 前の未確定の文字は確定済み) 足さない。二重になるため。
+            if (_commits.Count == 0 && _pendingDelete == 0 && _delivered is { Text.Length: > 0 } shown) text.Append(shown.Text);
+            // 先に閉じた状態にしてから Result を呼ぶ (Result が _delivered を書き戻すので、後だと同じ文字を次の例外でもう一度確定してしまう)。
+            _view = null;
+            _hidden = true;
+            foreach (var input in rest)
+            {
+                if (input.Key is not { IsDown: true } key || VirtualKeys.IsModifier(key.Vk)) continue;
+                if (current is { } c && key.Vk == c.Vk && key.Scan == c.Scan) continue;
+                if (CharFromKey(key, false) is { } ch && !char.IsControl(ch)) text.Append(ch);
+            }
+            if (text.Length > 0) _commits.Add(new TextEdit(0, text.ToString(), null));
+            return Result(consumed: false);
+        }
+
         public SessionResult Result(bool consumed)
         {
             if (_pendingDelete > 0) _commits.Add(new TextEdit(_pendingDelete, "", OriginalOrNull()));
             _pendingDelete = 0;
             _pendingDeleteText = null;
-            return new SessionResult(consumed, _commits.ToList(), _hidden ? null : _view);
+            _delivered = _hidden ? null : _view;
+            return new SessionResult(consumed, _commits.ToList(), _delivered);
         }
 
         public void CommitText(string text)

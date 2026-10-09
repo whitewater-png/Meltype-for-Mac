@@ -477,4 +477,196 @@ internal static class SessionFacadeTests
         session.SetApp("com.example.Chat");
         Assert.True(session.Direct, "独自の種類で「最初は英数」なら英数から始める");
     }
+
+    /// <summary>失敗させる回数を指定できる変換器 (failures が負なら毎回失敗)。</summary>
+    private sealed class ThrowingConverter(int failures) : IKanjiConverter
+    {
+        private int _left = failures;
+        private readonly CompositionTests.FakeConverter _inner = new();
+
+        private void MaybeThrow()
+        {
+            if (_left == 0) return;
+            if (_left > 0) _left--;
+            throw new InvalidOperationException("テスト用の例外");
+        }
+
+        public string? Convert(string hiragana)
+        {
+            MaybeThrow();
+            return _inner.Convert(hiragana);
+        }
+
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null)
+        {
+            MaybeThrow();
+            return _inner.ConvertClauses(hiragana, context);
+        }
+    }
+
+    private static MeltypeSession CreateWith(IKanjiConverter converter) =>
+        new(CompositionTests.Detector, converter, new CompositionOptions(), () => new Settings());
+
+    [Test]
+    public static void Exception_ResetsAndDoesNotThrow()
+    {
+        var session = CreateWith(new ThrowingConverter(-1));
+        Type(session, "kyou");
+        var space = Type(session, " ")[0]; // 変換で例外になる
+        Assert.True(!space.Consumed, "例外のときはキーをアプリに渡す");
+        Assert.True(space.View is null, "例外のときは変換ボックスを閉じる");
+        Assert.True(!session.IsComposing, "例外のあとは未確定の内容を捨てる");
+        Assert.Equal("きょう", space.Commits.Single().Text); // 画面に出ていた未確定の文字は、消さずにそのまま確定する
+    }
+
+    [Test]
+    public static void Exception_NextKeyWorks()
+    {
+        var session = CreateWith(new ThrowingConverter(1));
+        Type(session, "kyou");
+        Type(session, " "); // 1 回だけ例外
+        var results = Type(session, "kyouha");
+        Assert.True(results.All(r => r.Consumed), "例外のあとも普通に入力できる");
+        Assert.Equal("きょうは", results[^1].View?.Text);
+        var enter = Type(session, "\n")[0];
+        Assert.Equal("きょうは", enter.Commits.Single().Text);
+    }
+
+    [Test]
+    public static void KanaTyping_WorksWithoutTouchingConverter()
+    {
+        var session = CreateWith(new ThrowingConverter(-1));
+        for (var round = 0; round < 3; round++)
+        {
+            var results = Type(session, "kyouha");
+            Assert.True(results[0].Consumed, "かな入力は変換器を使わないので続けられる");
+            Assert.Equal("きょうは", results[^1].View?.Text);
+            var enter = Type(session, "\n")[0];
+            Assert.Equal("きょうは", enter.Commits.Single().Text);
+        }
+    }
+
+    [Test]
+    public static void Exception_AfterReset_CommitPendingIsHarmless()
+    {
+        var session = CreateWith(new ThrowingConverter(-1));
+        Type(session, "kyou");
+        Type(session, " ");
+        var result = session.CommitPending();
+        Assert.True(result.View is null, "立て直したあとのフォーカス喪失の確定は何も残さず返る");
+    }
+
+    /// <summary>Armed の間 (と、predicate が当たるとき) だけ例外を投げる変換器。</summary>
+    private sealed class ArmedConverter : IKanjiConverter
+    {
+        public bool Armed { get; set; }
+        public Func<string, bool>? ThrowWhen { get; init; }
+        private readonly CompositionTests.FakeConverter _inner = new();
+
+        private void MaybeThrow(string hiragana)
+        {
+            if (Armed || ThrowWhen?.Invoke(hiragana) == true) throw new InvalidOperationException("テスト用の例外");
+        }
+
+        public string? Convert(string hiragana)
+        {
+            MaybeThrow(hiragana);
+            return _inner.Convert(hiragana);
+        }
+
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null)
+        {
+            MaybeThrow(hiragana);
+            return _inner.ConvertClauses(hiragana, context);
+        }
+    }
+
+    [Test]
+    public static void Exception_KeepsTypedKanaAsCommit()
+    {
+        var converter = new ArmedConverter();
+        var session = CreateWith(converter);
+        Type(session, "kyouha");
+        converter.Armed = true;
+        var result = Type(session, " ")[0];
+        Assert.Equal("きょうは", result.Commits.Single().Text);
+        Assert.True(!result.Consumed && result.View is null, "キーはアプリに渡し、変換ボックスは閉じる");
+    }
+
+    [Test]
+    public static void Exception_InLiveConversion_KeepsShownText()
+    {
+        // ライブ変換で、4 文字目の「は」を打った瞬間に変換器が例外を投げる。直前まで画面に出ていた文字を、1 度だけ確定する。
+        var session = new MeltypeSession(CompositionTests.Detector, new ArmedConverter { ThrowWhen = h => h == "きょうは" },
+            new CompositionOptions { LiveConversion = () => true }, () => new Settings());
+        var typed = Type(session, "kyouh");
+        var shown = typed[^1].View!.Text;
+        var failed = Type(session, "a")[0];
+        Assert.True(failed.Commits.Count == 1 && failed.Commits[0].Text == shown, $"画面に出ていた「{shown}」を 1 度だけ確定する (実際: {string.Concat(failed.Commits.Select(c => c.Text))})");
+        Assert.True(!session.IsComposing && failed.View is null, "例外のあとは入力が空");
+    }
+
+    [Test]
+    public static void SelectPrediction_WhenProviderWouldThrow_StillLeavesInputEmpty()
+    {
+        var armed = false;
+        var session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(),
+            new CompositionOptions
+            {
+                Predictions = _ => armed ? throw new InvalidOperationException("テスト用の例外") : ["きょうは", "きょうと"],
+            }, () => new Settings());
+        var typed = Type(session, "kyou");
+        Assert.True(typed[^1].View?.Predictions is { Count: > 0 }, "前提: 予測候補が出ている");
+        armed = true;
+        var result = session.SelectPrediction(0);
+        Assert.True(result.View is null && !session.IsComposing, "例外のあとは変換ボックスが空");
+    }
+
+    [Test]
+    public static void Exception_InReconvert_IsRecovered()
+    {
+        var converter = new ArmedConverter { Armed = true };
+        var session = CreateWith(converter);
+        var result = session.Reconvert("きょうは");
+        Assert.True(!result.Consumed && result.View is null && !session.IsComposing, "例外のあとは変換ボックスが空");
+        converter.Armed = false;
+        Assert.True(Type(session, "k")[0].Consumed, "例外のあとも入力できる");
+    }
+
+    [Test]
+    public static void CommitPending_AfterEarlierFailure_LeavesInputEmpty()
+    {
+        var converter = new ArmedConverter();
+        var session = CreateWith(converter);
+        Type(session, "kyou");
+        Type(session, " ");
+        converter.Armed = true;
+        var result = session.CommitPending();
+        Assert.True(result.View is null && !session.IsComposing, "例外のあとは変換ボックスが空");
+    }
+
+    [Test]
+    public static void Exception_Twice_DoesNotCommitShownTextAgain()
+    {
+        // 予測候補の関数が毎回例外になる。1 回目で画面の「きょう」を確定したら、2 回目で同じ文字をもう一度確定してはいけない。
+        var session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(),
+            new CompositionOptions { PredictionMinLength = () => 1, Predictions = h => h.Contains('あ') ? throw new InvalidOperationException("テスト用の例外") : [] }, () => new Settings());
+        Type(session, "kyou");
+        var first = Type(session, "a")[0];
+        var second = Type(session, "a")[0];
+        Assert.Equal("きょう", string.Concat(first.Commits.Select(c => c.Text)));
+        Assert.Equal("", string.Concat(second.Commits.Select(c => c.Text)));
+    }
+
+    [Test]
+    public static void Exception_AfterCommitInSameKey_DoesNotCommitShownTextAgain()
+    {
+        // 変換中に「a」を打つ → 「今日」を確定し、同じ回で新しい入力「あ」の予測候補を調べて例外。確定済みの「今日」をもう一度足さない。
+        var session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(),
+            new CompositionOptions { PredictionMinLength = () => 1, Predictions = h => h.Contains('あ') ? throw new InvalidOperationException("テスト用の例外") : [] }, () => new Settings());
+        Type(session, "kyou");
+        Type(session, " ");
+        var result = Type(session, "a")[0];
+        Assert.Equal("今日", string.Concat(result.Commits.Select(c => c.Text)));
+    }
 }

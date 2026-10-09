@@ -184,6 +184,8 @@ final class MeltypeInputController: IMKInputController {
         Self.trace("surroundingText before=\(Self.cut(before)) after=\(Self.cut(after))")
         guard let result = NativeCore.shared.handleKey(session, vk: vk, character: character, modifiers: modifiers, before: before, after: after) else {
             Self.trace("handleKey の結果なし")
+            // 本体が結果を返せなかった (FFI の層で例外など) ときも、前の未確定の表示を残さない。キーはアプリに渡す。
+            hideComposition(client: client)
             return false
         }
         Self.trace("handleKey consumed=\(result.consumed) commits=\(result.commits.map { "(del=\($0.deleteBefore) orig=\(Self.cut($0.original)) text=\(Self.cut($0.text)))" }.joined()) view=\(result.view.map { "text=\(Self.cut($0.text)) converting=\($0.converting) clauses=\($0.clauses.map { Self.cut($0) }) selectedClause=\($0.selectedClause)" } ?? "nil")")

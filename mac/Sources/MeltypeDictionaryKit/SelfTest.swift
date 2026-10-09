@@ -267,7 +267,7 @@ public enum SelfTest {
         check(dictionary.userProblem() == nil, "読めているときは問題なし")
 
         let domains = dictionary.termDomains()
-        check(Set(domains.map(\.id)) == ["ai", "civil", "it", "medical", "netslang", "video"], "同梱の分野 (\(domains.map(\.id)))")
+        check(Set(domains.map(\.id)) == ["ai", "business", "civil", "it", "medical", "netslang", "video"], "同梱の分野 (\(domains.map(\.id)))")
         check(domains.allSatisfy { !$0.enabled }, "既定はすべて OFF")
         let revision = dictionary.termRevision()
         check(dictionary.setTermDomain(id: "civil", enabled: true), "分野を有効にできる")
@@ -299,7 +299,7 @@ public enum SelfTest {
         }
         check(dictionary.termDomains().first { $0.id == domainId }.map { $0.isUser && $0.enabled && $0.name == "自作の用語" } == true, "一覧に自作・有効で出る")
         check(dictionary.createDomain(name: "自作の用語").error != nil && dictionary.createDomain(name: "").error != nil, "名前がかぶる・空は理由を返す")
-        check(dictionary.termDomains().filter(\.isUser).count == 1 && dictionary.termDomains().filter { !$0.isUser }.count == 6, "同梱の 6 分野は自作ではない")
+        check(dictionary.termDomains().filter(\.isUser).count == 1 && dictionary.termDomains().filter { !$0.isUser }.count == 7, "同梱の 7 分野は自作ではない")
         _ = dictionary.add(WordKey(reading: "うつしたい", word: "移したい語"))
         let moved = DictionaryChange.moveToDomain(id: domainId, keys: [WordKey(reading: "うつしたい", word: "移したい語"), WordKey(reading: "x", word: "短い")]).perform(on: dictionary)
         check(moved.error == nil && dictionary.userEntries()?.contains { $0.word == "移したい語" } == false, "移した語はユーザー辞書から消える")
