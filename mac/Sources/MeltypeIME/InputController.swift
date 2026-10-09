@@ -116,6 +116,8 @@ final class MeltypeInputController: IMKInputController {
     override func commitComposition(_ sender: Any!) {
         guard let client = (sender as? IMKTextInput) ?? (self.client() as? IMKTextInput) else { return }
         apply(NativeCore.shared.commit(session), to: client)
+        // 確定する内容が無くても (変換ボックスが無くても) 組版の状態は終えておく。冪等。
+        MeltypeConverter.shared.endComposition()
     }
 
     /// 入力メニューや Caps Lock でモードが切り替わったとき。英数なら直接入力、Meltype なら自動判定に合わせる。
@@ -473,6 +475,7 @@ final class MeltypeInputController: IMKInputController {
                 }
             }
             client.insertText(edit.text, replacementRange: range)
+            if hasMarkedText { MeltypeConverter.shared.endComposition() }
             hasMarkedText = false
         }
         // 登録提案ができた直後の確定なら、1 行のヒントを出す (1 日 1 回まで。出すかどうかは本体が決める)。
@@ -519,6 +522,8 @@ final class MeltypeInputController: IMKInputController {
         if hasMarkedText {
             client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
             hasMarkedText = false
+            // 変換ボックスが閉じたので、azooKey の差分変換の状態 (前回の入力) も終える。
+            MeltypeConverter.shared.endComposition()
         }
         candidateList = []
         shownIndex = 0

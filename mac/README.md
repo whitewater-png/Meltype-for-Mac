@@ -181,6 +181,17 @@ MELTYPE_DATA_DIR="$D" build/Meltype.app/Contents/Helpers/MeltypeDictionary.app/C
 8. もう一度同じコマンドで起動すると、新しく起動せずに最初のウインドウが前に出る
 9. 入れたあと (自分の Mac で ./build.sh): 入力メニューの「辞書を管理…」で前に出ること。画面で登録した語が、ほかのアプリでの変換にすぐ出ること。入力メニューから登録した語が、画面の一覧に出ること
 
+## 開発者向け: 変換の速度と正しさの計測 (`MeltypeIME --bench`)
+
+azooKey の変換まわり (`Converter.swift`) を変えたときの計測用です。IMKServer は立てず、標準出力に表を出して終わります (入力ソースには影響せず、`~/Library` にも書きません。学習データは一時フォルダーです)。
+
+```bash
+cd mac && swift build -c release
+.build/release/MeltypeIME --bench   # 1 分ほどかかる。辞書は同じフォルダーの *.bundle から読む
+```
+
+毎キーごとに止める従来の変換器と、差分変換の新しい変換器を並べて、(1) 10〜400 文字を 1 文字ずつ打つ速度 (Core と同じ「予測 → 変換 → 文節ごとの候補」の 3 呼び出し)、(2) 一括変換と 1 文字ずつ打った結果の一致、(3) ランダムな編集・学習を挟んだときの新旧の一致、(4) 予測だけが続くときの並びの違い、を出します。
+
 ## 開発者向け: AOT 版で設定を保存できるかの確認
 
 managed (dotnet) のテストが通っても、NativeAOT の `libMeltypeNative.dylib` では System.Text.Json の reflection が使えず、列挙型を持つ設定 (`Settings.Mode` など) の保存が例外になることがある (実際に、入力メニューの切り替えが保存失敗になった)。
