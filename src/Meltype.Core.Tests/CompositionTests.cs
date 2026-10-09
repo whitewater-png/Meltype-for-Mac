@@ -498,6 +498,27 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Punctuation_AfterEnglish_FollowedByJapanese()
+    {
+        // 英単語の後の , . も、すぐ後ろに日本語が続くなら日本語の句読点 (Ok,こんな → Ok、こんな)
+        foreach (var (typed, expected) in new[]
+        {
+            ("Ok,konnnakanjidesu.\n", "Ok、こんなかんじです。"),
+            ("OK,sorede.\n", "OK、それで。"),
+            ("ok.jaa,mataashita.\n", "ok。じゃあ、またあした。"),
+            // 全部英語なら英文の句読点のまま
+            ("Hello, world.\n", "Hello, world."),
+            // 空白を挟んだら英文の句読点のまま (Space で英語として確定している)
+            ("Ok, konnnakanjidesu.\n", "Ok, こんなかんじです。"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, k.Host.Document, typed.TrimEnd());
+        }
+    }
+
+    [Test]
     public static void Punctuation_Comma()
     {
         // 設定「，．」: 技術文書向け

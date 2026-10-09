@@ -81,6 +81,11 @@ public sealed class CompositionDetector
     {
         var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final);
         if (kanaInput) return segments;
+        // 英語の後ろの , . は半角にしたが、すぐ後ろに日本語が続いた (Ok,konnna → Ok、こんな) なら、日本語の文の句読点にして分け直す。
+        if (PunctuationBeforeJapanese(units, segments) is { } japanesePunctuation)
+        {
+            segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation);
+        }
         // 辞書にない英単語 (stackoverflow など) を最初から打っているなら全体を英語にする。
         // 途中の区間 (… flow) だけを英語にすると「sたcこvえrflow」のようになってしまう。
         // ただし先頭が辞書の英単語として区切れている (github に push) ならその区切りを使う。
@@ -116,7 +121,30 @@ public sealed class CompositionDetector
         return null;
     }
 
-    private List<CompositionSegment> FindSpans(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish, bool? followingEnglish, DetectionLevel level, bool englishSentence, bool kanaInput, bool final)
+    /// <summary>
+    /// 英語の区間にした , . だけの区間のうち、すぐ後ろが英字を打った日本語の区間 (こんな) のものの単位の位置。無ければ null。
+    /// 後ろが空白・記号だけ (Ok, thanks の空白) や英語なら英文の句読点のまま。
+    /// </summary>
+    private static HashSet<int>? PunctuationBeforeJapanese(IReadOnlyList<CompositionUnit> units, List<CompositionSegment> segments)
+    {
+        HashSet<int>? result = null;
+        var unit = 0;
+        for (var s = 0; s < segments.Count; s++)
+        {
+            var first = unit;
+            for (var remaining = segments[s].Raw.Length; unit < units.Count && remaining > 0; unit++) remaining -= units[unit].Raw.Length;
+            if (!segments[s].IsEnglish || segments[s].Raw is not { Length: > 0 } raw || !raw.All(c => c is ',' or '.')) continue;
+            if (s + 1 < segments.Count && !segments[s + 1].IsEnglish && segments[s + 1].Raw is [var next, ..] && char.IsAsciiLetter(next))
+            {
+                result ??= [];
+                for (var k = first; k < unit; k++) result.Add(k);
+            }
+        }
+        return result;
+    }
+
+    private List<CompositionSegment> FindSpans(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish, bool? followingEnglish, DetectionLevel level, bool englishSentence, bool kanaInput, bool final,
+        HashSet<int>? japanesePunctuation = null)
     {
         var n = units.Count;
         var segments = new List<CompositionSegment>();
@@ -145,7 +173,8 @@ public sealed class CompositionDetector
             }
             // 英文の中の記号 (, . ! ? -) は読点・句点にせず半角のまま。日本語の文の中の英単語の後 (今日はgoogle、) は日本語の記号。
             // (かな入力では 、。 も かなのキーなので対象外)
-            if (!kanaInput && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter))) found = i + 1;
+            if (!kanaInput && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&
+                japanesePunctuation?.Contains(i) != true) found = i + 1;
             if (!kanaInput && found < 0) found = UserNameEnd(units, i, pending);
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = CapitalizedWordEnd(units, i, pending, final);
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = HyphenatedWordEnd(units, i, pending);
