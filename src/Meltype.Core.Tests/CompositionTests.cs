@@ -903,6 +903,43 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void AutoCorrect_NotWhenCaretIsElsewhere()
+    {
+        // 「i 」の後にクリックで別の場所へ移った (Meltype はクリックを知らない) 想定。キャレットの前が記録と違うので消さない。
+        var k = new Keyboard();
+        k.Type("i w\b"); // 「い」が確定し、変換ボックスが空になる
+        k.Host.PrecedingText = "ほかの場所";
+        Thread.Sleep(1700); // 自分の確定の記録を信じる時間 (OwnCommitTrustMs) を過ぎて、入力欄から読んだ文字を使わせる
+        k.Type("want ");
+        Assert.True(!k.Host.Events.Any(e => e.StartsWith("bs:")), "別の場所の文字を消さない: " + string.Join("|", k.Host.Events));
+    }
+
+    [Test]
+    public static void AutoCorrect_StillWorksAfterTrustTimeWhenPrecedingMatches()
+    {
+        // 1.5 秒たって入力欄から読んだ文字を使うようになっても、記録と一致すれば直す (誤検知しない)。
+        var k = new Keyboard();
+        k.Type("i w\b");
+        k.Host.PrecedingText = "い";
+        Thread.Sleep(1700);
+        k.Type("want ");
+        Assert.True(k.Host.Events.Contains("bs:1"), string.Join("|", k.Host.Events));
+    }
+
+    [Test]
+    public static void AutoCorrect_TreatsNoBreakSpaceAsSpace()
+    {
+        // Chrome・Safari は行末の空白を U+00A0 で返すことがある。
+        var k = new Keyboard();
+        k.Host.PrecedingText = "I love ";
+        k.Type("sushi g\b");
+        k.Host.PrecedingText = "I love sushi\u00A0";
+        Thread.Sleep(1700);
+        k.Type("gasuki\n");
+        Assert.True(k.Host.Events.Any(e => e.StartsWith("bs:")), string.Join("|", k.Host.Events));
+    }
+
+    [Test]
     public static void AutoCorrect_NotWhenUserChoseCandidate()
     {
         var k = new Keyboard();
@@ -1678,6 +1715,54 @@ internal static class CompositionTests
         k.Press(VirtualKeys.Return);
         Assert.Equal("お世話になります", k.Host.Document, "Enter で予測が確定する");
         Assert.True(k.Host.View is null, "確定したら変換ボックスは閉じる");
+    }
+
+    [Test]
+    public static void ShiftEnter_CommitsAndPassesEnter()
+    {
+        var k = new Keyboard();
+        k.Type("aiueo");
+        k.Key(VirtualKeys.LShift);
+        k.Press(VirtualKeys.Return);
+        k.Key(VirtualKeys.LShift, up: true);
+        Assert.Equal("あいうえお", k.Host.Document, "確定する");
+        Assert.True(k.Host.Events.Contains("down:0D"), "Enter はアプリに渡す: " + string.Join("|", k.Host.Events));
+    }
+
+    [Test]
+    public static void Enter_Alone_DoesNotPassEnter()
+    {
+        var k = new Keyboard();
+        k.Type("aiueo");
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("あいうえお", k.Host.Document);
+        Assert.True(!k.Host.Events.Contains("down:0D"), "Enter 単体は確定のみ: " + string.Join("|", k.Host.Events));
+    }
+
+    [Test]
+    public static void ShiftEnter_WhileConverting_CommitsAndPassesEnter()
+    {
+        var k = new Keyboard();
+        k.Type("aiueo ");
+        Assert.True(k.Host.View is { Converting: true }, "Space で変換中");
+        k.Key(VirtualKeys.LShift);
+        k.Press(VirtualKeys.Return);
+        k.Key(VirtualKeys.LShift, up: true);
+        Assert.True(k.Host.Document.Length > 0, "確定する");
+        Assert.True(k.Host.Events.Contains("down:0D"), string.Join("|", k.Host.Events));
+    }
+
+    [Test]
+    public static void ShiftEnter_WhilePredicting_CommitsPredictionAndPassesEnter()
+    {
+        var k = new Keyboard(predictions: OsewaPredictions);
+        k.Type("osewa");
+        k.Press(VirtualKeys.Tab);
+        k.Key(VirtualKeys.LShift);
+        k.Press(VirtualKeys.Return);
+        k.Key(VirtualKeys.LShift, up: true);
+        Assert.Equal("お世話になります", k.Host.Document, "予測が確定する");
+        Assert.True(k.Host.Events.Contains("down:0D"), string.Join("|", k.Host.Events));
     }
 
     [Test]

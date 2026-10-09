@@ -973,3 +973,99 @@ azooKey の経路ごとの 1 呼び出し (新、20〜50 文字の読み 24 文�
 
 - **スロット選択**: 読み全体の変換のあとに先頭の文節の変換が来ると、読み全体のスロットが短い読みで上書きされ、次のキーの予測で後ろ半分を計算し直していた。直前に使ったスロットの読みの真の接頭辞は避けるようにした (平均 100 文字で 15.0 → 13.2 ms)。
 - `withSession` の `try?` と `??` の組み合わせ (Optional が戻り値のとき処理が二重に走りうる) を `do` / `catch` に変えた。ベンチ専用の static・環境変数を本番コードから除き、引き数付きの初期化にした。
+
+## 追加項目 P22 (Mac 版: 確定し直しが別の場所の文字を消す)
+
+### 現象
+
+Google ドキュメントで、確定済みの文字 (例: 「v1.1.2】Mel」の「2】Mel」) が、変換中の 1 文字に置き換わる。確定済みの文字を消す処理は Core の「確定し直し」(`CorrectPreviousCommit`) だけ。
+
+### 原因
+
+- (a) Windows 版は Meltype を通らないキー・クリックで `ForgetLastCommit` を呼び、確定の記録 (`_correctable`) を捨てる。Mac 版はマウスクリックを知る手段が無く、記録が残ったまま別の場所で確定し直しが発火する。
+- (b) Google ドキュメントなど `selectedRange` や範囲が不正確なアプリでは、消す範囲がずれる。Swift 側は消す前に中身を確かめていなかった。
+
+### 修正 (3 層の防御)
+
+| ファイル | 内容 |
+| --- | --- |
+| `src/Meltype.Core/Composition/CompositionController.cs` | `CorrectPreviousCommit` で、`_precedingText` があり `original` で終わっていなければ、ログに残して記録を捨て、確定し直さない。`original` が 20 文字を超えるときも (比べられないので) 直さない。`IHost.DeleteBackward(int, string expected)` を既定実装つきで追加 (既定は 1 引数版を呼ぶ。Windows の `ICompositionHost` 実装は無変更) |
+| `src/Meltype.Core/Composition/MeltypeSession.cs` | host が 2 引数版を実装して消す文字列を保持。`TextEdit` に `Original` を追加し、JSON に `"original"` を出す (null なら出さない)。Linux の `ibus-engine-meltype` は `dict.get` で読むので未知のキーは無視される |
+| `mac/Sources/MeltypeIME/NativeCore.swift` | `TextEdit` に `original: String?` |
+| `mac/Sources/MeltypeIME/InputController.swift` | `apply` で、キャレットが取れないとき、または `attributedSubstring(from:)` が `original` と違うときは、その edit 全体 (削除も挿入も) を飛ばす。確定済みの文字はそのまま残り、続く新しい語の確定は通常どおり入る |
+| `src/Meltype.Core.Tests/CompositionTests.cs` / `SessionFacadeTests.cs` | `AutoCorrect_NotWhenCaretIsElsewhere` (別の場所へ移ったら `bs:` が出ない)、`Json_IncludesOriginalOnlyWhenPresent` |
+
+### 挙動の変化
+
+- クリックなどでキャレットが動いた後は確定し直しが効かなくなる (Windows 版と同じ結果)。
+- 自分の確定から 1.5 秒以内 (`OwnCommitTrustMs`) は従来どおり直す (自分の記録と比べるので一致する)。この間にクリックで移ると Core の層では防げず、Swift 側の確認が頼り。
+
+### 未検証
+
+- 原因 (d) は実機で確認済み (トレースで marked 範囲が {0,1} のみ置換されていた)。それ以外 (確定し直しの層 1〜3、クリック検知) は実機未確認。
+- Google ドキュメントで `attributedSubstring(from:)` が何を返すか (nil や空を返すなら、確定し直しは常に飛ばされる。その場合は安全側に倒れるだけで、文字は消えない)。
+
+### P22 査読後の追加 (第 2 ラウンド)
+
+- **U+00A0 の正規化**: Chrome・Safari の入力欄は行末の空白を U+00A0 で持つことがある。Core の `EndsWith` 比較と Swift の `attributedSubstring` 比較の前に、両側の U+00A0 を半角空白に揃える (そのままだと「sushi 」のような空白で終わる語は常に不一致になる)。
+- **クリック検知 (原因 (a) の根本対策)**: `recognizedEvents` にマウス押下 (左・右・その他) を足し、`handle` の先頭で新 FFI `meltype_forget_last_commit` (`MeltypeSession.ForgetLastCommit` → Controller の同名) を呼んで `return false`。変換中の文字の確定・取消はしない。symbol は optional 解決で ABI 版数は据え置き (古い dylib なら何もしない)。
+- **`HandleKey` の早期 return** (直接入力・アプリ OFF・無効) でも記録を捨てる (Windows の「アプリに渡したキーでは捨てる」と同じ)。
+- **ログ**: Swift で edit を飛ばしたとき `NSLog` に飛ばした旨と文字数だけ出す (文字そのものは出さない)。
+- **整合チェック**: host で、消す文字数と保持した文字列の長さが合わなければ `Original` を null にする。
+- **テスト**: 1.5 秒経過後も一致すれば直す / U+00A0 で終わっていても直す / `MeltypeSession` 経由の JSON に `original` / `ForgetLastCommit` の後は直さない。
+
+### P22 の影響範囲と限界
+
+- 影響は Google ドキュメントに限らない。`attributedSubstring` を返さない・返すのが遅れるアプリでは、確定し直しが飛ばされる (文字は消えない安全側。確定し直しが効かないだけ)。
+- 自分の確定から 1.5 秒以内のクリックは、Core の層 (層 1) が自分の記録を信じて素通しする。クリック検知が働かなければ、頼りは Swift の層 3 だけになる。
+
+### P22 実機確認の手順 (未検証)
+
+1. TextEdit で「i want 」が「I want 」に、「sushi がすき」が「すしがすき」に直ること。
+2. Chrome の Gmail の本文で同様に直ること (U+00A0 の正規化が効くか)。
+3. 確定の直後に別の場所をクリックしてから続けて打ったとき、直さず元の文字が残ること。IMK がマウス押下を `handle(_:client:)` に渡すかは実機でしか分からない。
+4. Google ドキュメントで FileLog を ON にして再現手順を試し、ログに「確定し直しました」が出るか、`Console.app` に「確定し直しを飛ばしました」が出るかを見る。
+
+### P22 原因 (c): 確定とキーの素通しが同じイベントで起きる (当時の案。誤り。取り消し済み)
+
+- 英数字だけの変換ボックスで矢印を押すと「確定 + キーの素通し」が同じイベントで起き、Google ドキュメントが混乱すると考え、Swift で移動キーを飲み込む案を入れた。
+- 後のトレースで原因 (d) が確定し、この仮説は誤りと分かったため、変更 (`hadMarkedText` / `isNavigationKey`) はすべて取り消した。コードには残っていない。
+
+### P22 原因 (d): 機能キーの文字が変換ボックスに入る (トレースで確定)
+
+- **トレースの要点**: 右矢印のたびに `view.text` の長さが 1 → 2 に増え、`setMarkedText` の selectionRange が {2,0}、marked 範囲が {0,1} → {0,2} と広がった (U+F703 は不可視なので表示では分からない)。
+- **原因**: `InputController.handle` は `event.characters` の UTF-16 が 1 単位なら `character` として Core に渡す。矢印キーなどの機能キーの `characters` は Unicode 私用領域の文字 (U+F700〜U+F8FF。右矢印 = U+F703 `NSRightArrowFunctionKey`) で、Core には「vk=Right, ch=U+F703」が届く。英数字だけの変換ボックス (「2」) は矢印の処理 (`EnterClauseSelection`、かなのときだけ) を通らず、`CharFromKey` → `_text.Append(ch)` に落ちて U+F703 が変換ボックスに追加される。Google ドキュメントは marked 範囲を 1 文字ずつ広げ、Enter の `insertText` がその範囲を置き換えて既存の文字を消す。Core 単体 (ch = null) では「確定 + 素通し」になるので、原因 (c) の前提は誤りだった。
+- **修正**:
+
+| ファイル | 内容 |
+| --- | --- |
+| `mac/Sources/MeltypeIME/InputController.swift` | `character` を決めるとき U+F700〜U+F8FF は 0 にする。原因 (c) の移動キーを飲み込む変更と `isNavigationKey` は削除 |
+| `src/Meltype.Core/Composition/MeltypeSession.cs` | `HandleKey` の入口で ch が U+F700〜U+F8FF なら null に、host の `CharFromKey` も同じ範囲を null にする (Linux 側からも同じ経路で来うるため二重に守る) |
+| `src/Meltype.Core.Tests/SessionFacadeTests.cs` | 「2」→ 右矢印 (ch = U+F703) で `consumed:false`・commits は「2」だけ・view が null。「か」→ 同じ右矢印で文節選択に入り view.text が「か」のまま |
+
+- **トレース機能**: `MeltypeTraceIMK` (既定 OFF)、出力は `imk-trace.log`。そのまま残した。
+- **実機確認の手順**: Google ドキュメントで「2」→ 右矢印連打 → Enter で後ろの文字が消えないこと。英単語 (google) → 右矢印でキャレットが 1 つ右に動くこと。TextEdit でも同じこと。
+
+### P22 補足 (最終査読の反映)
+
+- **`_precedingText` の照合は Windows にも効く**: 照合は共通 Core (`CorrectPreviousCommit`) にあるため、Windows 版にも効く。UI Automation で読んだ前の文字と食い違うアプリでは、確定し直しが止まりうる (Windows は実機未確認)。ホスト実装は無変更という意味でのみ「無変更」。
+- **素通しキーで記録を捨てる**: `MeltypeSession.HandleKey` の通常経路で、アプリに渡したキー (修飾キーを除く) のとき `ForgetLastCommit` を呼ぶ (Windows の `MeltypeEngine` と同じ)。
+- **機能キーの文字の範囲**: U+F700〜U+F8FF を落とす。境界はテスト済み (U+F6FF は文字として通り、U+F8FF は落ちる)。
+- **マウス押下の検知**: トレースでは「マウス押下」が 0 件 (858 行を確認)。Chrome では IMK がマウスを渡していない可能性が高い。害はないので残す。
+- **トレース機能の注意**:
+  - ON: `defaults write io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK -bool true`。OFF: `defaults delete io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK`。
+  - 設定は起動時に 1 回だけ読むので、切り替えたら IME のプロセスを再起動する (`pkill -x Meltype`)。
+  - `~/Library/Application Support/Meltype/imk-trace.log` (0600) に、打った文字・キャレットの前後 20 文字・確定/変換中の文字が残る。使い終わったらこのファイルを消す。
+  - 秘匿入力 (パスワード欄) とアプリ別 OFF のアプリでは記録しない (その判定より後でログを出す)。
+
+## 追加項目 P23 (Shift+Enter で確定と改行)
+
+- **現象**: Web アプリ (Chrome など) で、文を打ってそのまま Shift+Enter しても改行できない。
+- **原因**: 変換ボックスが開いている間、`CompositionController` の Return 処理 (通常・変換中 `HandleConversionKey`・予測中 `HandlePredictionKey`) は Shift の有無にかかわらず「確定して消費」する。確定だけされて、改行のキーがアプリに届かない。
+- **修正** (`CompositionController.cs`): 変換ボックスが開いていて Shift+Enter (`_swallowedShift.Count > 0 || _host.IsShiftDown()`) のときは、確定したうえで `ReplayDown(e)` でキーをアプリに渡す。予測候補を選んでいるときはその予測を確定、未変換のときは `FixTypos()` してから確定。Enter 単体は従来どおり確定のみ (チャット欄で送信されないように)。変換ボックスが空のときの Shift+Enter は従来どおり素通し。`docs/USAGE.md` のキー表にも追加。
+- **Windows への影響**: 同じ Core を通るので、Windows でも変換中の Shift+Enter は「確定 + 改行」になる (フックが送り直す)。Windows は実機未確認。
+- **テスト**: `CompositionTests` に 4 件 (未変換 / Enter 単体 / 変換中 / 予測中)、`SessionFacadeTests` に 2 件 (Shift+Enter は `consumed:false`、Enter 単体は `consumed:true`)。
+
+### P23 実機確認 (2026-10-09)
+- Google ドキュメント (Chrome): 下線ありの Shift+Enter で確定 + 改行を確認。
+- Discord (Chrome の Web 版): 最初は下線なしでも Shift+Enter が効かなかったが、ページの再読み込みで解消。トレースでは Meltype は Shift+Enter をすべて素通ししていたので、P22 の修正前の版 (矢印キーの機能キー文字が変換ボックスに入っていた) での操作で Discord のページ側の状態が固まっていたと判断。再読み込み後は「下線あり Shift+Enter → 確定 + 改行」「続けて下線なし Shift+Enter → 改行」「Enter 確定 → Shift+Enter → 改行」のすべてが正常で、固まらない。コード変更なし。

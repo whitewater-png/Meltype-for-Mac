@@ -46,12 +46,76 @@ final class MeltypeInputController: IMKInputController {
         NativeCore.shared.destroySession(session)
     }
 
+    // ---- 原因調査用のトレース ----
+    // `defaults write io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK -bool true` で ON (起動時に 1 回読む)。出力は Application Support/Meltype/imk-trace.log。OFF のときは何も出さず、
+    // 範囲の読み取り (selectedRange / markedRange) も呼ばない (呼び出し自体がアプリの状態を変える疑いがあるため)。
+
+    private static let trace: Bool = {
+        let on = UserDefaults.standard.bool(forKey: "MeltypeTraceIMK")
+        if on {
+            let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+            appendTrace("trace start \(version) \(Bundle.main.bundleIdentifier ?? "?")")
+        }
+        return on
+    }()
+
+    private static func trace(_ message: @autoclosure () -> String) {
+        guard trace else { return }
+        appendTrace(message())
+    }
+
+    /// ~/Library/Application Support/Meltype/imk-trace.log に 1 行追記する (毎回開いて閉じる。診断用なので簡単な実装)。
+    private static func appendTrace(_ message: String) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        let line = "\(formatter.string(from: Date())) \(message)\n"
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        let directory = base.appendingPathComponent("Meltype")
+        let file = directory.appendingPathComponent("imk-trace.log")
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        guard let data = line.data(using: .utf8) else { return }
+        // 打った文字が残るので、自分だけが読める権限 (0600) にする (既存のファイルにも付ける)。
+        if !FileManager.default.fileExists(atPath: file.path) {
+            FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        } else {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+        }
+        if let handle = try? FileHandle(forWritingTo: file) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        } else {
+            try? data.write(to: file)
+        }
+    }
+
+    /// 40 文字で切り、改行は見える形にする。
+    private static func cut(_ text: String?) -> String {
+        guard let text else { return "nil" }
+        let escaped = text.replacingOccurrences(of: "\n", with: "\\n").replacingOccurrences(of: "\u{00A0}", with: "\\u00A0")
+        return "\"" + String(escaped.prefix(40)) + (escaped.count > 40 ? "…" : "") + "\""
+    }
+
+    /// トレース用: 今の選択範囲と変換中の範囲 (trace が ON のときだけ呼ばれる)。
+    private static func ranges(_ client: IMKTextInput) -> String {
+        "selected=\(NSStringFromRange(client.selectedRange())) marked=\(NSStringFromRange(client.markedRange()))"
+    }
+
     override func recognizedEvents(_ sender: Any!) -> Int {
-        Int(NSEvent.EventTypeMask.keyDown.rawValue)
+        // マウスの押下も受ける: キャレットが動いたことを本体に伝え、直前の語を確定し直さないようにする (下の handle)。
+        // IMK が実際にマウスのイベントを渡すかはアプリ次第 (未検証)。
+        Int((NSEvent.EventTypeMask.keyDown.union(.leftMouseDown).union(.rightMouseDown).union(.otherMouseDown)).rawValue)
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
-        guard let event, event.type == .keyDown, let client = sender as? IMKTextInput else { return false }
+        guard let event else { return false }
+        // クリックでキャレットが別の場所へ移ったかもしれない。確定し直しの記録を捨てるだけ (変換中の文字の確定・取消はしない)。
+        if event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .otherMouseDown {
+            Self.trace("マウス押下: forgetLastCommit を呼ぶ type=\(event.type.rawValue)")
+            NativeCore.shared.forgetLastCommit(session)
+            return false
+        }
+        guard event.type == .keyDown, let client = sender as? IMKTextInput else { return false }
 
         // パスワード欄など、macOS が「秘匿入力」にしているとき (IsSecureEventInputEnabled) は、キーを一切扱わずアプリに素通しする。
         // 本体 (学習・提案・ログ) にも何も渡さず、周りの文字 (surroundingText) も読まない。未確定の文字が残っていれば先に確定する。
@@ -63,6 +127,9 @@ final class MeltypeInputController: IMKInputController {
 
         // アプリ別設定で OFF・ゲームのアプリ (setApp の戻り値 .disabled) は、英数/かなキーも含めて全てアプリに素通しする。
         if appKind == .disabled { return false }
+
+        // トレースは、秘匿入力・アプリ別 OFF のときは記録しない (ここより後)。
+        Self.trace("handle keyCode=\(event.keyCode) flags=\(event.modifierFlags.rawValue) hasMarkedText=\(hasMarkedText) \(Self.ranges(client)) bundle=\(client.bundleIdentifier() ?? "nil")")
 
         // JIS キーボードの「英数」「かな」キー: 英数 (直接入力) ⇔ 日本語。
         switch Int(event.keyCode) {
@@ -84,7 +151,9 @@ final class MeltypeInputController: IMKInputController {
 
         guard let vk = KeyMapping.virtualKey(for: event) else { return false }
         let utf16 = Array((event.characters ?? "").utf16)
-        let character: Int32 = utf16.count == 1 ? Int32(utf16[0]) : 0
+        // 矢印・Home などの機能キーの characters は Unicode 私用領域の文字 (U+F700〜U+F8FF。右矢印は U+F703) なので、文字としては渡さない。
+        // 渡すと英数字だけの変換ボックス (「2」など) で矢印がその文字を変換ボックスに足し、Google ドキュメントが変換中の範囲を広げて後ろの文字を消す。
+        let character: Int32 = utf16.count == 1 && !(0xF700...0xF8FF).contains(utf16[0]) ? Int32(utf16[0]) : 0
         let flags = event.modifierFlags
         var modifiers: Int32 = 0
         if flags.contains(.shift) { modifiers |= 1 }
@@ -105,9 +174,12 @@ final class MeltypeInputController: IMKInputController {
         }
 
         let (before, after) = hasMarkedText ? (nil, nil) : surroundingText(of: client)
+        Self.trace("surroundingText before=\(Self.cut(before)) after=\(Self.cut(after))")
         guard let result = NativeCore.shared.handleKey(session, vk: vk, character: character, modifiers: modifiers, before: before, after: after) else {
+            Self.trace("handleKey の結果なし")
             return false
         }
+        Self.trace("handleKey consumed=\(result.consumed) commits=\(result.commits.map { "(del=\($0.deleteBefore) orig=\(Self.cut($0.original)) text=\(Self.cut($0.text)))" }.joined()) view=\(result.view.map { "text=\(Self.cut($0.text)) converting=\($0.converting) clauses=\($0.clauses.map { Self.cut($0) }) selectedClause=\($0.selectedClause)" } ?? "nil")")
         apply(result, to: client)
         return result.consumed
     }
@@ -115,6 +187,7 @@ final class MeltypeInputController: IMKInputController {
     /// フォーカスが外れた・クリックで別の場所に移ったときなど。未確定の内容をそのまま確定する。
     override func commitComposition(_ sender: Any!) {
         guard let client = (sender as? IMKTextInput) ?? (self.client() as? IMKTextInput) else { return }
+        Self.trace("commitComposition が呼ばれた hasMarkedText=\(hasMarkedText) \(Self.ranges(client))")
         apply(NativeCore.shared.commit(session), to: client)
         // 確定する内容が無くても (変換ボックスが無くても) 組版の状態は終えておく。冪等。
         MeltypeConverter.shared.endComposition()
@@ -456,6 +529,12 @@ final class MeltypeInputController: IMKInputController {
 
     // ---- 結果を入力欄に反映する ----
 
+    /// 入力欄の文字列と記録の比較。Chrome・Safari は行末の空白を U+00A0 で持つことがあるので、半角空白に揃える。読めなければ false。
+    private static func sameText(_ actual: String?, _ expected: String) -> Bool {
+        guard let actual else { return false }
+        return actual.replacingOccurrences(of: "\u{00A0}", with: " ") == expected.replacingOccurrences(of: "\u{00A0}", with: " ")
+    }
+
     /// replacing: 再変換のとき、置き換える選択範囲 (確定する文字があればそこに、無ければ変換中の文字の表示に使う)。
     private func apply(_ result: SessionResult?, to client: IMKTextInput, replacing replacement: NSRange? = nil) {
         guard let result else { return }
@@ -469,12 +548,26 @@ final class MeltypeInputController: IMKInputController {
                 // 確定し直し: キャレット (変換中の文字があればその先頭) の前の文字を置き換える。
                 let marked = client.markedRange()
                 let caret = marked.location != NSNotFound && marked.length > 0 ? marked.location : client.selectedRange().location
-                if caret != NSNotFound {
-                    let length = min(edit.deleteBefore, caret)
-                    range = NSRange(location: caret - length, length: length)
+                // キャレットが分からないまま入れると、消さずに足すので文字が重複する。この edit 全体を飛ばす。
+                if caret == NSNotFound {
+                    Self.trace("apply: 確定し直しを飛ばす (キャレット不明)")
+                    NSLog("Meltype: 確定し直しを飛ばしました (キャレットが分からない。消す予定 %d 文字)", edit.deleteBefore)
+                    continue
+                }
+                let length = min(edit.deleteBefore, caret)
+                range = NSRange(location: caret - length, length: length)
+                // 消す前に中身を確かめる。Google ドキュメントなどは selectedRange が不正確で (例: 「v1.1.2】Mel」の
+                // 「2】Mel」が変換中の 1 文字に置き換わった)、キャレットが別の場所のまま確定し直すと
+                // 確定済みの文字を消してしまう。違っていたら edit 全体を飛ばす (確定済みの文字はそのまま残る)。
+                if let original = edit.original, Self.sameText(client.attributedSubstring(from: range)?.string, original) == false {
+                    Self.trace("apply: 確定し直しを飛ばす (中身が違う) actual=\(Self.cut(client.attributedSubstring(from: range)?.string)) range=\(NSStringFromRange(range))")
+                    NSLog("Meltype: 確定し直しを飛ばしました (入力欄の中身が記録と違う・読めない。消す予定 %d 文字)", original.count)
+                    continue
                 }
             }
+            Self.trace("apply: insertText text=\(Self.cut(edit.text)) replacementRange=\(NSStringFromRange(range)) 直前 \(Self.ranges(client))")
             client.insertText(edit.text, replacementRange: range)
+            Self.trace("apply: insertText 直後 \(Self.ranges(client))")
             if hasMarkedText { MeltypeConverter.shared.endComposition() }
             hasMarkedText = false
         }
@@ -513,14 +606,18 @@ final class MeltypeInputController: IMKInputController {
         } else {
             addMark(kTSMHiliteRawText, to: text, range: NSRange(location: 0, length: length))
         }
+        Self.trace("showComposition: setMarkedText text=\(Self.cut(view.text)) selectionRange=\(NSStringFromRange(NSRange(location: length, length: 0))) replacementRange=\(NSStringFromRange(replacement ?? NSRange(location: NSNotFound, length: NSNotFound))) 直前 \(Self.ranges(client))")
         client.setMarkedText(text, selectionRange: NSRange(location: length, length: 0), replacementRange: replacement ?? NSRange(location: NSNotFound, length: NSNotFound))
+        Self.trace("showComposition: setMarkedText 直後 \(Self.ranges(client))")
         hasMarkedText = length > 0
         updateCandidates(view)
     }
 
     private func hideComposition(client: IMKTextInput) {
         if hasMarkedText {
+            Self.trace("hideComposition: setMarkedText(\"\") 直前 \(Self.ranges(client))")
             client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+            Self.trace("hideComposition: setMarkedText 直後 \(Self.ranges(client))")
             hasMarkedText = false
             // 変換ボックスが閉じたので、azooKey の差分変換の状態 (前回の入力) も終える。
             MeltypeConverter.shared.endComposition()

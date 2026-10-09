@@ -37,6 +37,12 @@ public interface ICompositionHost
     /// <summary>キャレットの前の文字を count 文字消す (確定し直すとき)。</summary>
     void DeleteBackward(int count);
 
+    /// <summary>
+    /// DeleteBackward に、消すはずの文字列 (expected) を添える。入力欄の範囲が不正確なアプリ (Google ドキュメントなど) で、
+    /// 消す前に中身を確かめられるホスト用。既定は expected を無視する (Windows 版はこれまでどおり)。
+    /// </summary>
+    void DeleteBackward(int count, string expected) => DeleteBackward(count);
+
     void Replay(MouseButtonEvent e);
 
     /// <summary>その打鍵で入力される文字 (記号・数字を含む)。文字を生まないキーなら null。</summary>
@@ -500,6 +506,19 @@ public sealed class CompositionController
         if (!IsComposing)
         {
             StartWith(e);
+            return;
+        }
+
+        // Shift+Enter: 確定したうえで、Enter をアプリに渡す (Web アプリの改行用)。Enter 単体は確定のみ (チャット欄で送信されないように)。
+        if (vk == VirtualKeys.Return && (_swallowedShift.Count > 0 || _host.IsShiftDown()))
+        {
+            if (_predicting) CommitPrediction(_predictions[_predictionIndex]);
+            else
+            {
+                if (!_converting) _text.FixTypos();
+                Commit();
+            }
+            ReplayDown(e);
             return;
         }
 
@@ -1697,6 +1716,9 @@ public sealed class CompositionController
     /// <summary>再変換で置き換えた元の文字列 (Esc で取り消すときに書き戻す)。再変換中でなければ null。</summary>
     private string? _reconvertOriginal;
 
+    /// <summary>Chrome・Safari の入力欄は行末の空白を U+00A0 で持つことがあるので、比べる前に半角空白に揃える。</summary>
+    private static string NoBreakToSpace(string text) => text.Replace('\u00A0', ' ');
+
     /// <summary>キャレットが動いたかもしれないとき (Meltype を通らなかったキー・クリック)。直前の語は確定し直さない。</summary>
     public void ForgetLastCommit() => _correctable.Clear();
 
@@ -1731,8 +1753,17 @@ public sealed class CompositionController
         var original = string.Concat(targets.Select(t => t.Text));
         if (replacement is null || replacement == original) return;
 
+        // キャレットの前の文字が記録と違う (クリックで別の場所へ移った、など) なら、別の場所の文字を消してしまうので直さない。
+        // 20 文字を超える分は前の文字列と比べられないので、その場合も直さない (安全側)。
+        if (_precedingText is not null && (original.Length > 20 || !NoBreakToSpace(_precedingText).EndsWith(NoBreakToSpace(original), StringComparison.Ordinal)))
+        {
+            Diagnostics.Log.Decision("キャレットの前の文字が記録と違うので確定し直しません");
+            _correctable.Clear();
+            return;
+        }
+
         Diagnostics.Log.Decision($"前後の文脈に合わせて確定し直しました: {Diagnostics.Log.Text(original)}→{Diagnostics.Log.Text(replacement)}");
-        _host.DeleteBackward(original.Length);
+        _host.DeleteBackward(original.Length, original);
         _host.CommitText(replacement);
         _lastCommitText = replacement;
         _correctable.Clear();

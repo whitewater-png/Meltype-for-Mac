@@ -130,6 +130,104 @@ internal static class SessionFacadeTests
     }
 
     [Test]
+    public static void Json_IncludesOriginalOnlyWhenPresent()
+    {
+        var result = new SessionResult(true, [new TextEdit(1, "I ", "胃 "), new TextEdit(0, "x")], null);
+        Assert.Equal("""{"consumed":true,"commits":[{"deleteBefore":1,"text":"I ","original":"胃 "},{"deleteBefore":0,"text":"x"}],"view":null}""", result.ToJson());
+    }
+
+    [Test]
+    public static void AutoCorrect_JsonCarriesOriginal()
+    {
+        var session = Create();
+        var results = Type(session, "i want ");
+        var edit = results.SelectMany(r => r.Commits).Single(c => c.DeleteBefore > 0);
+        Assert.True(edit.Original is { Length: > 0 }, "確定し直しの edit に消す文字列が入る");
+        Assert.True(results.Any(r => r.ToJson().Contains("\"original\":")), "JSON に original が出る");
+    }
+
+    [Test]
+    public static void ForgetLastCommit_StopsAutoCorrect()
+    {
+        var session = Create();
+        Type(session, "i w");
+        session.ForgetLastCommit(); // クリックでキャレットが動いた
+        var results = Type(session, "ant ");
+        Assert.True(!results.SelectMany(r => r.Commits).Any(c => c.DeleteBefore > 0), "クリックの後は確定し直さない");
+    }
+
+    [Test]
+    public static void FunctionKeyChar_IsNotAddedToComposition()
+    {
+        // macOS は右矢印の characters に U+F703 (機能キーの文字) を入れてくる。英数字だけの変換ボックスで文字として足してはいけない。
+        var session = Create();
+        Type(session, "2");
+        var result = session.HandleKey(VirtualKeys.Right, (char)0xF703, false, false, false, false);
+        Assert.True(!result.Consumed, "英数字だけなら確定してキーはアプリへ");
+        Assert.Equal("2", result.Commits.Single().Text);
+        Assert.True(result.View is null, "変換ボックスは閉じる");
+        Assert.True(!result.ToJson().Contains('\uF703'), "機能キーの文字が混ざらない");
+    }
+
+    [Test]
+    public static void FunctionKeyChar_KanaEntersClauseSelection()
+    {
+        var session = Create();
+        Type(session, "ka");
+        var result = session.HandleKey(VirtualKeys.Right, (char)0xF703, false, false, false, false);
+        Assert.True(result.Consumed && result.View is { Converting: true }, "かなは文節選択に入る");
+        Assert.Equal("か", result.View!.Text);
+    }
+
+    [Test]
+    public static void PassedThroughKey_StopsAutoCorrect()
+    {
+        // 「い」を確定した直後 (1.5 秒以内) に矢印を挟むと、続く want で確定し直さない。
+        var session = Create();
+        Type(session, "i w\b");
+        var arrow = session.HandleKey(VirtualKeys.Right, null, false, false, false, false);
+        Assert.True(!arrow.Consumed, "変換ボックスが無いので矢印はアプリへ");
+        var results = Type(session, "want ");
+        Assert.True(!results.SelectMany(r => r.Commits).Any(c => c.DeleteBefore > 0), "アプリに渡したキーの後は確定し直さない");
+    }
+
+    [Test]
+    public static void FunctionKeyChars_AreDropped_BoundaryChecked()
+    {
+        foreach (var code in new[] { 0xF728, 0xF729, 0xF8FF })
+        {
+            var session = Create();
+            Type(session, "2");
+            var result = session.HandleKey(VirtualKeys.Right, (char)code, false, false, false, false);
+            Assert.True(!result.ToJson().Contains((char)code), $"U+{code:X4} は変換ボックスに足さない");
+        }
+        // 範囲のすぐ外 (U+F6FF) は文字として通る。
+        var outside = Create();
+        Type(outside, "2");
+        var passed = outside.HandleKey(VirtualKeys.Right, (char)0xF6FF, false, false, false, false);
+        Assert.True(passed.ToJson().Contains('\uF6FF'), "U+F6FF は文字として通る");
+    }
+
+    [Test]
+    public static void ShiftEnter_CommitsAndPassesKeyToApp()
+    {
+        var session = Create();
+        Type(session, "aiueo");
+        var result = session.HandleKey(VirtualKeys.Return, '\r', true, false, false, false);
+        Assert.True(!result.Consumed, "Shift+Enter は改行をアプリに渡す");
+        Assert.True(result.Commits.Any(c => c.Text.Length > 0), "確定したテキストがある");
+    }
+
+    [Test]
+    public static void Enter_Alone_IsConsumed()
+    {
+        var session = Create();
+        Type(session, "aiueo");
+        var result = session.HandleKey(VirtualKeys.Return, '\r', false, false, false, false);
+        Assert.True(result.Consumed && result.Commits.Any(c => c.Text.Length > 0), "Enter 単体は確定のみ");
+    }
+
+    [Test]
     public static void AddUserWord_RegistersOrReturnsReason()
     {
         var dictionary = new UserDictionary(null, builtIn: false);

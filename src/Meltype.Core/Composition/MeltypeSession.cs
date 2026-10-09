@@ -9,7 +9,7 @@ using Meltype.Input;
 namespace Meltype.Composition;
 
 /// <summary>入力欄への書き込み 1 回分。DeleteBefore 文字をキャレットの前から消してから Text を入れる (確定し直すとき以外は 0)。</summary>
-public readonly record struct TextEdit(int DeleteBefore, string Text);
+public readonly record struct TextEdit(int DeleteBefore, string Text, string? Original = null);
 
 /// <summary>
 /// 1 回のキー入力の結果。Consumed が false ならそのキーはアプリにそのまま渡す (Commits を入れた後で)。
@@ -27,6 +27,11 @@ public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commit
             if (i > 0) builder.Append(',');
             builder.Append("{\"deleteBefore\":").Append(Commits[i].DeleteBefore).Append(",\"text\":");
             AppendString(builder, Commits[i].Text);
+            if (Commits[i].Original is { } original)
+            {
+                builder.Append(",\"original\":");
+                AppendString(builder, original);
+            }
             builder.Append('}');
         }
         builder.Append("],\"view\":");
@@ -321,6 +326,7 @@ public sealed class MeltypeSession
     /// </summary>
     public SessionResult HandleKey(int vk, char? ch, bool shift, bool control, bool alt, bool command, string? before = null, string? after = null)
     {
+        if (ch is >= '\uF700' and <= '\uF8FF') ch = null; // 機能キーの文字 (右矢印 = U+F703 など)
         _host.Begin(ch, shift, before, after);
         // Apple 日本語入力と同じ Ctrl キーで表示モードを切り替える (変換ボックスが出ているときだけ)。
         // Mac では F キーが OS のショートカットに取られることがあるため。
@@ -335,6 +341,8 @@ public sealed class MeltypeSession
         var modifier = control || alt || command;
         if (Direct || !AppEnabled || !_settings().Enabled)
         {
+            // アプリに渡したキーでキャレットが動くかもしれないので、確定し直しの記録は捨てる (Windows 版と同じ)。
+            _controller.ForgetLastCommit();
             return _host.Result(consumed: false);
         }
         // 英数へ切り替えるときなどに、Shift を押したことを変換ボックスにも伝える (Shift + 英字は大文字)。
@@ -344,6 +352,8 @@ public sealed class MeltypeSession
         var swallowed = Feed(down, e => !modifier && StartsComposition(e, ch, shift));
         // このキーをアプリに送り直した (= 使わなかった) なら、アプリに渡す。
         var consumed = swallowed && !_host.ReplayedCurrent;
+        // アプリに渡したキーでキャレットが動くかもしれないので、確定し直しの記録は捨てる (Windows の MeltypeEngine と同じ)。
+        if (!consumed && !VirtualKeys.IsModifier(vk)) _controller.ForgetLastCommit();
         Feed(down with { IsUp = true });
         if (modifier && _controller.IsComposing) Feed(new KeyEvent(control ? VirtualKeys.LControl : VirtualKeys.LMenu, 0, false, true, false, down.TimeMs));
         if (shift && _controller.IsComposing) Feed(new KeyEvent(VirtualKeys.LShift, 0, false, true, false, down.TimeMs));
@@ -360,6 +370,9 @@ public sealed class MeltypeSession
         VirtualKeys.Oem1 => VirtualKeys.F8,
         _ => null,
     };
+
+    /// <summary>キャレットが動いたかもしれないとき (マウスのクリックなど)。直前の語は確定し直さない。変換中の文字には触らない。</summary>
+    public void ForgetLastCommit() => _controller.ForgetLastCommit();
 
     /// <summary>予測候補ウィンドウで候補をクリックしたとき。</summary>
     public SessionResult SelectPrediction(int index)
@@ -407,6 +420,7 @@ public sealed class MeltypeSession
     {
         private readonly List<TextEdit> _commits = [];
         private int _pendingDelete;
+        private string? _pendingDeleteText;
         private char? _char;
         private bool _shift;
         private string? _before, _after;
@@ -419,6 +433,7 @@ public sealed class MeltypeSession
         {
             _commits.Clear();
             _pendingDelete = 0;
+            _pendingDeleteText = null;
             _char = ch;
             _shift = shift;
             _before = before;
@@ -429,18 +444,29 @@ public sealed class MeltypeSession
 
         public SessionResult Result(bool consumed)
         {
-            if (_pendingDelete > 0) _commits.Add(new TextEdit(_pendingDelete, ""));
+            if (_pendingDelete > 0) _commits.Add(new TextEdit(_pendingDelete, "", OriginalOrNull()));
             _pendingDelete = 0;
+            _pendingDeleteText = null;
             return new SessionResult(consumed, _commits.ToList(), _hidden ? null : _view);
         }
 
         public void CommitText(string text)
         {
-            _commits.Add(new TextEdit(_pendingDelete, text));
+            _commits.Add(new TextEdit(_pendingDelete, text, OriginalOrNull()));
             _pendingDelete = 0;
+            _pendingDeleteText = null;
         }
 
         public void DeleteBackward(int count) => _pendingDelete += count;
+
+        /// <summary>消す文字数と保持した文字列の長さが合わないとき (1 引数版が混ざったとき) は、確かめようがないので null。</summary>
+        private string? OriginalOrNull() => _pendingDeleteText is { } text && text.Length == _pendingDelete ? text : null;
+
+        public void DeleteBackward(int count, string expected)
+        {
+            _pendingDelete += count;
+            _pendingDeleteText = (_pendingDeleteText ?? "") + expected;
+        }
 
         public void Replay(KeyEvent e)
         {
@@ -452,7 +478,8 @@ public sealed class MeltypeSession
         {
         }
 
-        public char? CharFromKey(KeyEvent e, bool shift) => e.Scan is > 0 and < 0x10000 ? (char)e.Scan : null;
+        // U+F700〜U+F8FF は macOS の機能キー (矢印など) の文字。文字としては扱わない (変換ボックスに足さない)。
+        public char? CharFromKey(KeyEvent e, bool shift) => e.Scan is > 0 and < 0x10000 and not (>= 0xF700 and <= 0xF8FF) ? (char)e.Scan : null;
 
         public bool IsShiftDown() => _shift;
 

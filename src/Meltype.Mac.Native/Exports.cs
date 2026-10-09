@@ -208,6 +208,20 @@ public static unsafe class Exports
     [UnmanagedCallersOnly(EntryPoint = "meltype_select_prediction")]
     public static byte* SelectPrediction(IntPtr handle, int index) => Run(handle, session => session.SelectPrediction(index));
 
+    /// <summary>マウスのクリックなどでキャレットが動いたかもしれない。直前の語は確定し直さない (変換中の文字は変えない)。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_forget_last_commit")]
+    public static void ForgetLastCommit(IntPtr handle)
+    {
+        try
+        {
+            if (handle != IntPtr.Zero && GCHandle.FromIntPtr(handle).Target is MeltypeSession session) session.ForgetLastCommit();
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Warn($"確定の記録の破棄に失敗しました: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// 確定済みの文字列 (入力欄で選択されているもの) を読みに戻して変換を始める。結果は他と同じ JSON。
     /// 読みに戻せなければ consumed が false (キーはアプリに渡す)。

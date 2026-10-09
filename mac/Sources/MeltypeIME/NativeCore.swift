@@ -20,6 +20,7 @@ private typealias HandleKeyFunction = @convention(c) (UnsafeMutableRawPointer?, 
 private typealias CommitFunction = @convention(c) (UnsafeMutableRawPointer?) -> UnsafeMutablePointer<CChar>?
 private typealias SelectFunction = @convention(c) (UnsafeMutableRawPointer?, Int32) -> UnsafeMutablePointer<CChar>?
 private typealias SetDirectFunction = @convention(c) (UnsafeMutableRawPointer?, Int32) -> Void
+private typealias ForgetFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
 private typealias ReconvertFunction = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 private typealias SetAppFunction = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> Int32
 private typealias AddUserWordFunction = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
@@ -119,6 +120,8 @@ struct SessionResult: Decodable {
 struct TextEdit: Decodable {
     let deleteBefore: Int
     let text: String
+    /// 確定し直しで消すはずの文字列 (無ければ nil)。消す前に入力欄の中身と比べる。
+    let original: String?
 }
 
 struct CompositionView: Decodable {
@@ -175,6 +178,8 @@ final class NativeCore {
     private let selectFunction: SelectFunction?
     private let selectPredictionFunction: SelectFunction?
     private let setDirectFunction: SetDirectFunction?
+    /// 無い (古い dylib) ときは何もしない。ABI 版数は上げない。
+    private let forgetLastCommitFunction: ForgetFunction?
     private let reconvertFunction: ReconvertFunction?
     private let setAppFunction: SetAppFunction?
     private let addUserWordFunction: AddUserWordFunction?
@@ -215,6 +220,7 @@ final class NativeCore {
         selectFunction = symbol("meltype_select_candidate", as: SelectFunction.self)
         selectPredictionFunction = symbol("meltype_select_prediction", as: SelectFunction.self)
         setDirectFunction = symbol("meltype_set_direct", as: SetDirectFunction.self)
+        forgetLastCommitFunction = symbol("meltype_forget_last_commit", as: ForgetFunction.self)
         reconvertFunction = symbol("meltype_reconvert", as: ReconvertFunction.self)
         setAppFunction = symbol("meltype_set_app", as: SetAppFunction.self)
         addUserWordFunction = symbol("meltype_add_user_word", as: AddUserWordFunction.self)
@@ -290,6 +296,12 @@ final class NativeCore {
         guard isCompatible, let setAppFunction else { return .general }
         let raw = withOptionalCString(bundleIdentifier) { setAppFunction(session, $0) }
         return AppKind(rawValue: Int(raw)) ?? .general
+    }
+
+    /// マウスのクリックなどでキャレットが動いたかもしれないとき。直前の語を確定し直さないようにする。
+    func forgetLastCommit(_ session: UnsafeMutableRawPointer?) {
+        guard isCompatible else { return }
+        forgetLastCommitFunction?(session)
     }
 
     func setDirect(_ session: UnsafeMutableRawPointer?, _ direct: Bool) {
