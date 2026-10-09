@@ -50,6 +50,8 @@ internal static class AppPaths
 
     /// <summary>専門用語集のうち、利用者が使わないことにした (除外した) 語。1 行に「読み[Tab]語」。config.json とは別にする (数千行になりうるため)。</summary>
     public static string TermExclusionFile => Path.Combine(DataDirectory, "terms-excluded.txt");
+    /// <summary>利用者が自分で作った専門用語集 (1 つ 1 ファイル: terms-user-xxxxxxxx.txt)。</summary>
+    public static string UserTermsDirectory => Path.Combine(DataDirectory, "terms");
     public static string LogFile => Path.Combine(DataDirectory, "meltype.log");
 
     /// <summary>落ちたときの例外 (ファイルへのログが OFF でも書く)。</summary>

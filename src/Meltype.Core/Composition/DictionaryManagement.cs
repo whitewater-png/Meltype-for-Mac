@@ -60,6 +60,43 @@ internal static class DictionaryManagement
     public static string FormatTermWords(IEnumerable<(TermEntry Entry, bool Excluded)> words) =>
         string.Join('\n', words.Select(w => $"{w.Entry.Reading}\t{w.Entry.Word}\t{Clean(w.Entry.Note)}\t{(w.Excluded ? 1 : 0)}"));
 
+    /// <summary>自作の専門用語集の語: 「読み Tab 語 Tab 注記」を改行でつなぐ (注記の Tab・改行は空白にする)。</summary>
+    public static string FormatTermEntries(IEnumerable<TermEntry> entries) =>
+        string.Join('\n', entries.Select(e => $"{e.Reading}\t{e.Word}\t{Clean(e.Note)}"));
+
+    /// <summary>「読み Tab 語 (Tab 注記)」の行を読む (欄が足りない行は飛ばす)。</summary>
+    public static List<(string Reading, string Word, string Note)> ParseTermEntries(string? text)
+    {
+        var items = new List<(string, string, string)>();
+        foreach (var line in (text ?? "").Split('\n'))
+        {
+            var fields = line.TrimEnd('\r').Split('\t');
+            if (fields.Length >= 2 && fields[0].Length > 0) items.Add((fields[0], fields[1], fields.Length >= 3 ? fields[2] : ""));
+        }
+        return items;
+    }
+
+    /// <summary>「位置 Tab 読み Tab 語 Tab 注記」を改行でつなぐ (自作の専門用語集で消した語と元の位置)。</summary>
+    public static string FormatIndexedTerms(IEnumerable<(int Index, TermEntry Entry)> entries) =>
+        string.Join('\n', entries.Select(e => $"{e.Index}\t{e.Entry.Reading}\t{e.Entry.Word}\t{Clean(e.Entry.Note)}"));
+
+    /// <summary>「位置 Tab 読み Tab 語 (Tab 注記)」の行を読む (位置が数でない行は飛ばす)。</summary>
+    public static List<(int Index, TermEntry Entry)> ParseIndexedTerms(string? text)
+    {
+        var entries = new List<(int, TermEntry)>();
+        foreach (var line in (text ?? "").Split('\n'))
+        {
+            var fields = line.TrimEnd('\r').Split('\t');
+            if (fields.Length >= 3 && int.TryParse(fields[0], out var index) && index >= 0)
+                entries.Add((index, new TermEntry(fields[1], fields[2], fields.Length >= 4 ? fields[3] : "")));
+        }
+        return entries;
+    }
+
+    /// <summary>入れられなかった語: 「読み Tab 語 Tab 理由」を改行でつなぐ。</summary>
+    public static string FormatSkipped(IEnumerable<(string Reading, string Word, string Reason)> items) =>
+        string.Join('\n', items.Select(i => $"{i.Reading}\t{i.Word}\t{Clean(i.Reason)}"));
+
     private static string Clean(string text) => text.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
 
     // ---- 入力の補助 ----

@@ -18,6 +18,7 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
     private let emptyLabel = UI.label(secondary: true, size: 13)
     private var editButton: NSButton!
     private var deleteButton: NSButton!
+    private var moveButton: NSButton!
     private var lastVersion: Int32 = .min
     private let problemLabel = UI.wrapping("", secondary: false)
     /// ほかのタブにも変更を知らせる (専門用語集の「直す」でユーザー辞書が変わるなど)。
@@ -77,13 +78,15 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
         editButton.setAccessibilityHelp("選んだ単語を直します (Return)")
         deleteButton = UI.button("削除…", target: self, action: #selector(deleteSelected(_:)))
         deleteButton.setAccessibilityHelp("選んだ単語を削除します (Delete。⌘Z で元に戻せます)")
+        moveButton = UI.button("専門用語集へ移す…", target: self, action: #selector(moveToTermDomain(_:)))
+        moveButton.setAccessibilityHelp("選んだ語を、自作の専門用語集へ移します (ユーザー辞書からは消えます。⌘Z で元に戻せます)")
         let importButton = UI.button("取り込む…", target: self, action: #selector(importDictionary(_:)))
         importButton.setAccessibilityHelp("Microsoft IME・Google 日本語入力の書き出したファイルや、Meltype の userdict.txt を取り込みます")
         let exportButton = UI.button("書き出す…", target: self, action: #selector(exportDictionary(_:)))
         exportButton.setAccessibilityHelp("Microsoft IME の形式で書き出します (Google 日本語入力・ATOK でも取り込めます)")
 
         let top = NSStackView(views: [searchField, UI.spacer(), countLabel])
-        let bottom = NSStackView(views: [add, editButton, deleteButton, UI.spacer(), importButton, exportButton])
+        let bottom = NSStackView(views: [add, editButton, deleteButton, moveButton, UI.spacer(), importButton, exportButton])
         statusLabel.setAccessibilityLabel("状態")
         // userdict.txt を読めない (文字コード・権限)・大きすぎて読み込んでいないときの警告 (ふだんは隠す)
         problemLabel.textColor = .systemOrange
@@ -180,7 +183,11 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
         let count = tableView.selectedRowIndexes.count
         editButton.isEnabled = count == 1
         deleteButton.isEnabled = count > 0
+        moveButton.isEnabled = count > 0
     }
+
+    /// 語を選んでいるか (メニューの「専門用語集へ移す…」を使えるか)。
+    var hasSelection: Bool { !tableView.selectedRowIndexes.isEmpty }
 
     private func selectedKeys() -> [WordKey] {
         tableView.selectedRowIndexes.compactMap { $0 < list.visible.count ? list.visible[$0].key : nil }
@@ -263,6 +270,7 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
         let menu = NSMenu()
         menu.addItem(withTitle: "編集…", action: #selector(editSelected(_:)), keyEquivalent: "").target = self
         menu.addItem(withTitle: "削除…", action: #selector(deleteSelected(_:)), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "専門用語集へ移す…", action: #selector(moveToTermDomain(_:)), keyEquivalent: "").target = self
         menu.addItem(withTitle: "コピー", action: #selector(copy(_:)), keyEquivalent: "").target = self
         return menu
     }
@@ -270,7 +278,7 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(editSelected(_:)): return tableView.selectedRowIndexes.count == 1
-        case #selector(deleteSelected(_:)), #selector(copy(_:)), #selector(delete(_:)): return !tableView.selectedRowIndexes.isEmpty
+        case #selector(deleteSelected(_:)), #selector(copy(_:)), #selector(delete(_:)), #selector(moveToTermDomain(_:)): return !tableView.selectedRowIndexes.isEmpty
         default: return true
         }
     }
@@ -362,6 +370,61 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
             if let error = self.perform(.remove(keys), message: keys.count == 1 ? "「\(keys[0].word)」を削除しました (⌘Z で元に戻せます)" : "\(keys.count) 語を削除しました (⌘Z で元に戻せます)") {
                 UI.showError(error, title: "削除できませんでした", in: window)
             }
+        }
+    }
+
+    // ---- 専門用語集へ移す ----
+
+    /// 選んだ語を、自作の専門用語集へ移す (先を選ぶシート → 本体が検めて移す。専門用語集に入れられない語はユーザー辞書に残して、あとで知らせる)。
+    @objc func moveToTermDomain(_ sender: Any?) {
+        let keys = selectedKeys()
+        guard !keys.isEmpty, let window else { return }
+        let domains = dictionary.termDomains().filter(\.isUser)
+        TermSheets.chooseMoveTarget(count: keys.count, domains: domains, in: window) { [weak self] choice in
+            guard let self else { return nil }
+            let id: String
+            let name: String
+            var wasDisabled = false
+            switch choice {
+            case let .existing(domain):
+                id = domain.id
+                name = domain.name
+                wasDisabled = !domain.enabled
+            case let .new(newName):
+                let created = self.dictionary.createDomain(name: newName)
+                if let error = created.error { return error }
+                guard let createdId = created.id else { return "専門用語集を作れませんでした。" }
+                id = createdId
+                name = newName
+            }
+            self.performMove(id: id, name: name, keys: keys, wasDisabled: wasDisabled)
+            return nil
+        }
+    }
+
+    private func performMove(id: String, name: String, keys: [WordKey], wasDisabled: Bool) {
+        let result = dictionary.moveToDomain(id: id, keys: keys)
+        let outcome = result.outcome
+        // 専門用語集に書けたのにユーザー辞書から消せなかったとき (result.error) も、足した語を取り消せるようにしておく
+        if !outcome.added.isEmpty || !outcome.removed.isEmpty {
+            registerUndo(.undoMove(id: id, added: outcome.added, removed: outcome.removed), name: DictionaryChange.moveToDomain(id: id, keys: keys).actionName)
+        }
+        reload()
+        didChange?()
+        if let error = result.error {
+            UI.showError(error, title: "移し終えられませんでした", in: window)
+            return
+        }
+        var message = "\(outcome.removed.count) 語を専門用語集「\(name)」へ移しました (⌘Z で元に戻せます)"
+        if wasDisabled && !outcome.removed.isEmpty { message += "。使わない設定だったので、使う設定にしました" }
+        if !outcome.skipped.isEmpty { message += "。\(outcome.skipped.count) 語は移せずユーザー辞書に残しました" }
+        showStatus(message)
+        if !outcome.skipped.isEmpty, let window {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "\(outcome.skipped.count) 語は専門用語集に入れられないため、ユーザー辞書に残しました"
+            alert.informativeText = TermSheets.skippedSummary(outcome.skipped)
+            alert.beginSheetModal(for: window)
         }
     }
 

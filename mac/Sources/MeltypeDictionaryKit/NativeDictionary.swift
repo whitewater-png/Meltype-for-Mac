@@ -16,6 +16,13 @@ private typealias TextOut2Function = @convention(c) (UnsafePointer<CChar>?, Unsa
 private typealias TextCountFunction = @convention(c) (UnsafePointer<CChar>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
 private typealias TextFlagFunction = @convention(c) (UnsafePointer<CChar>?, Int32) -> UnsafeMutablePointer<CChar>?
 private typealias SetTermDomainFunction = @convention(c) (UnsafePointer<CChar>?, Int32) -> Int32
+private typealias Text5Function = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+private typealias Text2OutFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?) -> UnsafeMutablePointer<CChar>?
+private typealias Text2Out2Function = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?) -> UnsafeMutablePointer<CChar>?
+private typealias Text2Out3Function = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?) -> UnsafeMutablePointer<CChar>?
+private typealias Text2CountFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
+private typealias TextOutIntFunction = @convention(c) (UnsafePointer<CChar>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
+private typealias Text2FlagFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, Int32) -> UnsafeMutablePointer<CChar>?
 private typealias TermEditFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
 
 /// 辞書の管理画面が使う操作 (本物は NativeDictionary。--self-test は偽物でも確かめる)。理由の文字列は、だめなときだけ (画面にそのまま出す)。
@@ -28,13 +35,26 @@ public protocol DictionaryOperations: AnyObject {
     func restore(_ entries: [RemovedEntry]) -> String?
     func setExcluded(_ keys: [WordKey], excluded: Bool) -> String?
     func editTerm(original: WordKey, to new: WordKey) -> (error: String?, added: Bool)
+
+    // ---- 自作の専門用語集 ----
+
+    /// ユーザー辞書の語を自作の専門用語集へ移す。専門用語集に書けたのにユーザー辞書から消せなかったときは理由を返すが、outcome.added は返す。
+    func moveToDomain(id: String, keys: [WordKey]) -> (error: String?, outcome: MoveOutcome)
+    /// 自作の専門用語集に語を足す (すでにある語は飛ばす)。足した語と、入れられなかった語。
+    func addTerms(id: String, keys: [WordKey]) -> (error: String?, added: [WordKey], skipped: [SkippedWord])
+    func removeTerms(id: String, keys: [WordKey]) -> (error: String?, removed: [RemovedTerm])
+    func restoreTerms(id: String, entries: [RemovedTerm]) -> String?
+    func updateTerm(id: String, from old: WordKey, to new: WordKey) -> String?
+    func deleteDomain(id: String) -> (error: String?, deleted: DeletedDomain?)
+    func restoreDomain(_ deleted: DeletedDomain) -> String?
+    func renameDomain(id: String, name: String) -> String?
 }
 
 /// libMeltypeNative.dylib を読み込んで、ユーザー辞書・専門用語集を操作する (中身は C# の DictionaryManagement / UserDictionary / TermDomains)。
 /// 関数はどれも、C# 側でロックしているので、どのスレッドから呼んでもよい (専門用語の一覧は重いので裏のスレッドで呼ぶ)。
 public final class NativeDictionary: DictionaryOperations {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion・IME の NativeCore.expectedAbiVersion と必ず同じにする。
-    public static let expectedAbiVersion: Int32 = 7
+    public static let expectedAbiVersion: Int32 = 8
 
     /// 読み込めなかった理由 (画面に出す)。
     public enum LoadError: Error, CustomStringConvertible {
@@ -83,6 +103,18 @@ public final class NativeDictionary: DictionaryOperations {
     private let termSetExcludedFunction: TextFlagFunction
     private let termEditFunction: TermEditFunction
     private let termRevisionFunction: IntFunction
+    private let termCreateFunction: TextOutFunction
+    private let termRenameFunction: Text2Function
+    private let termDeleteFunction: TextOutIntFunction
+    private let termRestoreDomainFunction: Text2FlagFunction
+    private let termUserCheckFunction: Text5Function
+    private let termUserAddFunction: Text2Out2Function
+    private let termUserRemoveFunction: Text2OutFunction
+    private let termUserRestoreFunction: Text2Function
+    private let termUserUpdateFunction: Text5Function
+    private let termMoveFunction: Text2Out3Function
+    private let termExportFunction: Text2CountFunction
+    private let termImportFunction: TextOut2Function
     private let settingsGetFunction: TextFunction
     private let settingsSetFunction: Text2Function
     private let settingsResetFunction: TextFunction
@@ -120,6 +152,18 @@ public final class NativeDictionary: DictionaryOperations {
         termSetExcludedFunction = try symbol("meltype_term_set_excluded", as: TextFlagFunction.self)
         termEditFunction = try symbol("meltype_term_edit", as: TermEditFunction.self)
         termRevisionFunction = try symbol("meltype_term_revision", as: IntFunction.self)
+        termCreateFunction = try symbol("meltype_term_create", as: TextOutFunction.self)
+        termRenameFunction = try symbol("meltype_term_rename", as: Text2Function.self)
+        termDeleteFunction = try symbol("meltype_term_delete", as: TextOutIntFunction.self)
+        termRestoreDomainFunction = try symbol("meltype_term_restore_domain", as: Text2FlagFunction.self)
+        termUserCheckFunction = try symbol("meltype_term_user_check", as: Text5Function.self)
+        termUserAddFunction = try symbol("meltype_term_user_add", as: Text2Out2Function.self)
+        termUserRemoveFunction = try symbol("meltype_term_user_remove", as: Text2OutFunction.self)
+        termUserRestoreFunction = try symbol("meltype_term_user_restore", as: Text2Function.self)
+        termUserUpdateFunction = try symbol("meltype_term_user_update", as: Text5Function.self)
+        termMoveFunction = try symbol("meltype_term_move", as: Text2Out3Function.self)
+        termExportFunction = try symbol("meltype_term_export", as: Text2CountFunction.self)
+        termImportFunction = try symbol("meltype_term_import", as: TextOut2Function.self)
         settingsGetFunction = try symbol("meltype_settings_get", as: TextFunction.self)
         settingsSetFunction = try symbol("meltype_settings_set", as: Text2Function.self)
         settingsResetFunction = try symbol("meltype_settings_reset", as: TextFunction.self)
@@ -254,6 +298,108 @@ public final class NativeDictionary: DictionaryOperations {
 
     /// 専門用語集の版 (有効な分野・除外した語が、ほかのプロセスで変わったときも増える)。
     public func termRevision() -> Int32 { termRevisionFunction() }
+
+    // ---- 自作の専門用語集 ----
+
+    /// 自作の専門用語集を作る (すぐ有効)。名前が空・長い・かぶるときは理由。
+    public func createDomain(name: String) -> (error: String?, id: String?) {
+        var idPointer: UnsafeMutablePointer<CChar>?
+        let error = name.withCString { take(termCreateFunction($0, &idPointer)) }
+        return (error, take(idPointer))
+    }
+
+    public func renameDomain(id: String, name: String) -> String? {
+        id.withCString { idPointer in name.withCString { take(termRenameFunction(idPointer, $0)) } }
+    }
+
+    public func deleteDomain(id: String) -> (error: String?, deleted: DeletedDomain?) {
+        var contentPointer: UnsafeMutablePointer<CChar>?
+        var wasEnabled: Int32 = 0
+        let name = termDomains().first { $0.id == id }?.name ?? id
+        let error = id.withCString { take(termDeleteFunction($0, &contentPointer, &wasEnabled)) }
+        let content = take(contentPointer)
+        if error != nil { return (error, nil) }
+        return (nil, DeletedDomain(id: id, name: name, content: content ?? "", wasEnabled: wasEnabled == 1))
+    }
+
+    public func restoreDomain(_ deleted: DeletedDomain) -> String? {
+        deleted.id.withCString { id in deleted.content.withCString { take(termRestoreDomainFunction(id, $0, deleted.wasEnabled ? 1 : 0)) } }
+    }
+
+    /// 自作の専門用語集に語を登録・編集してよいか (保存はしない)。だめなら理由。except は編集中の元の語。
+    public func checkTerm(id: String, _ key: WordKey, except: WordKey?) -> String? {
+        id.withCString { idPointer in
+            key.reading.withCString { reading in
+                key.word.withCString { word in
+                    withOptionalCString(except?.reading) { exceptReading in
+                        withOptionalCString(except?.word) { exceptWord in
+                            take(termUserCheckFunction(idPointer, reading, word, exceptReading, exceptWord))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public func addTerms(id: String, keys: [WordKey]) -> (error: String?, added: [WordKey], skipped: [SkippedWord]) {
+        var addedPointer: UnsafeMutablePointer<CChar>?
+        var skippedPointer: UnsafeMutablePointer<CChar>?
+        let error = id.withCString { idPointer in FfiFormat.formatKeys(keys).withCString { take(termUserAddFunction(idPointer, $0, &addedPointer, &skippedPointer)) } }
+        return (error, take(addedPointer).map(FfiFormat.parseKeys) ?? [], take(skippedPointer).map(FfiFormat.parseSkipped) ?? [])
+    }
+
+    public func removeTerms(id: String, keys: [WordKey]) -> (error: String?, removed: [RemovedTerm]) {
+        var removedPointer: UnsafeMutablePointer<CChar>?
+        let error = id.withCString { idPointer in FfiFormat.formatKeys(keys).withCString { take(termUserRemoveFunction(idPointer, $0, &removedPointer)) } }
+        return (error, take(removedPointer).map(FfiFormat.parseRemovedTerms) ?? [])
+    }
+
+    public func restoreTerms(id: String, entries: [RemovedTerm]) -> String? {
+        id.withCString { idPointer in FfiFormat.formatRemovedTerms(entries).withCString { take(termUserRestoreFunction(idPointer, $0)) } }
+    }
+
+    public func updateTerm(id: String, from old: WordKey, to new: WordKey) -> String? {
+        id.withCString { idPointer in
+            old.reading.withCString { oldReading in
+                old.word.withCString { oldWord in
+                    new.reading.withCString { reading in
+                        new.word.withCString { take(termUserUpdateFunction(idPointer, oldReading, oldWord, reading, $0)) }
+                    }
+                }
+            }
+        }
+    }
+
+    public func moveToDomain(id: String, keys: [WordKey]) -> (error: String?, outcome: MoveOutcome) {
+        var removedPointer: UnsafeMutablePointer<CChar>?
+        var addedPointer: UnsafeMutablePointer<CChar>?
+        var skippedPointer: UnsafeMutablePointer<CChar>?
+        let error = id.withCString { idPointer in
+            FfiFormat.formatKeys(keys).withCString { take(termMoveFunction(idPointer, $0, &removedPointer, &addedPointer, &skippedPointer)) }
+        }
+        let outcome = MoveOutcome(removed: take(removedPointer).map(FfiFormat.parseRemoved) ?? [],
+                                  added: take(addedPointer).map(FfiFormat.parseKeys) ?? [],
+                                  skipped: take(skippedPointer).map(FfiFormat.parseSkipped) ?? [])
+        return (error, outcome)
+    }
+
+    /// 自作の専門用語集を、同梱と同じ形式のテキストファイルに書き出す。
+    public func exportDomain(id: String, path: String) -> (error: String?, count: Int) {
+        var count: Int32 = 0
+        let error = id.withCString { idPointer in path.withCString { take(termExportFunction(idPointer, $0, &count)) } }
+        return (error, Int(count))
+    }
+
+    /// ファイルを新しい自作の専門用語集として取り込む (すぐ有効)。
+    public func importDomain(path: String) -> (error: String?, summary: DomainImportSummary?) {
+        var idPointer: UnsafeMutablePointer<CChar>?
+        var summaryPointer: UnsafeMutablePointer<CChar>?
+        let error = path.withCString { take(termImportFunction($0, &idPointer, &summaryPointer)) }
+        let id = take(idPointer)
+        let summary = take(summaryPointer)
+        guard error == nil, let id, let summary else { return (error, nil) }
+        return (nil, FfiFormat.parseDomainImportSummary(summary, id: id))
+    }
 
     // ---- 設定 ----
 

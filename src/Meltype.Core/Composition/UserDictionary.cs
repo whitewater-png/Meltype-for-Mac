@@ -83,10 +83,14 @@ public sealed class UserDictionary
     private readonly string? _path;
     // 同梱の語句 (dictionaries/phrases.txt)。変換エンジンが苦手な語句を補う。ユーザーの登録より後回しで、保存も表示もしない。
     private readonly UserWord[] _builtIn = [];
+    // 同梱の語句を読みで引くもの (ユーザーの登録・自作の専門用語集の後ろ、同梱の専門用語集の前に使う)。builtIn: false なら空。
+    private readonly Dictionary<string, List<string>> _builtInByReading = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<string>>.AlternateLookup<ReadOnlySpan<char>> _builtInLookup;
+    private readonly int _builtInMaxLength;
 
     /// <summary>
     /// 登録した語 (ファイルの順) と、そこから作った検索用の辞書。作ったあとは変えない (参照ごと入れ替える)。
-    /// ByReading は読み → 単語 (後から登録したものが先。同梱の語句はユーザーの登録の後)。
+    /// ByReading は読み → 単語 (後から登録したものが先。ユーザーの登録だけ。同梱の語句は <see cref="_builtInByReading"/>)。
     /// </summary>
     private sealed class Index
     {
@@ -139,6 +143,12 @@ public sealed class UserDictionary
             var phrases = new List<UserWord>();
             Parse(Detection.DictionarySource.ReadEmbedded("phrases.txt").Split('\n'), phrases);
             _builtIn = [.. phrases];
+            foreach (var phrase in _builtIn)
+            {
+                if (!_builtInByReading.TryGetValue(phrase.Reading, out var list)) _builtInByReading[phrase.Reading] = list = [];
+                if (!list.Contains(phrase.Word)) list.Add(phrase.Word);
+            }
+            _builtInMaxLength = _builtInByReading.Count == 0 ? 0 : _builtInByReading.Keys.Max(k => k.Length);
             // 取る前の Revision を覚える (取っている間に切り替わっても、次の確認でもう一度入れ替わる)
             var revision = TermDomains.Revision;
             _terms = new TermSnapshot(TermDomains.Current, revision, true);
@@ -151,6 +161,7 @@ public sealed class UserDictionary
             _stamp = stamp;
             _problem = error ?? OversizeProblem(stamp);
         }
+        _builtInLookup = _builtInByReading.GetAlternateLookup<ReadOnlySpan<char>>();
         _index = BuildIndex([.. words]);
         _nextFileCheck = Environment.TickCount64 + FileCheckIntervalMs;
     }
@@ -294,6 +305,12 @@ public sealed class UserDictionary
 
     /// <summary>読みが reading で始まる専門用語 (予測変換用。強制型・候補追加型の両方)。</summary>
     public IEnumerable<string> PredictTerms(string reading) => Terms.StartingWith(reading);
+
+    /// <summary>
+    /// 読みが reading で始まる、自作の専門用語集の語 (読み込んだ順)。予測変換では、ユーザー辞書の語の次・同梱の専門用語集の前に置く
+    /// (自作の語は、ユーザー辞書の語と同じ扱いなので、同梱の語の使用実績に負けないように、別の列にする)。
+    /// </summary>
+    public IEnumerable<string> PredictUserTerms(string reading) => Terms.UserStartingWith(reading);
 
     // ---- 変更 (どれもファイルを読み直してから行い、すぐ保存する) ----
 
@@ -439,12 +456,17 @@ public sealed class UserDictionary
     /// <summary>読みに登録されている単語 (新しく登録したものが先)。</summary>
     public IReadOnlyList<string> Lookup(string reading)
     {
+        // 順序: ユーザーの登録 → 自作の専門用語集 (ユーザー辞書の語と同じ扱い) → 組み込み語句 → 同梱の専門用語集 (強制型)。重複は除く。
         var words = Current.ByReading.TryGetValue(reading, out var own) ? own : null;
-        // 読みがちょうど同じ強制型の専門用語は、ユーザー辞書・組み込み語句の後ろに足す (重複は除く)。
-        var terms = Terms.LookupForced(reading);
-        if (terms.Count == 0) return words ?? [];
+        var terms = Terms;
+        var userTerms = terms.LookupUserForced(reading);
+        var builtIn = _builtInByReading.TryGetValue(reading, out var phrases) ? phrases : null;
+        var bundled = terms.LookupForced(reading);
+        if (userTerms.Count == 0 && bundled.Count == 0 && builtIn is null) return words ?? [];
         var merged = words is null ? [] : new List<string>(words);
-        foreach (var term in terms) if (!merged.Contains(term)) merged.Add(term);
+        foreach (var term in userTerms) if (!merged.Contains(term)) merged.Add(term);
+        foreach (var phrase in builtIn ?? []) if (!merged.Contains(phrase)) merged.Add(phrase);
+        foreach (var term in bundled) if (!merged.Contains(term)) merged.Add(term);
         return merged;
     }
 
@@ -458,7 +480,7 @@ public sealed class UserDictionary
         var index = Current;
         var maxReadingLength = index.MaxReadingLength;
         var lookup = index.Lookup;
-        if ((index.ByReading.Count == 0 && terms.ForcedCount == 0) || kana.Length < MinReadingLength) return null;
+        if ((index.ByReading.Count == 0 && terms.ForcedCount == 0 && terms.UserForcedCount == 0 && _builtInByReading.Count == 0) || kana.Length < MinReadingLength) return null;
         var pieces = new List<(string Reading, string? Word)>();
         var plain = new StringBuilder();
         var found = false;
@@ -467,15 +489,30 @@ public sealed class UserDictionary
         {
             // その位置から始まる最も長い読み。同じ長さならユーザー辞書・組み込み語句が先。文字列は作らずに引く。
             var termMax = terms.MaxForcedLengthAt(kana, i);
+            var userTermMax = terms.MaxUserForcedLengthAt(kana, i);
             var matchedLength = 0;
             string? matchedWord = null;
-            for (var length = Math.Min(Math.Max(maxReadingLength, termMax), kana.Length - i); length >= MinReadingLength; length--)
+            var longest = Math.Max(Math.Max(maxReadingLength, _builtInMaxLength), Math.Max(termMax, userTermMax));
+            for (var length = Math.Min(longest, kana.Length - i); length >= MinReadingLength; length--)
             {
                 var span = kana.AsSpan(i, length);
+                // 同じ長さなら: ユーザーの登録 → 自作の専門用語集 → 組み込み語句 → 同梱の専門用語集
                 if (length <= maxReadingLength && lookup.TryGetValue(span, out var own))
                 {
                     matchedLength = length;
                     matchedWord = own[0];
+                    break;
+                }
+                if (length <= userTermMax && terms.TryGetUserForced(span, out var userForced))
+                {
+                    matchedLength = length;
+                    matchedWord = userForced[0];
+                    break;
+                }
+                if (length <= _builtInMaxLength && _builtInLookup.TryGetValue(span, out var phrase))
+                {
+                    matchedLength = length;
+                    matchedWord = phrase[0];
                     break;
                 }
                 if (length <= termMax && terms.TryGetForced(span, out var forced))
@@ -623,8 +660,8 @@ public sealed class UserDictionary
     private Index BuildIndex(UserWord[] words)
     {
         var byReading = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-        // 後から登録したものを先にする。同梱の語句はユーザーの登録の後。
-        foreach (var word in Enumerable.Reverse(words).Concat(_builtIn))
+        // 後から登録したものを先にする。同梱の語句は別に持つ (_builtInByReading)。
+        foreach (var word in Enumerable.Reverse(words))
         {
             if (!byReading.TryGetValue(word.Reading, out var list)) byReading[word.Reading] = list = [];
             if (!list.Contains(word.Word)) list.Add(word.Word);

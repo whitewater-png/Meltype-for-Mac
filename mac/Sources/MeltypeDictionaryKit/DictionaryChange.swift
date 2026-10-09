@@ -24,6 +24,24 @@ public enum DictionaryChange: Equatable {
     case editTerm(original: WordKey, to: WordKey, originalExcluded: Bool)
     /// 専門用語の編集を取り消す (ユーザー辞書に新しく登録していたら消し、直す前は除外していなかった元の語の除外をやめる)。
     case revertTermEdit(original: WordKey, to: WordKey, removeFromUser: Bool, originalExcluded: Bool)
+    /// ユーザー辞書の語を、自作の専門用語集へ移す (ユーザー辞書からは消える)。
+    case moveToDomain(id: String, keys: [WordKey])
+    /// 移したのを取り消す (専門用語集に足した語を消し、ユーザー辞書へ元の位置に戻す)。
+    case undoMove(id: String, added: [WordKey], removed: [RemovedEntry])
+    /// 自作の専門用語集に語を足す。
+    case addTerms(id: String, keys: [WordKey])
+    /// 自作の専門用語集から語を消す。
+    case removeTerms(id: String, keys: [WordKey])
+    /// 自作の専門用語集から消した語を元の位置に戻す。
+    case restoreTerms(id: String, entries: [RemovedTerm])
+    /// 自作の専門用語集の語を直す。
+    case updateTerm(id: String, from: WordKey, to: WordKey)
+    /// 自作の専門用語集を消す。
+    case deleteDomain(id: String)
+    /// 消した自作の専門用語集を戻す。
+    case restoreDomain(DeletedDomain)
+    /// 自作の専門用語集の名前を変える。
+    case renameDomain(id: String, to: String, from: String)
 
     /// 「取り消す」メニューに出す名前。
     public var actionName: String {
@@ -34,6 +52,12 @@ public enum DictionaryChange: Equatable {
         case .update: return "単語の編集"
         case .exclude, .include: return "専門用語の除外"
         case .editTerm, .revertTermEdit: return "専門用語の編集"
+        case .moveToDomain, .undoMove: return "専門用語集へ移す"
+        case .addTerms: return "専門用語の登録"
+        case .removeTerms, .restoreTerms: return "専門用語の削除"
+        case .updateTerm: return "専門用語の編集"
+        case .deleteDomain, .restoreDomain: return "専門用語集の削除"
+        case .renameDomain: return "専門用語集の名前の変更"
         }
     }
 
@@ -76,6 +100,41 @@ public enum DictionaryChange: Equatable {
                 return (error, nil)
             }
             return (nil, .editTerm(original: original, to: new, originalExcluded: originalExcluded))
+        case let .moveToDomain(id, keys):
+            let result = operations.moveToDomain(id: id, keys: keys)
+            let undo: DictionaryChange? = result.outcome.added.isEmpty && result.outcome.removed.isEmpty ? nil : .undoMove(id: id, added: result.outcome.added, removed: result.outcome.removed)
+            // 専門用語集に書けたのにユーザー辞書から消せなかったとき (error) も、足した語を取り消せるようにしておく
+            return (result.error, undo)
+        case let .undoMove(id, added, removed):
+            // 先にユーザー辞書へ戻す (だめでも、語は専門用語集にあるまま消えない)。次に専門用語集から消す。
+            if !removed.isEmpty, let error = operations.restore(removed) { return (error, nil) }
+            if !added.isEmpty, let error = operations.removeTerms(id: id, keys: added).error { return (error, nil) }
+            return (nil, removed.isEmpty ? nil : .moveToDomain(id: id, keys: removed.map(\.key)))
+        case let .addTerms(id, keys):
+            let result = operations.addTerms(id: id, keys: keys)
+            if let error = result.error { return (error, nil) }
+            return (nil, result.added.isEmpty ? nil : .removeTerms(id: id, keys: result.added))
+        case let .removeTerms(id, keys):
+            let result = operations.removeTerms(id: id, keys: keys)
+            if let error = result.error { return (error, nil) }
+            return (nil, result.removed.isEmpty ? nil : .restoreTerms(id: id, entries: result.removed))
+        case let .restoreTerms(id, entries):
+            if let error = operations.restoreTerms(id: id, entries: entries) { return (error, nil) }
+            return (nil, .removeTerms(id: id, keys: entries.map(\.key)))
+        case let .updateTerm(id, old, new):
+            if let error = operations.updateTerm(id: id, from: old, to: new) { return (error, nil) }
+            return (nil, old == new ? nil : .updateTerm(id: id, from: new, to: old))
+        case let .deleteDomain(id):
+            let result = operations.deleteDomain(id: id)
+            if let error = result.error { return (error, nil) }
+            return (nil, result.deleted.map { .restoreDomain($0) })
+        case let .restoreDomain(deleted):
+            // 戻せなかったときは、同じ内容をもう一度戻せるようにしておく (消した専門用語集の中身を、取り消しと一緒に失わないため)
+            if let error = operations.restoreDomain(deleted) { return (error, self) }
+            return (nil, .deleteDomain(id: deleted.id))
+        case let .renameDomain(id, new, old):
+            if let error = operations.renameDomain(id: id, name: new) { return (error, nil) }
+            return (nil, .renameDomain(id: id, to: old, from: new))
         }
     }
 }

@@ -23,6 +23,12 @@ enum MainMenu {
 
         let file = submenu("ファイル", in: main)
         file.addItem(withTitle: "単語を登録…", action: #selector(MainWindowController.addWord(_:)), keyEquivalent: "n")
+        let moveItem = file.addItem(withTitle: "専門用語集へ移す…", action: #selector(MainWindowController.moveToTermDomain(_:)), keyEquivalent: "m")
+        moveItem.keyEquivalentModifierMask = [.command, .shift]
+        let newTermItem = file.addItem(withTitle: "新しい専門用語集…", action: #selector(MainWindowController.newTermDomain(_:)), keyEquivalent: "n")
+        newTermItem.keyEquivalentModifierMask = [.command, .option]
+        file.addItem(withTitle: "専門用語集を取り込む…", action: #selector(MainWindowController.importTermDomain(_:)), keyEquivalent: "")
+        file.addItem(withTitle: "専門用語集を書き出す…", action: #selector(MainWindowController.exportTermDomain(_:)), keyEquivalent: "")
         file.addItem(.separator())
         let importItem = file.addItem(withTitle: "ほかの辞書を取り込む…", action: #selector(MainWindowController.importDictionary(_:)), keyEquivalent: "i")
         importItem.keyEquivalentModifierMask = [.command, .shift]

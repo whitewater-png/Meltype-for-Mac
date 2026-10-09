@@ -48,8 +48,9 @@ public static unsafe class Exports
     /// (別の版の libMeltypeNative.dylib が混ざったとき、引数の食い違いで落ちる代わりに初期化を止めるため)。
     /// 6: 辞書の管理画面の関数 (meltype_userdict_* / meltype_term_words ほか) を足した。
     /// 7: 設定タブの関数 (meltype_settings_get / meltype_settings_set / meltype_settings_reset) を足した。
+    /// 8: 自作の専門用語集の関数 (meltype_term_create ほか) を足し、meltype_term_domains の各行に 5 つ目の欄 (自作なら 1) を足した。
     /// </summary>
-    public const int AbiVersion = 7;
+    public const int AbiVersion = 8;
 
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
@@ -628,6 +629,198 @@ public static unsafe class Exports
     /// <summary>設定タブにある項目をすべて既定値に戻して保存する (ほかの設定は触らない)。だめなら理由、できたら NULL。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_settings_reset")]
     public static byte* SettingsReset() => Reason("設定を既定値に戻す処理", Config.MacSettingsCatalog.ResetToDefaults);
+
+    // ---- 自作の専門用語集 (「Meltype 辞書」の画面。中身は Composition.TermDomains.User.cs) ----
+    // 「理由」を返す関数は、成功なら NULL、だめなら理由の文字列。*out の引数は、増えなければ NULL。語の行は「読み\t語\t注記」(注記は省略できる)。
+
+    /// <summary>自作の専門用語集を作る (すぐ有効)。*id に新しい ID。名前が空・長い・かぶるときは理由。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_create")]
+    public static byte* TermCreate(byte* name, byte** id)
+    {
+        if (id != null) *id = null;
+        try
+        {
+            var error = TermDomains.CreateUserDomain(FromUtf8(name) ?? "", out var created);
+            if (error is not null) return ToUtf8(error);
+            if (id != null) *id = ToUtf8(created);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return Failure("専門用語集の作成", ex);
+        }
+    }
+
+    /// <summary>自作の専門用語集の名前を変える。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_rename")]
+    public static byte* TermRename(byte* id, byte* name)
+    {
+        var idText = FromUtf8(id) ?? "";
+        var nameText = FromUtf8(name) ?? "";
+        return Reason("専門用語集の名前の変更", () => TermDomains.RenameUserDomain(idText, nameText));
+    }
+
+    /// <summary>自作の専門用語集を消す。*content に消す前の中身、*wasEnabled に有効だったか (1/0)。元に戻すとき meltype_term_restore_domain に渡す。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_delete")]
+    public static byte* TermDelete(byte* id, byte** content, int* wasEnabled)
+    {
+        if (content != null) *content = null;
+        if (wasEnabled != null) *wasEnabled = 0;
+        try
+        {
+            var error = TermDomains.DeleteUserDomain(FromUtf8(id) ?? "", out var text, out var enabled);
+            if (error is not null) return ToUtf8(error);
+            if (content != null) *content = ToUtf8(text);
+            if (wasEnabled != null) *wasEnabled = enabled ? 1 : 0;
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return Failure("専門用語集の削除", ex);
+        }
+    }
+
+    /// <summary>消した自作の専門用語集を、同じ ID・中身で戻す。enabled != 0 なら有効にする。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_restore_domain")]
+    public static byte* TermRestoreDomain(byte* id, byte* content, int enabled)
+    {
+        var idText = FromUtf8(id) ?? "";
+        var text = FromUtf8(content) ?? "";
+        return Reason("専門用語集の復元", () => TermDomains.RestoreUserDomain(idText, text, enabled != 0));
+    }
+
+    /// <summary>自作の専門用語集に語を登録・編集してよいか (保存しない)。exceptReading / exceptWord は編集中の元の語 (どちらかが NULL なら無し)。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_user_check")]
+    public static byte* TermUserCheck(byte* id, byte* reading, byte* word, byte* exceptReading, byte* exceptWord)
+    {
+        var idText = FromUtf8(id) ?? "";
+        var readingText = FromUtf8(reading) ?? "";
+        var wordText = FromUtf8(word) ?? "";
+        (string, string)? except = exceptReading == null || exceptWord == null ? null : (FromUtf8(exceptReading)!, FromUtf8(exceptWord)!);
+        return Reason("専門用語の入力チェック", () => TermDomains.CheckUserWord(idText, readingText, wordText, except));
+    }
+
+    /// <summary>自作の専門用語集に語を足す。*added に実際に足した語 (「読み\t語\t注記」の行)、*skipped に入れられなかった語 (「読み\t語\t理由」の行。すでにある語は含めない)。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_user_add")]
+    public static byte* TermUserAdd(byte* id, byte* lines, byte** added, byte** skipped)
+    {
+        if (added != null) *added = null;
+        if (skipped != null) *skipped = null;
+        try
+        {
+            var error = TermDomains.AddUserWords(FromUtf8(id) ?? "", DictionaryManagement.ParseTermEntries(FromUtf8(lines)), out var entries, out var rejected);
+            if (error is not null) return ToUtf8(error);
+            if (added != null && entries.Count > 0) *added = ToUtf8(DictionaryManagement.FormatTermEntries(entries));
+            if (skipped != null && rejected.Count > 0) *skipped = ToUtf8(DictionaryManagement.FormatSkipped(rejected.Select(r => (r.Item.Reading, r.Item.Word, r.Reason))));
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return Failure("専門用語の登録", ex);
+        }
+    }
+
+    /// <summary>自作の専門用語集の語を消す (lines は「読み\t語」の行)。*removed に消した語と元の位置 (「位置\t読み\t語\t注記」。meltype_term_user_restore に渡す)。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_user_remove")]
+    public static byte* TermUserRemove(byte* id, byte* lines, byte** removed)
+    {
+        if (removed != null) *removed = null;
+        try
+        {
+            var items = DictionaryManagement.ParseTermEntries(FromUtf8(lines)).Select(i => (i.Reading, i.Word));
+            var error = TermDomains.RemoveUserWords(FromUtf8(id) ?? "", items, out var entries);
+            if (error is not null) return ToUtf8(error);
+            if (removed != null && entries.Count > 0) *removed = ToUtf8(DictionaryManagement.FormatIndexedTerms(entries));
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return Failure("専門用語の削除", ex);
+        }
+    }
+
+    /// <summary>消した語を元の位置に戻す (lines は meltype_term_user_remove が返した行)。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_user_restore")]
+    public static byte* TermUserRestore(byte* id, byte* lines)
+    {
+        var idText = FromUtf8(id) ?? "";
+        var text = FromUtf8(lines);
+        return Reason("専門用語の復元", () => TermDomains.RestoreUserWords(idText, DictionaryManagement.ParseIndexedTerms(text)));
+    }
+
+    /// <summary>自作の専門用語集の語を直す (位置はそのまま)。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_user_update")]
+    public static byte* TermUserUpdate(byte* id, byte* oldReading, byte* oldWord, byte* reading, byte* word)
+    {
+        var idText = FromUtf8(id) ?? "";
+        var old = (FromUtf8(oldReading) ?? "", FromUtf8(oldWord) ?? "");
+        var readingText = FromUtf8(reading) ?? "";
+        var wordText = FromUtf8(word) ?? "";
+        return Reason("専門用語の編集", () => TermDomains.UpdateUserWord(idText, old, readingText, wordText));
+    }
+
+    /// <summary>
+    /// ユーザー辞書の語 (lines は「読み\t単語」の行) を、自作の専門用語集へ移す。専門用語集に入れられない語は、ユーザー辞書に残す。
+    /// *removed にユーザー辞書から消した語と元の位置 (「位置\t読み\t単語」。元に戻すとき meltype_userdict_restore に渡す)、
+    /// *added に専門用語集へ新しく足した語 (「読み\t語\t注記」。元に戻すとき meltype_term_user_remove に渡す)、
+    /// *skipped に移せなかった語 (「読み\t語\t理由」)。専門用語集に書けたがユーザー辞書から消せなかったときは理由を返す (*added は返す)。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_move")]
+    public static byte* TermMove(byte* id, byte* lines, byte** removed, byte** added, byte** skipped)
+    {
+        if (removed != null) *removed = null;
+        if (added != null) *added = null;
+        if (skipped != null) *skipped = null;
+        try
+        {
+            var error = TermDomains.MoveFromUserDictionary(DictionaryManagement.UserWords, FromUtf8(id) ?? "", DictionaryManagement.ParseWords(FromUtf8(lines)), out var result);
+            if (removed != null && result.RemovedFromUser.Count > 0) *removed = ToUtf8(DictionaryManagement.FormatIndexed(result.RemovedFromUser));
+            if (added != null && result.AddedToDomain.Count > 0) *added = ToUtf8(DictionaryManagement.FormatTermEntries(result.AddedToDomain));
+            if (skipped != null && result.Skipped.Count > 0) *skipped = ToUtf8(DictionaryManagement.FormatSkipped(result.Skipped.Select(s => (s.Word.Reading, s.Word.Word, s.Reason))));
+            return error is null ? null : ToUtf8(error);
+        }
+        catch (Exception ex)
+        {
+            return Failure("専門用語集への移動", ex);
+        }
+    }
+
+    /// <summary>自作の専門用語集を、同梱と同じ形式のテキストファイル (path) に書き出す。*count に語数。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_export")]
+    public static byte* TermExport(byte* id, byte* path, int* count)
+    {
+        if (count != null) *count = 0;
+        try
+        {
+            var error = TermDomains.ExportUserDomain(FromUtf8(id) ?? "", FromUtf8(path) ?? "", out var written);
+            if (count != null) *count = written;
+            return error is null ? null : ToUtf8(error);
+        }
+        catch (Exception ex)
+        {
+            return Failure("専門用語集の書き出し", ex);
+        }
+    }
+
+    /// <summary>ファイル (path) を新しい自作の専門用語集として取り込む (すぐ有効)。*id に新しい ID、*summary に「取り込んだ語数\t飛ばした行数\t重複して省いた数\t名前」。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_term_import")]
+    public static byte* TermImport(byte* path, byte** id, byte** summary)
+    {
+        if (id != null) *id = null;
+        if (summary != null) *summary = null;
+        try
+        {
+            var error = TermDomains.ImportUserDomain(FromUtf8(path) ?? "", out var created, out var text);
+            if (error is not null) return ToUtf8(error);
+            if (id != null) *id = ToUtf8(created);
+            if (summary != null) *summary = ToUtf8(text);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return Failure("専門用語集の取り込み", ex);
+        }
+    }
 
     /// <summary>文字列を返す処理を、例外で落ちないように包む (例外は UnmanagedCallersOnly の外へ出せない)。null・失敗は NULL。</summary>
     private static byte* Text(string what, Func<string?> action)

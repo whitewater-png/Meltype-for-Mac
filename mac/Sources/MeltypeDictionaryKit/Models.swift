@@ -47,12 +47,91 @@ public struct TermDomainInfo: Hashable {
     public let name: String
     public let count: Int
     public let enabled: Bool
+    /// 利用者が自分で作った分野 (語を足し・直し・消せる。同梱の分野は読み取り専用)。
+    public let isUser: Bool
 
-    public init(id: String, name: String, count: Int, enabled: Bool) {
+    public init(id: String, name: String, count: Int, enabled: Bool, isUser: Bool = false) {
         self.id = id
         self.name = name
         self.count = count
         self.enabled = enabled
+        self.isUser = isUser
+    }
+}
+
+/// 自作の専門用語集から消した語と、消す前の位置 (元に戻すときに、本体へそのまま返す)。
+public struct RemovedTerm: Hashable {
+    public let index: Int
+    public let key: WordKey
+    public let note: String
+
+    public init(index: Int, key: WordKey, note: String = "") {
+        self.index = index
+        self.key = key
+        self.note = note
+    }
+}
+
+/// 専門用語集に入れられなかった語と、その理由。
+public struct SkippedWord: Hashable {
+    public let key: WordKey
+    public let reason: String
+
+    public init(key: WordKey, reason: String) {
+        self.key = key
+        self.reason = reason
+    }
+}
+
+/// ユーザー辞書から自作の専門用語集へ移した結果。removed はユーザー辞書から消した語 (元の位置つき)、added は専門用語集に新しく足した語。
+public struct MoveOutcome: Hashable {
+    public var removed: [RemovedEntry]
+    public var added: [WordKey]
+    public var skipped: [SkippedWord]
+
+    public init(removed: [RemovedEntry] = [], added: [WordKey] = [], skipped: [SkippedWord] = []) {
+        self.removed = removed
+        self.added = added
+        self.skipped = skipped
+    }
+}
+
+/// 消した自作の専門用語集 (元に戻すために、中身と、有効だったかを持つ)。
+public struct DeletedDomain: Hashable {
+    public let id: String
+    public let name: String
+    public let content: String
+    public let wasEnabled: Bool
+
+    public init(id: String, name: String, content: String, wasEnabled: Bool) {
+        self.id = id
+        self.name = name
+        self.content = content
+        self.wasEnabled = wasEnabled
+    }
+}
+
+/// 自作の専門用語集の取り込みの結果。
+public struct DomainImportSummary: Hashable {
+    public let id: String
+    public let name: String
+    public let added: Int
+    public let skipped: Int
+    public let duplicates: Int
+
+    public init(id: String, name: String, added: Int, skipped: Int, duplicates: Int) {
+        self.id = id
+        self.name = name
+        self.added = added
+        self.skipped = skipped
+        self.duplicates = duplicates
+    }
+
+    public var message: String {
+        var lines = ["専門用語集「\(name)」を作り、\(added) 語を取り込みました (すぐ有効です)。"]
+        if skipped > 0 { lines.append("読みがかなでない・短すぎるなどで飛ばした行: \(skipped)") }
+        if duplicates > 0 { lines.append("重複して省いた語: \(duplicates)") }
+        return lines.joined(separator: "\n")
     }
 }
 
@@ -139,13 +218,42 @@ public enum FfiFormat {
         entries.map { "\($0.index)\t\($0.key.reading)\t\($0.key.word)" }.joined(separator: "\n")
     }
 
-    /// 「ID\t名称\t語数\t有効なら 1」の行 → 分野。
+    /// 「ID\t名称\t語数\t有効なら 1\t自作なら 1」の行 → 分野。5 つ目の欄は無くてもよい (古い本体の形)。欄が増えても読める。
     public static func parseDomains(_ text: String) -> [TermDomainInfo] {
         lines(text).compactMap { line in
             let parts = fields(line)
-            guard parts.count == 4, let count = Int(parts[2]) else { return nil }
-            return TermDomainInfo(id: String(parts[0]), name: String(parts[1]), count: count, enabled: parts[3] == "1")
+            guard parts.count >= 4, let count = Int(parts[2]) else { return nil }
+            return TermDomainInfo(id: String(parts[0]), name: String(parts[1]), count: count, enabled: parts[3] == "1", isUser: parts.count >= 5 && parts[4] == "1")
         }
+    }
+
+    /// 「読み\t語\t理由」の行 → 入れられなかった語。
+    public static func parseSkipped(_ text: String) -> [SkippedWord] {
+        lines(text).compactMap { line in
+            let parts = fields(line)
+            guard parts.count >= 3, !parts[0].isEmpty else { return nil }
+            return SkippedWord(key: WordKey(reading: String(parts[0]), word: String(parts[1])), reason: String(parts[2]))
+        }
+    }
+
+    /// 「位置\t読み\t語\t注記」の行 → 自作の専門用語集から消した語。
+    public static func parseRemovedTerms(_ text: String) -> [RemovedTerm] {
+        lines(text).compactMap { line in
+            let parts = fields(line)
+            guard parts.count >= 3, let index = Int(parts[0]), index >= 0 else { return nil }
+            return RemovedTerm(index: index, key: WordKey(reading: String(parts[1]), word: String(parts[2])), note: parts.count >= 4 ? String(parts[3]) : "")
+        }
+    }
+
+    public static func formatRemovedTerms(_ entries: [RemovedTerm]) -> String {
+        entries.map { "\($0.index)\t\($0.key.reading)\t\($0.key.word)\t\($0.note)" }.joined(separator: "\n")
+    }
+
+    /// 「取り込んだ語数\t飛ばした行数\t重複して省いた数\t名前」(+ ID) → 自作の専門用語集の取り込みの結果。
+    public static func parseDomainImportSummary(_ text: String, id: String) -> DomainImportSummary? {
+        let parts = text.split(separator: "\t", omittingEmptySubsequences: false)
+        guard parts.count >= 4, let added = Int(parts[0]), let skipped = Int(parts[1]), let duplicates = Int(parts[2]) else { return nil }
+        return DomainImportSummary(id: id, name: String(parts[3]), added: added, skipped: skipped, duplicates: duplicates)
     }
 
     /// 「読み\t語\t注記\t除外なら 1」の行 → 専門用語。

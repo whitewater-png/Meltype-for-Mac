@@ -200,12 +200,13 @@ internal static class TermDomainTests
     [Test]
     public static void Domains_FfiFormat_ReplacesTabsAndNewlines()
     {
-        var text = TermDomains.FormatForFfi([new TermDomain("a", "名\t称\n二行目", 12, true), new TermDomain("b", "医療", 0, false)]);
+        var text = TermDomains.FormatForFfi([new TermDomain("a", "名\t称\n二行目", 12, true), new TermDomain("b", "医療", 0, false), new TermDomain("user-0123abcd", "自作", 3, true, IsUser: true)]);
         var lines = text.Split('\n');
-        Assert.Equal(2, lines.Length, "1 分野 1 行 (名称の改行は空白にする)");
-        Assert.Equal("a\t名 称 二行目\t12\t1", lines[0], "ID Tab 名称 Tab 語数 Tab 有効");
-        Assert.Equal("b\t医療\t0\t0", lines[1], "OFF は 0");
-        Assert.True(lines.All(l => l.Split('\t').Length == 4), "どの行も 4 欄");
+        Assert.Equal(3, lines.Length, "1 分野 1 行 (名称の改行は空白にする)");
+        Assert.Equal("a\t名 称 二行目\t12\t1\t0", lines[0], "ID Tab 名称 Tab 語数 Tab 有効 Tab 自作");
+        Assert.Equal("b\t医療\t0\t0\t0", lines[1], "OFF は 0");
+        Assert.Equal("user-0123abcd\t自作\t3\t1\t1", lines[2], "自作は 1");
+        Assert.True(lines.All(l => l.Split('\t').Length == 5), "どの行も 5 欄");
     }
 
     [Test]

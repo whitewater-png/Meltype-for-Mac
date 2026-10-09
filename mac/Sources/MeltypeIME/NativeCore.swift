@@ -139,7 +139,7 @@ struct CompositionView: Decodable {
     let selectedPrediction: Int
 }
 
-/// 専門用語集の分野 (meltype_term_domains の 1 行)。
+/// 専門用語集の分野 (meltype_term_domains の 1 行: ID・名称・語数・有効か・自作か)。
 struct TermDomain {
     let id: String
     let name: String
@@ -163,7 +163,7 @@ final class NativeCore {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion と、
     /// 辞書の管理画面の NativeDictionary.expectedAbiVersion (Sources/MeltypeDictionaryKit) と必ず同じにする。
     /// 食い違う dylib (別の版が混ざった) を読むと関数の引数が合わずに落ちるので、食い違ったら初期化を止める。
-    static let expectedAbiVersion: Int32 = 7
+    static let expectedAbiVersion: Int32 = 8
 
     /// dylib の版数が expectedAbiVersion と合っているか (initialize で確かめる)。合わなければ入力を一切扱わない (キーはアプリに渡る)。
     private(set) var isCompatible = false
@@ -413,7 +413,8 @@ final class NativeCore {
             .split(separator: "\n", omittingEmptySubsequences: true)
             .compactMap { (line: Substring) -> TermDomain? in
                 let parts = line.split(separator: "\t", omittingEmptySubsequences: false)
-                guard parts.count == 4, let count = Int(parts[2]) else { return nil }
+                // 5 つ目の欄 (自作なら 1) は、このメニューでは使わない。欄が増えても読めるよう、4 つ以上あればよい。
+                guard parts.count >= 4, let count = Int(parts[2]) else { return nil }
                 return TermDomain(id: String(parts[0]), name: String(parts[1]), count: count, enabled: parts[3] == "1")
             }
     }

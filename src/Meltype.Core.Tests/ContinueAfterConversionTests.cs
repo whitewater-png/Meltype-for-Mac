@@ -672,7 +672,9 @@ internal static class ContinueAfterConversionTests
         Assert.True(int.Parse(csharpVersion) >= 6, "辞書の管理画面の FFI を足した版 (6) 以上");
         foreach (var name in new[] { "meltype_userdict_words", "meltype_userdict_version", "meltype_userdict_check", "meltype_userdict_add", "meltype_userdict_add_many", "meltype_userdict_problem", "meltype_userdict_update",
                      "meltype_userdict_remove", "meltype_userdict_restore", "meltype_userdict_import", "meltype_userdict_export", "meltype_to_reading",
-                     "meltype_term_words", "meltype_term_excluded", "meltype_term_set_excluded", "meltype_term_edit", "meltype_term_revision", "meltype_term_domains", "meltype_set_term_domain" })
+                     "meltype_term_words", "meltype_term_excluded", "meltype_term_set_excluded", "meltype_term_edit", "meltype_term_revision", "meltype_term_domains", "meltype_set_term_domain",
+                     "meltype_term_create", "meltype_term_rename", "meltype_term_delete", "meltype_term_restore_domain", "meltype_term_user_check", "meltype_term_user_add",
+                     "meltype_term_user_remove", "meltype_term_user_restore", "meltype_term_user_update", "meltype_term_move", "meltype_term_export", "meltype_term_import" })
         {
             Assert.True(exports.Contains($"\"{name}\""), $"FFI の入口 {name}");
             Assert.True(manager.Contains($"\"{name}\""), $"辞書の管理画面からの呼び出し {name}");

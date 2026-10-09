@@ -5,6 +5,8 @@ import AppKit
 import MeltypeDictionaryKit
 
 /// 「専門用語集」のタブ: 左に分野 (チェックで ON/OFF)、右にその分野の語 (約 2 万語でも軽い一覧。検索・並べ替え・絞り込み)。
+/// 同梱の分野の下に、自分で作った分野 (「自作」の印) が並ぶ。自作の分野は、新規作成・名前の変更・削除 (⌘Z で戻せる)・書き出し・取り込みができ、
+/// 語の追加・編集・削除もできる (ユーザー辞書の語は、ユーザー辞書のタブの「専門用語集へ移す…」で入れる)。
 /// 同梱の語は書き換えられないので、
 ///   - 「除外」(Delete) = その語を変換に使わない (terms-excluded.txt に保存。「除外をやめる」・⌘Z で元に戻せる。除外中の語も一覧に出る)
 ///   - 「直す」(Return) = 元の語を除外して、直した語をユーザー辞書に登録する (ユーザー辞書が専門用語集より優先)
@@ -31,6 +33,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     private let filterPopup = NSPopUpButton()
     private let countLabel = UI.label(secondary: true)
     private let statusLabel = UI.label(secondary: true)
+    private let infoLabel = UI.wrapping("")
     private let offLabel = UI.wrapping("", secondary: false)
     private let emptyLabel = UI.label(secondary: true, size: 13)
     private let spinner = NSProgressIndicator()
@@ -38,6 +41,12 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     private var includeButton: NSButton!
     private var editButton: NSButton!
     private var copyButton: NSButton!
+    private var addTermButton: NSButton!
+    private var editTermButton: NSButton!
+    private var deleteTermButton: NSButton!
+    private var bundledButtons: [NSView] = []
+    private var userButtons: [NSView] = []
+    private var domainActions: NSPopUpButton!
     private var lastRevision: Int32 = .min
     private var loadToken = 0
     private var loadedSource: Source?
@@ -75,9 +84,31 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         sourceScroll.hasVerticalScroller = true
         sourceScroll.translatesAutoresizingMaskIntoConstraints = false
         sourceScroll.widthAnchor.constraint(equalToConstant: 260).isActive = true
+        sourceTable.contextMenu = { [weak self] in self?.sourceMenu() }
+
+        // 左の下: 自作の専門用語集の操作 (新規・取り込み・名前の変更・書き出し・削除)
+        domainActions = NSPopUpButton(frame: .zero, pullsDown: true)
+        domainActions.addItem(withTitle: "自作の専門用語集")
+        for (title, action) in [("新しい専門用語集…", #selector(newDomain(_:))), ("ファイルから取り込む…", #selector(importDomain(_:))), (nil, nil),
+                                ("名前を変更…", #selector(renameDomain(_:))), ("書き出す…", #selector(exportDomain(_:))), ("削除…", #selector(deleteDomain(_:)))] as [(String?, Selector?)] {
+            if let title, let action {
+                domainActions.menu?.addItem(withTitle: title, action: action, keyEquivalent: "").target = self
+            } else {
+                domainActions.menu?.addItem(.separator())
+            }
+        }
+        domainActions.setAccessibilityLabel("自作の専門用語集の操作")
+        domainActions.setAccessibilityHelp("専門用語集を新しく作る・ファイルから取り込む・名前を変える・書き出す・削除する")
+        domainActions.translatesAutoresizingMaskIntoConstraints = false
+        let left = NSStackView(views: [sourceScroll, domainActions])
+        left.orientation = .vertical
+        left.alignment = .leading
+        left.spacing = 8
+        left.translatesAutoresizingMaskIntoConstraints = false
 
         // 右: 語
-        let info = UI.wrapping("ここにある専門用語集はサンプルです。ご自身の用途に合わせて育てていくための出発点として使ってください (不要な語は「除外」、直したい語は「直す」、使いたい語は「複製」、足したい語はユーザー辞書への登録で、自分の辞書にできます)。同梱の専門用語は書き換えられません。「除外」はその語を変換に使わないこと (元に戻せます)、「直す」は元の語を除外して直した語をユーザー辞書に登録すること、「複製」はそのままユーザー辞書にコピーすることです。ユーザー辞書の語は専門用語集より優先されます。")
+        let info = infoLabel
+        info.stringValue = Self.bundledInfo
         offLabel.textColor = .systemOrange
         offLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         offLabel.isHidden = true
@@ -111,7 +142,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         tableView.target = self
         tableView.doubleAction = #selector(editSelected(_:))
         tableView.setAccessibilityLabel("専門用語の一覧")
-        tableView.onDelete = { [weak self] in self?.excludeSelected(nil) }
+        tableView.onDelete = { [weak self] in self?.deleteKey() }
         tableView.onActivate = { [weak self] in self?.editSelected(nil) }
         tableView.contextMenu = { [weak self] in self?.rowMenu() }
         let scroll = NSScrollView()
@@ -132,8 +163,17 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         copyButton = UI.button("ユーザー辞書へ複製", target: self, action: #selector(copyToUserDictionary(_:)))
         copyButton.setAccessibilityHelp("選んだ語を、そのままユーザー辞書に登録します")
 
+        addTermButton = UI.button("語を追加…", target: self, action: #selector(addTerm(_:)))
+        addTermButton.setAccessibilityHelp("この専門用語集に語を足します")
+        editTermButton = UI.button("編集…", target: self, action: #selector(editSelected(_:)))
+        editTermButton.setAccessibilityHelp("選んだ語を直します (Return)")
+        deleteTermButton = UI.button("削除…", target: self, action: #selector(deleteTerms(_:)))
+        deleteTermButton.setAccessibilityHelp("選んだ語をこの専門用語集から消します (Delete。⌘Z で元に戻せます)")
+        bundledButtons = [excludeButton, includeButton, editButton]
+        userButtons = [addTermButton, editTermButton, deleteTermButton]
+        userButtons.forEach { $0.isHidden = true }
         let top = NSStackView(views: [searchField, filterPopup, spinner, UI.spacer(), countLabel])
-        let bottom = NSStackView(views: [excludeButton, includeButton, UI.spacer(), editButton, copyButton])
+        let bottom = NSStackView(views: [excludeButton, includeButton, addTermButton, editTermButton, deleteTermButton, UI.spacer(), editButton, copyButton])
         statusLabel.setAccessibilityLabel("状態")
         let right = NSStackView(views: [info, offLabel, top, scroll, bottom, statusLabel])
         right.orientation = .vertical
@@ -147,13 +187,15 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         scroll.setContentHuggingPriority(.init(1), for: .vertical)
 
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 880, height: 560))
-        root.addSubview(sourceScroll)
+        root.addSubview(left)
         root.addSubview(right)
         NSLayoutConstraint.activate([
-            sourceScroll.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
-            sourceScroll.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
-            sourceScroll.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -12),
-            right.leadingAnchor.constraint(equalTo: sourceScroll.trailingAnchor, constant: 12),
+            left.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
+            left.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
+            left.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -12),
+            sourceScroll.widthAnchor.constraint(equalTo: left.widthAnchor),
+            domainActions.widthAnchor.constraint(equalTo: left.widthAnchor),
+            right.leadingAnchor.constraint(equalTo: left.trailingAnchor, constant: 12),
             right.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
             right.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
             right.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -12),
@@ -189,10 +231,15 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     private func reloadSources() {
         lastRevision = dictionary.termRevision()
         let selected = selectedSource
-        sources = dictionary.termDomains().map { .domain($0) } + [.excluded]
+        // 同梱の分野の下に、自作の分野を並べる
+        let domains = dictionary.termDomains()
+        sources = (domains.filter { !$0.isUser } + domains.filter(\.isUser)).map { .domain($0) } + [.excluded]
         sourceTable.reloadData()
         if let selected, let index = sources.firstIndex(where: { Self.sameSource($0, selected) }) {
             sourceTable.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+        } else if selected != nil, !sources.isEmpty {
+            // 選んでいた分野が無くなった (削除した・ほかの画面で消えた): 先頭の分野に移る
+            sourceTable.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
         updateOffLabel()
     }
@@ -259,7 +306,17 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         updateState()
     }
 
+    /// 選んでいる分野が自作の分野なら、その情報。
+    private var selectedUserDomain: TermDomainInfo? {
+        if case let .domain(domain)? = selectedSource, domain.isUser { return domain }
+        return nil
+    }
+
+    private static let bundledInfo = "ここにある専門用語集はサンプルです。ご自身の用途に合わせて育てていくための出発点として使ってください (不要な語は「除外」、直したい語は「直す」、使いたい語は「複製」、足したい語はユーザー辞書への登録で、自分の辞書にできます)。同梱の専門用語は書き換えられません。「除外」はその語を変換に使わないこと (元に戻せます)、「直す」は元の語を除外して直した語をユーザー辞書に登録すること、「複製」はそのままユーザー辞書にコピーすることです。ユーザー辞書の語は専門用語集より優先されます。"
+    private static let userInfo = "自分で作った専門用語集です。語は、ユーザー辞書の語と同じように変換で使われます (読みが短くても、日常語と同じ読みでも、英単語でも)。語はここで追加・編集・削除できます。ユーザー辞書のタブで語を選び、「専門用語集へ移す…」で入れることもできます。左のチェックで、専門用語集ごとに使う・使わないを切り替えられます。"
+
     private func updateOffLabel() {
+        infoLabel.stringValue = selectedUserDomain == nil ? Self.bundledInfo : Self.userInfo
         if case let .domain(domain)? = selectedSource, !domain.enabled {
             offLabel.stringValue = "「\(domain.name)」は OFF です (変換に使われません)。左のチェックを入れると、すべての入力欄ですぐ使われます。"
             offLabel.isHidden = false
@@ -282,11 +339,21 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         }
         emptyLabel.isHidden = shown > 0
         let rows = selectedRows()
+        let isUser = selectedUserDomain != nil
+        bundledButtons.forEach { $0.isHidden = isUser }
+        userButtons.forEach { $0.isHidden = !isUser }
+        if isUser, total == 0, !loading { emptyLabel.stringValue = "まだ語がありません。「語を追加…」か、ユーザー辞書のタブの「専門用語集へ移す…」で入れられます。" }
         excludeButton.isEnabled = rows.contains { !$0.excluded }
         includeButton.isEnabled = rows.contains { $0.excluded }
         editButton.isEnabled = rows.count == 1
         copyButton.isEnabled = !rows.isEmpty
+        addTermButton.isEnabled = isUser
+        editTermButton.isEnabled = rows.count == 1
+        deleteTermButton.isEnabled = !rows.isEmpty
     }
+
+    /// 自作の専門用語集を選んでいるか (メニューの書き出しなどを使えるか)。
+    var hasUserDomainSelected: Bool { selectedUserDomain != nil }
 
     private func selectedRows() -> [TermWord] {
         tableView.selectedRowIndexes.compactMap { $0 < list.visible.count ? list.visible[$0] : nil }
@@ -339,7 +406,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         let cell = sourceTable.makeView(withIdentifier: identifier, owner: nil) as? SourceCellView ?? SourceCellView(identifier: identifier, target: self, action: #selector(toggleDomain(_:)))
         switch sources[row] {
         case let .domain(domain):
-            cell.configure(name: domain.name, detail: "\(domain.count) 語", checkbox: domain.enabled, tag: row)
+            cell.configure(name: domain.name, detail: domain.isUser ? "自作 \(domain.count) 語" : "\(domain.count) 語", checkbox: domain.enabled, tag: row, isUser: domain.isUser)
         case .excluded:
             cell.configure(name: "除外した語 (すべての分野)", detail: nil, checkbox: nil, tag: row)
         }
@@ -355,6 +422,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     func tableViewSelectionDidChange(_ notification: Notification) {
         if (notification.object as? NSTableView) === sourceTable {
             updateOffLabel()
+            updateState()
             loadWords()
         } else {
             updateState()
@@ -402,7 +470,30 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         return true
     }
 
+    /// Delete キー: 自作の専門用語集なら語を消し、同梱ならその語を除外する。
+    private func deleteKey() {
+        if selectedUserDomain != nil { deleteTerms(nil) } else { excludeSelected(nil) }
+    }
+
+    private func sourceMenu() -> NSMenu? {
+        guard selectedUserDomain != nil else { return nil }
+        let menu = NSMenu()
+        menu.addItem(withTitle: "名前を変更…", action: #selector(renameDomain(_:)), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "書き出す…", action: #selector(exportDomain(_:)), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "削除…", action: #selector(deleteDomain(_:)), keyEquivalent: "").target = self
+        return menu
+    }
+
     private func rowMenu() -> NSMenu? {
+        if selectedUserDomain != nil {
+            let menu = NSMenu()
+            menu.addItem(withTitle: "編集…", action: #selector(editSelected(_:)), keyEquivalent: "").target = self
+            menu.addItem(withTitle: "削除…", action: #selector(deleteTerms(_:)), keyEquivalent: "").target = self
+            menu.addItem(.separator())
+            menu.addItem(withTitle: "ユーザー辞書へ複製", action: #selector(copyToUserDictionary(_:)), keyEquivalent: "").target = self
+            menu.addItem(withTitle: "コピー", action: #selector(copy(_:)), keyEquivalent: "").target = self
+            return menu
+        }
         let menu = NSMenu()
         menu.addItem(withTitle: "除外する", action: #selector(excludeSelected(_:)), keyEquivalent: "").target = self
         menu.addItem(withTitle: "除外をやめる", action: #selector(includeSelected(_:)), keyEquivalent: "").target = self
@@ -416,7 +507,11 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         let rows = selectedRows()
         switch menuItem.action {
-        case #selector(excludeSelected(_:)), #selector(delete(_:)): return rows.contains { !$0.excluded }
+        case #selector(renameDomain(_:)), #selector(exportDomain(_:)), #selector(deleteDomain(_:)): return selectedUserDomain != nil
+        case #selector(deleteTerms(_:)): return selectedUserDomain != nil && !rows.isEmpty
+        case #selector(addTerm(_:)): return selectedUserDomain != nil
+        case #selector(delete(_:)): return selectedUserDomain != nil ? !rows.isEmpty : rows.contains { !$0.excluded }
+        case #selector(excludeSelected(_:)): return selectedUserDomain == nil && rows.contains { !$0.excluded }
         case #selector(includeSelected(_:)): return rows.contains { $0.excluded }
         case #selector(editSelected(_:)): return rows.count == 1
         case #selector(copyToUserDictionary(_:)), #selector(copy(_:)): return !rows.isEmpty
@@ -472,7 +567,15 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         undoManager.registerUndo(withTarget: self) { [weak undoManager] target in
             let undoing = undoManager?.isUndoing ?? true
             let result = change.perform(on: target.dictionary)
-            if let redo = result.undo, let undoManager { target.registerUndo(redo, name: name, on: undoManager) }
+            if let redo = result.undo, let undoManager {
+                if result.error != nil && undoing {
+                    // 取り消しに失敗したとき (消した専門用語集を戻せないなど) の「もう一度」は、取り消しが終わってから積む
+                    // (取り消しの最中に積むと「やり直し」の側に入ってしまい、⌘Z でもう一度戻せない)。
+                    DispatchQueue.main.async { target.registerUndo(redo, name: name, on: undoManager) }
+                } else {
+                    target.registerUndo(redo, name: name, on: undoManager)
+                }
+            }
             target.reloadSources()
             target.loadWords(keepPosition: true)
             target.didChange?()
@@ -494,7 +597,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         }
     }
 
-    @objc func delete(_ sender: Any?) { excludeSelected(sender) }
+    @objc func delete(_ sender: Any?) { deleteKey() }
 
     @objc func includeSelected(_ sender: Any?) {
         let keys = selectedRows().filter(\.excluded).map(\.key)
@@ -508,6 +611,16 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     @objc func editSelected(_ sender: Any?) {
         let rows = selectedRows()
         guard rows.count == 1, let original = rows.first, let window else { return }
+        if let domain = selectedUserDomain {
+            let editor = WordEditor(.init(title: "専門用語を編集", explanation: "「\(domain.name)」の語を直します (⌘Z で元に戻せます)。", confirmTitle: "保存", key: original.key),
+                                    validate: { [dictionary] key in dictionary.checkTerm(id: domain.id, key, except: original.key) },
+                                    submit: { [weak self] key in
+                                        self?.perform(.updateTerm(id: domain.id, from: original.key, to: key), message: "「\(key.word)」(\(key.reading)) に直しました")
+                                    },
+                                    toReading: { [dictionary] in dictionary.toReading($0) })
+            editor.begin(on: window)
+            return
+        }
         let explanation = "同梱の「\(original.word)」(\(original.reading)) は書き換えられないので、直した語をユーザー辞書に登録し、元の語は除外します (⌘Z で元に戻せます)。ユーザー辞書の語は専門用語集より優先されます。"
         let editor = WordEditor(.init(title: "専門用語を直す", explanation: explanation, confirmTitle: "ユーザー辞書に登録", key: original.key),
                                 // 直した語がもうユーザー辞書にあっても、登録はせず除外だけ行うので、重複は理由にしない (入力の規則だけ確かめる)
@@ -518,6 +631,134 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
                                 },
                                 toReading: { [dictionary] in dictionary.toReading($0) })
         editor.begin(on: window)
+    }
+
+    // ---- 自作の専門用語集 ----
+
+    /// 自作の専門用語集に語を足す。
+    @objc func addTerm(_ sender: Any?) {
+        guard let domain = selectedUserDomain, let window else { return }
+        let editor = WordEditor(.init(title: "専門用語を追加", explanation: "「\(domain.name)」に語を足します。ユーザー辞書の語と同じように変換で使われます。", confirmTitle: "追加", key: WordKey(reading: "", word: "")),
+                                validate: { [dictionary] key in dictionary.checkTerm(id: domain.id, key, except: nil) },
+                                submit: { [weak self] key in
+                                    self?.perform(.addTerms(id: domain.id, keys: [key]), message: "「\(key.word)」(\(key.reading)) を追加しました")
+                                },
+                                toReading: { [dictionary] in dictionary.toReading($0) })
+        editor.begin(on: window)
+    }
+
+    /// 自作の専門用語集から、選んだ語を消す (確認あり・⌘Z で戻せる)。
+    @objc func deleteTerms(_ sender: Any?) {
+        guard let domain = selectedUserDomain, let window else { return }
+        let keys = selectedKeys()
+        guard !keys.isEmpty else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = keys.count == 1 ? "「\(keys[0].word)」(\(keys[0].reading)) を削除しますか？" : "選んだ \(keys.count) 語を削除しますか？"
+        alert.informativeText = "「\(domain.name)」から消します。「編集」→「取り消す」(⌘Z) で元に戻せます。"
+        alert.addButton(withTitle: "削除").hasDestructiveAction = true
+        alert.addButton(withTitle: "キャンセル").keyEquivalent = "\u{1b}"
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .alertFirstButtonReturn else { return }
+            if let error = self.perform(.removeTerms(id: domain.id, keys: keys), message: keys.count == 1 ? "「\(keys[0].word)」を削除しました (⌘Z で元に戻せます)" : "\(keys.count) 語を削除しました (⌘Z で元に戻せます)") {
+                UI.showError(error, title: "削除できませんでした", in: window)
+            }
+        }
+    }
+
+    /// 自作の専門用語集を新しく作る (すぐ有効)。
+    @objc func newDomain(_ sender: Any?) {
+        guard let window else { return }
+        TermSheets.promptName(title: "新しい専門用語集", message: "名前を付けてください。作るとすぐ有効になります (左のチェックで切り替えられます)。", confirmTitle: "作成", in: window) { [weak self] name in
+            guard let self else { return nil }
+            let result = self.dictionary.createDomain(name: name)
+            if let error = result.error { return error }
+            self.reloadSources()
+            if let id = result.id { self.selectDomain(id: id) }
+            self.showStatus("専門用語集「\(name)」を作りました")
+            self.didChange?()
+            return nil
+        }
+    }
+
+    private func selectDomain(id: String) {
+        if let index = sources.firstIndex(where: { if case let .domain(domain) = $0 { return domain.id == id } else { return false } }) {
+            sourceTable.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+            sourceTable.scrollRowToVisible(index)
+        }
+    }
+
+    @objc func renameDomain(_ sender: Any?) {
+        guard let domain = selectedUserDomain, let window else { return }
+        TermSheets.promptName(title: "名前を変更", message: "「\(domain.name)」の新しい名前を入れてください。", initial: domain.name, confirmTitle: "変更", in: window) { [weak self] name in
+            guard let self else { return nil }
+            if name == domain.name { return nil }
+            return self.perform(.renameDomain(id: domain.id, to: name, from: domain.name), message: "名前を「\(name)」に変えました")
+        }
+    }
+
+    @objc func deleteDomain(_ sender: Any?) {
+        guard let domain = selectedUserDomain, let window else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "専門用語集「\(domain.name)」(\(domain.count) 語) を削除しますか？"
+        alert.informativeText = "この専門用語集の語は、変換に使われなくなります。「編集」→「取り消す」(⌘Z) で、語ごと元に戻せます。"
+        alert.addButton(withTitle: "削除").hasDestructiveAction = true
+        alert.addButton(withTitle: "キャンセル").keyEquivalent = "\u{1b}"
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .alertFirstButtonReturn else { return }
+            if let error = self.perform(.deleteDomain(id: domain.id), message: "専門用語集「\(domain.name)」を削除しました (⌘Z で元に戻せます)") {
+                UI.showError(error, title: "削除できませんでした", in: window)
+            }
+        }
+    }
+
+    @objc func exportDomain(_ sender: Any?) {
+        guard let domain = selectedUserDomain, let window else { return }
+        let panel = NSSavePanel()
+        panel.title = "専門用語集を書き出す"
+        panel.message = "「\(domain.name)」を、Meltype の専門用語集のファイル (UTF-8 のテキスト) に書き出します。「ファイルから取り込む…」で、ほかの Mac でも使えます。"
+        panel.prompt = "書き出す"
+        panel.nameFieldStringValue = "Meltype-専門用語集-\(domain.name).txt"
+        panel.allowedContentTypes = [.plainText]
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .OK, let url = panel.url else { return }
+            let result = self.dictionary.exportDomain(id: domain.id, path: url.path)
+            if let error = result.error {
+                UI.showError(error, title: "書き出せませんでした", in: window)
+                return
+            }
+            self.showStatus("\(result.count) 語を書き出しました: \(url.lastPathComponent)")
+        }
+    }
+
+    @objc func importDomain(_ sender: Any?) {
+        guard let window else { return }
+        let panel = NSOpenPanel()
+        panel.title = "専門用語集を取り込む"
+        panel.message = "Meltype の専門用語集のファイル (「読み」と「語」を Tab で区切った UTF-8 のテキスト。先頭の「# 名称:」が名前になります) を選んでください。新しい専門用語集として追加します。"
+        panel.prompt = "取り込む"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .OK, let url = panel.url else { return }
+            let result = self.dictionary.importDomain(path: url.path)
+            if let error = result.error {
+                UI.showError(error, title: "取り込めませんでした", in: window)
+                return
+            }
+            self.reloadSources()
+            if let summary = result.summary {
+                self.selectDomain(id: summary.id)
+                self.showStatus(summary.message.replacingOccurrences(of: "\n", with: " / "))
+                let alert = NSAlert()
+                alert.messageText = "専門用語集を取り込みました"
+                alert.informativeText = summary.message
+                alert.beginSheetModal(for: window)
+            }
+            self.didChange?()
+        }
     }
 
     /// 選んだ語を、そのままユーザー辞書にコピーする (すでにあるものは飛ばす)。本体の 1 回の読み直し・保存で済ませ (数千語でも待たせない)、
@@ -586,7 +827,8 @@ private final class SourceCellView: NSTableCellView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     /// checkbox が nil なら、チェックを出さない (除外した語の一覧)。
-    func configure(name text: String, detail detailText: String?, checkbox state: Bool?, tag: Int) {
+    func configure(name text: String, detail detailText: String?, checkbox state: Bool?, tag: Int, isUser: Bool = false) {
+        detail.textColor = isUser ? .controlAccentColor : .secondaryLabelColor
         name.stringValue = text
         detail.stringValue = detailText ?? ""
         detail.isHidden = detailText == nil

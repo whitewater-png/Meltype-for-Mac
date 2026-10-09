@@ -66,8 +66,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     /// 設定のタブには検索が無い。
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(focusSearch(_:)) { return tabs.selectedTabViewItemIndex != 2 }
-        return true
+        switch menuItem.action {
+        case #selector(focusSearch(_:)): return tabs.selectedTabViewItemIndex != 2
+        case #selector(moveToTermDomain(_:)): return tabs.selectedTabViewItemIndex == 0 && userController.hasSelection
+        case #selector(exportTermDomain(_:)): return tabs.selectedTabViewItemIndex == 1 && termController.hasUserDomainSelected
+        default: return true
+        }
     }
 
     @objc func addWord(_ sender: Any?) {
@@ -91,6 +95,27 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case 1: termController.focusSearch()
         default: break   // 設定のタブに検索は無い
         }
+    }
+
+    /// ユーザー辞書で選んだ語を、自作の専門用語集へ移す。
+    @objc func moveToTermDomain(_ sender: Any?) {
+        tabs.selectedTabViewItemIndex = 0
+        userController.moveToTermDomain(sender)
+    }
+
+    @objc func newTermDomain(_ sender: Any?) {
+        tabs.selectedTabViewItemIndex = 1
+        termController.newDomain(sender)
+    }
+
+    @objc func importTermDomain(_ sender: Any?) {
+        tabs.selectedTabViewItemIndex = 1
+        termController.importDomain(sender)
+    }
+
+    @objc func exportTermDomain(_ sender: Any?) {
+        tabs.selectedTabViewItemIndex = 1
+        termController.exportDomain(sender)
     }
 
     @objc func showUserDictionary(_ sender: Any?) { tabs.selectedTabViewItemIndex = 0 }

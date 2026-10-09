@@ -19,6 +19,8 @@ internal static class Program
         Meltype.Composition.TermDomains.ConfigPath = () => Path.Combine(Path.GetTempPath(), "meltype-tests-no-config", "config.json");
         // 除外した専門用語 (terms-excluded.txt) も、利用者の本物のファイルを読まない。
         Meltype.Composition.TermDomains.ExclusionPath = () => Path.Combine(Path.GetTempPath(), "meltype-tests-no-config", "terms-excluded.txt");
+        // 自作の専門用語集 (terms/) も、利用者の本物のフォルダーを読まない。
+        Meltype.Composition.TermDomains.UserDirectory = () => Path.Combine(Path.GetTempPath(), "meltype-tests-no-config", "terms");
         switch (args.FirstOrDefault())
         {
             case "--eval":

@@ -27,10 +27,12 @@ public static class Backup
     public static bool IsRestorableName(string name)
     {
         if (RootFiles.Contains(name, StringComparer.Ordinal)) return true;
+        // 自分で作った専門用語集 (terms/terms-user-xxxxxxxx.txt)
+        if (name.StartsWith("terms/", StringComparison.Ordinal)) return System.Text.RegularExpressions.Regex.IsMatch(name["terms/".Length..], @"^terms-user-[0-9a-f]{8}\.txt\z");
         if (!name.StartsWith("dictionaries/", StringComparison.Ordinal)) return false;
         var file = name["dictionaries/".Length..];
-        return System.Text.RegularExpressions.Regex.IsMatch(file, @"^[^\\/:*?""<>|\x00-\x1f]{1,100}\.txt$") && !file.StartsWith('.') &&
-               !System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileNameWithoutExtension(file), @"^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return System.Text.RegularExpressions.Regex.IsMatch(file, @"^[^\\/:*?""<>|\x00-\x1f]{1,100}\.txt\z") && !file.StartsWith('.') &&
+               !System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileNameWithoutExtension(file), @"^(con|prn|aux|nul|com\d|lpt\d)(\..*)?\z", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
     private static IEnumerable<string> TargetFiles(string dataDirectory)
@@ -38,6 +40,11 @@ public static class Backup
         foreach (var name in RootFiles)
         {
             if (File.Exists(Path.Combine(dataDirectory, name))) yield return name;
+        }
+        var userTerms = Path.Combine(dataDirectory, "terms");
+        if (Directory.Exists(userTerms))
+        {
+            foreach (var file in Directory.GetFiles(userTerms, "terms-user-*.txt").Where(f => IsRestorableName("terms/" + Path.GetFileName(f)))) yield return "terms/" + Path.GetFileName(file);
         }
         var dictionaries = Path.Combine(dataDirectory, "dictionaries");
         if (Directory.Exists(dictionaries))
@@ -94,7 +101,7 @@ public static class Backup
             if (!IsRestorableName(name)) continue;
             var path = Path.GetFullPath(Path.Combine(dataDirectory, name));
             if (!path.StartsWith(Path.GetFullPath(dataDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            SafeFile.EnsureDirectory(Path.GetDirectoryName(path)!);
             if (File.Exists(path))
             {
                 File.Copy(path, path + ".before-restore", overwrite: true);

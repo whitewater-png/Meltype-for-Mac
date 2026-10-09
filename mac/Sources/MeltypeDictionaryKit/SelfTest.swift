@@ -66,6 +66,14 @@ public enum SelfTest {
         check(catalog?.groups.map(\.name) == ["入力", "変換・候補"] && catalog?.groups[0].items.count == 2, "グループは出てきた順")
         check(SettingsCatalog.parse("{ 壊れた") == nil, "壊れた JSON は nil")
         check(SettingValue.bool(false).jsonLiteral == "false" && SettingValue.int(3).jsonLiteral == "3" && SettingValue.string("a\"b").jsonLiteral == "\"a\\\"b\"", "本体に渡す JSON の値")
+        // 専門用語集の一覧 (5 つ目の欄は無くてもよい)
+        let domainsText = "ai\tAI\t10\t1\nuser-0123abcd\t自作\t3\t0\t1\nold\t古い形\t2\t0\nbad\tx\tn\t1\nfuture\t先の形\t5\t1\t0\t余分"
+        let domains = FfiFormat.parseDomains(domainsText)
+        check(domains.map(\.id) == ["ai", "user-0123abcd", "old", "future"], "専門用語集の一覧 (語数が数でない行は飛ばす・欄が増えても読める)")
+        check(domains[0].enabled && !domains[0].isUser && !domains[1].enabled && domains[1].isUser && !domains[2].isUser, "有効・自作の欄")
+        check(FfiFormat.parseRemovedTerms(FfiFormat.formatRemovedTerms([RemovedTerm(index: 2, key: keys[0], note: "注記")])) == [RemovedTerm(index: 2, key: keys[0], note: "注記")], "位置 Tab 読み Tab 語 Tab 注記 の往復")
+        check(FfiFormat.parseSkipped("あ\tA\t理由\n欄なし").map(\.reason) == ["理由"], "入れられなかった語と理由")
+        check(FfiFormat.parseDomainImportSummary("3\t1\t2\t名前", id: "user-0123abcd") == DomainImportSummary(id: "user-0123abcd", name: "名前", added: 3, skipped: 1, duplicates: 2), "専門用語集の取り込みの結果")
         check(FfiFormat.parseKeys("きごう\t記号\n\n欄なし\n\t空の読み\n").count == 1, "欄が足りない行・空の読みは飛ばす")
         check(FfiFormat.parseUserEntries("あ\tA\nい\tI").map(\.order) == [0, 1], "登録順はファイルの順")
         let removed = [RemovedEntry(index: 3, key: keys[0]), RemovedEntry(index: 10, key: keys[1])]
@@ -196,6 +204,29 @@ public enum SelfTest {
         let d = WordKey(reading: "でぃー", word: "D")
         let many = DictionaryChange.addMany([a, d]).perform(on: fake)
         check(many.undo == .remove([d]), "まとめての登録の取り消しは、新しく登録した語だけを消す")
+        // 自作の専門用語集: 移す・取り消す・やり直す
+        fake.domains["user-0000abcd"] = ("自作", [], true)
+        fake.words = [a, b, c]
+        let move = DictionaryChange.moveToDomain(id: "user-0000abcd", keys: [a, b]).perform(on: fake)
+        check(move.error == nil && fake.words == [c] && fake.domains["user-0000abcd"]!.words == [a, b], "移すと、ユーザー辞書から消えて専門用語集に入る")
+        guard let moveUndo = move.undo else { check(false, "移したら取り消しを返す"); return }
+        let moveRedo = moveUndo.perform(on: fake)
+        check(moveRedo.error == nil && fake.words == [a, b, c] && fake.domains["user-0000abcd"]!.words.isEmpty, "取り消すと、ユーザー辞書の元の位置に戻り、専門用語集から消える")
+        check(moveRedo.undo == .moveToDomain(id: "user-0000abcd", keys: [a, b]), "取り消しの取り消しは、同じ語をもう一度移すこと")
+        _ = moveRedo.undo?.perform(on: fake)
+        check(fake.words == [c] && fake.domains["user-0000abcd"]!.words == [a, b], "やり直せる")
+        let removeTerm = DictionaryChange.removeTerms(id: "user-0000abcd", keys: [a]).perform(on: fake)
+        check(fake.domains["user-0000abcd"]!.words == [b] && removeTerm.undo?.actionName == "専門用語の削除", "専門用語を消す")
+        _ = removeTerm.undo?.perform(on: fake)
+        check(fake.domains["user-0000abcd"]!.words == [a, b], "消した専門用語を元の位置に戻せる")
+        let deleted = DictionaryChange.deleteDomain(id: "user-0000abcd").perform(on: fake)
+        check(fake.domains.isEmpty && deleted.undo != nil, "専門用語集を消す")
+        _ = deleted.undo?.perform(on: fake)
+        check(fake.domains["user-0000abcd"]?.words == [a, b] && fake.domains["user-0000abcd"]?.enabled == true, "消した専門用語集を、同じ中身で戻せる")
+        let rename = DictionaryChange.renameDomain(id: "user-0000abcd", to: "新しい名前", from: "自作").perform(on: fake)
+        check(fake.domains["user-0000abcd"]?.name == "新しい名前" && rename.undo == .renameDomain(id: "user-0000abcd", to: "自作", from: "新しい名前"), "名前の変更と、その取り消し")
+        check(DictionaryChange.moveToDomain(id: "user-ffffffff", keys: [a]).perform(on: fake).error != nil, "無い専門用語集へは移せない")
+        fake.words = [a]
         let none = DictionaryChange.addMany([a]).perform(on: fake)
         check(none.error == nil && none.undo == nil, "1 語も増えなければ、取り消しを積まない")
     }
@@ -259,6 +290,38 @@ public enum SelfTest {
         check(!dictionary.excludedTerms().contains(words[1].key) && dictionary.userEntries()?.contains { $0.key == fixed } == false, "専門用語の編集を取り消せる")
         check(dictionary.setExcluded([first], excluded: false) == nil && dictionary.excludedTerms().isEmpty, "除外をやめられる")
         check(dictionary.setTermDomain(id: "civil", enabled: false), "分野を無効に戻せる")
+
+        // 自作の専門用語集 (ユーザー辞書の語を移す)
+        let created = dictionary.createDomain(name: "自作の用語")
+        guard created.error == nil, let domainId = created.id else {
+            check(false, "自作の専門用語集を作れる (\(created.error ?? "ID なし"))")
+            return
+        }
+        check(dictionary.termDomains().first { $0.id == domainId }.map { $0.isUser && $0.enabled && $0.name == "自作の用語" } == true, "一覧に自作・有効で出る")
+        check(dictionary.createDomain(name: "自作の用語").error != nil && dictionary.createDomain(name: "").error != nil, "名前がかぶる・空は理由を返す")
+        check(dictionary.termDomains().filter(\.isUser).count == 1 && dictionary.termDomains().filter { !$0.isUser }.count == 6, "同梱の 6 分野は自作ではない")
+        _ = dictionary.add(WordKey(reading: "うつしたい", word: "移したい語"))
+        let moved = DictionaryChange.moveToDomain(id: domainId, keys: [WordKey(reading: "うつしたい", word: "移したい語"), WordKey(reading: "x", word: "短い")]).perform(on: dictionary)
+        check(moved.error == nil && dictionary.userEntries()?.contains { $0.word == "移したい語" } == false, "移した語はユーザー辞書から消える")
+        check(dictionary.termWords(domain: domainId)?.map(\.word) == ["移したい語"], "専門用語集に入る")
+        let move = dictionary.moveToDomain(id: domainId, keys: [WordKey(reading: "x", word: "短い")])
+        check(move.error == nil && move.outcome.skipped.count == 1 && move.outcome.skipped[0].reason.count > 0, "入れられない語は理由つきで返る")
+        check(dictionary.checkTerm(id: domainId, WordKey(reading: "うつしたい", word: "移したい語"), except: nil) != nil, "同じ専門用語集の中の重複は理由を返す")
+        check(dictionary.updateTerm(id: domainId, from: WordKey(reading: "うつしたい", word: "移したい語"), to: WordKey(reading: "うつしたい", word: "移した語")) == nil, "専門用語を直せる")
+        _ = moved.undo?.perform(on: dictionary)
+        check(dictionary.userEntries()?.contains { $0.word == "移したい語" } == true, "取り消すとユーザー辞書に戻る (直した語は別なので専門用語集には残る)")
+        let exportPath = resolved + "/domain-export.txt"
+        _ = dictionary.addTerms(id: domainId, keys: [WordKey(reading: "ほかのよみ", word: "ほかの語")])
+        let domainExport = dictionary.exportDomain(id: domainId, path: exportPath)
+        check(domainExport.error == nil && domainExport.count == 2, "自作の専門用語集を書き出せる")
+        let domainImport = dictionary.importDomain(path: exportPath)
+        check(domainImport.error == nil && domainImport.summary?.added == 2 && domainImport.summary?.name == "自作の用語 (2)", "取り込むと新しい専門用語集 (名前は (2))")
+        let deleted = DictionaryChange.deleteDomain(id: domainId).perform(on: dictionary)
+        check(deleted.error == nil && dictionary.termDomains().contains { $0.id == domainId } == false, "専門用語集を消せる")
+        _ = deleted.undo?.perform(on: dictionary)
+        check(dictionary.termDomains().first { $0.id == domainId }?.count == 2, "消した専門用語集を、同じ中身で戻せる")
+        if let importedId = domainImport.summary?.id { _ = dictionary.deleteDomain(id: importedId) }
+        _ = dictionary.deleteDomain(id: domainId)
 
         // 設定タブ
         guard let catalog = dictionary.settings() else {
@@ -325,5 +388,64 @@ final class FakeOperations: DictionaryOperations {
         let added = add(new) == nil
         if original != new { excluded.insert(original) }
         return (nil, added)
+    }
+
+    // 自作の専門用語集 (メモリの上だけ)
+    var domains: [String: (name: String, words: [WordKey], enabled: Bool)] = [:]
+
+    func moveToDomain(id: String, keys: [WordKey]) -> (error: String?, outcome: MoveOutcome) {
+        guard domains[id] != nil else { return ("その専門用語集が見つかりません", MoveOutcome()) }
+        var outcome = MoveOutcome()
+        let movable = keys.filter { $0.reading.count >= 2 }
+        outcome.skipped = keys.filter { $0.reading.count < 2 }.map { SkippedWord(key: $0, reason: "読みが短い") }
+        outcome.added = movable.filter { !domains[id]!.words.contains($0) }
+        domains[id]!.words.append(contentsOf: outcome.added)
+        outcome.removed = remove(movable).removed
+        return (nil, outcome)
+    }
+
+    func addTerms(id: String, keys: [WordKey]) -> (error: String?, added: [WordKey], skipped: [SkippedWord]) {
+        guard domains[id] != nil else { return ("その専門用語集が見つかりません", [], []) }
+        let added = keys.filter { !domains[id]!.words.contains($0) }
+        domains[id]!.words.append(contentsOf: added)
+        return (nil, added, [])
+    }
+
+    func removeTerms(id: String, keys: [WordKey]) -> (error: String?, removed: [RemovedTerm]) {
+        guard let domain = domains[id] else { return ("その専門用語集が見つかりません", []) }
+        let targets = Set(keys)
+        let removed = domain.words.enumerated().filter { targets.contains($0.element) }.map { RemovedTerm(index: $0.offset, key: $0.element) }
+        domains[id]!.words.removeAll { targets.contains($0) }
+        return (nil, removed)
+    }
+
+    func restoreTerms(id: String, entries: [RemovedTerm]) -> String? {
+        guard domains[id] != nil else { return "その専門用語集が見つかりません" }
+        for entry in entries.sorted(by: { $0.index < $1.index }) where !domains[id]!.words.contains(entry.key) {
+            domains[id]!.words.insert(entry.key, at: min(entry.index, domains[id]!.words.count))
+        }
+        return nil
+    }
+
+    func updateTerm(id: String, from old: WordKey, to new: WordKey) -> String? {
+        guard let index = domains[id]?.words.firstIndex(of: old) else { return "元の語が見つかりません" }
+        domains[id]!.words[index] = new
+        return nil
+    }
+
+    func deleteDomain(id: String) -> (error: String?, deleted: DeletedDomain?) {
+        guard let domain = domains.removeValue(forKey: id) else { return ("その専門用語集が見つかりません", nil) }
+        return (nil, DeletedDomain(id: id, name: domain.name, content: domain.words.map { "\($0.reading)\t\($0.word)" }.joined(separator: "\n"), wasEnabled: domain.enabled))
+    }
+
+    func restoreDomain(_ deleted: DeletedDomain) -> String? {
+        domains[deleted.id] = (deleted.name, FfiFormat.parseKeys(deleted.content), deleted.wasEnabled)
+        return nil
+    }
+
+    func renameDomain(id: String, name: String) -> String? {
+        guard domains[id] != nil else { return "その専門用語集が見つかりません" }
+        domains[id]!.name = name
+        return nil
     }
 }

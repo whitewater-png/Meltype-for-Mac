@@ -2052,6 +2052,8 @@ public sealed class CompositionController
             }
             if (_options.UserDictionary is { } termSource)
             {
+                // 自作の専門用語集の語は、ユーザー辞書の語の次 (同梱の専門用語集の語の使用実績に負けない)
+                foreach (var word in termSource.PredictUserTerms(reading).OrderByDescending(Used)) yield return word;
                 foreach (var word in termSource.PredictTerms(reading).OrderByDescending(Used)) yield return word;
             }
             if (reading.Length <= MaxPredictionReadingLength && _options.Predictions?.Invoke(reading) is { } engine)

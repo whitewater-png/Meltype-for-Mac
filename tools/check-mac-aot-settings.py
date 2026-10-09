@@ -17,7 +17,9 @@
 #   3. 別々のプロセスが同時にユーザー辞書へ登録しても、1 語も消えない (ロック + 読み直してから書く)
 #   4. 設定タブの関数 (meltype_settings_*): 一覧の取得・真偽/選択肢/数の保存・不正な値の拒否・既定値に戻す。別のプロセスで読み直しても保たれ、
 #      読めない config.json は上書きしない。IME のつもりのプロセス (meltype_create のセッション) が、作り直さずに設定の変更に追随する
-#   5. IME のつもりのプロセス (meltype_create のセッション) が動いたまま、別のプロセス (管理画面のつもり) の登録・除外・分野の切り替えが
+#   5. 自作の専門用語集 (meltype_term_create ほか): 作成・名前の変更・削除と復元・語の追加と編集・ユーザー辞書から移す (移した語は変換に使われ続ける)・書き出しと取り込み。
+#      別のプロセスで読み直しても保たれ、IME のつもりのプロセスが動いたまま、別のプロセスが作った専門用語集の語が変換に出る
+#   6. IME のつもりのプロセス (meltype_create のセッション) が動いたまま、別のプロセス (管理画面のつもり) の登録・除外・分野の切り替えが
 #      すぐ反映される (変換の結果に出る・版が進む)。IME の側の登録 (meltype_add_user_word) も、管理画面の登録を消さない
 # 終了コード: 0 = 通った、1 = 失敗。
 import ctypes
@@ -45,6 +47,18 @@ def load(lib_path):
         "meltype_get_continue_after_conversion": ([], i),
         "meltype_set_shift_enter_newline": ([i], i),
         "meltype_get_shift_enter_newline": ([], i),
+        "meltype_term_create": ([s, ctypes.POINTER(p)], p),
+        "meltype_term_rename": ([s, s], p),
+        "meltype_term_delete": ([s, ctypes.POINTER(p), ctypes.POINTER(i)], p),
+        "meltype_term_restore_domain": ([s, s, i], p),
+        "meltype_term_user_check": ([s, s, s, s, s], p),
+        "meltype_term_user_add": ([s, s, ctypes.POINTER(p), ctypes.POINTER(p)], p),
+        "meltype_term_user_remove": ([s, s, ctypes.POINTER(p)], p),
+        "meltype_term_user_restore": ([s, s], p),
+        "meltype_term_user_update": ([s, s, s, s, s], p),
+        "meltype_term_move": ([s, s, ctypes.POINTER(p), ctypes.POINTER(p), ctypes.POINTER(p)], p),
+        "meltype_term_export": ([s, s, ctypes.POINTER(i)], p),
+        "meltype_term_import": ([s, ctypes.POINTER(p), ctypes.POINTER(p)], p),
         "meltype_settings_get": ([], p),
         "meltype_settings_set": ([s, s], p),
         "meltype_settings_reset": ([], p),
@@ -99,7 +113,7 @@ def domains(lib):
     result = {}
     for line in (text(lib, lib.meltype_term_domains()) or "").split("\n"):
         parts = line.split("\t")
-        if len(parts) == 4:
+        if len(parts) >= 4:   # 5 つ目の欄 (自作なら 1) は user_domains が読む
             result[parts[0]] = int(parts[3])
     return result
 
@@ -241,6 +255,134 @@ def child_settings_watch(lib):
     time.sleep(0.8)                 # ファイルの確認の間隔 (0.5 秒) より長く待つ
     out["after"] = comma_result(lib, session)
     out["flag_continue_after"] = lib.meltype_get_continue_after_conversion()
+    return out
+
+
+def user_domains(lib):
+    """専門用語集の一覧のうち、自作のもの (ID → [名称, 語数, 有効, 自作])。5 つ目の欄を読む。"""
+    result = {}
+    for line in (text(lib, lib.meltype_term_domains()) or "").split("\n"):
+        parts = line.split("\t")
+        if len(parts) == 5 and parts[4] == "1":
+            result[parts[0]] = [parts[1], int(parts[2]), int(parts[3]), 1]
+    return result
+
+
+def out_text(lib, function, *args):
+    """出力用のポインター 1 つを持つ関数を呼ぶ。(理由, 出力) を返す。"""
+    out = ctypes.c_void_p()
+    reason = text(lib, function(*args, ctypes.byref(out)))
+    return reason, text(lib, out.value)
+
+
+def child_term_ops(lib):
+    """画面がする、自作の専門用語集の操作を一通り行う。"""
+    out = {}
+    out["data_directory"], out["safe"] = data_directory(lib)
+    if not out["safe"]:
+        return out
+    directory = out["data_directory"]
+    out["abi"] = lib.meltype_abi_version()
+    for reading, word in [("きごう", "記号"), ("あいこん", "icon"), ("こうせい", "構成"), ("ぬるぽが", "nullpo")]:
+        lib.meltype_userdict_add(u(reading), u(word))
+    out["user_before"] = user_words(lib)
+    out["create_bad"] = out_text(lib, lib.meltype_term_create, u(""))[0]
+    reason, domain_id = out_text(lib, lib.meltype_term_create, u("自作の用語"))
+    out["create"] = reason
+    out["id"] = domain_id
+    out["dup_name"] = out_text(lib, lib.meltype_term_create, u("自作の用語"))[0]
+    out["bundled_name"] = out_text(lib, lib.meltype_term_create, u("土木・建設"))[0]
+    out["listed"] = user_domains(lib).get(domain_id)
+    out["bundled_not_user"] = [k for k in domains(lib) if k in user_domains(lib)]
+    # 移す: 専門用語集に入れられない語 (読みが 1 文字) は無いので、全部移る。ユーザー辞書に無い語を混ぜても、飛ばすだけ
+    removed, added, skipped = ctypes.c_void_p(), ctypes.c_void_p(), ctypes.c_void_p()
+    out["move"] = text(lib, lib.meltype_term_move(u(domain_id), u("きごう\t記号\nあいこん\ticon\nこうせい\t構成\nぬるぽが\tnullpo"), ctypes.byref(removed), ctypes.byref(added), ctypes.byref(skipped)))
+    out["move_removed"] = text(lib, removed.value)
+    out["move_added"] = text(lib, added.value)
+    out["move_skipped"] = text(lib, skipped.value)
+    out["user_after_move"] = user_words(lib)
+    out["words_after_move"] = [line.split("\t")[:2] for line in (text(lib, lib.meltype_term_words(u(domain_id))) or "").split("\n") if line]
+    out["listed_after_move"] = user_domains(lib).get(domain_id)
+    # 取り消し: ユーザー辞書へ元の位置に戻し、専門用語集から消す
+    out["undo_restore"] = text(lib, lib.meltype_userdict_restore(u(out["move_removed"] or "")))
+    out["undo_remove"], undo_removed = out_text(lib, lib.meltype_term_user_remove, u(domain_id), u(out["move_added"] or ""))
+    out["user_after_undo"] = user_words(lib)
+    out["words_after_undo"] = [line.split("\t")[:2] for line in (text(lib, lib.meltype_term_words(u(domain_id))) or "").split("\n") if line]
+    out["redo_restore_terms"] = text(lib, lib.meltype_term_user_restore(u(domain_id), u(undo_removed or "")))
+    out["words_after_redo"] = [line.split("\t")[:2] for line in (text(lib, lib.meltype_term_words(u(domain_id))) or "").split("\n") if line]
+    # 語の編集
+    out["check_ok"] = text(lib, lib.meltype_term_user_check(u(domain_id), u("ほそう"), u("舗装"), None, None))
+    out["check_dup"] = text(lib, lib.meltype_term_user_check(u(domain_id), u("きごう"), u("記号"), None, None))
+    out["check_short"] = text(lib, lib.meltype_term_user_check(u(domain_id), u("き"), u("記"), None, None))
+    out["add"], add_added = out_text(lib, lambda *a: lib.meltype_term_user_add(a[0], a[1], a[2], ctypes.byref(ctypes.c_void_p())), u(domain_id), u("ほそう\t舗装"))
+    out["update"] = text(lib, lib.meltype_term_user_update(u(domain_id), u("ほそう"), u("舗装"), u("ほそう"), u("舗装路")))
+    out["update_missing"] = text(lib, lib.meltype_term_user_update(u(domain_id), u("ないよみ"), u("無い"), u("あたらしい"), u("新しい")))
+    out["rename"] = text(lib, lib.meltype_term_rename(u(domain_id), u("改名した用語")))
+    out["rename_bundled"] = text(lib, lib.meltype_term_rename(b"civil", u("x")))
+    # 書き出し・取り込み
+    path = os.path.join(directory, "domain-export.txt")
+    count = ctypes.c_int()
+    out["export"] = text(lib, lib.meltype_term_export(u(domain_id), u(path), ctypes.byref(count)))
+    out["export_count"] = count.value
+    out["export_text"] = open(path, encoding="utf-8").read()
+    out["export_bundled"] = text(lib, lib.meltype_term_export(b"civil", u(path), ctypes.byref(ctypes.c_int())))
+    reason, imported_id = out_text(lib, lambda p_, o: lib.meltype_term_import(p_, o, ctypes.byref(ctypes.c_void_p())), u(path))
+    out["import"] = reason
+    out["imported"] = user_domains(lib).get(imported_id)
+    # 削除と復元
+    content, was_enabled = ctypes.c_void_p(), ctypes.c_int()
+    out["delete"] = text(lib, lib.meltype_term_delete(u(imported_id), ctypes.byref(content), ctypes.byref(was_enabled)))
+    deleted_content = text(lib, content.value)
+    out["deleted_enabled"] = was_enabled.value
+    out["after_delete"] = imported_id in user_domains(lib)
+    out["delete_bundled"] = text(lib, lib.meltype_term_delete(b"civil", ctypes.byref(ctypes.c_void_p()), ctypes.byref(ctypes.c_int())))
+    out["restore"] = text(lib, lib.meltype_term_restore_domain(u(imported_id), u(deleted_content or ""), was_enabled.value))
+    out["after_restore"] = user_domains(lib).get(imported_id)
+    out["files"] = sorted(f for f in os.listdir(os.path.join(directory, "terms")) if f.endswith(".txt"))
+    return out
+
+
+def child_term_read(lib):
+    out = {}
+    out["data_directory"], out["safe"] = data_directory(lib)
+    out["domains"] = user_domains(lib)
+    out["user_words"] = user_words(lib)
+    out["words"] = {key: [line.split("\t")[:2] for line in (text(lib, lib.meltype_term_words(u(key))) or "").split("\n") if line] for key in user_domains(lib)}
+    return out
+
+
+def child_term_create(lib):
+    """画面のつもり: 自作の専門用語集を作って語を足す (別のプロセスの IME が動いたまま、変換に出るか)。"""
+    out = {}
+    _, safe = data_directory(lib)
+    if safe:
+        reason, domain_id = out_text(lib, lib.meltype_term_create, u("外で作った用語"))
+        out["create"] = reason
+        added = ctypes.c_void_p()
+        skipped = ctypes.c_void_p()
+        out["add"] = text(lib, lib.meltype_term_user_add(u(domain_id), u("ぬるぽが\tnullpo"), ctypes.byref(added), ctypes.byref(skipped)))
+        out["id"] = domain_id
+    return out
+
+
+def child_term_watch(lib):
+    """IME のつもり: 専門用語集が無い状態で打つ → 親の合図 (別のプロセスが専門用語集を作る) → 作り直さずにもう一度打つ。"""
+    out = {}
+    out["data_directory"], out["safe"] = data_directory(lib)
+    if not out["safe"]:
+        print(json.dumps(out), flush=True)
+        return None
+    session = lib.meltype_create()
+    out["session"] = bool(session)
+    out["before"] = type_keys(lib, session, "nurupoga ")
+    type_keys(lib, session, "\x1b\x1b\x1b")
+    out["revision_before"] = lib.meltype_term_revision()
+    print(json.dumps({"ready": True}), flush=True)
+    sys.stdin.readline()
+    time.sleep(0.8)                 # ファイルの確認の間隔 (0.5 秒) より長く待つ
+    out["after"] = type_keys(lib, session, "nurupoga ")
+    type_keys(lib, session, "\x1b\x1b\x1b")
+    out["revision_after"] = lib.meltype_term_revision()
     return out
 
 
@@ -394,6 +536,16 @@ def child(lib_path, step, args):
         out = child_settings_watch(lib)
         if out is None:
             return
+    elif step == "term-ops":
+        out = child_term_ops(lib)
+    elif step == "term-read":
+        out = child_term_read(lib)
+    elif step == "term-create":
+        out = child_term_create(lib)
+    elif step == "term-watch":
+        out = child_term_watch(lib)
+        if out is None:
+            return
     elif step == "dict-ops":
         out = child_dict_ops(lib)
     elif step == "dict-read":
@@ -475,7 +627,7 @@ def check_settings_tab(lib_path, failures):
         if not ops["safe"]:
             failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
             return
-        expect(ops["abi"] == 7, f"FFI の版数が 7 でない: {ops['abi']}")
+        expect(ops["abi"] == 8, f"FFI の版数が 8 でない: {ops['abi']}")
         expect(len(ops["keys"]) >= 15 and ops["keys"][0] == "LiveConversion" and "DetectionLevel" in ops["keys"], f"設定の一覧が違う: {ops['keys']}")
         expect(not {"Mode", "InputStyle", "AutoUpdate", "AppRules", "Profiles"} & set(ops["keys"]), "Mac で効かない設定が一覧にある")
         expect(ops["detection"]["kind"] == "choice" and [o["value"] for o in ops["detection"]["options"]] == ["Aggressive", "Balanced", "Conservative", "Manual"], f"選択肢が違う: {ops['detection']}")
@@ -546,6 +698,80 @@ def check_settings_tab(lib_path, failures):
         expect(live["before"] == "あ、", f"変更前の句読点が既定の「、」でない: {live['before']}")
         expect(live["after"] == "あ，", f"作り直さなくても、設定タブの変更 (句読点「，。」) が入力に反映される: {live['after']}")
         expect(live["flag_continue_before"] == 0 and live["flag_continue_after"] == 1, f"変換後も続けて入力の変更が、動いている IME に見えない: {live}")
+
+
+def check_user_terms(lib_path, failures):
+    def expect(condition, message):
+        if not condition:
+            failures.append(message)
+
+    with tempfile.TemporaryDirectory(prefix="meltype-aot-terms-") as home:
+        ops = run(lib_path, home, "term-ops")
+        if not ops["safe"]:
+            failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
+            return
+        data = ops["data_directory"]
+        expect(ops["abi"] == 8, f"FFI の版数が 8 でない: {ops['abi']}")
+        expect(len(ops["user_before"]) == 4, f"前提: ユーザー辞書に 4 語: {ops['user_before']}")
+        expect(ops["create_bad"], "空の名前を断らない")
+        expect(ops["create"] is None and ops["id"] and ops["id"].startswith("user-") and len(ops["id"]) == 13, f"自作の専門用語集を作れない: {ops['create']} / {ops['id']}")
+        expect(ops["dup_name"] and ops["bundled_name"], "かぶる名前 (自作・同梱) を断らない")
+        expect(ops["listed"] == ["自作の用語", 0, 1, 1], f"一覧に自作・有効で出ない: {ops['listed']}")
+        expect(not ops["bundled_not_user"] or all(k.startswith("user-") for k in ops["bundled_not_user"]), "同梱の分野が自作に見える")
+        expect(ops["move"] is None, f"移せない: {ops['move']}")
+        expect(ops["move_skipped"] is None and ops["move_added"] and len(ops["move_added"].split("\n")) == 4, f"移した語が違う: {ops['move_added']} / {ops['move_skipped']}")
+        expect(ops["user_after_move"] == [], f"移した語がユーザー辞書に残っている: {ops['user_after_move']}")
+        expect(sorted(map(tuple, ops["words_after_move"])) == sorted([("きごう", "記号"), ("あいこん", "icon"), ("こうせい", "構成"), ("ぬるぽが", "nullpo")]), f"専門用語集の中身が違う: {ops['words_after_move']}")
+        expect(ops["listed_after_move"] and ops["listed_after_move"][1] == 4, f"語数が変わらない: {ops['listed_after_move']}")
+        expect(ops["undo_restore"] is None and ops["undo_remove"] is None, f"取り消せない: {ops['undo_restore']} / {ops['undo_remove']}")
+        expect(ops["user_after_undo"] == ops["user_before"], f"取り消しで、ユーザー辞書が元の並びに戻らない: {ops['user_after_undo']}")
+        expect(ops["words_after_undo"] == [], "取り消しで、専門用語集から消えない")
+        expect(ops["redo_restore_terms"] is None and len(ops["words_after_redo"]) == 4, "消した専門用語を元に戻せない")
+        expect(ops["check_ok"] is None and ops["check_dup"] and ops["check_short"], f"入力チェックが違う: {ops['check_ok']} / {ops['check_dup']} / {ops['check_short']}")
+        expect(ops["add"] is None and ops["update"] is None and ops["update_missing"], f"語の追加・編集が違う: {ops['add']} / {ops['update']} / {ops['update_missing']}")
+        expect(ops["rename"] is None and ops["rename_bundled"], "名前の変更 (同梱は断る) が違う")
+        expect(ops["export"] is None and ops["export_count"] == 5 and "# 名称: 改名した用語" in ops["export_text"] and "# 出典: 自作" in ops["export_text"], f"書き出しが違う: {ops['export']} / {ops['export_count']}")
+        expect(ops["export_bundled"], "同梱の専門用語集を書き出せてしまう")
+        expect(ops["import"] is None and ops["imported"] and ops["imported"][0] == "改名した用語 (2)" and ops["imported"][1] == 5, f"取り込みが違う: {ops['import']} / {ops['imported']}")
+        expect(ops["delete"] is None and ops["deleted_enabled"] == 1 and ops["after_delete"] is False and ops["delete_bundled"], "削除が違う")
+        expect(ops["restore"] is None and ops["after_restore"] and ops["after_restore"][2] == 1 and ops["after_restore"][1] == 5, f"削除した専門用語集を、同じ中身・有効で戻せない: {ops['restore']} / {ops['after_restore']}")
+        expect(len(ops["files"]) == 2 and all(f.startswith("terms-user-") for f in ops["files"]), f"terms/ のファイルが違う: {ops['files']}")
+        terms_dir = os.path.join(data, "terms")
+        expect(mode(terms_dir) == 0o700, "terms/ が 0700 でない")
+        for name in ops["files"]:
+            expect(mode(os.path.join(terms_dir, name)) == 0o600, f"{name} が 0600 でない")
+        config = json.load(open(os.path.join(data, "config.json"), encoding="utf-8"))
+        expect(ops["id"] in config.get("EnabledTermDomains", []), "config.json の有効な分野に入っていない")
+
+        again = run(lib_path, home, "term-read")   # 別のプロセスで読み直す
+        expect(set(again["domains"]) == set(user_ids(ops)), f"別のプロセスで読み直すと、専門用語集が違う: {again['domains']}")
+        expect(len(again["words"].get(ops["id"], [])) == 5, "別のプロセスで読み直すと、語が違う")
+        expect(again["user_words"] == ops["user_before"], "別のプロセスで読み直すと、ユーザー辞書が違う")
+
+    # IME のつもりのプロセスが動いたまま、別のプロセスが作った専門用語集が変換に出る
+    with tempfile.TemporaryDirectory(prefix="meltype-aot-terms-live-") as home:
+        watcher = subprocess.Popen(command(lib_path, "term-watch"), env=env_for(home), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        ready = json.loads(watcher.stdout.readline())
+        if not ready.get("ready"):
+            failures.append(f"IME のつもりのプロセスが始まらない (専門用語集): {ready}")
+            watcher.kill()
+            return
+        created = run(lib_path, home, "term-create")
+        expect(created.get("create") is None and created.get("add") is None, f"画面のつもりの専門用語集を作れない: {created}")
+        stdout, stderr = watcher.communicate("go\n", timeout=120)
+        if watcher.returncode != 0:
+            failures.append(f"IME のつもりのプロセスが異常終了 (専門用語集): {stderr.strip()[-500:]}")
+            return
+        live = json.loads(stdout.strip().splitlines()[-1])
+        expect(live["session"], "セッションを作れない (専門用語集)")
+        expect("nullpo" not in (live["before"] or ""), f"作る前から出ている: {live['before']}")
+        expect(live["after"] == "nullpo", f"別のプロセスが作った専門用語集 (英単語の語) が、動いている IME の変換に出ない: {live['after']}")
+        expect(live["revision_after"] != live["revision_before"], "専門用語集の版が進まない")
+
+
+def user_ids(ops):
+    """term-ops が最後に持っている自作の専門用語集 (作った 1 つ + 取り込んで戻した 1 つ)。"""
+    return [name[len("terms-"):-len(".txt")] for name in ops["files"]]
 
 
 def check_dictionary(lib_path, failures):
@@ -662,6 +888,7 @@ def main():
     if not check_settings(lib_path, failures):
         return 1
     check_settings_tab(lib_path, failures)
+    check_user_terms(lib_path, failures)
     settings_failures = len(failures)
     check_dictionary(lib_path, failures)
     for message in failures:
@@ -669,6 +896,7 @@ def main():
     if not failures:
         print("PASS: AOT 版で設定を保存・読み直しできた")
         print("PASS: AOT 版で設定タブの操作・不正な値の拒否・別プロセスへの反映ができた")
+        print("PASS: AOT 版で自作の専門用語集の作成・移動・取り消し・書き出し・取り込み・別プロセスへの反映ができた")
         print("PASS: AOT 版で辞書の管理画面の操作・別プロセスへの反映・同時の登録ができた")
     else:
         print(f"FAIL (設定 {settings_failures} 件・辞書 {len(failures) - settings_failures} 件)")

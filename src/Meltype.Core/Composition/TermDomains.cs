@@ -8,9 +8,10 @@ namespace Meltype.Composition;
 
 /// <summary>
 /// 専門用語集 (dictionaries/terms-*.txt) の「分野」(ファイル 1 つ)。ID はファイル名から terms- と .txt を除いたもの (ai, civil, …)。
+/// IsUser は、利用者が自分で作った分野 (データフォルダーの terms/terms-user-xxxxxxxx.txt。ID は user-xxxxxxxx)。同梱の分野は読み取り専用、自作の分野は語を足し・直し・消せる。
 /// Count は語数 (不正な行・重複を除く。TermDictionary.Count と同じ)。
 /// </summary>
-public sealed record TermDomain(string Id, string Name, int Count, bool Enabled);
+public sealed record TermDomain(string Id, string Name, int Count, bool Enabled, bool IsUser = false);
 
 /// <summary>
 /// 専門用語集の、分野ごとの有効/無効と、利用者が除外した語。ContinueAfterConversionSetting と同じく、状態はプロセスで 1 つ持ち、
@@ -27,7 +28,7 @@ public sealed record TermDomain(string Id, string Name, int Count, bool Enabled)
 /// 分野の数に依らない。分野ごとの辞書を持って順に引くと、探索が分野の数だけ増え、同じ読みの語の順序・重複の整理も分野をまたいで崩れる。
 /// 分野ごとの辞書は持たない (メモリが 2 重になるため)。OFF の分野のファイルは、語数を数えるときに 1 回だけ読んですぐ捨て、保持しない。
 /// </summary>
-internal static class TermDomains
+internal static partial class TermDomains
 {
     private static readonly object Lock = new();
 
@@ -59,7 +60,7 @@ internal static class TermDomains
     private static FileStamp s_exclusionStamp = FileStamp.Missing;
     // 除外した語が変わるたびに増える (Current のキャッシュの鍵に入れる)
     private static int s_exclusionVersion;
-    private static List<(string Id, string Name, int Count)>? s_meta;
+    private static List<(string Id, string Name, int Count, bool User)>? s_meta;
     private static TermDictionary? s_current;
     private static string? s_currentKey;
     private static volatile int s_revision;
@@ -84,7 +85,7 @@ internal static class TermDomains
             {
                 var ids = EnabledIds();
                 var excluded = ExcludedSet();
-                var key = string.Join('\n', ids.Order(StringComparer.Ordinal)) + "\n#" + s_exclusionVersion;
+                var key = string.Join('\n', ids.Order(StringComparer.Ordinal)) + "\n#" + s_exclusionVersion + "\n@" + s_userVersion;
                 if (s_current is not null && s_currentKey == key) return s_current;
                 TermDictionary terms;
                 if (ids.Count == 0)
@@ -95,7 +96,9 @@ internal static class TermDomains
                 {
                     try
                     {
-                        terms = TermDictionary.Parse(Source().Where(d => ids.Contains(d.Id)).Select(d => d.ReadText()).ToList(), excluded, CommonReadings.Set);
+                        // 自作の分野は、ユーザー辞書の語と同じ扱いにする (TermDictionary.Parse の userTexts)
+                        terms = TermDictionary.Parse(Source().Where(d => ids.Contains(d.Id)).Select(d => d.ReadText()).ToList(), excluded, CommonReadings.Set,
+                            OrderedUserTexts(ids));
                     }
                     catch (Exception ex)
                     {
@@ -117,7 +120,7 @@ internal static class TermDomains
         lock (Lock)
         {
             var enabled = EnabledIds();
-            return Meta().Select(m => new TermDomain(m.Id, m.Name, m.Count, enabled.Contains(m.Id))).ToList();
+            return Meta().Select(m => new TermDomain(m.Id, m.Name, m.Count, enabled.Contains(m.Id), m.User)).ToList();
         }
     }
 
@@ -128,7 +131,7 @@ internal static class TermDomains
         {
             try
             {
-                if (Source().All(d => d.Id != id)) return false;
+                if (AllSource().All(d => d.Id != id)) return false;
                 var path = ConfigPath();
                 SafeFile.EnsureDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
                 // ほかのプロセス (Mac の IME と辞書の画面) が同時に config.json を書いても、互いの変更を消さないよう、ロックの中で読み直して書く。
@@ -160,11 +163,17 @@ internal static class TermDomains
     public static IReadOnlyList<(TermEntry Entry, bool Excluded)>? Words(string id)
     {
         CheckExternal(force: true);
-        var source = Source().FirstOrDefault(d => d.Id == id);
+        (string Id, Func<string> ReadText) source;
+        HashSet<(string, string)> excluded;
+        lock (Lock)
+        {
+            // 分野の一覧を作るときに共有の状態 (自作の分野のファイルの版) を触るので、ロックの中で引く。ファイルを読むのはロックの外。
+            source = AllSource().FirstOrDefault(d => d.Id == id);
+            // 除外は同梱の分野の語だけに効く (自作の分野の語は、消すときに語そのものを消す)
+            excluded = IsUserId(id) ? [] : [.. ExcludedSet()];
+        }
         if (source.Id is null) return null;
         var entries = TermDictionary.Entries(source.ReadText());
-        HashSet<(string, string)> excluded;
-        lock (Lock) excluded = [.. ExcludedSet()];
         return entries.Select(e => (e, excluded.Contains((e.Reading, e.Word)))).ToList();
     }
 
@@ -224,9 +233,9 @@ internal static class TermDomains
         }
     }
 
-    /// <summary>FFI (meltype_term_domains) の文字列: 1 行 1 分野の「ID Tab 名称 Tab 語数 Tab 有効なら 1」を改行でつなぐ。名称の Tab・改行は空白にする (区切りと衝突しないように)。</summary>
+    /// <summary>FFI (meltype_term_domains) の文字列: 1 行 1 分野の「ID Tab 名称 Tab 語数 Tab 有効なら 1 Tab 自作なら 1」を改行でつなぐ。名称の Tab・改行は空白にする (区切りと衝突しないように)。</summary>
     internal static string FormatForFfi(IEnumerable<TermDomain> domains) =>
-        string.Join('\n', domains.Select(d => $"{d.Id}\t{d.Name.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ')}\t{d.Count}\t{(d.Enabled ? 1 : 0)}"));
+        string.Join('\n', domains.Select(d => $"{d.Id}\t{d.Name.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ')}\t{d.Count}\t{(d.Enabled ? 1 : 0)}\t{(d.IsUser ? 1 : 0)}"));
 
     /// <summary>覚えた状態を捨てて、次に使うときに読み直す (テスト用)。</summary>
     internal static void Reset()
@@ -241,6 +250,10 @@ internal static class TermDomains
             s_meta = null;
             s_current = null;
             s_currentKey = null;
+            s_userSignature = null;
+            s_userDirectoryTicks = 0;
+            s_nextFullUserCheck = 0;
+            s_userVersion++;
             s_nextExternalCheck = 0;
             s_revision++;
         }
@@ -278,6 +291,24 @@ internal static class TermDomains
                     {
                         s_stored = ids;
                         s_revision++;
+                    }
+                }
+            }
+            // 自作の分野のファイルが、ほかのプロセスで足された・消された・書き換えられたら、一覧・語数・辞書を作り直す
+            // フォルダーの更新時刻だけの安い確認を毎回し、変わっていれば (または force・一定の間隔ごとに) 全ファイルの版を調べる
+            // (ファイルをその場で書き換えるエディターは、フォルダーの更新時刻を変えないので、間隔ごとの確認で拾う)。
+            if (s_userSignature is not null)
+            {
+                var directoryTicks = UserDirectoryTicks();
+                if (force || directoryTicks != s_userDirectoryTicks || now >= s_nextFullUserCheck)
+                {
+                    s_userDirectoryTicks = directoryTicks;
+                    s_nextFullUserCheck = now + UserFullCheckIntervalMs;
+                    var signature = UserSignature();
+                    if (signature != s_userSignature)
+                    {
+                        s_userSignature = signature;
+                        InvalidateUser();
                     }
                 }
             }
@@ -384,30 +415,33 @@ internal static class TermDomains
                 s_stored = [];
             }
         }
-        var known = Source().Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
+        var known = AllSource().Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
         return s_stored.Where(known.Contains).ToHashSet(StringComparer.Ordinal);
     }
 
-    private static List<(string Id, string Name, int Count)> Meta()
+    private static List<(string Id, string Name, int Count, bool User)> Meta()
     {
         if (s_meta is not null) return s_meta;
-        var meta = new List<(string, string, int)>();
-        foreach (var (id, read) in Source().OrderBy(d => d.Id, StringComparer.Ordinal))
+        var meta = new List<(string, string, int, bool)>();
+        var created = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var (id, read) in AllSource().OrderBy(d => d.Id, StringComparer.Ordinal))
         {
             try
             {
                 var text = read();
                 // メニューを開くたびの待ち時間を避けるため、Parse せずに語の行 (コメント・空行以外でタブを含む行) を数える。
                 // 重複や不正な行は引かない概数で、有効にしたときの実際の語数とは数語ずれることがある。
-                meta.Add((id, ParseName(text) ?? id, CountEntryLines(text)));
+                meta.Add((id, ParseName(text) ?? id, CountEntryLines(text), IsUserId(id)));
+                if (IsUserId(id)) created[id] = ParseCreated(text);
             }
             catch (Exception ex)
             {
                 Diagnostics.Log.Warn($"専門用語集 {id} を読めませんでした: {ex.Message}");
-                meta.Add((id, id, 0));
+                meta.Add((id, id, 0, IsUserId(id)));
             }
         }
-        return s_meta = meta;
+        // 同梱の分野 (ID の順) のあとに、自作の分野を作った順に並べる (ID は乱数なので、ID の順は意味がない)
+        return s_meta = [.. meta.OrderBy(m => m.Item4).ThenBy(m => m.Item4 ? created.GetValueOrDefault(m.Item1) : 0).ThenBy(m => m.Item1, StringComparer.Ordinal)];
     }
 
     internal static int CountEntryLines(string text)
