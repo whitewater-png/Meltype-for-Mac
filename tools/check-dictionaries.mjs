@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Yukishiro
 //
-// dictionaries/*.txt の形式を確かめる (Pull Request のチェック「辞書の形式」で使う)。
+// dictionaries/*.txt の形式を確かめる。手元で実行する (この Mac 版のリポジトリには CI の設定 (.github/workflows) が無い)。
 //   node tools/check-dictionaries.mjs [ファイル …]   … 省略するとすべての辞書
 // 読み込めない行 (エラー) があれば終了コード 1。直した方がよい行 (警告) は表示だけ。
+// 指定したファイルが dictionaries/ に無いときもエラー (終了コード 1)。
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', 'dictionaries');
+const root = fileURLToPath(new URL('../dictionaries/', import.meta.url));
 const hiragana = /^[ぁ-ゖー゛゜ゔ]+$/;
 const kana = /^[ぁ-ゖァ-ヺー・ゔヴ]+$/;
 const ascii = /^[\x21-\x7e]+$/;
@@ -28,6 +30,8 @@ const formats = {
   'propernouns.txt': words(w => /^[A-Za-z][A-Za-z0-9.+&'-]*$/.test(w) ? null : `「${w}」が英字の語でない`),
   'english.txt': words(w => /^[a-z][a-z0-9_'-]*$/.test(w) ? null : `「${w}」が小文字の英字の語でない`),
   'english-words.txt': words(w => /^[a-z]{2,}$/.test(w) ? null : `「${w}」が小文字の英字の語でない`),
+  // 空白区切りの語。4 文字以上 (CompositionDetector の Length >= 4)、小文字の a-z だけ (ParseWords)、64 文字まで (WordList.MaxWordLength)
+  'english-readable.txt': words(w => /^[a-z]{4,64}$/.test(w) ? null : `「${w}」が 4〜64 文字の小文字の英字の語でない`),
   'japanese.txt': words(w => /^[a-z]+$/.test(w) ? null : `「${w}」が小文字のローマ字でない`),
   'contexts.txt': line => {
     const [left, right] = line.split(' : ');
@@ -67,12 +71,13 @@ function tabbed(min, max, check) {
 const files = process.argv.slice(2).length > 0
   ? process.argv.slice(2).map(f => path.basename(f)).filter(f => f.endsWith('.txt'))
   : fs.readdirSync(root).filter(f => f.endsWith('.txt'));
-let errors = 0, warnings = 0;
+let errors = 0, warnings = 0, checked = 0;
 const report = [];
 for (const file of files) {
   const full = path.join(root, file);
-  if (!fs.existsSync(full)) continue; // 消した辞書
+  if (!fs.existsSync(full)) { report.push(`::error file=dictionaries/${file}::見つかりません`); errors++; continue; }
   if (file.startsWith('terms-')) continue; // 専門用語集は tools/check-terms.mjs で確かめる
+  checked++;
   const format = formats[file];
   const text = fs.readFileSync(full, 'utf8');
   if (text.charCodeAt(0) === 0xfeff) { report.push(`::warning file=dictionaries/${file}::先頭に BOM がある`); warnings++; }
@@ -96,5 +101,5 @@ for (const file of files) {
   });
 }
 console.log(report.join('\n'));
-console.log(`辞書の形式: ${files.length} ファイル、エラー ${errors}、警告 ${warnings}`);
+console.log(`辞書の形式: ${checked} ファイル (terms-*.txt は check-terms.mjs で確かめる)、エラー ${errors}、警告 ${warnings}`);
 process.exitCode = errors > 0 ? 1 : 0;

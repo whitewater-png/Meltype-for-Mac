@@ -74,7 +74,20 @@ public sealed class LanguageMemory
         {
             if (Config.SafeFile.ReadAllText(path) is not { } json) return;
             var loaded = JsonSerializer.Deserialize(json, Config.LearningJsonContext.Default.LanguageEntries);
-            if (loaded is not null) foreach (var (word, entry) in loaded) _entries[word] = entry;
+            // 手で書き換えた・壊れたファイルの null の値や不正なキーは入れない (入れると、その語を打つたびにキー処理の途中で例外になる)。
+            // キーは Remember と同じ決まり (2 文字以上の英小文字。長さは単語リストの上限まで)。
+            if (loaded is not null)
+            {
+                foreach (var (word, entry) in loaded)
+                {
+                    if (entry is null || word is null || word.Length is < 2 or > Detection.WordList.MaxWordLength || !word.All(char.IsAsciiLetterLower)) continue;
+                    _entries[word] = entry;
+                }
+                if (_entries.Count > MaxEntries)
+                {
+                    foreach (var key in _entries.OrderBy(e => e.Value.Used).Take(_entries.Count - MaxEntries).Select(e => e.Key).ToList()) _entries.Remove(key);
+                }
+            }
         }
         catch (Exception ex)
         {

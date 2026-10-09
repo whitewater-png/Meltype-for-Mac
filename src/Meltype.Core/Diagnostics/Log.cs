@@ -85,22 +85,52 @@ public static class Log
         _fileTimer ??= new System.Threading.Timer(_ => FlushFile(), null, 1000, 1000);
     }
 
+    // ファイルへの書き出しは 1 つずつ (タイマーと SetFileOutput(null) の FlushFile が重なって、同じファイルに同時に追記しないため)
+    private static readonly object FileGate = new();
+
     public static void FlushFile()
     {
-        var path = Volatile.Read(ref _filePath);
-        if (FileQueue.IsEmpty) return;
-        var builder = new StringBuilder();
-        while (FileQueue.TryDequeue(out var entry)) builder.AppendLine(entry.ToString());
-        if (path is null) return;
-        try
+        lock (FileGate)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            if (File.Exists(path) && new FileInfo(path).Length > 5 * 1024 * 1024) File.Move(path, path + ".old", overwrite: true);
-            File.AppendAllText(path, builder.ToString());
+            var path = Volatile.Read(ref _filePath);
+            if (FileQueue.IsEmpty) return;
+            var builder = new StringBuilder();
+            while (FileQueue.TryDequeue(out var entry)) builder.AppendLine(entry.ToString());
+            if (path is null) return;
+            try
+            {
+                // ログには (設定によっては) 打った文字が入るので、本人だけが読める権限にする (フォルダー 0700・ファイル 0600。ほかのデータと同じ)。
+                Config.SafeFile.EnsureDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+                if (File.Exists(path) && new FileInfo(path).Length > 5 * 1024 * 1024)
+                {
+                    File.Move(path, path + ".old", overwrite: true);
+                    Config.SafeFile.Restrict(path + ".old");
+                }
+                var existed = File.Exists(path);
+                var options = new FileStreamOptions { Mode = FileMode.Append, Access = FileAccess.Write, Share = FileShare.Read };
+                if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+                using (var stream = new FileStream(path, options))
+                using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
+                {
+                    writer.Write(builder.ToString());
+                }
+                // 前の版が 0644 で作ったファイルも直す (UnixCreateMode は新しく作るときにしか効かない)
+                if (existed) RestrictOnce(path);
+            }
+            catch
+            {
+                // ログの失敗で入力処理を止めない。
+            }
         }
-        catch
-        {
-            // ログの失敗で入力処理を止めない。
-        }
+    }
+
+    private static string? _restrictedPath;
+
+    // 既にあったログの権限を直すのは、パスごとに 1 回だけ (毎秒の書き出しのたびに chmod しない)
+    private static void RestrictOnce(string path)
+    {
+        if (_restrictedPath == path) return;
+        Config.SafeFile.Restrict(path);
+        _restrictedPath = path;
     }
 }

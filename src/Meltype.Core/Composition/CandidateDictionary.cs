@@ -83,9 +83,14 @@ public sealed class CandidateDictionary
 
     public void Add(string reading, IEnumerable<string> words)
     {
-        if (!_entries.TryGetValue(reading, out var list)) _entries[reading] = list = [];
+        // 制御文字・書式文字を含む読み・語は入れない (ユーザー辞書と同じ決まり。データフォルダの dictionaries/ に置いた
+        // 利用者の辞書から、見えない文字を候補に出して確定させないため)
+        if (UserDictionary.HasUnsafeText(reading)) return;
+        List<string>? list = null;
         foreach (var word in words)
         {
+            if (UserDictionary.HasUnsafeText(word)) continue;
+            if (list is null && !_entries.TryGetValue(reading, out list)) _entries[reading] = list = [];
             if (!list.Contains(word)) list.Add(word);
         }
     }

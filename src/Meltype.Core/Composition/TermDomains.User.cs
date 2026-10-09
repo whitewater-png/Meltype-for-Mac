@@ -203,7 +203,8 @@ internal static partial class TermDomains
         var value = (raw ?? "").Trim();
         if (value.Length == 0) return "専門用語集の名前を入力してください。";
         if (value.Length > MaxUserNameLength) return $"名前は {MaxUserNameLength} 文字までにしてください。";
-        if (value.Any(c => char.IsControl(c) || c is '\u2028' or '\u2029')) return "名前に改行・タブ・制御文字は使えません。";
+        // 書式文字 (右から左に並べ替える U+202E など) は、一覧の表示を偽装できるので断る (語と同じ決まり)
+        if (UserDictionary.HasUnsafeText(value)) return "名前に改行・タブ・制御文字・書式文字は使えません。";
         name = value;
         return null;
     }
@@ -272,9 +273,45 @@ internal static partial class TermDomains
         long bytes = 0;
         foreach (var line in all) bytes += Encoding.UTF8.GetByteCount(line) + Environment.NewLine.Length;
         if (bytes > SafeFile.MaxReadBytes) return $"専門用語集が大きくなりすぎます (上限 {Math.Max(1, SafeFile.MaxReadBytes / 1024 / 1024)} MB)。語を減らしてください。";
+        // 直す前の内容を「名前.bak」に残す (ユーザー辞書の userdict.txt.bak と同じ考え方。辞書アプリを閉じると ⌘Z で戻せなくなるため)。
+        // 読み込める大きさのときだけ。.bak は terms-user-*.txt の一覧には入らない。
+        if (File.Exists(path) && new FileInfo(path).Length <= SafeFile.MaxReadBytes) SafeFile.WriteAllBytes(path + ".bak", File.ReadAllBytes(path));
         SafeFile.WriteAllLines(path, all, new UTF8Encoding(false));
         AfterOwnWrite();
         return null;
+    }
+
+    /// <summary>消した分野を残しておく数 (古いものから消す)。</summary>
+    internal const int TrashKeepCount = 20;
+
+    /// <summary>消した分野のファイルを置く場所 (terms/.trash。terms-user-*.txt の一覧には入らない)。</summary>
+    internal static string TrashDirectory() => Path.Combine(UserDirectory(), ".trash");
+
+    /// <summary>
+    /// 分野のファイルを terms/.trash/terms-user-xxx.<日時>.txt へ移す。同じ名前があれば番号を付ける。
+    /// 残すのは新しいものから <see cref="TrashKeepCount"/> 個まで (古いものは消す。消せなくても移動は成功のまま)。
+    /// </summary>
+    private static void MoveToTrash(string path)
+    {
+        var trash = TrashDirectory();
+        SafeFile.EnsureDirectory(trash);
+        var stem = Path.GetFileNameWithoutExtension(path) + "." + DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+        var target = Path.Combine(trash, stem + ".txt");
+        for (var n = 1; File.Exists(target); n++) target = Path.Combine(trash, $"{stem}-{n}.txt");
+        File.Move(path, target);
+        try
+        {
+            // 消した時刻で並べるため、更新時刻を今にする (移動では元の時刻のまま)
+            File.SetLastWriteTimeUtc(target, DateTime.UtcNow);
+            foreach (var old in new DirectoryInfo(trash).GetFiles("*.txt").OrderByDescending(f => f.LastWriteTimeUtc).ThenByDescending(f => f.Name, StringComparer.Ordinal).Skip(TrashKeepCount))
+            {
+                old.Delete();
+            }
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Warn($"消した専門用語集の古い控えを整理できませんでした: {ex.Message}");
+        }
     }
 
     /// <summary>行の並びから、語の行だけを (行の位置・語) で取り出す (不正な行・コメントは飛ばす)。</summary>
@@ -292,7 +329,18 @@ internal static partial class TermDomains
 
     private static string EntryText(TermEntry entry) => entry.Note.Length == 0 ? $"{entry.Reading}\t{entry.Word}" : $"{entry.Reading}\t{entry.Word}\t{entry.Note}";
 
-    private static string CleanNote(string note) => note.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ').Trim();
+    /// <summary>注記の上限 (画面に出すだけの欄なので、巨大な文字列を持たせない)。</summary>
+    internal const int MaxNoteLength = 200;
+
+    // 注記は断らずに整える: タブ・改行は空白に、制御文字・書式文字は取り除き、長すぎれば切る
+    private static string CleanNote(string note)
+    {
+        var text = UserDictionary.RemoveUnsafeText(note.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ')).Trim();
+        if (text.Length <= MaxNoteLength) return text;
+        // サロゲートの対の途中で切らない
+        var cut = char.IsHighSurrogate(text[MaxNoteLength - 1]) ? MaxNoteLength - 1 : MaxNoteLength;
+        return text[..cut];
+    }
 
     private static List<string> HeaderLines(string name) =>
     [
@@ -448,12 +496,23 @@ internal static partial class TermDomains
                 if (wasEnabled && !Set(id, false)) return "設定ファイル (config.json) を読めないため、専門用語集を消しませんでした。";
                 try
                 {
-                    File.Delete(path);
+                    // すぐには消さず、terms/.trash へ移す (辞書アプリを閉じたあとでも、ファイルから戻せるように)。
+                    MoveToTrash(path);
                 }
                 catch (Exception ex)
                 {
                     if (wasEnabled) Set(id, true);
                     return $"専門用語集のファイルを消せませんでした: {ex.Message}";
+                }
+                // .bak は控え (.trash) があるので消す。消せなくても、分野の削除は成功のまま (有効の設定を戻さない)
+                try
+                {
+                    var backup = path + ".bak";
+                    if (File.Exists(backup)) File.Delete(backup);
+                }
+                catch (Exception ex)
+                {
+                    Diagnostics.Log.Warn($"消した専門用語集の .bak を消せませんでした: {ex.Message}");
                 }
                 AfterOwnWrite();
                 return null;
@@ -717,6 +776,8 @@ internal static partial class TermDomains
         var skippedSet = skipped.Select(s => s.Item1).ToHashSet();
         var toRemove = movable.Select(m => m.Word).Where(w => !skippedSet.Contains(w)).ToList();
         var removeError = dictionary.RemoveRange(toRemove, out var removed);
+        // ほかの画面がすでに消していた (1 語も見つからない) ときは、移せたことに変わりはないので成功にする
+        if (removeError == UserDictionary.NotFoundMessage) removeError = null;
         if (removeError is not null)
         {
             result = new MoveResult([], added, skipped);
@@ -733,17 +794,8 @@ internal static partial class TermDomains
     {
         count = 0;
         if (!IsUserId(id)) return "書き出せるのは自作の専門用語集だけです。";
-        // 自作の専門用語集のフォルダーの中へは書き出せない (今使っている分野のファイルを上書きしかねない)
-        try
-        {
-            var target = Path.GetFullPath(path);
-            var folder = Path.GetFullPath(UserDirectory()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (target.StartsWith(folder, StringComparison.OrdinalIgnoreCase)) return "自作の専門用語集のフォルダーの中には書き出せません。別の場所を選んでください。";
-        }
-        catch (Exception ex)
-        {
-            return $"書き出せませんでした: {ex.Message}";
-        }
+        // データフォルダー (自作の専門用語集のフォルダーを含む) の中へは書き出せない。シンボリックリンクを経由しても同じ
+        if (DictionaryManagement.CheckExportTarget(path) is { } invalid) return invalid;
         CheckExternal(force: true);
         lock (Lock)
         {

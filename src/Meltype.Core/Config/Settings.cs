@@ -520,7 +520,7 @@ public sealed class Settings
 
     /// <summary>アプリに割り当てた独自の種類 (無ければ null)。</summary>
     public AppKind? KindFor(string? processName) =>
-        FindRule(processName)?.Kind is { Length: > 0 } name ? AppKinds.FirstOrDefault(k => k.Name == name) : null;
+        FindRule(processName)?.Kind is { Length: > 0 } name ? AppKinds.FirstOrDefault(k => k is not null && k.Name == name) : null;
 
     /// <summary>アプリの独自の種類で変えた項目 (判定の強さ・ライブ変換) を反映した設定。変えていなければ自分自身。</summary>
     public Settings ForApp(string? processName)
@@ -537,6 +537,8 @@ public sealed class Settings
         if (string.IsNullOrEmpty(processName)) return null;
         foreach (var rule in AppRules)
         {
+            // 手で書き換えた config.json の null の要素は飛ばす (Normalize の前の Migrate からも呼ばれる)
+            if (rule is null) continue;
             if (string.Equals(rule.Process, processName, StringComparison.OrdinalIgnoreCase)) return rule;
         }
         return null;
@@ -566,6 +568,8 @@ public sealed class Settings
         AppRules ??= [];
         AppKinds ??= [];
         AppRules.RemoveAll(r => r is null || string.IsNullOrWhiteSpace(r.Process));
+        // null の要素があると、アプリ別の種類 (KindFor) を引くたびに例外になる
+        AppKinds.RemoveAll(k => k is null);
         // プロファイル: 名前の無いもの・同じ名前のものは除き、使っているプロファイルは必ず一覧にある
         Profiles ??= [];
         Profiles.RemoveAll(p => p is null || string.IsNullOrWhiteSpace(p.Name));
@@ -655,9 +659,10 @@ public sealed class Settings
                         }
                     }
                 }
-                catch (FileLockTimeoutException ex)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    // ロックを取れなくても、設定は読めている。今回は保存し直さず (次の起動でやり直す)、読んだ値で動く。壊れたファイルとして退避しない。
+                    // ロックを取れない・保存できない (権限など) ときも、設定は読めている。今回は保存し直さず (次の起動でやり直す)、
+                    // 読んだ値で動く。壊れたファイルとして退避しない (FileLockTimeoutException も IOException の一種)。
                     Diagnostics.Log.Warn($"config.json の移行後の保存を見送りました: {ex.Message}");
                 }
             }

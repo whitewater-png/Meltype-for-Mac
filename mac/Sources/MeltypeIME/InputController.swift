@@ -60,7 +60,8 @@ final class MeltypeInputController: IMKInputController {
     }()
 
     private static func trace(_ message: @autoclosure () -> String) {
-        guard trace else { return }
+        // パスワード欄など秘匿入力の間は書かない (確定した文字・前後の文字がそのまま残るため。どの経路から呼ばれても効くよう、ここで止める)
+        guard trace, !IsSecureEventInputEnabled() else { return }
         appendTrace(message())
     }
 
@@ -74,6 +75,12 @@ final class MeltypeInputController: IMKInputController {
         let file = directory.appendingPathComponent("imk-trace.log")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         guard let data = line.data(using: .utf8) else { return }
+        // 大きくなりすぎないよう、5MB を超えたら .old に回す (Core のログ meltype.log と同じ)
+        if let size = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? NSNumber, size.int64Value > 5 * 1024 * 1024 {
+            let old = directory.appendingPathComponent("imk-trace.log.old")
+            try? FileManager.default.removeItem(at: old)
+            try? FileManager.default.moveItem(at: file, to: old)
+        }
         // 打った文字が残るので、自分だけが読める権限 (0600) にする (既存のファイルにも付ける)。
         if !FileManager.default.fileExists(atPath: file.path) {
             FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600])
@@ -392,7 +399,7 @@ final class MeltypeInputController: IMKInputController {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "学習データをすべて消去しますか？"
-        alert.informativeText = "変換の学習・辞書の登録提案の履歴・英語/日本語の学習・英訳の学習・ユーザーモデル・azooKey の学習を消します。ログ (meltype.log・crash.log) と、読めない・大きすぎるために退避したコピー (.broken・.oversize) も消します。元に戻せません。\n不具合を報告する予定があれば、先にログを保存してください。ユーザー辞書と設定は消えません。"
+        alert.informativeText = "変換の学習・辞書の登録提案の履歴・英語/日本語の学習・英訳の学習・ユーザーモデル・azooKey の学習を消します。ログ (meltype.log・crash.log・原因調査用の imk-trace.log) と、読めない・大きすぎるために退避したコピー (.broken・.oversize) も消します。元に戻せません。\n不具合を報告する予定があれば、先にログを保存してください。ユーザー辞書と設定は消えません。"
         // 取り消せない操作なので、Return で押される先頭のボタンはキャンセルにする。
         alert.addButton(withTitle: "キャンセル")
         alert.addButton(withTitle: "消去")

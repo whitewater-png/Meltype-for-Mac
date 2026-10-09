@@ -54,7 +54,7 @@ public static class LearningData
             AppPaths.ModelFile);
         var leftoversCleared = ClearLeftovers(
             [AppPaths.ModelFile, AppPaths.ConversionHistoryFile, AppPaths.DictionarySuggestionFile, AppPaths.TranslationHistoryFile, AppPaths.LanguageMemoryFile],
-            [AppPaths.LogFile, AppPaths.CrashLogFile]);
+            [AppPaths.LogFile, AppPaths.CrashLogFile, AppPaths.TraceLogFile]);
         return ok && leftoversCleared;
     }
 

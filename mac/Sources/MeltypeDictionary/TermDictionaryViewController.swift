@@ -355,8 +355,17 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     /// 自作の専門用語集を選んでいるか (メニューの書き出しなどを使えるか)。
     var hasUserDomainSelected: Bool { selectedUserDomain != nil }
 
+    /// 右の一覧が、左で今選んでいる分野のものか。分野を切り替えてから読み込みが終わるまでは、一覧も選択も前の分野のまま残るので false。
+    private var listMatchesSelection: Bool {
+        guard let loaded = loadedSource, let selected = selectedSource else { return false }
+        return Self.sameSource(loaded, selected)
+    }
+
+    /// 選んでいる語。一覧が今の分野のものでなければ空 (前の分野で選んだ語を、新しい分野に対する削除・除外・編集に使わない)。
+    /// ボタン・メニュー・Delete キー・右クリックの操作は、すべてここを通る。
     private func selectedRows() -> [TermWord] {
-        tableView.selectedRowIndexes.compactMap { $0 < list.visible.count ? list.visible[$0] : nil }
+        guard listMatchesSelection else { return [] }
+        return tableView.selectedRowIndexes.compactMap { $0 < list.visible.count ? list.visible[$0] : nil }
     }
 
     private func selectedKeys() -> [WordKey] { selectedRows().map(\.key) }
@@ -655,11 +664,14 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = keys.count == 1 ? "「\(keys[0].word)」(\(keys[0].reading)) を削除しますか？" : "選んだ \(keys.count) 語を削除しますか？"
-        alert.informativeText = "「\(domain.name)」から消します。「編集」→「取り消す」(⌘Z) で元に戻せます。"
-        alert.addButton(withTitle: "削除").hasDestructiveAction = true
-        alert.addButton(withTitle: "キャンセル").keyEquivalent = "\u{1b}"
+        alert.informativeText = "「\(domain.name)」から消します。「編集」→「取り消す」(⌘Z) で元に戻せます。直す前の内容は、データフォルダの terms/ の .bak にも残ります。"
+        // 取り消せなくなりうる操作なので、Return で押される先頭のボタンはキャンセルにする (入力メニューの「学習データをすべて消去」と同じ方針)。
+        alert.addButton(withTitle: "キャンセル")
+        let delete = alert.addButton(withTitle: "削除")
+        delete.hasDestructiveAction = true
+        delete.keyEquivalent = ""
         alert.beginSheetModal(for: window) { [weak self] response in
-            guard let self, response == .alertFirstButtonReturn else { return }
+            guard let self, response == .alertSecondButtonReturn else { return }
             if let error = self.perform(.removeTerms(id: domain.id, keys: keys), message: keys.count == 1 ? "「\(keys[0].word)」を削除しました (⌘Z で元に戻せます)" : "\(keys.count) 語を削除しました (⌘Z で元に戻せます)") {
                 UI.showError(error, title: "削除できませんでした", in: window)
             }
@@ -702,11 +714,14 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "専門用語集「\(domain.name)」(\(domain.count) 語) を削除しますか？"
-        alert.informativeText = "この専門用語集の語は、変換に使われなくなります。「編集」→「取り消す」(⌘Z) で、語ごと元に戻せます。"
-        alert.addButton(withTitle: "削除").hasDestructiveAction = true
-        alert.addButton(withTitle: "キャンセル").keyEquivalent = "\u{1b}"
+        alert.informativeText = "この専門用語集の語は、変換に使われなくなります。「編集」→「取り消す」(⌘Z) で、語ごと元に戻せます。消した専門用語集のファイルは、データフォルダの terms/.trash にも残ります (新しいものから 20 個まで)。"
+        // 取り消せなくなりうる操作なので、Return で押される先頭のボタンはキャンセルにする (入力メニューの「学習データをすべて消去」と同じ方針)。
+        alert.addButton(withTitle: "キャンセル")
+        let delete = alert.addButton(withTitle: "削除")
+        delete.hasDestructiveAction = true
+        delete.keyEquivalent = ""
         alert.beginSheetModal(for: window) { [weak self] response in
-            guard let self, response == .alertFirstButtonReturn else { return }
+            guard let self, response == .alertSecondButtonReturn else { return }
             if let error = self.perform(.deleteDomain(id: domain.id), message: "専門用語集「\(domain.name)」を削除しました (⌘Z で元に戻せます)") {
                 UI.showError(error, title: "削除できませんでした", in: window)
             }
@@ -743,6 +758,10 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         panel.allowsMultipleSelection = false
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .OK, let url = panel.url else { return }
+            if let problem = UI.regularFileProblem(url) {
+                UI.showError(problem, title: "取り込めませんでした", in: window)
+                return
+            }
             let result = self.dictionary.importDomain(path: url.path)
             if let error = result.error {
                 UI.showError(error, title: "取り込めませんでした", in: window)
@@ -766,6 +785,8 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     @objc func copyToUserDictionary(_ sender: Any?) {
         let keys = selectedKeys()
         guard !keys.isEmpty else { return }
+        // 複製の前にユーザー辞書にあった語 (「登録済み」と「登録できない語」を分けて数えるため)
+        let existing = Set((dictionary.userEntries() ?? []).map(\.key))
         let result = DictionaryChange.addMany(keys).perform(on: dictionary)
         if let error = result.error {
             UI.showError(error, title: "複製できませんでした", in: window)
@@ -780,7 +801,12 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         }
         didChange?()
         var message = "\(added) 語をユーザー辞書に複製しました"
-        if added < keys.count { message += " (\(keys.count - added) 語は登録済み)" }
+        let already = Set(keys).intersection(existing).count
+        let invalid = max(0, keys.count - added - already)
+        var notes: [String] = []
+        if already > 0 { notes.append("\(already) 語は登録済み") }
+        if invalid > 0 { notes.append("\(invalid) 語はユーザー辞書に登録できない語のため飛ばしました") }
+        if !notes.isEmpty { message += " (\(notes.joined(separator: "、")))" }
         showStatus(message)
     }
 

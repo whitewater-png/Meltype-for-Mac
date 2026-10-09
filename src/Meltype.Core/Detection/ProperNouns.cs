@@ -40,7 +40,8 @@ public sealed class ProperNouns
             if (hash >= 0) line = line[..hash];
             foreach (var word in line.Split([' ', '\t', '\r', ','], StringSplitOptions.RemoveEmptyEntries))
             {
-                if (!word.All(char.IsAsciiLetterOrDigit)) continue;
+                // 長すぎる語は入れない (英語の判定の WordList に渡すと、先頭部分をすべて覚えるので長さの 2 乗のメモリを使う)
+                if (word.Length > WordList.MaxWordLength || !word.All(char.IsAsciiLetterOrDigit)) continue;
                 var lower = word.ToLowerInvariant();
                 _canonical.TryAdd(lower, word);
                 _words.Add(lower);

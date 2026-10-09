@@ -33,6 +33,9 @@ public sealed class UserDictionary
     /// <summary>同じ読み・同じ単語がすでにあるとき (管理画面の登録・編集で使う。入力メニューの登録は、黙って成功にする)。</summary>
     public const string DuplicateMessage = "同じ読みと単語が、すでに登録されています。";
 
+    /// <summary>保存すると読み込みの上限を超えるとき (書かずに返す)。</summary>
+    public static string TooLargeMessage => $"ユーザー辞書が大きくなりすぎます (上限 {Math.Max(1, SafeFile.MaxReadBytes / 1024 / 1024)} MB)。語を減らすか、分けて専門用語集に移してください。何も変えていません。";
+
     /// <summary>編集しようとした語が、ファイルに無くなっていたとき。</summary>
     public const string NotFoundMessage = "元の語が見つかりません (ほかの画面で変更・削除された可能性があります)。一覧を読み直してください。";
 
@@ -48,7 +51,8 @@ public sealed class UserDictionary
         if (reading.Any(c => c is '\t' or '\r' or '\n') || word.Any(c => c is '\t' or '\r' or '\n')) return "改行・タブ文字は使えません。";
         // 制御文字 (ESC・Ctrl+O など) は、確定した先がターミナルだと「行の実行」や画面の書き換えになりうる。
         // 書式文字 (右から左に並べ替える U+202E など) は、見えている語と確定する語を食い違わせる。どちらも候補欄では見えない。
-        if (reading.Any(IsUnsafeChar) || word.Any(IsUnsafeChar)) return "制御文字・書式文字は使えません。";
+        // 判定は 1 文字 (コードポイント) ずつ。UTF-16 の 1 単位ずつだと、補助面の書式文字 (タグ文字 U+E0000 台など) がサロゲートとして通ってしまう。
+        if (HasUnsafeText(reading) || HasUnsafeText(word)) return "制御文字・書式文字は使えません。";
         return null;
     }
 
@@ -65,16 +69,78 @@ public sealed class UserDictionary
     }
 
     /// <summary>
-    /// 語に入れてはいけない文字か: 制御文字 (Cc)・書式文字 (Cf)・行/段落区切り (Zl・Zp)。
-    /// 絵文字をつなぐ ZWJ (U+200D) だけは許す。異体字選択子 (U+FE00 台・U+E0100 台) は Mn なので対象外。
+    /// 語・名前に入れてはいけない文字を含むか: 制御文字 (Cc)・書式文字 (Cf)・行/段落区切り (Zl・Zp)・対になっていないサロゲート。
+    /// 1 文字 (コードポイント) ずつ見る (補助面の書式文字、たとえばタグ文字 U+E0001〜E007F を見落とさないため)。
+    /// 許すもの: 絵文字をつなぐ ZWJ (U+200D)、旗の絵文字 (U+1F3F4 の直後のタグ文字の並びで、U+E007F で終わるもの)。
+    /// 異体字選択子 (U+FE00 台・U+E0100 台) は Mn なので対象外 (許す)。
     /// </summary>
-    private static bool IsUnsafeChar(char c)
+    public static bool HasUnsafeText(ReadOnlySpan<char> text)
     {
-        if (c == '‍') return false;
-        return char.GetUnicodeCategory(c) is System.Globalization.UnicodeCategory.Control
-            or System.Globalization.UnicodeCategory.Format
-            or System.Globalization.UnicodeCategory.LineSeparator
-            or System.Globalization.UnicodeCategory.ParagraphSeparator;
+        var i = 0;
+        while (i < text.Length)
+        {
+            if (System.Text.Rune.DecodeFromUtf16(text[i..], out var rune, out var consumed) != System.Buffers.OperationStatus.Done) return true;
+            i += consumed;
+            if (rune.Value == 0x200D) continue;
+            if (rune.Value == 0x1F3F4 && TagSequenceLength(text[i..]) is > 0 and var length)
+            {
+                i += length;
+                continue;
+            }
+            if (System.Text.Rune.GetUnicodeCategory(rune) is System.Globalization.UnicodeCategory.Control
+                or System.Globalization.UnicodeCategory.Format
+                or System.Globalization.UnicodeCategory.LineSeparator
+                or System.Globalization.UnicodeCategory.ParagraphSeparator
+                or System.Globalization.UnicodeCategory.Surrogate) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 許す旗の絵文字のタグ列 (Unicode の推奨する絵文字: イングランド・スコットランド・ウェールズ)。
+    /// タグ文字は ASCII と 1 対 1 に対応するので、任意のタグ列を許すと「🏴 + 見えない任意の文字列」を確定させられる。実在する旗だけに絞る。
+    /// </summary>
+    private static readonly string[] AllowedFlagTags = ["gbeng", "gbsct", "gbwls"];
+
+    /// <summary>許す旗のタグ列 (<see cref="AllowedFlagTags"/> + 終わりの U+E007F) の UTF-16 の長さ。そうでなければ 0。</summary>
+    private static int TagSequenceLength(ReadOnlySpan<char> text)
+    {
+        foreach (var tag in AllowedFlagTags)
+        {
+            var i = 0;
+            var matched = true;
+            foreach (var letter in tag + "\u007f")
+            {
+                if (System.Text.Rune.DecodeFromUtf16(text[i..], out var rune, out var consumed) != System.Buffers.OperationStatus.Done || rune.Value != 0xE0000 + letter)
+                {
+                    matched = false;
+                    break;
+                }
+                i += consumed;
+            }
+            if (matched) return i;
+        }
+        return 0;
+    }
+
+    /// <summary>入れてはいけない文字 (<see cref="HasUnsafeText"/> と同じ決まり) を取り除く (注記など、断らずに整えるところで使う)。</summary>
+    public static string RemoveUnsafeText(string text)
+    {
+        if (!HasUnsafeText(text)) return text;
+        var builder = new StringBuilder(text.Length);
+        var i = 0;
+        while (i < text.Length)
+        {
+            if (System.Text.Rune.DecodeFromUtf16(text.AsSpan(i), out _, out var consumed) != System.Buffers.OperationStatus.Done)
+            {
+                i += Math.Max(1, consumed);
+                continue;
+            }
+            var piece = text.AsSpan(i, consumed);
+            if (!HasUnsafeText(piece)) builder.Append(piece);
+            i += consumed;
+        }
+        return builder.ToString();
     }
 
     /// <summary>ファイルが書き換わっていないかを確かめる間隔 (ミリ秒)。テストが 0 にする。</summary>
@@ -174,7 +240,7 @@ public sealed class UserDictionary
             var parts = line.TrimEnd('\r').Split('\t');
             // 取り込み・登録は Validate を通るが、ファイルを直接編集・復元した場合はここが唯一の入口なので、制御文字・書式文字の語は読み込まない。
             if (parts.Length >= 2 && parts[0].Trim().Length >= MinReadingLength && parts[1].Trim().Length > 0
-                && !parts[0].Any(IsUnsafeChar) && !parts[1].Any(IsUnsafeChar))
+                && !HasUnsafeText(parts[0]) && !HasUnsafeText(parts[1]))
             {
                 words.Add(new UserWord(parts[0].Trim(), parts[1].Trim()));
             }
@@ -381,21 +447,26 @@ public sealed class UserDictionary
     /// </summary>
     public string? RemoveRange(IEnumerable<UserWord> words, out IReadOnlyList<(int Index, UserWord Word)> removed)
     {
-        var targets = words.Select(w => new UserWord(w.Reading.Trim(), w.Word.Trim())).ToHashSet();
+        // 照合は読みをそろえてから (カタカナで渡された語・10/08 より前にカタカナのまま保存された語も、同じ語として扱う)
+        var targets = words.Select(Key).ToHashSet();
         var list = new List<(int, UserWord)>();
         var error = Mutate(current =>
         {
             for (var i = 0; i < current.Count; i++)
             {
-                if (targets.Contains(current[i])) list.Add((i, current[i]));
+                if (targets.Contains(Key(current[i]))) list.Add((i, current[i]));
             }
-            if (list.Count == 0) return (false, null);
-            current.RemoveAll(targets.Contains);
+            // 消す語を渡されたのに 1 つも無いときは、成功にしない (取り消しが効かなかったのに「取り消しました」と出さないため)
+            if (list.Count == 0) return (false, targets.Count > 0 ? NotFoundMessage : null);
+            current.RemoveAll(w => targets.Contains(Key(w)));
             return (true, null);
         }, backup: true);
         removed = error is null ? list : [];
         return error;
     }
+
+    /// <summary>照合用に、読みをそろえ (<see cref="NormalizeReading"/>)、語の前後の空白を取った語。</summary>
+    private static UserWord Key(UserWord word) => new(NormalizeReading(word.Reading), word.Word.Trim());
 
     /// <summary>
     /// 消した語を元の位置に戻す (RemoveRange の removed をそのまま渡す)。位置が今の数より後ろなら末尾に足す。
@@ -428,11 +499,13 @@ public sealed class UserDictionary
         word = word.Trim();
         if (Validate(reading, word) is { } invalid) return invalid;
         var replacement = new UserWord(reading, word);
+        var oldKey = Key(old);
         return Mutate(current =>
         {
-            var index = current.IndexOf(old);
+            // 元の語も読みをそろえて探す (画面がカタカナの読みのまま渡しても見つかる)
+            var index = current.FindIndex(w => Key(w) == oldKey);
             if (index < 0) return (false, NotFoundMessage);
-            if (replacement == old) return (false, null);
+            if (replacement == current[index]) return (false, null);
             if (current.Contains(replacement)) return (false, DuplicateMessage);
             current[index] = replacement;
             return (true, null);
@@ -449,7 +522,7 @@ public sealed class UserDictionary
         word = word.Trim();
         if (Validate(reading, word) is { } invalid) return invalid;
         var entry = new UserWord(reading, word);
-        if (entry == except) return null;
+        if (except is not null && entry == Key(except)) return null;
         return Current.Words.Contains(entry) ? DuplicateMessage : null;
     }
 
@@ -578,9 +651,15 @@ public sealed class UserDictionary
                     return error;
                 }
                 if (SafeFile.IsBlocked(_path)) return "ユーザー辞書のファイルが大きすぎて退避できなかったため、保存を止めています (元のファイルを守るため)。";
-                if (backup && stamp.Exists && stamp.Length <= SafeFile.MaxReadBytes) SafeFile.WriteAllBytes(_path + ".bak", File.ReadAllBytes(_path));
                 var lines = new List<string> { "# Meltype ユーザー辞書: 1 行に「読み<Tab>単語」" };
                 lines.AddRange(words.Select(w => $"{w.Reading}\t{w.Word}"));
+                // 読み込める大きさ (SafeFile.MaxReadBytes) を超えるファイルは書かない。超えると、次に読むときに退避されて空の辞書として扱われ、
+                // そこで 1 語登録するとファイルがその 1 語だけになる (自作の専門用語集の WriteUserLines と同じ守り)。
+                long bytes = 3; // BOM
+                foreach (var line in lines) bytes += Encoding.UTF8.GetByteCount(line) + Environment.NewLine.Length;
+                if (bytes > SafeFile.MaxReadBytes) return TooLargeMessage;
+                // 書かずに終わるときに .bak (1 世代前) を上書きしないよう、大きさを確かめてから作る
+                if (backup && stamp.Exists && stamp.Length <= SafeFile.MaxReadBytes) SafeFile.WriteAllBytes(_path + ".bak", File.ReadAllBytes(_path));
                 SafeFile.WriteAllLines(_path, lines, new UTF8Encoding(true));
                 // ロックを持ったまま版を取るので、ここで見る版は自分が書いたもの。
                 Adopt(words, FileStamp.Of(_path));

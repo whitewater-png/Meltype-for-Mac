@@ -132,7 +132,20 @@ public sealed class TranslationHistory
         {
             if (Config.SafeFile.ReadAllText(path) is not { } json) return;
             var loaded = JsonSerializer.Deserialize(json, Config.LearningJsonContext.Default.TranslationCounts);
-            if (loaded is not null) foreach (var (key, value) in loaded) _counts[key] = value;
+            // null の値・空のキー・1 未満の回数は入れない (null が入ると、その読みの英訳を出すたびに例外になる)
+            if (loaded is not null)
+            {
+                foreach (var (key, value) in loaded)
+                {
+                    if (string.IsNullOrEmpty(key) || value is null) continue;
+                    var words = new Dictionary<string, int>(StringComparer.Ordinal);
+                    foreach (var (word, count) in value)
+                    {
+                        if (!string.IsNullOrEmpty(word) && count > 0) words[word] = count;
+                    }
+                    if (words.Count > 0) _counts[key] = words;
+                }
+            }
         }
         catch (Exception ex)
         {

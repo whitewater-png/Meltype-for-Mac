@@ -8,6 +8,15 @@ namespace Meltype.Tests;
 internal static class ReportUrlTests
 {
     [Test]
+    public static void Fallback_ForMac_DoesNotGoToUpstream()
+    {
+        // 報告の URL を作れなかったときも、Mac 版の報告を本家へ誘導しない
+        var mac = ProjectInfo.FallbackReportUrl("Mac");
+        Assert.True(mac.StartsWith(ProjectInfo.MacSourceUrl, StringComparison.Ordinal) && !mac.Contains("yksr-melt"), "Mac 版は Mac 版のリポジトリへ");
+        Assert.True(ProjectInfo.FallbackReportUrl("Linux").StartsWith(ProjectInfo.SourceUrl, StringComparison.Ordinal), "Linux は今までどおり");
+    }
+
+    [Test]
     public static void Mac_OpensMacRepositoryIssues()
     {
         var url = ProjectInfo.ReportUrl("Mac (プレビュー版)", "1.0.1", "OS: macOS");

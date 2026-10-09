@@ -13,7 +13,7 @@ case "--register-check": exit(InputSourceRegistration.check())
 case "--register-add": exit(InputSourceRegistration.add())
 case "--register-enable": exit(InputSourceRegistration.enable())
 case "--unregister": exit(InputSourceRegistration.disable())
-case "--bench": Bench.run(); exit(0)   // 変換の速度と正しさの計測 (IMKServer は立てない。Bench.swift)
+case "--bench": exit(Bench.run() ? 0 : 1)   // 変換の速度と正しさの計測 (IMKServer は立てない。Bench.swift)。変換の食い違いがあれば終了コード 1
 default: break
 }
 

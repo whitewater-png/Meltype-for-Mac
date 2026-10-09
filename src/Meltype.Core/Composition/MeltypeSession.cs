@@ -25,7 +25,7 @@ public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commit
         for (var i = 0; i < Commits.Count; i++)
         {
             if (i > 0) builder.Append(',');
-            builder.Append("{\"deleteBefore\":").Append(Commits[i].DeleteBefore).Append(",\"text\":");
+            builder.Append("{\"deleteBefore\":").AppendInt(Commits[i].DeleteBefore).Append(",\"text\":");
             AppendString(builder, Commits[i].Text);
             if (Commits[i].Original is { } original)
             {
@@ -43,8 +43,8 @@ public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commit
         builder.Append("{\"text\":");
         AppendString(builder, view.Text);
         builder.Append(",\"converting\":").Append(view.Converting ? "true" : "false");
-        builder.Append(",\"selectedIndex\":").Append(view.SelectedIndex);
-        builder.Append(",\"selectedClause\":").Append(view.SelectedClause);
+        builder.Append(",\"selectedIndex\":").AppendInt(view.SelectedIndex);
+        builder.Append(",\"selectedClause\":").AppendInt(view.SelectedClause);
         builder.Append(",\"hint\":");
         AppendString(builder, view.Hint);
         builder.Append(",\"candidates\":");
@@ -60,7 +60,7 @@ public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commit
         else builder.Append("null");
         builder.Append(",\"predictions\":");
         AppendArray(builder, view.Predictions ?? []);
-        builder.Append(",\"selectedPrediction\":").Append(view.SelectedPrediction);
+        builder.Append(",\"selectedPrediction\":").AppendInt(view.SelectedPrediction);
         builder.Append("}}");
         return builder.ToString();
     }
@@ -498,4 +498,15 @@ public sealed class MeltypeSession
             _hidden = true;
         }
     }
+}
+
+/// <summary>JSON に整数を書くための StringBuilder の拡張。</summary>
+internal static class JsonNumberExtensions
+{
+    /// <summary>
+    /// 整数を、カルチャによらず JSON の数として書く。StringBuilder.Append(int) は今のカルチャで書くので、
+    /// 負号が U+2212 になるカルチャ (sv-SE・nb-NO・fi-FI など) では -1 が「−1」になり、Swift 側で JSON を読めなくなる。
+    /// </summary>
+    internal static StringBuilder AppendInt(this StringBuilder builder, int value) =>
+        builder.Append(value.ToString(System.Globalization.CultureInfo.InvariantCulture));
 }

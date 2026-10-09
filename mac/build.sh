@@ -129,6 +129,10 @@ done
 AZ_DICT_LICENSE=".build/checkouts/AzooKeyKanaKanjiConverter/Sources/KanaKanjiConverterModuleWithDefaultDictionary/azooKey_dictionary_storage/LICENSE"
 [[ -f "$AZ_DICT_LICENSE" ]] || { echo "azooKey 辞書のライセンスファイルが見つかりません。" >&2; exit 1; }
 cp "$AZ_DICT_LICENSE" "$LICENSES/azooKey_dictionary_storage-LICENSE"
+# azooKey の絵文字辞書は Mozc の emoji_data.tsv (BSD-3-Clause) を元に作られている。Mozc の LICENSE の原文
+# (native/mozc/MOZC_COMMIT の版から取ったもの) を mac/Resources/Licenses に置いてある
+[[ -f Resources/Licenses/Mozc-LICENSE.txt ]] || { echo "Mozc のライセンスファイル (mac/Resources/Licenses/Mozc-LICENSE.txt) が見つかりません。" >&2; exit 1; }
+cp Resources/Licenses/Mozc-LICENSE.txt "$LICENSES/Mozc-LICENSE.txt"
 # 実行ファイルの RPATH に、ビルドしたマシンの絶対パス (/Library/Developer/CommandLineTools/... など) が残っていると、
 # 配布先の Mac でそのパスを探しに行く (ビルドした人の環境が漏れ、同じパスに置かれたライブラリを読み込まされる余地も残る)。
 # 署名すると中身を変えられなくなるので、署名の前に外す。無いときに失敗しないよう || true。

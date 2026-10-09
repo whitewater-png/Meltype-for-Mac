@@ -475,6 +475,9 @@ internal static partial class TermDomains
             body = body[2..].TrimStart(" \t");
             if (body.Length == 0 || (body[0] != ':' && body[0] != '：')) continue;
             var value = body[1..].Trim().ToString().Replace('\t', ' ');
+            // 手で置いた・復元したファイルの名前も、作るときと同じく書式文字 (U+202E など) を通さない (一覧の表示を偽装させない)。
+            // だめな名前は無いものとして扱い、呼び出し側の代わりの名前 (ID など) にする (長さは取り込み側で切り詰める)。
+            if (UserDictionary.HasUnsafeText(value)) return null;
             return value.Length == 0 ? null : value;
         }
         return null;

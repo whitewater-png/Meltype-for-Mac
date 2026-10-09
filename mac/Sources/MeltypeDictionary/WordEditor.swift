@@ -124,8 +124,23 @@ final class WordEditor: NSObject, NSTextFieldDelegate {
     }
 
     private var currentKey: WordKey {
-        WordKey(reading: readingField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
+        WordKey(reading: Self.normalizedReading(readingField.stringValue),
                 word: wordField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// 読みを、本体が保存する形にそろえる (UserDictionary.NormalizeReading と同じ: 前後の空白を取り、カタカナ ァ〜ヶ をひらがなにする)。
+    /// 登録したあとの選択と ⌘Z の取り消しを、保存された語と同じキーで行うため。
+    static func normalizedReading(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var scalars = String.UnicodeScalarView()
+        for scalar in trimmed.unicodeScalars {
+            if (0x30A1...0x30F6).contains(scalar.value), let hiragana = Unicode.Scalar(scalar.value - 0x60) {
+                scalars.append(hiragana)
+            } else {
+                scalars.append(scalar)
+            }
+        }
+        return String(scalars)
     }
 
     func controlTextDidChange(_ notification: Notification) { refresh() }
@@ -133,8 +148,10 @@ final class WordEditor: NSObject, NSTextFieldDelegate {
     /// 入力を確かめて、理由・ボタンの状態を更新する。
     private func refresh() {
         let key = currentKey
-        let converted = key.reading.isEmpty ? key.reading : toReading(key.reading)
-        hiraganaButton.isEnabled = !key.reading.isEmpty && converted != key.reading
+        // 「ひらがなにする」は、欄に入っている文字そのもの (カタカナのままでも) を見て出す
+        let typed = readingField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let converted = typed.isEmpty ? typed : toReading(typed)
+        hiraganaButton.isEnabled = !typed.isEmpty && converted != typed
         hiraganaButton.setAccessibilityHelp(hiraganaButton.isEnabled ? "読みを「\(converted)」にします" : nil)
         let empty = key.reading.isEmpty && key.word.isEmpty
         let error = empty ? nil : validate(key)

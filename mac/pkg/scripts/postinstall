@@ -17,7 +17,14 @@ if [[ -z "$CONSOLE_USER" || "$CONSOLE_USER" == root ]]; then
     exit 0
 fi
 CONSOLE_UID="$(id -u "$CONSOLE_USER")"
-USER_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory | awk '{print $2}')"
+# plist の形で取り出す (dscl の普通の出力は、空白を含む値を次の行に回すので、awk '{print $2}' だとパスが切れる)
+USER_HOME="$(dscl -plist . -read "/Users/$CONSOLE_USER" NFSHomeDirectory | plutil -extract "dsAttrTypeStandard:NFSHomeDirectory.0" raw -o - -)"
+# 取れなかったとき (空) に先へ進むと、APP が /Library/Input Methods/Meltype.app (全ユーザー用) を指し、
+# root のまま持ち主を書き換えてしまうので、ここで止める
+if [[ "$USER_HOME" != /* || ! -d "$USER_HOME" ]]; then
+    echo "ホームフォルダーが見つかりません ($CONSOLE_USER)。登録をスキップします。"
+    exit 0
+fi
 APP="$USER_HOME/Library/Input Methods/Meltype.app"
 BIN="$APP/Contents/MacOS/Meltype"
 

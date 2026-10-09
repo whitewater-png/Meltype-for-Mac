@@ -18,7 +18,7 @@ Mac の正式な IME の仕組み (Input Method Kit) で動く Meltype です。
 
 ## 必要なもの
 
-- macOS 13 以降 (Apple シリコン / Intel)
+- macOS 13 以降。配布している zip は Apple シリコン (M1 以降) 用です。ソースからのビルドは、ビルドした Mac の CPU 用になります (Apple シリコンの Mac なら Apple シリコン用、Intel の Mac なら Intel 用。Intel 用のビルドは配布していません)
 - Xcode、またはコマンドライン ツール (`xcode-select --install`)
 - .NET 10 SDK (<https://dotnet.microsoft.com/download>。または `curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0`)
 
@@ -55,6 +55,7 @@ cd mac
 - 「更新する」を押したときだけ、zip をダウンロード (リダイレクトは github.com / githubusercontent.com だけ) → SHA-256 を照合 → `ditto -x -k` で展開 → `codesign --verify --deep --strict`・版・バンドル ID の確認 → (展開の前に zip の中身を検査) → 展開したフォルダーの `install.sh --yes` を新しいセッションで切り離して起動する。
   `install.sh` は rsync で入れ替えてから `pkill -x Meltype` で IME を止めるが、切り離した bash は続き、終わると結果のダイアログを出して一時フォルダーを消す (ログは `Application Support/Meltype/update.log`)。ダウンロード・SHA-256・展開前の zip の検査 (エントリ 5000 個以下・展開後 300MB 以下・`..` や絶対パスの名前なし)・展開・署名の検査のどれかで失敗したら、入れてある Meltype には触れずに中止する。
   `install.sh` は入れ替える前に今の Meltype.app を一時フォルダーへ `cp -Rp` で退避し、rsync か入れ替え後の `codesign --verify` が失敗したら退避から書き戻す (成功したら退避を消す。`Meltype.app` フォルダーそのものは消さない)。
+- 1.0.4〜1.0.9 をお使いの場合は、入力メニューの更新が失敗するので、リリースページから zip をダウンロードして、「Install Meltype.command」で手で入れ替えてください (設定と辞書はそのまま残ります。1.0.10 以降は更新が使えます)。
 - 「更新する」が出るのは、実行中の Meltype が `~/Library/Input Methods/Meltype.app` のときだけ (それ以外 (ビルドの途中の場所など) は「詳細」でリリースページを開くだけ)。
   更新を始めたあとは、切り離した install.sh が終わるまで二重に始まらない (メニューの項目を消し、`Application Support/Meltype/update.lock` で排他ロック)。確認のダイアログは 5 分で時間切れ (「あとで」と同じ)。
 - `update.json` は項目ごとに読む (型の違う項目だけ既定値)。ファイルがあるのに壊れていて読めないときは、勝手に通信しないよう OFF にする (ファイルが無いときだけ既定の ON)。更新で残った一時フォルダー (`meltype-update-*`、24 時間以上前) は IME の起動時に消す。
@@ -77,7 +78,7 @@ shasum -a 256 ~/Downloads/Meltype-mac.zip   # ファイル名は実際のもの�
 4. 隔離属性 `com.apple.quarantine` を外す。**macOS の Gatekeeper の検査をこの Meltype.app について回避する**操作なので、端末では `[y/N]` を聞きます (`--yes` で省略。端末でなく `--yes` も無いときは外さない)
 5. 入力ソースとして登録し、`killall imklaunchagent TextInputMenuAgent` で入力メニューと IME の起動役を起動し直す
 6. 登録できなかったときだけ `defaults write com.apple.HIToolbox AppleEnabledInputSources -array-add …` で入力ソースの一覧に書き込む
-7. 同じバンドル ID の別の Meltype.app を `lsregister -u` で LaunchServices の登録から外す (ファイルは消さない)
+7. 同じバンドル ID の別の Meltype.app (展開したフォルダーのものなど) を Spotlight (`mdfind`) で探し、`lsregister -u` で LaunchServices の登録から外す (ファイルは消さない)。そのあと入れた方を `lsregister -f` で登録し直す
 
 `build.sh` は、ビルドした実行ファイルの RPATH からビルドしたマシンの絶対パス (`/Library/Developer/CommandLineTools/...`) を `install_name_tool -delete_rpath` で除いてから署名します。
 組み立てたあとの `otool -l build/Meltype.app/Contents/MacOS/Meltype` で、`LC_RPATH` に `/usr/lib/swift`・`@loader_path`・`@executable_path/../Frameworks` だけが残っていることを確かめられます。
@@ -97,12 +98,13 @@ zip の **`Uninstall Meltype.command`** のダブルクリック、またはタ�
 
 ```bash
 bash uninstall.sh                          # 対話式
-bash uninstall.sh --yes                    # 確認なしでアプリを削除 (設定・学習データは残す)
-bash uninstall.sh --yes --remove-data      # 設定・学習データ・ユーザー辞書も削除 (辞書はデスクトップにバックアップ)
+bash uninstall.sh --yes                    # 確認なしでアプリを削除 (データを消すかは聞く。端末でなければ残す)
+bash uninstall.sh --yes --keep-data        # 確認なしでアプリを削除し、データは聞かずに残す
+bash uninstall.sh --yes --remove-data      # 設定・学習データ・ユーザー辞書・自作の専門用語集も削除 (辞書と専門用語集はデスクトップの Meltype-backup-<日時> にバックアップ)
 ```
 
 入力ソースを外して `~/Library/Input Methods/Meltype.app` を削除します。辞書の管理画面「Meltype 辞書」は Meltype.app の中にあるので一緒に消えます (開いていれば先に閉じます)。
-設定・学習データ・ユーザー辞書 (`~/Library/Application Support/Meltype`。除外した専門用語の `terms-excluded.txt`・`userdict.txt.bak`・ロック用の隠しファイルも含む) は、聞かれたときに残すか消すかを選べます。
+設定・学習データ・ユーザー辞書・自作の専門用語集 (`~/Library/Application Support/Meltype`。自作の専門用語集の `terms/`・除外した専門用語の `terms-excluded.txt`・`userdict.txt.bak`・ロック用の隠しファイルも含む) は、聞かれたときに残すか消すかを選べます。消すときは、`userdict.txt`・`terms/`・`terms-excluded.txt` を先にデスクトップの `Meltype-backup-<日時>` フォルダーへ写します。
 そのあと、いったんログアウトしてログインし直してください。
 
 ## 使い方
@@ -174,7 +176,7 @@ bash uninstall.sh --yes --remove-data      # 設定・学習データ・ユー�
 - 変更 (登録・編集・削除・取り込み・除外・分野の切り替え) は、プロセスをまたぐロック (データフォルダの隠しファイル `.userdict.txt.lock` など。flock、0600) の中で、ファイルを読み直してから書きます。
   IME と画面が同時に書いても、片方の変更が消えることはありません。読めないファイル (権限・文字コード) には書かず、理由を出します。
 
-**しくみ**: 画面は IME と同じ `libMeltypeNative.dylib` (外側の `Meltype.app/Contents/Frameworks`) を dlopen して、C# の `DictionaryManagement` / `UserDictionary` / `TermDomains` を呼びます (入力の規則・ファイルの形式・ロックを 1 か所にするため。FFI の版数 `AbiVersion` = 6)。
+**しくみ**: 画面は IME と同じ `libMeltypeNative.dylib` (外側の `Meltype.app/Contents/Frameworks`) を dlopen して、C# の `DictionaryManagement` / `UserDictionary` / `TermDomains` を呼びます (入力の規則・ファイルの形式・ロックを 1 か所にするため。FFI の版数は `Exports.AbiVersion` を参照)。
 IME が背面専用のアプリ (`LSBackgroundOnly`) で、自分のウインドウがキーボード入力を受けられない (登録のダイアログが打てず、osascript のダイアログにした経緯がある) ので、画面は別のアプリにしています。
 
 ### 実機での確認の手順 (画面の自動テストは無い)

@@ -3,6 +3,7 @@
 
 using Meltype.Composition;
 using Meltype.Config;
+using Meltype.Detection;
 using Meltype.Learning;
 
 namespace Meltype.Tests;
@@ -123,29 +124,143 @@ internal static class SecurityTests
     }
 
     [Test]
+    public static void ProperNouns_And_WordListAdd_SkipOverlongWords()
+    {
+        // 利用者の propernouns.txt に巨大な 1 語があっても、先頭部分をすべて覚えて長さの 2 乗のメモリを使わない
+        var nouns = new ProperNouns();
+        nouns.AddText($"Kubernetes {new string('a', 100_000)} {new string('b', WordList.MaxWordLength + 1)}");
+        Assert.True(nouns.Contains("kubernetes"), "普通の語は入る");
+        Assert.Equal(1, nouns.LowercaseWords.Count(), "長すぎる語は入れない (英語の判定にも渡らない)");
+        var list = new WordList();
+        list.Add(new string('c', WordList.MaxWordLength + 1));
+        list.Add(new string('d', WordList.MaxWordLength));
+        Assert.Equal(1, list.Count, "WordList.Add も上限を守る (64 文字は入り、65 文字は入らない)");
+    }
+
+    [Test]
+    public static void LearningFiles_WithNullValues_DoNotThrowWhileTyping()
+    {
+        // 手で書き換えた・壊れた languages.json / translations.json の null の値や不正なキーは、読み込みで捨てる
+        var directory = TempDirectory();
+        var languages = Path.Combine(directory, "languages.json");
+        File.WriteAllText(languages, """{"api": null, "Sushi": {"English": true}, "x": {"English": true}, "ok": {"English": true, "Count": 2}}""");
+        var memory = new LanguageMemory(languages);
+        Assert.Equal<bool?>(null, memory.Get("api"), "null の値は無いのと同じ (例外にならない)");
+        Assert.Equal(1, memory.Count, "大文字のキー・1 文字のキー・null は捨てる");
+        Assert.Equal(1, memory.Entries().Count, "一覧も例外にならない");
+        var translations = Path.Combine(directory, "translations.json");
+        File.WriteAllText(translations, """{"はし": null, "": {"x": 1}, "ふくざつ": {"complex": 2, "": 3, "bad": 0}}""");
+        var history = new TranslationHistory(translations);
+        Assert.Equal(0, history.Get("はし").Count, "null の値は無いのと同じ");
+        Assert.Equal("complex", string.Join(",", history.Get("ふくざつ").Select(w => w.Word)), "空の語・1 未満の回数は捨てる");
+        history.Remember("はし", "bridge");
+        Assert.Equal(1, history.Get("はし").Count, "null だった読みにも記録できる");
+    }
+
+    [Test]
+    public static void Log_File_IsOwnerOnly()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        // ログには (設定によっては) 打った文字が入るので、ほかのデータと同じく本人だけが読める権限にする
+        var directory = Path.Combine(TempDirectory(), "logs");
+        var path = Path.Combine(directory, "meltype.log");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(path, "前の版が作った 0644 のログ\n");
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+        try
+        {
+            Meltype.Diagnostics.Log.SetFileOutput(path);
+            Meltype.Diagnostics.Log.Info("権限の確認");
+            Meltype.Diagnostics.Log.FlushFile();
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path), "既にあったログも 0600 に直す");
+            Assert.True(File.ReadAllText(path).Contains("権限の確認"), "追記される");
+            var fresh = Path.Combine(directory, "new.log");
+            Meltype.Diagnostics.Log.SetFileOutput(fresh);
+            Meltype.Diagnostics.Log.Info("新しいログ");
+            Meltype.Diagnostics.Log.FlushFile();
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(fresh), "新しく作るログは 0600");
+        }
+        finally
+        {
+            Meltype.Diagnostics.Log.SetFileOutput(null);
+        }
+    }
+
+    [Test]
+    public static void Settings_NullElements_AreDropped_NotTreatedAsBroken()
+    {
+        // 古い版 (移行が走る) の config.json に null の要素があっても、既定値に戻さず (.broken にせず) 読む
+        var directory = TempDirectory();
+        var path = Path.Combine(directory, "config.json");
+        var json = new Settings { LiveConversion = false, PredictionMinLength = 4 }.ToJson()
+            .Replace("\"AppRules\": [", "\"AppRules\": [null,")
+            .Replace("\"AppKinds\": [", "\"AppKinds\": [null,");
+        json = System.Text.RegularExpressions.Regex.Replace(json, "\"SettingsVersion\": \\d+", "\"SettingsVersion\": 3");
+        Assert.True(json.Contains("[null,"), "テストの前提: null の要素を入れた");
+        File.WriteAllText(path, json);
+        var settings = Settings.Load(path);
+        Assert.True(!settings.LiveConversion && settings.PredictionMinLength == 4, "読んだ値が使われる (既定値に戻らない)");
+        Assert.True(!File.Exists(path + ".broken"), "壊れたファイルとして退避しない");
+        Assert.True(settings.AppRules.All(r => r is not null) && settings.AppKinds.All(k => k is not null), "null の要素は捨てる");
+        Assert.True(settings.KindFor("anything") is null, "アプリ別の種類を引いても例外にならない");
+    }
+
+    [Test]
+    public static void UserDictionary_DoesNotWriteBeyondReadLimit()
+    {
+        // 取り込みを重ねて読み込みの上限を超えるファイルを作らない (超えると次に空として読まれ、1 語の登録で辞書がその語だけになる)
+        var directory = TempDirectory();
+        var userdict = Path.Combine(directory, "userdict.txt");
+        var dictionary = new UserDictionary(userdict, builtIn: false);
+        Assert.True(dictionary.AddMany([new UserWord("きごう", "記号")], out _) is null, "最初の取り込み");
+        var before = File.ReadAllText(userdict);
+        var saved = SafeFile.MaxReadBytes;
+        try
+        {
+            SafeFile.MaxReadBytes = new FileInfo(userdict).Length + 20;
+            var many = Enumerable.Range(0, 50).Select(i => new UserWord("たんご" + new string('あ', i % 10 + 1), "単語" + i)).ToList();
+            Assert.Equal(UserDictionary.TooLargeMessage, dictionary.AddMany(many, out var added), "上限を超える取り込みは理由を返す");
+            Assert.Equal(0, added.Count, "何も足さない");
+            Assert.Equal(before, File.ReadAllText(userdict), "ファイルは変わらない");
+            Assert.Equal(1, new UserDictionary(userdict, builtIn: false).Count, "別のインスタンスからも今までどおり読める");
+            Assert.Equal(1, dictionary.Count, "このインスタンスの中身も変わらない");
+        }
+        finally
+        {
+            SafeFile.MaxReadBytes = saved;
+        }
+    }
+
+    [Test]
     public static void Load_Oversized_IsBackedUpAndNotOverwritten()
     {
         var directory = TempDirectory();
         var userdict = Path.Combine(directory, "userdict.txt");
         var conversions = Path.Combine(directory, "conversions.json");
-        new UserDictionary(userdict, builtIn: false).Add("きごう", "記号");
+        // 元の辞書は、あとで登録する 1 語だけの辞書より大きくしておく (上限をその間に置くため)
+        var seed = new UserDictionary(userdict, builtIn: false);
+        foreach (var (reading, word) in new[] { ("きごう", "記号"), ("ばんごう", "番号"), ("しんごう", "信号"), ("ふごう", "符号"), ("あんごう", "暗号") }) seed.Add(reading, word);
         new ConversionHistory(conversions).Remember("きごう", "記号");
         var originalDict = File.ReadAllText(userdict);
         var originalHistory = File.ReadAllText(conversions);
         var saved = SafeFile.MaxReadBytes;
         try
         {
+            // 変換履歴: 上限を超えたら空で続け、保存の前に .oversize へ退避する
             SafeFile.MaxReadBytes = 10;
+            var history = new ConversionHistory(conversions);
+            history.Remember("こうほ", "候補");
+            Assert.Equal(originalHistory, File.ReadAllText(conversions + ".oversize"), "元の変換履歴が .oversize に残る");
+
+            // ユーザー辞書: 上限を元の辞書の大きさのすぐ下に置く (元は超え、1 語だけの辞書は収まる)
+            SafeFile.MaxReadBytes = new FileInfo(userdict).Length - 1;
             var words = new UserDictionary(userdict, builtIn: false);
             Assert.Equal(0, words.Count, "上限超過は空で続ける");
             // 同じファイルをもう一度読んでも、退避が増えない
             _ = new UserDictionary(userdict, builtIn: false);
             Assert.True(!File.Exists(userdict + ".oversize.1"), "同じ大きさなら再度コピーしない");
-            words.Add("あたらしい", "新しい");
-            var history = new ConversionHistory(conversions);
-            history.Remember("こうほ", "候補");
+            Assert.True(words.Add("あたらしい", "新しい") is null, "上限内に収まる 1 語の辞書は保存できる (登録を続けられる)");
             Assert.Equal(originalDict, File.ReadAllText(userdict + ".oversize"), "元のユーザー辞書が .oversize に残る");
-            Assert.Equal(originalHistory, File.ReadAllText(conversions + ".oversize"), "元の変換履歴が .oversize に残る");
             // 保存で置き換わったあとは大きさが変わるので、次に超過したときは連番になる
             SafeFile.MaxReadBytes = 1;
             _ = new UserDictionary(userdict, builtIn: false);

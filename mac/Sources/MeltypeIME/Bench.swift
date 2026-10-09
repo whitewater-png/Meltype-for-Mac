@@ -85,7 +85,11 @@ enum Bench {
         c.rawMainResults(for: reading).prefix(10).map(\.text)
     }
 
-    static func run() {
+    /// 計測と正しさの確認を流す。変換の食い違い (correctness 1 の不一致、correctness 2・3 の変換の mismatches) が 0 なら true。
+    /// 予測の違い (predictMismatches・prediction only) は仕様として受け入れた違いを含むので、表示だけで失敗には数えない。
+    @discardableResult
+    static func run() -> Bool {
+        var failures = 0
         let memory = FileManager.default.temporaryDirectory.appendingPathComponent("meltype-bench-\(getpid())", isDirectory: true)
         try? FileManager.default.createDirectory(at: memory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: memory) }
@@ -172,6 +176,7 @@ enum Bench {
             c.endComposition()
             print("\(name): \(ok) / \(corpus.count) match")
             report.forEach { print($0) }
+            failures += report.count
         }
 
         print("\n== correctness 2: random edits (seed fixed), new vs old(stopComposition every call), top-10 texts and predictions ==")
@@ -215,6 +220,7 @@ enum Bench {
             if a != b { mismatches += 1; if examples.count < 6 { examples.append("  MISMATCH \(reading!)\n    new: \(a)\n    old: \(b)") } }
         }
         print("requests=\(requests) mismatches=\(mismatches); prediction checks=\(predictChecks) mismatches=\(predictMismatches); crossed 50 chars: \(crossed50)")
+        failures += mismatches
         examples.forEach { print($0) }
 
         print("\n== prediction only (live conversion OFF): new vs old, keys 2...40 per sentence (predictions top 8) ==")
@@ -271,6 +277,9 @@ enum Bench {
             new.endComposition(); old.endComposition()
             print("learned \(learnSentences.count) readings; requests=\(requests) mismatches=\(mismatches)")
             examples.forEach { print($0) }
+            failures += mismatches
         }
+        print("\n== result: \(failures == 0 ? "PASS" : "FAIL") (conversion mismatches: \(failures)) ==")
+        return failures == 0
     }
 }

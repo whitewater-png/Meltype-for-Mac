@@ -12,7 +12,7 @@
 //   警告    同じ読み+語の重複 (読み込みでは 1 つにまとめられる) / 同じ読みに語が 20 を超える / 欄の前後に空白 / 先頭が長音の読み / 語が読みと同じ / BOM
 //   警告    (追加) 強制型になる語の読みが日常語の読み (dictionaries/readings.txt) と同じ → 読み込み時に候補追加型へ落ちる (件数と例を表示。全件は --collisions)。
 //           4 つ目の欄が「強制」なら強制型のまま残す。4 つ目の欄が「強制」以外ならエラー、強制型にならない語の「強制」は効果がないので警告
-//   情報    読みが 3 文字以下の語と、語が ASCII だけの語 (読みが長くても) は「候補追加型」(変換候補に足すだけ。強制しない) になる / 総語数・強制型の数
+//   情報    読みが 3 文字以下の語と、語が ASCII だけの語 (読みが長くても) は「候補追加型」(変換候補に足すだけ。強制しない) になる (件数は、日常語との衝突で落ちた語を含めない。衝突した語は別に数える) / 総語数・強制型の数
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -122,7 +122,7 @@ export function checkText(text, seen = new Map(), readings = new Map(), common =
   if (!label) add('error', 1, '先頭のコメントに「# 名称: …」の行が無い (入力メニュー「専門用語集」に出る分野の名前。例: # 名称: 土木・建設)');
   if (!source) add('error', 1, '先頭のコメントに「# 出典: …」の行が無い (自作なら「# 出典: 自作」でよい)');
   if (!license) add('error', 1, '先頭のコメントに「# ライセンス: …」の行が無い (自作なら「# ライセンス: 自作」でよい)');
-  if (stats.candidate > 0) add('info', 0, `読みが ${FORCED_MIN_READING_LENGTH - 1} 文字以下の ${stats.candidate - stats.ascii} 語と、語が ASCII だけの ${stats.ascii} 語 (読みが ${FORCED_MIN_READING_LENGTH} 文字以上でも) は「候補追加型」になる (変換候補に足すだけで、強制しない)`);
+  if (stats.candidate > 0) add('info', 0, `読みが ${FORCED_MIN_READING_LENGTH - 1} 文字以下の ${stats.candidate - stats.ascii - stats.collisions} 語と、語が ASCII だけの ${stats.ascii} 語 (読みが ${FORCED_MIN_READING_LENGTH} 文字以上でも) は「候補追加型」になる (変換候補に足すだけで、強制しない)${stats.collisions > 0 ? `。このほか、日常語の読みと衝突して候補追加型に落ちる ${stats.collisions} 語は、別の警告を見る` : ''}`);
   if (stats.four > 0) add('info', 0, `読みがちょうど ${FORCED_MIN_READING_LENGTH} 文字 (強制型の最短) の語が ${stats.four} 語ある。日常語の途中に現れて巻き込む恐れがあるので注意 (例: ${fourSamples.join('、')})`);
   if (stats.collisions > 0) add('warning', 0, `強制型になる読みが日常語の読み (readings.txt) と同じ語が ${stats.collisions} 語ある。読み込み時に候補追加型へ落ちる (変換候補には出るが、文の中で語を固定しない)。日常語と同じ読みでも固定したい語は、4 つ目の欄に「${KEEP_FORCED_MARK}」と書く (例: ${collisionSamples.join('、')}。全件は --collisions)`);
   if (placeholder && stats.words > 0) add('warning', 1, '名称・出典・ライセンスの行が、雛形の「(例: …)」のまま (実際の内容に書き換える)');
@@ -177,6 +177,7 @@ function selfTest() {
     ['正常な用語集はエラーなし', () => levels(header + 'ぎょうれつしき\t行列式\t数学\n', 'error').length === 0],
     ['統計 (強制型・候補追加型)', () => { const s = checkText(header + 'ぎょうれつしき\t行列式\nすう\t数\n').stats; return s.words === 2 && s.forced === 1 && s.candidate === 1; }],
     ['語が ASCII だけなら読みが長くても候補追加型', () => { const s = checkText(header + 'あいこんをくりっく\ticon\nぎょうれつしき\t行列式\n').stats; return s.forced === 1 && s.candidate === 1 && s.ascii === 1; }],
+    ['候補追加型の件数は、衝突で落ちた語を「読みが 3 文字以下」に混ぜない', () => { const c = checkText(header + 'すう\t数\nこうせい\t構成\n', new Map(), new Map(), new Set(['こうせい'])); return c.stats.collisions === 1 && c.problems.some(p => p.level === 'info' && p.message.includes('読みが 3 文字以下の 1 語')); }],
     ['3 文字以下は候補追加型の情報', () => levels(header + 'すう\t数\n', 'info').some(m => m.includes('候補追加型'))],
     ['名称が無いとエラー', () => levels('# 出典: 自作\n# ライセンス: 自作\nぎょうれつしき\t行列式\n', 'error').some(m => m.includes('名称'))],
     ['名称の値が空だとエラー', () => levels('# 名称:\n# 出典: 自作\n# ライセンス: 自作\n', 'error').some(m => m.includes('名称'))],

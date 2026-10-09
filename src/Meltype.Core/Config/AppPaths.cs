@@ -54,6 +54,9 @@ internal static class AppPaths
     public static string UserTermsDirectory => Path.Combine(DataDirectory, "terms");
     public static string LogFile => Path.Combine(DataDirectory, "meltype.log");
 
+    /// <summary>Mac の IME の原因調査用トレース (defaults の MeltypeTraceIMK で ON にしたときだけ書く。打った文字が入る)。</summary>
+    public static string TraceLogFile => Path.Combine(DataDirectory, "imk-trace.log");
+
     /// <summary>落ちたときの例外 (ファイルへのログが OFF でも書く)。</summary>
     public static string CrashLogFile => Path.Combine(DataDirectory, "crash.log");
 

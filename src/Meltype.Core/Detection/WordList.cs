@@ -15,7 +15,8 @@ public sealed class WordList
 
     public void Add(string word)
     {
-        if (word.Length == 0 || !_words.Add(word)) return;
+        // 長さの上限はここで守る (ParseWords 以外の経路、たとえば固有名詞の一覧からも 2 乗のメモリを使わせない)
+        if (word.Length is 0 or > MaxWordLength || !_words.Add(word)) return;
         for (var i = 1; i <= word.Length; i++) _prefixes.Add(word[..i]);
         if (!_byFirstLetter.TryGetValue(word[0], out var bucket)) _byFirstLetter[word[0]] = bucket = [];
         bucket.Add(word);

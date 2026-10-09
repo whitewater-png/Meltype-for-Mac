@@ -180,10 +180,66 @@ internal static class DictionaryManagement
         }
     }
 
+    /// <summary>
+    /// 書き出し先として使ってよいか。だめなら理由。次を断る:
+    /// - シンボリックリンクそのもの (リンク先へ書かれる)
+    /// - 自作の専門用語集のフォルダー (terms/) の中 (使っている分野のファイルを上書き・増やしかねない)
+    /// - Meltype のデータフォルダーの中の、すでにあるファイル (userdict.txt・config.json などの動いているデータを上書きしかねない)
+    /// フォルダーのシンボリックリンクはたどってから比べる (データフォルダーへのリンクを経由して抜けられないように)。
+    /// </summary>
+    public static string? CheckExportTarget(string path) => CheckExportTarget(path, AppPaths.DataDirectory);
+
+    /// <summary>dataDirectory を指定して判定する (テストが一時フォルダーで確かめるため)。</summary>
+    internal static string? CheckExportTarget(string path, string dataDirectory)
+    {
+        try
+        {
+            var full = Path.GetFullPath(path);
+            var file = new FileInfo(full);
+            if (file.Exists && file.LinkTarget is not null) return "書き出し先がシンボリックリンクのため、書き出せません。別の名前を選んでください。";
+            var folder = ResolveDirectory(Path.GetDirectoryName(full)!).TrimEnd(Path.DirectorySeparatorChar);
+            static bool Inside(string folder, string root)
+            {
+                var resolved = ResolveDirectory(Path.GetFullPath(root)).TrimEnd(Path.DirectorySeparatorChar);
+                return string.Equals(folder, resolved, StringComparison.OrdinalIgnoreCase)
+                    || folder.StartsWith(resolved + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            }
+            if (Inside(folder, TermDomains.UserDirectory())) return "自作の専門用語集のフォルダーの中には書き出せません。別の場所を選んでください。";
+            if (file.Exists && Inside(folder, dataDirectory))
+            {
+                return "Meltype のデータフォルダーの中にあるファイルは上書きできません (使っている辞書や設定を壊してしまうため)。別の場所か名前を選んでください。";
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return $"書き出せませんでした: {ex.Message}";
+        }
+    }
+
+    /// <summary>フォルダーのパスを、途中のシンボリックリンクをたどった実際のパスにする (無いフォルダーはそのまま)。</summary>
+    private static string ResolveDirectory(string full, int depth = 0)
+    {
+        var root = Path.GetPathRoot(full) ?? "";
+        var current = root;
+        foreach (var part in full[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, part);
+            var info = new DirectoryInfo(current);
+            // リンク先のパスにもリンクが含まれうる (/var → /private/var など) ので、たどった先をもう一度解決する (循環に備えて深さを限る)
+            if (info.Exists && info.LinkTarget is not null && info.ResolveLinkTarget(returnFinalTarget: true) is { } target)
+            {
+                current = depth < 8 ? ResolveDirectory(target.FullName, depth + 1) : target.FullName;
+            }
+        }
+        return current;
+    }
+
     /// <summary>Microsoft IME の形式 (UTF-16) で書き出す。書き出した語の数を count に返す。だめなら理由を返す。</summary>
     public static string? Export(UserDictionary dictionary, string path, out int count)
     {
         count = 0;
+        if (CheckExportTarget(path) is { } invalid) return invalid;
         try
         {
             dictionary.Refresh();

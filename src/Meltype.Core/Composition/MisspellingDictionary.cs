@@ -59,13 +59,15 @@ public sealed class MisspellingDictionary
     public void Add(string wrong, string right)
     {
         if (wrong.Length == 0 || right.Length == 0 || wrong == right) return;
+        // 制御文字・書式文字を含む語は入れない (ユーザー辞書と同じ決まり)
+        if (UserDictionary.HasUnsafeText(wrong) || UserDictionary.HasUnsafeText(right)) return;
         _wrong[wrong] = right;
         AddRight(right);
     }
 
     private void AddRight(string right)
     {
-        if (right.Length == 0 || !_right.Add(right) || right.Length < FuzzyMinimumLength) return;
+        if (right.Length == 0 || UserDictionary.HasUnsafeText(right) || !_right.Add(right) || right.Length < FuzzyMinimumLength) return;
         var shape = Shape(right);
         if (!_rightByShape.TryGetValue(shape, out var list)) _rightByShape[shape] = list = [];
         list.Add(right);

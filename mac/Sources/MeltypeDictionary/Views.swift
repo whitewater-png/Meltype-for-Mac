@@ -55,6 +55,12 @@ final class SearchDebouncer {
 }
 
 enum UI {
+    /// 取り込みに選んだものが普通のファイルか (FIFO・デバイスなどを選ぶと、読み込みが終わらずに画面が止まるため)。だめなら理由。
+    static func regularFileProblem(_ url: URL) -> String? {
+        let values = try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isRegularFileKey])
+        return values?.isRegularFile == true ? nil : "普通のファイルではないため、取り込めません。"
+    }
+
     static func configure(search field: NSSearchField) {
         field.sendsSearchStringImmediately = true
         field.sendsWholeSearchString = false

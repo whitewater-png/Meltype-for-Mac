@@ -47,6 +47,8 @@ public sealed class ContextRules
             var head = line[..colon].Split([' ', '\t', '　'], StringSplitOptions.RemoveEmptyEntries);
             var cues = line[(colon + 1)..].Split([' ', '\t', '\r', '　'], StringSplitOptions.RemoveEmptyEntries);
             if (head.Length != 2 || cues.Length == 0) continue;
+            // 制御文字・書式文字を含む規則は入れない (ユーザー辞書と同じ決まり)
+            if (UserDictionary.HasUnsafeText(head[0]) || UserDictionary.HasUnsafeText(head[1])) continue;
             if (!_rules.TryGetValue(head[0], out var list)) _rules[head[0]] = list = [];
             list.Add((head[1], cues));
         }

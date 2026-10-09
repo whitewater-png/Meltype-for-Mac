@@ -144,7 +144,13 @@ final class UpdateManager {
 
     /// 入力メニューの「今すぐ更新を確認する」。OFF のままでも、利用者が押したときだけは確認する。
     func checkNow() {
-        guard !isChecking, !isUpdating else { return }
+        // 黙って何もしないと、押しても反応が無いように見えるので、理由を出す
+        guard !isUpdating else { showMessage("更新を進めています。終わるまでお待ちください。"); return }
+        guard NativeCore.shared.isCompatible else {
+            showMessage("この Meltype の部品の版がそろっていないため、更新を確認できません。リリースページの zip から入れ直してください。")
+            return
+        }
+        guard !isChecking else { return }
         check(manual: true)
     }
 
@@ -170,19 +176,48 @@ final class UpdateManager {
             // 通信できなかった (オフラインなど) ときは lastCheck を進めない。HTTP の応答があれば (404・403 でも) 確認したことにする
             var reachedServer = false
             var found: UpdateOffer?
+            // 手動の確認で「最新の版です」以外を伝えるときの文 (nil なら最新、または新しい版が見つかった)
+            var problem: String?
             if let http = response as? HTTPURLResponse {
                 reachedServer = true
-                if http.statusCode == 200, let data, data.count <= Self.maxJsonBytes, let json = String(data: data, encoding: .utf8) {
+                if http.statusCode != 200 {
+                    problem = "更新を確認できませんでした (GitHub の応答: HTTP \(http.statusCode))。時間をおいて、もう一度お試しください。"
+                } else if let data, data.count <= Self.maxJsonBytes, let json = String(data: data, encoding: .utf8) {
                     found = NativeCore.shared.evaluateUpdate(releaseJson: json, currentVersion: current)
+                    if found == nil { problem = Self.whyNoOffer(releaseJson: data, currentVersion: current) }
+                } else {
+                    problem = "更新の情報を読み取れませんでした。時間をおいて、もう一度お試しください。"
                 }
             } else if error != nil {
                 NSLog("Meltype: 更新の確認に失敗しました")
             }
-            DispatchQueue.main.async { self?.finishCheck(found: found, reachedServer: reachedServer, manual: manual) }
+            DispatchQueue.main.async { self?.finishCheck(found: found, reachedServer: reachedServer, manual: manual, problem: problem) }
         }.resume()
     }
 
-    private func finishCheck(found: UpdateOffer?, reachedServer: Bool, manual: Bool) {
+    /// 新しい版が見つからなかった (evaluateUpdate が nil) ときに、それが「最新だから」か「Release の情報が足りない・読めないから」かを分ける。
+    /// 最新なら nil、そうでなければ利用者に見せる理由。判定そのもの (ダウンロードしてよいか) は本体の evaluateUpdate だけが行う。
+    static func whyNoOffer(releaseJson: Data, currentVersion: String) -> String? {
+        guard let object = try? JSONSerialization.jsonObject(with: releaseJson) as? [String: Any],
+              let tag = object["tag_name"] as? String else {
+            return "更新の情報を読み取れませんでした。時間をおいて、もう一度お試しください。"
+        }
+        // 「v1.2.3-mac」→ 1.2.3
+        var version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+        if let dash = version.firstIndex(of: "-") { version = String(version[..<dash]) }
+        let latest = version.split(separator: ".").compactMap { Int($0) }
+        let mine = currentVersion.split(separator: ".").compactMap { Int($0) }
+        guard !latest.isEmpty else { return "更新の情報を読み取れませんでした。時間をおいて、もう一度お試しください。" }
+        for i in 0..<max(latest.count, mine.count) {
+            let a = i < latest.count ? latest[i] : 0, b = i < mine.count ? mine[i] : 0
+            if a != b {
+                return a > b ? "新しい版 (\(tag)) がありますが、配布ファイルや検査値 (SHA-256) が確認できないため、ここからは更新できません。リリースページから手で入れ替えてください。" : nil
+            }
+        }
+        return nil
+    }
+
+    private func finishCheck(found: UpdateOffer?, reachedServer: Bool, manual: Bool, problem: String? = nil) {
         isChecking = false
         // 確認している間に OFF にされたら、結果は捨てる (通知も出さない)。手動の確認だけは OFF でも結果を返す
         guard manual || loadSettings().enabled else { return }
@@ -194,7 +229,11 @@ final class UpdateManager {
         offer = found
         guard let found else {
             if manual {
-                showMessage(reachedServer ? "Meltype は最新の版です (v\(currentVersion))。" : "更新を確認できませんでした。ネットワークに接続できないか、GitHub から応答がありません。")
+                if !reachedServer {
+                    showMessage("更新を確認できませんでした。ネットワークに接続できないか、GitHub から応答がありません。")
+                } else {
+                    showMessage(problem ?? "Meltype は最新の版です (v\(currentVersion))。")
+                }
             }
             return
         }
@@ -318,6 +357,19 @@ final class UpdateManager {
         }
     }
 
+    /// 切り離した install.sh が終わったのに、この IME がまだ動いている (= 入れ替えが失敗・中止された) ときに呼ばれる (メインスレッド)。
+    /// 成功したときは install.sh がこの IME を止めるので、ここには来ない。
+    /// isUpdating を戻さないと、IME を起動し直すまで自動の確認も「今すぐ更新を確認する」も黙って何もしなくなる。
+    func detachedInstallDidEnd(status: Int32) {
+        guard isUpdating else { return }
+        isUpdating = false
+        lastAttempt = Date()
+        NSLog("Meltype: 更新の install.sh が終わりました (status %d)。IME は旧版のまま動いています。", status)
+        // 新しい版をもう一度メニューに出す。自動の確認が OFF なら通信しない (結果のダイアログは install.sh が出している。
+        // 手動で「今すぐ更新を確認する」を押せば、また出る)
+        if loadSettings().enabled { check(manual: false) }
+    }
+
     /// 結果などの短い知らせ (OK だけのダイアログ)。メインスレッドを止めない。
     func showMessage(_ text: String) {
         Self.runOsascript([
@@ -401,12 +453,69 @@ enum Updater {
             return fail("ダウンロードした Meltype.app の版が、Release の版 (v\(offer.version)) と一致しませんでした。")
         }
         guard info["CFBundleIdentifier"] as? String == Bundle.main.bundleIdentifier else { return fail("ダウンロードした Meltype.app が、今の Meltype と別のアプリでした。") }
+        // (4b) この Mac の CPU で動くか。配布の zip は Apple シリコン用だけなので、Intel Mac でソースから入れた Meltype を
+        //      入れ替えると、起動できなくなって日本語入力が使えなくなる (codesign の検査は CPU を見ない)
+        if let reason = checkArchitectures(app) { return fail(reason) }
 
         // (5) install.sh を、この IME が止められても続くように切り離して起動する
         guard launchDetachedInstall(folder: folder, work: work, version: offer.version, logFile: logFile, dataDirectory: dataDirectory) else {
             return fail("インストールを開始できませんでした。")
         }
         return .success(())
+    }
+
+    /// Meltype.app の中の実行ファイル (IME 本体・辞書の管理画面・C# のライブラリ) が、この Mac の CPU 向けを含むか。だめなら理由。
+    private static func checkArchitectures(_ app: URL) -> String? {
+        let binaries = [
+            app.appendingPathComponent("Contents/MacOS/Meltype"),
+            app.appendingPathComponent("Contents/Helpers/MeltypeDictionary.app/Contents/MacOS/MeltypeDictionary"),
+            app.appendingPathComponent("Contents/Frameworks/libMeltypeNative.dylib"),
+        ]
+        let accepted = acceptedCPUTypes()
+        for binary in binaries {
+            guard let types = machOCPUTypes(binary) else { return "ダウンロードした Meltype.app の実行ファイル (\(binary.lastPathComponent)) を読めませんでした。" }
+            if types.isDisjoint(with: accepted) {
+                return "この版は、この Mac の CPU では動きません (\(binary.lastPathComponent))。配布の版は Apple シリコン用です。Intel の Mac では、ソースから build.sh で入れ直してください。"
+            }
+        }
+        return nil
+    }
+
+    private static let cpuTypeX86_64: Int32 = 0x0100_0007
+    private static let cpuTypeARM64: Int32 = 0x0100_000C
+
+    /// この Mac で動かせる CPU の種類。Rosetta で動いている x86_64 の IME なら、arm64 も動かせる。
+    private static func acceptedCPUTypes() -> Set<Int32> {
+        #if arch(arm64)
+        return [cpuTypeARM64]
+        #else
+        var translated: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        let underRosetta = sysctlbyname("sysctl.proc_translated", &translated, &size, nil, 0) == 0 && translated == 1
+        return underRosetta ? [cpuTypeX86_64, cpuTypeARM64] : [cpuTypeX86_64]
+        #endif
+    }
+
+    /// Mach-O (単一、または fat/universal) の先頭を読み、含まれる CPU の種類を返す。Mach-O でなければ nil。
+    /// (/usr/bin/lipo は Command Line Tools が無い Mac では動かないので使わない)
+    static func machOCPUTypes(_ url: URL) -> Set<Int32>? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 4096), header.count >= 8 else { return nil }
+        let bytes = [UInt8](header)
+        func little(_ offset: Int) -> UInt32 { UInt32(bytes[offset]) | UInt32(bytes[offset + 1]) << 8 | UInt32(bytes[offset + 2]) << 16 | UInt32(bytes[offset + 3]) << 24 }
+        func big(_ offset: Int) -> UInt32 { UInt32(bytes[offset]) << 24 | UInt32(bytes[offset + 1]) << 16 | UInt32(bytes[offset + 2]) << 8 | UInt32(bytes[offset + 3]) }
+        switch big(0) {
+        case 0xCAFE_BABE, 0xCAFE_BABF: // fat (32 ビットの表 / 64 ビットの表)
+            let entrySize = big(0) == 0xCAFE_BABE ? 20 : 32
+            let count = Int(big(4))
+            guard count > 0, count <= 16, 8 + count * entrySize <= bytes.count else { return nil }
+            return Set((0..<count).map { Int32(bitPattern: big(8 + $0 * entrySize)) })
+        default:
+            // 単一の Mach-O (リトルエンディアン): MH_MAGIC_64 / MH_MAGIC
+            guard little(0) == 0xFEED_FACF || little(0) == 0xFEED_FACE else { return nil }
+            return [Int32(bitPattern: little(4))]
+        }
     }
 
     /// 展開してよい zip か。エントリ数 5000 以下・展開後の合計 300MB 以下で、絶対パス・`..` を含む名前が無いこと。問題があれば理由 (OK なら nil)。
@@ -538,8 +647,13 @@ enum Updater {
 
         var pid: pid_t = 0
         guard posix_spawn(&pid, "/bin/bash", &actions, &attributes, &argv, &envp) == 0 else { return false }
-        // IME が生きているあいだに終わったときのゾンビを残さない
-        DispatchQueue.global(qos: .utility).async { var status: Int32 = 0; waitpid(pid, &status, 0) }
+        // IME が生きているあいだに終わったときのゾンビを残さない。終わったのにこの IME が生きていれば、入れ替えは失敗・中止なので、
+        // 更新の状態を戻す (成功なら install.sh がこの IME を止めるので、ここまで来ない)
+        DispatchQueue.global(qos: .utility).async {
+            var status: Int32 = 0
+            waitpid(pid, &status, 0)
+            DispatchQueue.main.async { UpdateManager.shared.detachedInstallDidEnd(status: status) }
+        }
         return true
     }
 }

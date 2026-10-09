@@ -89,6 +89,8 @@ internal static class UserTermDomainTests
             Assert.True(TermDomains.CreateUserDomain("土木・建設", out _) is { Length: > 0 }, "同梱とかぶる名前は断る");
             Assert.True(TermDomains.CreateUserDomain(new string('あ', 51), out _) is { Length: > 0 }, "長すぎる名前は断る");
             Assert.True(TermDomains.CreateUserDomain("a\tb", out _) is { Length: > 0 }, "タブは断る");
+            Assert.True(TermDomains.CreateUserDomain("名前" + char.ConvertFromUtf32(0x202E) + "反転", out _) is { Length: > 0 }, "書式文字 (U+202E) は断る (一覧の表示の偽装)");
+            Assert.True(TermDomains.CreateUserDomain("名前" + char.ConvertFromUtf32(0xE0041), out _) is { Length: > 0 }, "補助面の書式文字も断る");
             var second = Create("もう 1 つ");
             Assert.True(second != id, "ID は別");
 
@@ -102,9 +104,16 @@ internal static class UserTermDomainTests
 
             // 削除と復元
             TermDomains.AddUserWords(id, [("きごう", "記号", "")], out _, out _);
+            TermDomains.AddUserWords(id, [("ばんごう", "番号", "注" + char.ConvertFromUtf32(0x202E) + "記" + new string('x', 300))], out var noted, out _);
+            Assert.True(noted.Single().Note.StartsWith("注記", StringComparison.Ordinal) && noted.Single().Note.Length == TermDomains.MaxNoteLength, "注記は書式文字を取り除き、長さを切る");
+            Assert.True(File.Exists(file + ".bak") && File.ReadAllText(file + ".bak").Contains("きごう\t記号") && !File.ReadAllText(file + ".bak").Contains("ばんごう"), "書き換える前の内容が .bak に残る");
+            TermDomains.RemoveUserWords(id, [("ばんごう", "番号")], out _);
             Assert.Equal<string?>(null, TermDomains.DeleteUserDomain(id, out var content, out var wasEnabled));
             Assert.True(wasEnabled && content.Contains("きごう\t記号"), "消す前の中身と有効だったかを返す");
             Assert.True(!File.Exists(file) && TermDomains.List().All(d => d.Id != id), "ファイルも一覧からも消える");
+            var trashed = Directory.GetFiles(TermDomains.TrashDirectory(), "*.txt");
+            Assert.True(trashed.Length == 1 && File.ReadAllText(trashed[0]).Contains("きごう\t記号"), "すぐには消さず terms/.trash に控えが残る (辞書アプリを閉じても戻せる)");
+            Assert.True(!File.Exists(file + ".bak"), "消した分野の .bak は残さない (控えは .trash にある)");
             Assert.True(!Enabled(env).Contains(id) && Enabled(env).Contains(second), "有効な分野の一覧から外れる (ほかは残る)");
             Assert.True(TermDomains.DeleteUserDomain("civil", out _, out _) is { Length: > 0 }, "同梱は消せない");
             Assert.True(TermDomains.List().Any(d => d.Id == "civil"), "同梱の分野は触っていない");
@@ -112,6 +121,23 @@ internal static class UserTermDomainTests
             var restored = TermDomains.List().Single(d => d.Id == id);
             Assert.True(restored.Name == "改名した用語" && restored.Enabled && restored.Count == 1 && Enabled(env).Contains(id), "同じ ID・中身・有効で戻る");
             Assert.Equal<string?>(null, TermDomains.RestoreUserDomain(id, content, true), "すでにあれば成功 (戻し済み。取り消しを消せなくならない)");
+        }
+        finally { env.Dispose(); }
+    }
+
+    [Test]
+    public static void DeletedDomains_KeepOnlyNewest()
+    {
+        var env = Use();
+        try
+        {
+            for (var i = 0; i < TermDomains.TrashKeepCount + 3; i++)
+            {
+                var id = Create($"消す分野 {i}");
+                Assert.Equal<string?>(null, TermDomains.DeleteUserDomain(id, out _, out _));
+            }
+            Assert.Equal(TermDomains.TrashKeepCount, Directory.GetFiles(TermDomains.TrashDirectory(), "*.txt").Length, "控えは新しいものから決まった数だけ残す");
+            Assert.True(TermDomains.List().All(d => !d.Name.StartsWith("消す分野", StringComparison.Ordinal)), "控えは分野の一覧に出ない");
         }
         finally { env.Dispose(); }
     }
@@ -447,6 +473,24 @@ internal static class UserTermDomainTests
             Assert.True(TermDomains.ExportUserDomain(id, Path.Combine(env.Terms, "別名.txt"), out _) is { Length: > 0 }, "フォルダーの中へは書き出せない");
             Assert.Equal(before, File.ReadAllText(live), "ファイルは変わらない");
             Assert.Equal<string?>(null, TermDomains.ExportUserDomain(id, Path.Combine(env.Directory, "外.txt"), out _), "ほかの場所へは書き出せる");
+            // シンボリックリンクを経由して自作の専門用語集のフォルダーへ抜けられない
+            var link = Path.Combine(env.Directory, "link-to-terms");
+            Directory.CreateSymbolicLink(link, env.Terms);
+            Assert.True(TermDomains.ExportUserDomain(id, Path.Combine(link, "抜け.txt"), out _) is { Length: > 0 }, "フォルダーへのリンク経由でも書き出せない");
+            Assert.True(!File.Exists(Path.Combine(env.Terms, "抜け.txt")), "何も書かない");
+            // 書き出し先そのものがシンボリックリンクなら断る (リンク先に書かれる)
+            var victim = Path.Combine(env.Directory, "victim.txt");
+            File.WriteAllText(victim, "元の内容");
+            var fileLink = Path.Combine(env.Directory, "file-link.txt");
+            File.CreateSymbolicLink(fileLink, victim);
+            Assert.True(TermDomains.ExportUserDomain(id, fileLink, out _) is { Length: > 0 }, "リンクそのものへは書き出せない");
+            Assert.Equal("元の内容", File.ReadAllText(victim), "リンク先は変わらない");
+            // ユーザー辞書の書き出しも、データフォルダーの中は断る (判定だけ確かめる。実データには書かない)
+            // データフォルダーの中のすでにあるファイルは上書きしない (一時フォルダーをデータフォルダーとして判定する。実データは見ない)
+            File.WriteAllText(env.UserDict, "# 動いているユーザー辞書\n");
+            Assert.True(DictionaryManagement.CheckExportTarget(env.UserDict, env.Directory) is { Length: > 0 }, "データフォルダーのすでにあるファイル (userdict.txt) へは書き出せない");
+            Assert.True(DictionaryManagement.CheckExportTarget(Path.Combine(env.Directory, "新しい書き出し.txt"), env.Directory) is null, "データフォルダーの新しいファイルはよい");
+            Assert.True(DictionaryManagement.CheckExportTarget(Path.Combine(env.Directory, "外2.txt")) is null, "ほかの場所はよい");
         }
         finally { env.Dispose(); }
     }

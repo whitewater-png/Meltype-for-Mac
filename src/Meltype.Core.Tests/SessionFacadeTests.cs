@@ -130,6 +130,29 @@ internal static class SessionFacadeTests
     }
 
     [Test]
+    public static void Json_NumbersIgnoreCulture()
+    {
+        // 負号が U+2212 になるカルチャ (sv-SE など) でも、-1 は "-1" と書く (Swift の JSONDecoder が読めるように)
+        var saved = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            foreach (var name in new[] { "sv-SE", "nb-NO", "fi-FI", "fa-IR", "ar-SA" })
+            {
+                System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(name);
+                var result = new SessionResult(true, [new TextEdit(1, "x")], new CompositionView("x", ["y"], 0, true, "h", ["x"], -1));
+                var json = result.ToJson();
+                Assert.True(json.Contains("\"selectedClause\":-1") && json.Contains("\"selectedPrediction\":-1") && json.Contains("\"deleteBefore\":1"), $"{name}: 数は ASCII の - と数字で書く ({json})");
+                using var document = System.Text.Json.JsonDocument.Parse(json);
+                Assert.Equal(-1, document.RootElement.GetProperty("view").GetProperty("selectedClause").GetInt32(), $"{name}: JSON として読める");
+            }
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = saved;
+        }
+    }
+
+    [Test]
     public static void Json_IncludesOriginalOnlyWhenPresent()
     {
         var result = new SessionResult(true, [new TextEdit(1, "I ", "胃 "), new TextEdit(0, "x")], null);

@@ -45,6 +45,12 @@ public static class ProjectInfo
     }
 
     /// <summary>
+    /// 報告の URL を作れなかったとき (設定を読めないなど) に開く先。Mac 版は Mac 版のリポジトリの不具合報告 (本家へは誘導しない)。
+    /// </summary>
+    public static string FallbackReportUrl(string os) =>
+        os.StartsWith("Mac", StringComparison.Ordinal) ? $"{MacSourceUrl}/issues/new?template=1-bug.yml" : $"{SourceUrl}/issues/new/choose";
+
+    /// <summary>
     /// GitHub の Issue の作成画面を、OS・版・実行環境を入れた状態で開く URL。
     /// template は .github/ISSUE_TEMPLATE のファイル名 (1-bug.yml / 2-misdetection.yml / 4-idea.yml)。欄は id で入れる。
     /// </summary>

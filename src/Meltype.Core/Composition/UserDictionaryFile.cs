@@ -60,9 +60,17 @@ public static class UserDictionaryFile
     /// <summary>BOM を見て UTF-16 (LE / BE) か UTF-8 として読む。BOM が無ければ UTF-8、それで読めなければ UTF-16 LE とみなす。</summary>
     private static (string Text, string Encoding) Decode(byte[] bytes)
     {
-        if (bytes is [0xFF, 0xFE, ..]) return (Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2), "UTF-16");
-        if (bytes is [0xFE, 0xFF, ..]) return (Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2), "UTF-16 BE");
-        if (bytes is [0xEF, 0xBB, 0xBF, ..]) return (Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3), "UTF-8");
+        // BOM 付きも厳密に読む (壊れたバイトを U+FFFD に置き換えたまま語として登録しない)。BOM の無い UTF-8 と同じ扱い。
+        try
+        {
+            if (bytes is [0xFF, 0xFE, ..]) return (new UnicodeEncoding(bigEndian: false, byteOrderMark: false, throwOnInvalidBytes: true).GetString(bytes, 2, bytes.Length - 2), "UTF-16");
+            if (bytes is [0xFE, 0xFF, ..]) return (new UnicodeEncoding(bigEndian: true, byteOrderMark: false, throwOnInvalidBytes: true).GetString(bytes, 2, bytes.Length - 2), "UTF-16 BE");
+            if (bytes is [0xEF, 0xBB, 0xBF, ..]) return (new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes, 3, bytes.Length - 3), "UTF-8");
+        }
+        catch (DecoderFallbackException)
+        {
+            throw new InvalidDataException("ファイルに壊れた文字 (読めないバイト) が含まれているため、取り込めませんでした。UTF-8 か UTF-16 で保存し直してください。");
+        }
         try
         {
             var utf8 = new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes);

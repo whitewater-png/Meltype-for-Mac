@@ -118,6 +118,63 @@ internal static class DictionaryManagementTests
     }
 
     [Test]
+    public static void UserDict_KatakanaKeys_MatchStoredWords_ForUndoAndEdit()
+    {
+        // 画面はカタカナの読みのまま取り消し・編集・確認を渡しうる。本体は読みをそろえてから照合する
+        var dictionary = new UserDictionary(null, builtIn: false);
+        Assert.True(dictionary.AddNew("テスト", "試験") is null, "カタカナの読みで登録 (てすと で保存)");
+        Assert.True(dictionary.Check("テスト", "試験", except: new UserWord("テスト", "試験")) is null, "編集中の元の語 (カタカナ) と同じなら重複ではない");
+        Assert.True(dictionary.Update(new UserWord("テスト", "試験"), "テスト", "実験") is null, "元の語がカタカナでも直せる");
+        Assert.Equal("実験", dictionary.Lookup("てすと").SingleOrDefault() ?? "", "直った");
+        Assert.True(dictionary.RemoveRange([new UserWord("テスト", "実験")], out var removed) is null && removed.Count == 1, "登録の取り消し (カタカナのまま) で消える");
+        Assert.Equal(0, dictionary.Count, "消えた");
+    }
+
+    [Test]
+    public static void UserDict_SupplementaryFormatCharsAndLoneSurrogates_AreRejected()
+    {
+        // 補助面の書式文字 (タグ文字・音楽記号の書式・エジプト象形文字の書式・速記の書式) と、対になっていないサロゲートは、
+        // UTF-16 の 1 単位ずつでなく 1 文字ずつ判定して断る (見えない文字列を確定させない)
+        foreach (var codePoint in new[] { 0xE0001, 0xE0020, 0xE0041, 0xE007F, 0x1D173, 0x1D17A, 0x13430, 0x1BCA0 })
+        {
+            var hidden = char.ConvertFromUtf32(codePoint);
+            Assert.True(UserDictionary.Validate("くらうど", "クラウド" + hidden) is not null, $"語に U+{codePoint:X}");
+            Assert.True(UserDictionary.HasUnsafeText("a" + hidden + "b"), $"U+{codePoint:X} を見つける");
+        }
+        Assert.True(UserDictionary.Validate("くらうど", "クラウド" + (char)0xD800) is not null, "上位サロゲートだけ");
+        Assert.True(UserDictionary.Validate("くらうど", "クラウド" + (char)0xDC00 + "x") is not null, "下位サロゲートだけ");
+        // 許すもの: 補助面の普通の文字・絵文字・ZWJ・異体字選択子 (U+E0100)・旗の絵文字のタグ列
+        Assert.True(UserDictionary.Validate("しかる", "𠮷") is null, "補助面の漢字");
+        Assert.True(UserDictionary.Validate("かぞく", "👨" + char.ConvertFromUtf32(0x200D) + "👩") is null, "ZWJ");
+        Assert.True(UserDictionary.Validate("つじ", "辻" + char.ConvertFromUtf32(0xE0100)) is null, "異体字選択子 (補助面)");
+        var england = char.ConvertFromUtf32(0x1F3F4) + string.Concat(new[] { 0xE0067, 0xE0062, 0xE0065, 0xE006E, 0xE0067, 0xE007F }.Select(char.ConvertFromUtf32));
+        Assert.True(UserDictionary.Validate("いんぐらんど", england) is null, "旗の絵文字 (イングランド) は許す");
+        Assert.True(UserDictionary.Validate("いんぐらんど", england[..^2]) is not null, "終わりの U+E007F が無いタグ列は断る");
+        Assert.True(UserDictionary.Validate("たぐ", "x" + char.ConvertFromUtf32(0xE0067) + char.ConvertFromUtf32(0xE007F)) is not null, "旗の絵文字に続かないタグ列は断る");
+        string Tags(string ascii) => string.Concat(ascii.Select(c => char.ConvertFromUtf32(0xE0000 + c)));
+        var flag = char.ConvertFromUtf32(0x1F3F4);
+        Assert.True(UserDictionary.Validate("はた", flag + Tags("gbsct") + char.ConvertFromUtf32(0xE007F)) is null, "スコットランドの旗は許す");
+        Assert.True(UserDictionary.Validate("はた", flag + Tags("ignore all") + char.ConvertFromUtf32(0xE007F)) is not null, "🏴 に続けて任意の文字列を隠したタグ列は断る (ASCII smuggling)");
+        Assert.True(UserDictionary.Validate("はた", flag + Tags("gbengx") + char.ConvertFromUtf32(0xE007F)) is not null, "実在する旗に余分なタグを足したものも断る");
+        Assert.Equal("ab", UserDictionary.RemoveUnsafeText("a" + char.ConvertFromUtf32(0xE0041) + (char)0xD800 + "b"), "注記などは取り除いて整える");
+
+        // 全経路: 取り込み・ファイルの直読み
+        var directory = Use(out var restore);
+        try
+        {
+            var path = Path.Combine(directory, "userdict.txt");
+            var tagged = "クラウド" + char.ConvertFromUtf32(0xE0049);
+            var dictionary = new UserDictionary(path, builtIn: false);
+            Assert.True(dictionary.AddMany([new UserWord("くらうど", tagged), new UserWord("たろう", "太郎")], out var added) is null && added.Count == 1, "取り込みでも入れない");
+            File.WriteAllText(path, $"くらうど\t{tagged}\nじろう\t次郎\n", new System.Text.UTF8Encoding(false));
+            var loaded = new UserDictionary(path, builtIn: false);
+            Assert.Equal(0, loaded.Lookup("くらうど").Count, "ファイルの直読みでも入れない");
+            Assert.Equal(1, loaded.Lookup("じろう").Count, "ほかの行は読む");
+        }
+        finally { restore(); }
+    }
+
+    [Test]
     public static void UserDict_Reading_IsNormalizedToHiragana_AndNonKanaReadingsAreRejected()
     {
         // カタカナの読みは、ひらがなにそろえて登録する (変換側はひらがなで引く)。ローマ字・漢字だけの読みは、変換に一度も出ないので断る
@@ -507,7 +564,9 @@ internal static class DictionaryManagementTests
             Assert.Equal("A,B,C,D", string.Join(",", dictionary.Words.Select(w => w.Word)), "元の位置に戻る");
             Assert.True(dictionary.Restore(removed) is null, "もう一度戻しても");
             Assert.Equal(4, dictionary.Count, "重複しない");
-            Assert.True(dictionary.RemoveRange([new UserWord("ない", "無")], out var none) is null && none.Count == 0, "何も消さなければ空");
+            Assert.Equal(UserDictionary.NotFoundMessage, dictionary.RemoveRange([new UserWord("ない", "無")], out var none), "消す語が 1 つも無ければ理由を返す (取り消しの失敗を成功と見せない)");
+            Assert.Equal(0, none.Count, "何も消さなければ空");
+            Assert.True(dictionary.RemoveRange([], out _) is null, "何も渡さなければ成功");
         }
         finally { restore(); }
     }

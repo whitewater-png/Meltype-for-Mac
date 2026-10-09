@@ -14,7 +14,8 @@
 #   - 隔離属性 (com.apple.quarantine) を外す (確認してから。下を読むこと)
 #   - 入力ソースとして登録し (Meltype --register)、入力メニューと IME の起動役を起動し直す (killall imklaunchagent TextInputMenuAgent)
 #   - 登録できなかったときだけ、入力ソースの一覧に書き込む (defaults write com.apple.HIToolbox AppleEnabledInputSources)
-#   - 同じバンドル ID の別の Meltype.app を LaunchServices の登録から外す (lsregister -u。ファイルは消さない)
+#   - 同じバンドル ID の別の Meltype.app (展開したフォルダーのものなど) を Spotlight (mdfind) で探して、LaunchServices の登録から外す (lsregister -u。ファイルは消さない)。
+#     そのあと、入れた方を登録し直す (lsregister -f)
 # それ以外 (管理者権限・ネットワーク通信・ほかのアプリの設定) には触れない。
 set -euo pipefail
 cd "$(dirname "$0")"

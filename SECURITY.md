@@ -35,11 +35,13 @@ Meltype for Mac はキーボードの入力を扱うソフトです。安心し�
 ## 脆弱性・問題の報告
 
 悪用できそうな問題 (打った文字が漏れる・ほかのアプリに勝手に入力される・権限が上がる など) を見つけたら、
-**このリポジトリの [Issue](https://github.com/whitewater-png/Meltype-for-Mac/issues/new/choose) で報告してください。**
+**公開の Issue ではなく、GitHub の Private vulnerability reporting (非公開の報告) で報告してください。**
+このリポジトリの「Security」タブ →「Report a vulnerability」から送れます
+(<https://github.com/whitewater-png/Meltype-for-Mac/security/advisories/new>)。報告は、リポジトリの管理者だけに届きます。
 
-- Issue は誰でも読めます。**悪用の手順の細部や、打った文字・パスワード・個人情報は書かないでください。**
-  まず「どの部分で、どんな問題が起きそうか」を簡潔に書いてもらえれば、やりとりしながら確認します。
-- 書いてもらえると助かること: 起きること、再現の手順、Meltype の版と OS、考えられる影響。
+- 悪用につながらない不具合や要望は、これまでどおり [Issue](https://github.com/whitewater-png/Meltype-for-Mac/issues/new/choose) で受け付けます。
+  Issue は誰でも読めるので、**悪用の手順の細部や、打った文字・パスワード・個人情報は書かないでください。**
+- 書いてもらえると助かること: 起きること、再現の手順、Meltype の版と OS、考えられる影響 (再現の手順は、非公開で報告するときだけ詳しく書いてください)。
 - 更新は個人の気ままな対応のため、返事や修正までにお時間をいただくことがあります。
 
 ## 対象の版

@@ -861,16 +861,17 @@ public static unsafe class Exports
     [UnmanagedCallersOnly(EntryPoint = "meltype_report_url")]
     public static byte* ReportUrl(byte* platform)
     {
+        var name = "Mac";
         try
         {
-            var name = FromUtf8(platform) ?? "Mac";
+            name = FromUtf8(platform) ?? "Mac";
             var settings = Config.Settings.Load(Config.AppPaths.ConfigFile);
             return ToUtf8(Config.ProjectInfo.ReportUrl($"{name} (プレビュー版)", Config.ProjectInfo.CoreVersion, Config.ProjectInfo.Environment(settings, name)));
         }
         catch (Exception ex)
         {
             Diagnostics.Log.Error($"報告の URL を作れませんでした: {ex}");
-            return ToUtf8($"{Config.ProjectInfo.SourceUrl}/issues/new/choose");
+            return ToUtf8(Config.ProjectInfo.FallbackReportUrl(name));
         }
     }
 

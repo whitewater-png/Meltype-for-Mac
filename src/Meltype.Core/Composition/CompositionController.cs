@@ -224,6 +224,19 @@ public sealed class CompositionController
     private readonly CompositionOptions _options;
     private readonly Dictionary<string, string> _conversionCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _liveCache = new(StringComparer.Ordinal);
+    // 変換エンジンの学習が終わるたびに進む (学習は裏のスレッドで走るので、終わったあとに変換結果のキャッシュを捨てるための目印)
+    private int _learnGeneration;
+    private int _cacheGeneration;
+
+    /// <summary>学習が終わっていれば、変換結果のキャッシュを捨てる (学習の前の結果を使い続けないため)。</summary>
+    private void DropCachesIfLearned()
+    {
+        var generation = Volatile.Read(ref _learnGeneration);
+        if (generation == _cacheGeneration) return;
+        _conversionCache.Clear();
+        _liveCache.Clear();
+        _cacheGeneration = generation;
+    }
     private readonly HashSet<int> _swallowedShift = [];
     private readonly HashSet<int> _replayedDown = [];
     private readonly HashSet<int> _capturedDown = [];
@@ -1617,6 +1630,7 @@ public sealed class CompositionController
     /// <summary>同じかなを何度も変換しないようにキャッシュする。</summary>
     private string Convert(string kana)
     {
+        DropCachesIfLearned();
         if (_conversionCache.TryGetValue(kana, out var cached)) return cached;
         var converted = NormalizeHalfWidth(_converter.Convert(kana) ?? kana, kana);
         if (_conversionCache.Count > 256) _conversionCache.Clear();
@@ -1631,6 +1645,7 @@ public sealed class CompositionController
     private string LiveConvert(string kana)
     {
         if (kana.Length < LiveConversionMinLength) return kana;
+        DropCachesIfLearned();
         var key = string.Join("\u0001", kana, PrecedingForConversion, _followingText, _options.History?.Version, _options.UserDictionary?.Version);
         if (_liveCache.TryGetValue(key, out var cached)) return cached;
         var converted = string.Concat(ConvertJapanese(kana).Select(c => c.Text));
@@ -1848,7 +1863,18 @@ public sealed class CompositionController
             if (run.Count == 0) return;
             var clauses = run.ToList();
             run.Clear();
-            ThreadPool.QueueUserWorkItem(_ => learner.Learn(context, clauses));
+            // 変換エンジンが学習すると同じかなの変換結果が変わりうるので、変換結果のキャッシュを捨てる
+            // (Swift 側の azooKey の結果キャッシュも学習のたびに捨てている。合わせないと、学習した語が次の変換に出ない)。
+            // 学習は裏で後から終わるので、今捨てるのに加え、終わったときにも世代を進めて、その間に入った学習前の結果も捨てる
+            _conversionCache.Clear();
+            _liveCache.Clear();
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                // 裏のスレッドの例外はプロセスごと落とすので、学習の失敗はログに残すだけにする
+                try { learner.Learn(context, clauses); }
+                catch (Exception ex) { Diagnostics.Log.Warn($"変換エンジンの学習に失敗しました: {ex.Message}"); }
+                finally { Interlocked.Increment(ref _learnGeneration); }
+            });
         }
         foreach (var clause in _clauses)
         {

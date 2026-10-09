@@ -361,12 +361,13 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
         alert.alertStyle = .warning
         alert.messageText = keys.count == 1 ? "「\(keys[0].word)」(\(keys[0].reading)) を削除しますか？" : "選んだ \(keys.count) 語を削除しますか？"
         alert.informativeText = "「編集」→「取り消す」(⌘Z) で元に戻せます。削除の直前の内容は、データフォルダの userdict.txt.bak にも残ります。"
+        // 取り消せなくなりうる操作なので、Return で押される先頭のボタンはキャンセルにする (入力メニューの「学習データをすべて消去」と同じ方針)。
+        alert.addButton(withTitle: "キャンセル")
         let delete = alert.addButton(withTitle: "削除")
         delete.hasDestructiveAction = true
-        let cancel = alert.addButton(withTitle: "キャンセル")
-        cancel.keyEquivalent = "\u{1b}"
+        delete.keyEquivalent = ""
         alert.beginSheetModal(for: window) { [weak self] response in
-            guard let self, response == .alertFirstButtonReturn else { return }
+            guard let self, response == .alertSecondButtonReturn else { return }
             if let error = self.perform(.remove(keys), message: keys.count == 1 ? "「\(keys[0].word)」を削除しました (⌘Z で元に戻せます)" : "\(keys.count) 語を削除しました (⌘Z で元に戻せます)") {
                 UI.showError(error, title: "削除できませんでした", in: window)
             }
@@ -385,6 +386,7 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
             let id: String
             let name: String
             var wasDisabled = false
+            var newDomainId: String?
             switch choice {
             case let .existing(domain):
                 id = domain.id
@@ -396,18 +398,33 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
                 guard let createdId = created.id else { return "専門用語集を作れませんでした。" }
                 id = createdId
                 name = newName
+                newDomainId = id
             }
-            self.performMove(id: id, name: name, keys: keys, wasDisabled: wasDisabled)
+            self.performMove(id: id, name: name, keys: keys, wasDisabled: wasDisabled, createdId: newDomainId)
             return nil
         }
     }
 
-    private func performMove(id: String, name: String, keys: [WordKey], wasDisabled: Bool) {
+    /// createdId: 移すために新しく作った分野 (既存の分野へ移すときは nil)。1 語も入らなければ消し、入ったなら ⌘Z 1 回で語と一緒に消せるようにする。
+    private func performMove(id: String, name: String, keys: [WordKey], wasDisabled: Bool, createdId: String? = nil) {
         let result = dictionary.moveToDomain(id: id, keys: keys)
         let outcome = result.outcome
+        let actionName = DictionaryChange.moveToDomain(id: id, keys: keys).actionName
         // 専門用語集に書けたのにユーザー辞書から消せなかったとき (result.error) も、足した語を取り消せるようにしておく
-        if !outcome.added.isEmpty || !outcome.removed.isEmpty {
-            registerUndo(.undoMove(id: id, added: outcome.added, removed: outcome.removed), name: DictionaryChange.moveToDomain(id: id, keys: keys).actionName)
+        let undoable = !outcome.added.isEmpty || !outcome.removed.isEmpty
+        if undoable {
+            if let createdId, let undoManager = window?.undoManager {
+                // 取り消しは後に積んだものから戻る: 語を戻してから、作った分野を消す (1 回の ⌘Z にまとめる)
+                undoManager.beginUndoGrouping()
+                registerUndo(.deleteDomain(id: createdId), name: actionName, on: undoManager)
+                registerUndo(.undoMove(id: id, added: outcome.added, removed: outcome.removed), name: actionName, on: undoManager)
+                undoManager.endUndoGrouping()
+            } else {
+                registerUndo(.undoMove(id: id, added: outcome.added, removed: outcome.removed), name: actionName)
+            }
+        } else if let createdId {
+            // 1 語も入らなかった (移せる語が無い・書けなかった) ので、移すために作った空の分野は残さない
+            _ = dictionary.deleteDomain(id: createdId)
         }
         reload()
         didChange?()
@@ -415,7 +432,10 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
             UI.showError(error, title: "移し終えられませんでした", in: window)
             return
         }
-        var message = "\(outcome.removed.count) 語を専門用語集「\(name)」へ移しました (⌘Z で元に戻せます)"
+        // ⌘Z の案内は、取り消しを積んだときだけ出す
+        var message = outcome.removed.isEmpty
+            ? "専門用語集「\(name)」へ移せる語はありませんでした"
+            : "\(outcome.removed.count) 語を専門用語集「\(name)」へ移しました\(undoable ? " (⌘Z で元に戻せます)" : "")"
         if wasDisabled && !outcome.removed.isEmpty { message += "。使わない設定だったので、使う設定にしました" }
         if !outcome.skipped.isEmpty { message += "。\(outcome.skipped.count) 語は移せずユーザー辞書に残しました" }
         showStatus(message)
@@ -450,6 +470,10 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
         panel.allowsMultipleSelection = false
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .OK, let url = panel.url else { return }
+            if let problem = UI.regularFileProblem(url) {
+                UI.showError(problem, title: "取り込めませんでした", in: window)
+                return
+            }
             let result = self.dictionary.importFile(path: url.path)
             if let error = result.error {
                 UI.showError(error, title: "取り込めませんでした", in: window)

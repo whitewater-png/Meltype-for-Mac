@@ -332,10 +332,13 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate {
         alert.alertStyle = .warning
         alert.messageText = "設定を既定値に戻しますか?"
         alert.informativeText = "このタブにある設定をすべて、買ったときの状態に戻します。ユーザー辞書・専門用語集・ほかの設定は変わりません。"
-        alert.addButton(withTitle: "既定値に戻す").hasDestructiveAction = true
+        // 取り消せない操作なので、Return で押される先頭のボタンはキャンセルにする (入力メニューの「学習データをすべて消去」と同じ方針)。
         alert.addButton(withTitle: "キャンセル")
+        let reset = alert.addButton(withTitle: "既定値に戻す")
+        reset.hasDestructiveAction = true
+        reset.keyEquivalent = ""
         alert.beginSheetModal(for: window) { [weak self] response in
-            guard response == .alertFirstButtonReturn, let self else { return }
+            guard response == .alertSecondButtonReturn, let self else { return }
             // 数を入力中なら、保存せずに閉じる (戻したあとに、入力中の値が書き戻されないように)
             self.abortEditing()
             if let reason = self.dictionary.resetSettings() {

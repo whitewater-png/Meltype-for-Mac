@@ -4,7 +4,10 @@
 // 公開版のリリースから、パッケージマネージャーに出すマニフェストを作る (winget・Scoop・Homebrew)。
 //   node tools/make-manifests.mjs <版> <Windows の zip> [Mac の zip]
 //   例: node tools/make-manifests.mjs 1.0.0 dist/Meltype-1.0.0-windows.zip dist/Meltype-1.0.0-mac.zip
-// zip は GitHub のリリース (v<版>) に同じ名前で上げたもの。SHA-256 をここで計算する。
+// zip は GitHub のリリースに同じ名前で上げたもの。SHA-256 をここで計算する。
+//   Windows の zip: 本家 yksr-melt/Meltype のリリース v<版>
+//   Mac の zip (Homebrew cask): この Mac 版 whitewater-png/Meltype-for-Mac のリリース v<版>-mac (Meltype-mac-<版>.zip)
+// Scoop・winget は Windows 版 (Mac 版では使わない)。この Mac 版の配布では Homebrew の部分だけを使う。
 // できたものは dist/manifests/ に置く。出し方は docs/RELEASE.md。
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -17,6 +20,8 @@ if (!version || !windowsZip) {
 }
 const repo = 'https://github.com/yksr-melt/Meltype';
 const release = `${repo}/releases/download/v${version}`;
+const macRepo = 'https://github.com/whitewater-png/Meltype-for-Mac';
+const macRelease = `${macRepo}/releases/download/v${version}-mac`;
 const sha256 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const out = path.join('dist', 'manifests');
 const description = '半角/全角を押さずに、日本語と英語をそのまま打てる日本語入力 (英単語は英字のまま、ローマ字は日本語に)';
@@ -86,17 +91,17 @@ ManifestType: defaultLocale
 ManifestVersion: 1.6.0
 `);
 
-// --- Homebrew (自分の tap yksr-melt/homebrew-tap に置く想定) ---
+// --- Homebrew (tap に置く想定。配布元はこの Mac 版のリポジトリ whitewater-png/Meltype-for-Mac) ---
 if (macZip) {
   const macName = path.basename(macZip);
   write('homebrew/Casks/meltype.rb', `cask "meltype" do
   version "${version}"
   sha256 "${sha256(macZip)}"
 
-  url "${release}/${macName.replace(version, '#{version}')}"
+  url "${macRelease.replace(version, '#{version}')}/${macName.replace(version, '#{version}')}"
   name "Meltype"
   desc "${description}"
-  homepage "${repo}"
+  homepage "${macRepo}"
 
   depends_on macos: ">= :ventura"
   depends_on arch: :arm64
