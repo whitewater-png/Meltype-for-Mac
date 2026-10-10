@@ -79,6 +79,16 @@ public sealed class CompositionDetector
     public IReadOnlyList<CompositionSegment> Segment(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish = null, bool? followingEnglish = null,
         DetectionLevel level = DetectionLevel.Balanced, bool englishSentence = false, bool kanaInput = false, bool final = false)
     {
+        // 先頭の z + h/j/k/l の矢印 (zh = ←) は、英語かどうかを判定せず日本語の区間にする。
+        // (macOS のスペルチェッカーは zh を英単語と答えるので、判定に回すと矢印が元の綴りに戻る。先頭の zhang・zlib は CompositionText が矢印を取り消して英字に戻す)
+        var arrows = 0;
+        while (!kanaInput && arrows < units.Count && CompositionText.IsArrowUnit(units[arrows])) arrows++;
+        if (arrows > 0)
+        {
+            var arrowSegment = Japanese(units, 0, arrows, "");
+            if (arrows == units.Count && pending.Length == 0) return [arrowSegment];
+            return [arrowSegment, .. Segment([.. units.Skip(arrows)], pending, precedingEnglish, followingEnglish, level, englishSentence, kanaInput, final)];
+        }
         var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final);
         if (kanaInput) return segments;
         // 英語の後ろの , . は半角にしたが、すぐ後ろに日本語が続いた (Ok,konnna → Ok、こんな) なら、日本語の文の句読点にして分け直す。
@@ -655,6 +665,17 @@ public sealed class CompositionDetector
         return lower.Length >= minimum;
     }
 
+    // 大文字で終わる略語と見なす頭の最小の長さ。3 文字以下 (McA・LeB) は名前の途中、4 文字以上 (PlanB・TypeA) は英単語 + 大文字 1 文字として略語に残す
+    // (本家 yksr-melt/Meltype の 1640142 / issue #266 と同じ変更)
+    private const int MinCamelAcronymLength = 4;
+
+    /// <summary>
+    /// 大文字で終わる略語 (OCR、AutoIME、PlanB) か。McA・LeB のように、短い頭 (Mc・Le) の後ろの大文字で終わるものは、
+    /// 略語ではなく名前 (McAfee・LeBron) の途中と見る (本家 issue #266)。
+    /// </summary>
+    private static bool EndsWithAcronym(string head) =>
+        head.Length >= 2 && char.IsAsciiLetterUpper(head[^1]) && !(head.Length < MinCamelAcronymLength && char.IsAsciiLetterLower(head[^2]));
+
     /// <summary>
     /// 大文字で始まる語 (Shift を押して打った) の後ろに日本語が続いているなら、その語の終わり (単位の位置)。無ければ -1。
     /// 大文字で始まる区間は末尾まで英語になるので、そのままでは AutoIMEnotesuto → 全部英字 になってしまう。
@@ -682,12 +703,12 @@ public sealed class CompositionDetector
             // 後ろが助詞 1 つだけ (OCR|wo、English|ga) なら 2 文字でもよい
             if ((rest.Length < 3 && Detection.DictionaryDetector.StartsWithParticle(rest) != rest) || !rest.All(c => char.IsAsciiLetterLower(c) || c == '-') || !char.IsAsciiLetterLower(rest[0])) continue;
             // 知っている英単語・略語 (English、OCR) の後ろが助詞で始まるなら、その後ろに英単語が続いても (English|wo|happy) 区切る
-            var knownHead = head.Length >= 2 && char.IsAsciiLetterUpper(head[^1]) || head.Length >= 3 && IsKnownCapitalizedWord(head) || head.Length >= 4 && IsSpellWord(head.ToLowerInvariant());
+            var knownHead = EndsWithAcronym(head) || head.Length >= 3 && IsKnownCapitalizedWord(head) || head.Length >= 4 && IsSpellWord(head.ToLowerInvariant());
             if (knownHead && Detection.DictionaryDetector.StartsWithParticle(rest) is not null) return k;
             var analysis = _romaji.AnalyzeFragment(rest.Replace("-", ""));
             if (!analysis.IsValid || (final && analysis.Partial.Length > 0 && analysis.Partial != "n")) continue;
             // 大文字で終わる略語 (OCR)、知っている語 (Tokyo)、スペルチェッカーの 4 文字以上の語 (English)
-            if (head.Length >= 2 && char.IsAsciiLetterUpper(head[^1]) || head.Length >= 3 && IsKnownCapitalizedWord(head) || head.Length >= 4 && IsSpellWord(head.ToLowerInvariant())) return k;
+            if (EndsWithAcronym(head) || head.Length >= 3 && IsKnownCapitalizedWord(head) || head.Length >= 4 && IsSpellWord(head.ToLowerInvariant())) return k;
             // 大文字 1 文字 + 助詞で始まるローマ字 (A|nisiyouka → Aにしようか、B|noan → Bの案)。
             // 名前 (Tanaka、Hanako) を区切らないよう、後ろが助詞で始まるときだけ。
             if (head.Length == 1 && char.IsAsciiLetterUpper(head[0]) && Detection.DictionaryDetector.StartsWithParticle(rest.Replace("-", "")) is not null) return k;

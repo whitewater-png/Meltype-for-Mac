@@ -557,6 +557,112 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Backtick_BeforeEnglish_StaysHalfWidth()
+    {
+        // 報告 (本家 #243): 日本語の文の中の Markdown のインラインコード `code` で、バッククォートが全角の ｀ になる。
+        // 後ろが英語の ( " ' と同じく、後ろが英語なら開きも閉じも半角にする。
+        foreach (var (typed, expected) in new[]
+        {
+            ("kono`config`wo\n", "この`config`を"),
+            ("`git`dekakuninn\n", "`git`でかくにん"),
+            ("kono`git status`wo\n", "この`git status`を"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, string.Join("", k.Host.Output), typed);
+        }
+        // Markdown のコードフェンス (```python) は 3 つとも半角
+        var fence = new Keyboard();
+        fence.Type("```python\n");
+        Assert.Equal("```python", string.Join("", fence.Host.Output), "```python");
+        // 後ろが日本語のときは、これまでどおり全角のまま (日本語の文の記号)
+        var ja = new Keyboard();
+        ja.Type("`konnnichiha`\n");
+        Assert.Equal("｀こんにちは｀", string.Join("", ja.Host.Output), "日本語に挟まれたバッククォートは半角にしない");
+    }
+
+    [Test]
+    public static void ZArrows_HJKL()
+    {
+        // 提案 (本家 #234): Apple の日本語入力と同じ z + h/j/k/l で ← ↓ ↑ →。変換ボックスの先頭だけ。
+        foreach (var (typed, expected) in new[] { ("zh", "←"), ("zj", "↓"), ("zk", "↑"), ("zl", "→"), ("zhzl", "←→"), ("zhzjzkzl", "←↓↑→") })
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, string.Join("", k.Host.Output), typed);
+        }
+        // 矢印の後に Space・記号を挟めば、そのまま続けて日本語を打てる
+        var after = new Keyboard();
+        after.Type("zh!\n");
+        Assert.Equal("←！", string.Join("", after.Host.Output), "zh!");
+        // 既存の z + 記号は変わらない
+        var sym = new Keyboard();
+        sym.Type("z/\n");
+        Assert.Equal("・", string.Join("", sym.Host.Output), "z/");
+    }
+
+    /// <summary>macOS のスペルチェッカーのように、zh を英単語と答える単語チェッカー (ほかは同梱の単語リスト)。</summary>
+    private sealed class ZhIsWordChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) => lower is "zh" or "ZH" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void ZArrows_WorkEvenIfSpellCheckerKnowsZh()
+    {
+        // Mac 実機の報告: macOS のスペルチェッカーが zh を英単語と答えるため、zh だけ矢印にならなかった (zj・zk・zl は矢印になる)。
+        Detector.SpellChecker = new ZhIsWordChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[] { ("zh", "←"), ("zj", "↓"), ("zhzl", "←→"), ("zhzhzh", "←←←"), ("zhang", "zhang"), ("zlib", "zlib") })
+            {
+                var k = new Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, string.Join("", k.Host.Output), typed);
+            }
+            // 入力中の表示も矢印 (Enter の前)
+            var typing = new Keyboard();
+            typing.Type("zh");
+            Assert.Equal("←", typing.Showing, "入力中の表示");
+        }
+        finally
+        {
+            Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void ZArrows_DoNotBreakEnglishOrTypoCorrection()
+    {
+        // 変換ボックスの先頭だけが矢印。文頭の英語 (zhang・zlib・zkSync) は元の綴りに戻る。
+        // 文の途中・記号の後ろ・語の途中の zl・zk・zh、z の打ち間違い (zu → zj, zi → zk, zo → zl) は、これまでどおり。
+        foreach (var (typed, expected) in new[]
+        {
+            ("zhang", "zhang"), ("Zhang", "Zhang"), ("zlib", "zlib"), ("Zlatan", "Zlatan"), ("zkSync", "zkSync"), ("Zhou", "Zhou"), ("ZK", "ZK"),
+            ("kyouhazlibwotsukau", "きょうはzlibをつかう"), ("kyouhazhang", "きょうはzhang"),
+            ("(zlib)", "(zlib)"), ("\"zkp\"", "”zkp”"), ("foo.zlib", "ふぉお。zlib"),
+            ("buzzkill", "buzzkill"), ("bzl", "bzl"), ("quizlet", "quizlet"), ("wizkid", "wizkid"),
+            ("mizjwonomu", "みずをのむ"), ("mazjnoke", "まずのけ"), ("hazkimeru", "はじめる"), ("kozlsite", "こぞして"),
+        })
+        {
+            // 実際と同じく、辞書にない英単語 (buzzkill) はスペルチェッカーで見る
+            Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+            try
+            {
+                var k = new Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, string.Join("", k.Host.Output), typed);
+            }
+            finally
+            {
+                Detector.SpellChecker = null;
+            }
+        }
+    }
+
+    [Test]
     public static void Comma_AtEnd_DoesNotBreakFollowingInput()
     {
         // 報告: 読点を最後に打つと英数に固定される。
@@ -925,6 +1031,40 @@ internal static class CompositionTests
         k.Controller.ForgetLastCommit(); // Meltype を通らないキー (矢印など) が押された
         k.Type("ant ");
         Assert.True(!k.Host.Events.Any(e => e.StartsWith("bs:")), "キャレットが動いたかもしれないので消さない");
+    }
+
+    [Test]
+    public static void AutoCorrect_EnglishPronounAfterEnglishFunctionWord_IsNotRewrittenToJapanese()
+    {
+        // 報告 (本家 #265): Are you susi? で、英語の you を「よう」に確定し直していた。
+        // 英語の機能語 (Are・Thank・How are) のすぐ後ろで単独で確定した you / are / we / me / she は、後ろに日本語が続いても日本語に直さない。
+        foreach (var (typed, expected) in new[]
+        {
+            ("Are you susi?\n", "Are you すし？"),
+            ("Are you ningen?\n", "Are you にんげん？"),
+            ("Do you ningen\n", "Do you にんげん"),
+            ("Thank you ningen\n", "Thank you にんげん"),
+            ("How are you ningen\n", "How are you にんげん"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        // 直前が名詞・記号のとき (iPhone 用・PC 用の「よう」、Hello, you) と、文頭の you は、これまでどおり日本語に確定し直す
+        foreach (var (typed, expected) in new[]
+        {
+            ("you ningen\n", "ようにんげん"),
+            ("iPhone you nokesu\n", "iPhone ようのけす"),
+            ("PC you nokeibu\n", "PC ようのけいぶ"),
+            ("Windows you nogamen\n", "Windows ようのがめん"),
+            ("Hello, you ningen\n", "Hello, ようにんげん"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
     }
 
     [Test]

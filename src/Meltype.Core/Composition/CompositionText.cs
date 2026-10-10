@@ -100,6 +100,22 @@ public sealed class CompositionText
         }
         if (char.IsAsciiLetter(c))
         {
+            // z + h/j/k/l = ← ↓ ↑ → (Apple の日本語入力と同じ)。変換ボックスの先頭 (または矢印だけが続いた後) に限る。
+            // 同じ変換ボックスの途中 (文の途中・記号の後ろ・語の途中) の zl・zk・zh は、英語 (zlib・buzzkill・quizlet) や z の打ち間違い (zu → zj) なので矢印にしない。
+            // (Space などで確定すると新しい変換ボックスの先頭になるので、そのあとの単独の zh・zk・zl は矢印になる。)
+            if (_pending.Length == 1 && _pending[0] == 'z' && _units.All(IsArrowUnit) && ZArrow(c) is { } arrow)
+            {
+                _pending.Clear();
+                _units.Add(new CompositionUnit(arrow.ToString(), "z" + c));
+                return;
+            }
+            // 先頭の zh・zk・zl に英字が続いたら矢印ではなく英語 (zhang・zlib・zkp) なので、打った綴りに戻す。
+            // z は次の矢印 (zhzl) の頭かもしれないので戻さない。
+            if (_pending.Length == 0 && _units.Count == 1 && IsArrowUnit(_units[0]) && c != 'z')
+            {
+                _pending.Append(_units[0].Raw);
+                _units.Clear();
+            }
             // 大文字に続けて打った大文字 (TS, IME の S, M) は略語の 1 文字。後ろのローマ字 (yu) とつなげて かな (しゅ) にしない。
             var lastTyped = _pending.Length > 0 ? _pending[^1] : _units.Count > 0 && _units[^1].Raw.Length > 0 ? _units[^1].Raw[^1] : '\0';
             if (char.IsAsciiLetterUpper(c) && char.IsAsciiLetterUpper(lastTyped))
@@ -492,7 +508,7 @@ public sealed class CompositionText
 
     /// <summary>開きの記号と、その閉じの記号。</summary>
     // [ ] は日本語の入力では「」なので、英語の前後でも半角にしない
-    private static readonly Dictionary<string, string> Openers = new() { ["("] = ")", ["{"] = "}", ["\""] = "\"", ["'"] = "'" };
+    private static readonly Dictionary<string, string> Openers = new() { ["("] = ")", ["{"] = "}", ["\""] = "\"", ["'"] = "'", ["`"] = "`" };
 
     /// <summary>
     /// 開きの記号 (「(」「"」) は打った時点ではまだ後ろが分からないので全角になる。後ろが分かったら、
@@ -513,9 +529,12 @@ public sealed class CompositionText
         for (var i = 0; i < _units.Count; i++)
         {
             if (!Openers.TryGetValue(_units[i].Raw, out var closer) || _units[i].Kana == _units[i].Raw) continue;
-            var nextIsEnglish = i + 1 < _units.Count ? offsets[i + 1] < english.Count && english[offsets[i + 1]] && char.IsAsciiLetter(_units[i + 1].Raw[0])
+            // バッククォートが続く (```python のコードフェンス) ときは、その並びの次の文字を見る
+            var after = i + 1;
+            while (_units[i].Raw == "`" && after < _units.Count && _units[after].Raw == "`") after++;
+            var nextIsEnglish = after < _units.Count ? offsets[after] < english.Count && english[offsets[after]] && char.IsAsciiLetter(_units[after].Raw[0])
                 : Pending.Length > 0 && segments.Count > 0 && segments[^1].IsEnglish;
-            var closing = Enumerable.Range(i + 1, _units.Count - i - 1).FirstOrDefault(k => _units[k].Raw == closer, -1);
+            var closing = Enumerable.Range(after, _units.Count - after).FirstOrDefault(k => _units[k].Raw == closer, -1);
             // 閉じの記号が英語の語のすぐ後ろ (間の記号 ! . は飛ばす: …Through!") なら、閉じも、間の記号も半角にする
             var afterEnglish = -1;
             if (closing > i)
@@ -728,14 +747,14 @@ public sealed class CompositionText
         var start = 0;
         while (start < _units.Count)
         {
-            if (!IsLetters(_units[start].Raw) || IsLaughter(_units[start]))
+            if (!IsLetters(_units[start].Raw) || IsLaughter(_units[start]) || IsArrowUnit(_units[start]))
             {
                 offset += _units[start].Raw.Length;
                 start++;
                 continue;
             }
             var end = start;
-            while (end < _units.Count && IsLetters(_units[end].Raw) && !IsLaughter(_units[end])) end++;
+            while (end < _units.Count && IsLetters(_units[end].Raw) && !IsLaughter(_units[end]) && !IsArrowUnit(_units[end])) end++;
             var atEnd = end == _units.Count;
             var letters = string.Concat(_units.Skip(start).Take(end - start).Select(u => u.Raw)) + (atEnd ? Pending : "");
             var runOffset = offset;
@@ -955,6 +974,20 @@ public sealed class CompositionText
         }
         return new string(chars);
     }
+
+    /// <summary>z + h/j/k/l で作った矢印の単位か。</summary>
+    internal static bool IsArrowUnit(CompositionUnit u) =>
+        u.Raw is ['z', var key] && ZArrow(key) is { } arrow && u.Kana == arrow.ToString();
+
+    /// <summary>z + h/j/k/l (Apple の日本語入力と同じ): zh → ←、zj → ↓、zk → ↑、zl → →。</summary>
+    private static char? ZArrow(char c) => c switch
+    {
+        'h' => '←',
+        'j' => '↓',
+        'k' => '↑',
+        'l' => '→',
+        _ => null,
+    };
 
     /// <summary>z + 記号 (Microsoft IME と同じ): z/ → ・、z. → …、z, → ‥、z- → ～、z[ → 『、z] → 』。</summary>
     private static char? ZSymbol(char c) => c switch

@@ -1095,3 +1095,30 @@ Google ドキュメントで、確定済みの文字 (例: 「v1.1.2】Mel」の
 
 - **テスト**: 設定が OFF のとき、未変換・変換中・予測中の Shift+Enter が確定のみ (`down:0D` なし)。設定の読み書き (項目が無ければ ON、`Set(false)` が保存される、読めない `config.json` は上書きしない)。`SessionFacadeTests` に OFF のとき `consumed:true` の 1 件。既存の Shift+Enter のテストは既定 ON のまま通る。
 - **未検証**: Mac 実機 (入力メニューの切り替えと、Chrome・Google ドキュメントでの挙動)、Windows 実機 (設定画面の表示とトレイでの反映)。
+
+## 追加項目 P25〜P28 (本家 open issue を Mac 版 Core で再現して直した分)
+
+本家 (yksr-melt/Meltype) の open issue を、Mac 版の Core (`--repro`) で再現できたものから、直しやすい順に対応した。**Core の変更なので Windows / Linux にも同じく効く** (Windows・Linux は実機未確認)。`--repro` は同梱の単語リストと偽の変換エンジンで動くので、Mac 実機 (NSSpellChecker・azooKey) の結果とは違うことがある。
+
+| 項目 | 本家 issue | 内容 | 変更 |
+| --- | --- | --- | --- |
+| P25 | #243 | 後ろが英語のとき、バッククォートも半角にする (`` kono`config`wo `` → この`config`を、` ```python ` の 3 つとも半角) | `CompositionText.Openers` に `` ` `` を足す。バッククォートが続くときは、並びの次の文字で英語かを見る |
+| P26 | #234 | **変換ボックスの先頭で** `z` + `h/j/k/l` → `← ↓ ↑ →` (Apple の日本語入力と同じ) | `CompositionText.Append`: `z` が単独で待機中で、それまでの単位が無い (または矢印だけ) ときだけ矢印にする。矢印は `FixTypos` の対象外。先頭の矢印 1 つに英字が続いたら元の綴りに戻す (zhang・zlib・zkSync)。`CompositionDetector.Segment` は先頭の矢印の単位を英語判定に回さず、日本語の区間として切り出す (macOS のスペルチェッカーは `zh` を英単語と答える。zhzl = ←→) |
+| P27 | #265 | `Are you susi?` で英語の `you` を `よう` に確定し直さない | `CompositionController.CorrectPreviousCommit`: 英語の機能語 (are・do・thank・how …、`WordsBeforePronoun`) のすぐ後ろで単独で確定した `you / are / we / me / she` は日本語に直さない (`EnglishPronounAfterEnglish`)。キャレットの前の文字が分からない・直前が名詞や記号 (iPhone you・Hello, you) のときは従来どおり |
+| P28 | #266 | `McAfeeto` → `McAfeeと` (本家 1640142 と同じ変更) | `CompositionDetector.CapitalizedWordEnd`: `EndsWithAcronym` (短い頭 Mc・Le の後ろの大文字は略語にしない) |
+
+- **テスト**: 463 → 470 件。`CompositionTests`: `Backtick_BeforeEnglish_StaysHalfWidth`・`ZArrows_HJKL`・`ZArrows_DoNotBreakEnglishOrTypoCorrection` (文中・記号の後ろ・語中の zl/zk/zh と z の打ち間違いの回帰を完全一致で守る)・`ZArrows_WorkEvenIfSpellCheckerKnowsZh` (Mac 実機の報告: macOS のスペルチェッカーが `zh` を英単語と答えるため `zh` だけ矢印にならなかった。偽のスペルチェッカーで再現)・`AutoCorrect_EnglishPronounAfterEnglishFunctionWord_IsNotRewrittenToJapanese`。`FeedbackTests`: `ShortHeadThenCapital_IsName` (本家の例を移植)・`CamelCaseName_IsNotCutIntoParticle` (下記の取り下げの方針を守る)。`QualityTests`: McAfeeto。判定品質テスト (`--eval`) の外れは変更前と同じ 2 件のまま。バッククォートと矢印の新機能は、修正を外すと赤になることを確認済み。
+- **検証**: 独立した査読を 4 回行い、見つかった回帰 (P26 の文中の英語・打ち間違い補正、P27 の「〜用」、P28 の区切りが英語や名前を削る) をすべて直した。変更前のビルドと変更後を、約 1,400 入力、査読者が作った敵対入力 4,917 件、日本人の名前 6,471 件、英語の大文字つなぎ語 1,508 件で比べた。
+- **取り下げ: 本家 #268 (`DeVitode` → `DeVitoで`) は直していない。** 「大文字で始まる語が 2 つ以上つながった名前 + 助詞」で区切る処理を 4 通りに作り直して試したが、そのたびに、実在の名前や英語を削る回帰が査読で見つかった (`TanakaMakoto` → `TanakaMako|と`、`TanakaTaiga` → `TanakaTai|が`、`TanakaKanade` → `TanakaKana|で`、`UserGuide` → `UserGui|で`、`GeorgeWashingtonga` → `GeorgeWashing|とんが`)。`DeVito|de` と `Kana|de` は機械的に区別できない。区切らなければ、名前は英字のまま残り (`ClaudeCodede` や `DeVitode` は変更前のまま)、利用者が直せる。名前を壊す損のほうが大きいと判断して、この処理は入れていない。本家の報告者も「実際に使っていて出会ったものではありません」と書いている。入れ直すなら、辞書に載っていない名前だけでなく「利用者がその語を英字として確定した履歴 (Memory)」を条件にするなど、利用者の明示的な手がかりが要る。
+- **トレードオフ**:
+  - P26: 矢印になるのは変換ボックスの**先頭だけ**。文の途中 (`kyouhazl`)・記号の後ろ・語の途中の `zl` / `zk` / `zh` は矢印にならない (zlib・buzzkill や、`zu` を `zj` と打ち間違えた補正 `mizjwo` → みずを を守るため)。文の途中に矢印を入れたいときは、Space で区切るなどして新しく打ち始める。先頭の `zh` の直後にそのままローマ字を続ける (`zhkonnichiha`) と、矢印にならず英字扱い。矢印が 2 つ以上あとに英字が続く (`zhzlwotsukau`) と戻せない。先頭の `zu` を `zj` と打ち間違えて、すぐ後ろに何も続けず確定すると矢印になる。Space の後に単独で `zh` / `zk` / `zl` を打つ (`hello zh`) と、新しい入力の先頭なので矢印になる。`zh-CN`・`zk.js`・`zh1`・`zh_TW` のように記号や数字が続く形は、矢印 + 記号・数字になる (変更前も `zhーCN` のように崩れていた)。
+  - P27: 直前が英語の機能語のときだけ。`iPhone you` (iPhone 用) や `Hello, you` は従来どおり日本語に直す。`help you` (ヘルプ用)・`show you`・`call you`・`love you`・`miss you` のように、機能語の一覧にある動詞の後の `you` も英語のまま (名詞の「〜用」と打ちたい人は少ないとみて、動詞を含めた)。`me` は確定の時点で日本語側に倒れることがあり、守れないことがある。`I love sushi ` の後に `gasuki` で `すしがすき` に直す既存の動き (代名詞以外) は変えていない。
+- **未解決 (本家 issue のうち手を付けていないもの)**:
+  - #268 (上の取り下げ)。単独の `DeVito` + Enter が `でVito` のままの件も同じ。
+  - #265 の後半: `sushi?` を `susi?` と同じく日本語にする (`?` で終わる短い語の判定)。`Are you sushi?` は英語の文としても自然なので、方針を決めてから。
+  - #254・#260: `*.dll`・`*.json` など拡張子の形 (`name.ext`) を英字固定にする。本家に Pull Request #267 があるので、取り込むなら本家の形に合わせる。Mac 実機では NSSpellChecker の判定で結果が変わりうる。
+  - #263 `lo-fi`、#249 `mozcgamiteirutohaie`・`mocz`、#248 `pingwoutsu`。
+  - #259・#246 (Space・Shift+Space を全角にする設定)。関所 (`MeltypeSession.StartsComposition`) と `StartWith` の両方に触れるので別項目。
+  - 査読で見つかった小さな点: `McAfee-to` (ハイフン周りで `c` が消える)、閉じ側のコードフェンス ` ``` ` 単独は全角のまま。
+- **Mac 実機の確認 (2026-10-10、メンテナー、TextEdit・JIS 配列)**: P25 `` この`config`を確認します ``・`` `git status`で確認 ``・`` `npm install`を実行 `` が期待どおり (バッククォートは JIS では Shift + @)、P26 `zh` が `←` (macOS のスペルチェッカーが `zh` を英単語と答えるため、最初は `zh` だけ矢印にならなかった。直して確認)、`zlib`・`zhang` は英字のまま、P27 `Are you すし？`、P28 `McAfeeと`。
+- **未検証**: 矢印を含む読みを Space で azooKey に渡したときの挙動、BackSpace で矢印を消したときの挙動 (コードを読んだ範囲では単位・待機中の文字の整合は保たれる)。Windows・Linux の実機。

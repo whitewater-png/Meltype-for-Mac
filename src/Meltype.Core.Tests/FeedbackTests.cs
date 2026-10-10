@@ -789,4 +789,58 @@ internal static class RomajiTypoTests
         k.Type("onegaishimsu\n");
         Assert.Equal("おねがいしmす", k.Host.Document);
     }
+
+    [Test]
+    public static void ShortHeadThenCapital_IsName()
+    {
+        // 本家 #266 (本家 1640142 の例): McAfeeto が McA|feeto で切れて McAふぇえと になっていた。Mc・Le の後ろの大文字で終わる頭 (McA・LeB) は略語ではなく名前の途中
+        foreach (var (typed, expected) in new[]
+        {
+            ("McAfeeto", "McAfeeと"), ("McAfeewo", "McAfeeを"), ("McAfeede", "McAfeeで"), ("LeBronde", "LeBronで"),
+            // 英単語 + 大文字 1 文字・大文字が続く略語は今までどおり区切る
+            ("PlanBdeiku", "PlanBでいく"), ("TypeAnohou", "TypeAのほう"), ("OrpCde", "OrpCで"), ("oRPCde", "oRPCで"), ("ORPCde", "ORPCで"),
+            ("OCRwoshi", "OCRをし"), ("DeNAde", "DeNAで"), ("OpenAIno", "OpenAIの"), ("MrXde", "MrXで"),
+            ("McAfee", "McAfee"), ("McKinseyde", "McKinseyで"), ("McDonaldsde", "McDonaldsで"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+
+        var typing = new CompositionTests.Keyboard();
+        typing.Type("McAfeeto");
+        Assert.Equal("McAfeeと", typing.Showing);
+    }
+
+    [Test]
+    public static void CamelCaseName_IsNotCutIntoParticle()
+    {
+        // 大文字つなぎの名前 (TanakaTaiga・TanakaKanade・TanakaMakoto・UserGuide) の語尾を、助詞 (が・で・と) として削らない。
+        // 本家 #268 (DeVitode → DeVitoで) のために、大文字つなぎの名前 + 助詞で区切る処理を試したが、DeVito|de と Kana|de (名前) は
+        // 機械的に区別できず、実在の名前 (Taiga・Kanade・Mitsuha・Makoto) を削ってしまうので入れていない。
+        // 名前を壊すより、区切られずに英字のままのほうが利用者が直しやすい。ここは、この方針 (名前と英語を削らない) を守るテスト。
+        foreach (var (typed, expected) in new[]
+        {
+            // 語尾が が・で・は・と に似る日本人の名前 (姓 + 名を Shift でつなげて打つ)
+            ("TanakaTaiga", "TanakaTaiga"), ("TanakaRyoga", "TanakaRyoga"), ("TanakaDaiga", "TanakaDaiga"), ("TanakaKanade", "TanakaKanade"),
+            ("TanakaMitsuha", "TanakaMitsuha"), ("TanakaKotoha", "TanakaKotoha"), ("TanakaKaede", "TanakaKaede"), ("SatoChiharu", "SatoChiharu"),
+            ("TanakaMakoto", "TanakaMakoto"), ("SatoHayato", "SatoHayato"), ("ItoKento", "ItoKento"), ("WatanabeKaito", "WatanabeKaito"),
+            ("KobayashiHiroto", "KobayashiHiroto"), ("KatoMikoto", "KatoMikoto"), ("SatoShino", "SatoShino"),
+            ("TanakaMakoto desu", "TanakaMakoto です"), ("Please use TanakaMakoto today", "Please use TanakaMakoto today"),
+            ("TanakaTaiga to", "TanakaTaiga と"), ("TanakaKanade wo", "TanakaKanade を"),
+            // 語尾が助詞に似る英語の大文字つなぎ語
+            ("SuperRossini", "SuperRossini"), ("SunGizmo", "SunGizmo"), ("GoPinto", "GoPinto"),
+            ("UserGuide", "UserGuide"), ("StyleGuide", "StyleGuide"), ("JsonDecode", "JsonDecode"), ("TokyoKyoto", "TokyoKyoto"), ("FromToronto", "FromToronto"),
+            ("GrandPiano", "GrandPiano"), ("SuperDomino", "SuperDomino"), ("BigTomato", "BigTomato"), ("TokyoYamaha", "TokyoYamaha"),
+            ("IsaacNewtonno", "IsaacNewtonno"), ("AlexanderHamiltonno", "AlexanderHamiltonno"),
+            // 既存の区切り (知っている語 + 助詞) は変えない
+            ("BigBangtoha", "BigBangとは"), ("BigBangtoiudouga", "BigBangというどうが"), ("GeorgeWashingtonga", "GeorgeWashingtonが"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
 }

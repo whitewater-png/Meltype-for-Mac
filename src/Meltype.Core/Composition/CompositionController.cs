@@ -1743,6 +1743,37 @@ public sealed class CompositionController
     /// <summary>キャレットが動いたかもしれないとき (Meltype を通らなかったキー・クリック)。直前の語は確定し直さない。</summary>
     public void ForgetLastCommit() => _correctable.Clear();
 
+    /// <summary>ローマ字としても読める英語の代名詞 (you → よう、are → あれ、we → うぇ)。</summary>
+    private static readonly HashSet<string> EnglishPronouns = new(StringComparer.OrdinalIgnoreCase) { "you", "are", "we", "me", "she" };
+
+    /// <summary>
+    /// 代名詞の直前に来る英語の機能語 (Are you・Thank you・Let me)。名詞 (iPhone you = iPhone 用・PC you = PC 用) は含めない。
+    /// </summary>
+    private static readonly HashSet<string> WordsBeforePronoun = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "are", "is", "am", "was", "were", "do", "does", "did", "can", "could", "will", "would", "should", "shall", "have", "has", "had",
+        "how", "what", "where", "who", "why", "when", "if", "that", "and", "but", "so", "because", "to", "for", "with", "about", "from", "like",
+        "thank", "love", "miss", "see", "tell", "give", "show", "let", "call", "help", "hello", "hi", "hey", "bye", "hope", "think", "know", "want", "need",
+    };
+
+    /// <summary>
+    /// 直前に英語で確定した語が、英語の機能語 (Are・Thank) のすぐ後ろの you / are / we / me / she か。
+    /// そうなら、後ろに日本語が続いても (Are you すし？) 日本語に確定し直さない。
+    /// 英語の語の後ろ、は入力欄のキャレットの前 (自分の確定の記録・入力欄から読んだ文字) で見る。分からなければ false (従来どおり)。
+    /// </summary>
+    private bool EnglishPronounAfterEnglish(CommitRecord previous)
+    {
+        if (!EnglishPronouns.Contains(previous.Raw) || _precedingText is null) return false;
+        var preceding = NoBreakToSpace(_precedingText);
+        var original = NoBreakToSpace(previous.Text);
+        if (!preceding.EndsWith(original, StringComparison.Ordinal)) return false;
+        var before = preceding[..^original.Length].TrimEnd(' ');
+        var start = before.Length;
+        while (start > 0 && char.IsAsciiLetter(before[start - 1])) start--;
+        // 直前が記号 (Hello, you) や英字でない文字のときは、従来どおり (語を取り出せない)
+        return start < before.Length && (start == 0 || before[start - 1] == ' ') && WordsBeforePronoun.Contains(before[start..]);
+    }
+
     /// <summary>
     /// 今確定しようとしている語 (raw) で文脈がはっきりしたら、直前に確定した英語とも日本語とも読める語を確定し直す。
     /// 例: 「i」を Space で「胃」にした後に want と打つ → 「I want」、「sushi 」の後に「がすき」 → 「すしがすき」。
@@ -1767,6 +1798,8 @@ public sealed class CompositionController
         }
         else if (previous.English && !english && !_detector.IsAmbiguousWord(raw) && raw.Any(char.IsAsciiLetter))
         {
+            // 英語の語のすぐ後ろで確定した you / are などは、後ろに日本語が続いても英語のまま (Are you すし？)。
+            if (EnglishPronounAfterEnglish(previous)) return;
             // 英語で確定した語を日本語に (Space で空白を入れていたら取る)。
             targets = [previous];
             replacement = _detector.Romaji.ConvertLenient(previous.Raw.ToLowerInvariant(), final: true);
