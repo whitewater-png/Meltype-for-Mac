@@ -45,7 +45,7 @@
 | Q2 | `gemma4` が `げっ真4` になる (AI モデル名が辞書に無い)。`llama`→`っぁま`、`qwen`→`qうぇん` なども | 中 | 完了 (実機確認済み 2026-10-11: gemma4・llama3.1・qwen2.5 が英字のまま) | propernouns.txt に 42 語。日本語と衝突する語 (kimi・sora・haiku・yi・olmo・molmo など) と、入力途中の表示が崩れる語 (minimax・nemotron・Magistral など) と、ほかの語と衝突する Devin・Imagen は入れていない。`gemma4-27b` の `-` が `ー` になる、`ollama run` の `run` が `るん` になる、は別件 |
 | Q3 | `これはchangeしてほしい` が `これはちゃんげしてほしい` になる (本家 #411、未修正) | 中 | **change は直さない判断** (2026-10-11。実機確認済み: これはchanceを確認・これはbeforeしてほしい・侑ちゃん元気・花子ちゃん撃・別々・忘れたいんです・なければ心配が期待どおり): ちゃん付けの名前+げ… (`yuuchangenki`=ゆうちゃん元気) と同じ綴りで区別できないため、リョウさんが名前を優先。同じ型の英語 (chance・before・season・database など) を english-readable.txt に足して直した | change 型の英語は 1,000 語以上あるが、日本語を壊さない語だけを入れた。訓令式 (`tu`/`si`) や活用形で壊れた tube・basin・ensure・reason・refuse・assure・retire・entire・fusion・tension・sometime・venture・retain・gotten は外した。限界: 助詞と同じ綴りで始まる/終わる語 (code・line・note など)、英語を空白区切りで打つ文の一部 (回帰 190 : 改善 9,619) |
 | Q4 | 確定し直しで古い英語が消えず、日本語だけが足される (`I love sushi すしがすき`・`New York no のてんき`)。P35 より前からある | 高 | 完了 (TextEdit で実機確認済み 2026-10-11。トレースで原因も確認。LibreOffice は入力欄の中身を返さないので、確定し直しは見送られる (文字は壊れない)。Hermes など他のアプリは未確認) | Swift の置き換え (`apply`) で、変換中の文字を `setMarkedText("")` で先に取り除く (`insertText("")` では消えなかった)。`Let  It` (空白二重)・`Let IT Go`・`'` を含む英文は別件で未調査 |
-| Q5 | 英文の 2 行目以降で、`We're here susi` の here を へれ に直してしまう (P35・P27 が行頭で読めない) | 高 | TextEdit で実機確認済み (2026-10-11、5 行すべて期待どおり)。Hermes は Shift+Enter の改行を記録に入れていなかったため `Please take susi` が `たけすし` になった (ログで確認) → 修正して、再確認待ち。`HI there` は再現せず (打ち方の影響と見ている) | 自分の確定の記録に、素通しした Enter・Tab の改行を入れる。語の前が行頭でも読む。行頭の短い英文が日本語に直される退行が約 40 件 (受け入れ)。`'` は原因ではなかった。Hermes の `We'うぇへれすし` は未調査 |
+| Q5 | 英文の 2 行目以降で、`We're here susi` の here を へれ に直してしまう (P35・P27 が行頭で読めない) | 高 | 完了 (TextEdit・Hermes で実機確認済み 2026-10-11)。TextEdit は 5 行すべて期待どおり。Hermes は Shift+Enter の改行を記録に入れていなかったため `Please take susi` が `たけすし` になった (ログで確認) → 修正して、Hermes でも実機確認済み (`Hi there`・`Let's go すし`・`Please take すし` が期待どおり)。`HI there` は再現せず (打ち方の影響と見ている) | 自分の確定の記録に、素通しした Enter・Tab の改行を入れる。語の前が行頭でも読む。行頭の短い英文が日本語に直される退行が約 40 件 (受け入れ)。`'` は原因ではなかった。Hermes の `We'うぇへれすし` は未調査 |
 ## 3. 見送り・対象外・済 (理由は調査結果の文書を参照)
 
 | 区分 | PR |
@@ -61,6 +61,7 @@
 | 日付 | 内容 |
 | --- | --- |
 | 2026-10-11 | 調査結果の文書と、この管理表を作成。P30〜P33 を並列で作業開始 |
+| 2026-10-11 | Q5 を Hermes で再確認: Shift+Enter で改行して打った `Hi there`・`Let's go すし`・`Please take すし` が期待どおり。Q5 は TextEdit・Hermes で確認済み |
 | 2026-10-11 | Hermes でログを取って調査 (Q5 続き): 改行が Shift+Enter だったため、初版が除外していた。Shift+Return も記録に入れる修正を、査読 (R17) を経て実装。526 件。**Hermes の再確認待ち** |
 | 2026-10-11 | Q5 を実機で確認。TextEdit: `We’re here すし`・`Let’s go すし`・`Please take すし`・`I want to go すし` が期待どおり。Hermes (直線の `'` から推定): `We're here すし`・`I want to go すし` は期待どおりだが、`Let's ごすし`・`Please take たけすし` が直らず、`Hi there` が `HI there` になる (原因は未調査。以前の `Let IT Go` と同じ型) |
 | 2026-10-11 | `'` を含む英文の調査 (Q5): ログで原因は `'` ではなく、2 行目以降の行頭だと判明。自分の確定の記録に改行を入れる・行頭を読む修正を、独立した査読 (R15・R16) を経て実装。526 件。**実機確認待ち** |
