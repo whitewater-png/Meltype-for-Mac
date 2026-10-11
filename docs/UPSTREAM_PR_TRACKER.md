@@ -44,7 +44,7 @@
 | Q2 | `docs/HANDOFF-exception-recovery.md` (未コミット) が実装済みなのに「未着手」と書いている | 低 | 未着手 | 文書の扱いはリョウさんが決める |
 | Q2 | `gemma4` が `げっ真4` になる (AI モデル名が辞書に無い)。`llama`→`っぁま`、`qwen`→`qうぇん` なども | 中 | 完了 (実機確認済み 2026-10-11: gemma4・llama3.1・qwen2.5 が英字のまま) | propernouns.txt に 42 語。日本語と衝突する語 (kimi・sora・haiku・yi・olmo・molmo など) と、入力途中の表示が崩れる語 (minimax・nemotron・Magistral など) と、ほかの語と衝突する Devin・Imagen は入れていない。`gemma4-27b` の `-` が `ー` になる、`ollama run` の `run` が `るん` になる、は別件 |
 | Q3 | `これはchangeしてほしい` が `これはちゃんげしてほしい` になる (本家 #411、未修正) | 中 | **change は直さない判断** (2026-10-11。実機確認済み: これはchanceを確認・これはbeforeしてほしい・侑ちゃん元気・花子ちゃん撃・別々・忘れたいんです・なければ心配が期待どおり): ちゃん付けの名前+げ… (`yuuchangenki`=ゆうちゃん元気) と同じ綴りで区別できないため、リョウさんが名前を優先。同じ型の英語 (chance・before・season・database など) を english-readable.txt に足して直した | change 型の英語は 1,000 語以上あるが、日本語を壊さない語だけを入れた。訓令式 (`tu`/`si`) や活用形で壊れた tube・basin・ensure・reason・refuse・assure・retire・entire・fusion・tension・sometime・venture・retain・gotten は外した。限界: 助詞と同じ綴りで始まる/終わる語 (code・line・note など)、英語を空白区切りで打つ文の一部 (回帰 190 : 改善 9,619) |
-| Q4 | 確定し直しで古い英語が消えず、日本語だけが足される (`I love sushi すしがすき`・`New York no のてんき`)。P35 より前からある | 高 | 完了 (TextEdit で実機確認済み 2026-10-11。トレースで原因も確認。Hermes など他のアプリは未確認) | Swift の置き換え (`apply`) で、変換中の文字を `setMarkedText("")` で先に取り除く (`insertText("")` では消えなかった)。`Let  It` (空白二重)・`Let IT Go`・`'` を含む英文は別件で未調査 |
+| Q4 | 確定し直しで古い英語が消えず、日本語だけが足される (`I love sushi すしがすき`・`New York no のてんき`)。P35 より前からある | 高 | 完了 (TextEdit で実機確認済み 2026-10-11。トレースで原因も確認。LibreOffice は入力欄の中身を返さないので、確定し直しは見送られる (文字は壊れない)。Hermes など他のアプリは未確認) | Swift の置き換え (`apply`) で、変換中の文字を `setMarkedText("")` で先に取り除く (`insertText("")` では消えなかった)。`Let  It` (空白二重)・`Let IT Go`・`'` を含む英文は別件で未調査 |
 
 ## 3. 見送り・対象外・済 (理由は調査結果の文書を参照)
 
