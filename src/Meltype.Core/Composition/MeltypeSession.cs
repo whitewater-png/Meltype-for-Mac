@@ -337,8 +337,8 @@ public sealed class MeltypeSession
     {
         if (ch is >= '\uF700' and <= '\uF8FF') ch = null; // 機能キーの文字 (右矢印 = U+F703 など)
         _host.Begin(ch, shift, before, after);
-        // Apple 日本語入力と同じ Ctrl キーで表示モードを切り替える (変換ボックスが出ているときだけ)。
-        // Mac では F キーが OS のショートカットに取られることがあるため。
+        // Ctrl + 文字を同じ意味のキーにする (変換ボックスが出ているときだけ)。J K L ' ; は表示モードの切り替えで、
+        // Mac では F キーが OS のショートカットに取られることがあるため。H は BackSpace。
         if (control && !alt && !command && !shift && _controller.IsComposing && CtrlShortcutToFunctionKey(vk) is { } functionKey)
         {
             vk = functionKey;
@@ -369,7 +369,10 @@ public sealed class MeltypeSession
         return _host.Result(consumed);
     }
 
-    /// <summary>Ctrl + 文字を、同じ意味の F キーにする (J=F6 K=F7 L=F9 '=F10 は Apple と同じ、; = F8 は半角カナ用の独自割り当て)。</summary>
+    /// <summary>
+    /// Ctrl + 文字を、同じ意味のキーにする (J=F6 K=F7 L=F9 '=F10 は Apple と同じ、; = F8 は半角カナ用の独自割り当て)。
+    /// H = BackSpace は Microsoft IME・本家 #150 と同じ (ホームポジションのまま消せる。変換中なら変換をやめてかなに戻る)。
+    /// </summary>
     private static int? CtrlShortcutToFunctionKey(int vk) => vk switch
     {
         0x4A => VirtualKeys.F6,
@@ -377,6 +380,7 @@ public sealed class MeltypeSession
         0x4C => VirtualKeys.F9,
         VirtualKeys.Oem7 => VirtualKeys.F10,
         VirtualKeys.Oem1 => VirtualKeys.F8,
+        0x48 => VirtualKeys.Back,
         _ => null,
     };
 

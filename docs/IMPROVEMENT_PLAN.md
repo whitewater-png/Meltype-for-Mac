@@ -1235,3 +1235,46 @@ Google ドキュメントで、確定済みの文字 (例: 「v1.1.2】Mel」の
 - **未検証**: 実機の azooKey が `しゃーなし` を `西なし` にするか・`き` に `氣` を返す順番。NS の答えはこの Mac 1 台ぶん。Windows・Linux の実機。
 
 - 作業用のコピー・比較表・評価用の文は作業用フォルダー (`cache/scratch`) にあり、24 時間で消える。再現は `--repro`・`--segments`・`--expect` と、この節の入力で行う。
+
+## 追加項目 P32 (入力中の Ctrl+H を BackSpace にする: 本家 #150・PR #308)
+
+- **現象**: Mac で `aiueo` を打っている途中に Ctrl+H を押すと、`consumed:false`・`commits:[あいうえお]`・`view:null` = 全文を確定して Ctrl+H がアプリに渡る (Ctrl+U なども同じ)。Microsoft IME や ATOK のように、ホームポジションのまま 1 音消すことができない。
+- **対応**: 本家 PR #308 (`CompositionController.ControlShortcut` に `'H' => VirtualKeys.Back` を足す) は、Mac 版の Core にその関数が無く hunk が当たらない。Mac 版は Ctrl+文字を F キーなどに置き換える場所が `MeltypeSession.CtrlShortcutToFunctionKey` なので、そこに `0x48 => VirtualKeys.Back` を 1 行足した (`MeltypeSession.cs` 6 行、コメント含む)。
+  - 置き換えは「Ctrl だけ・Shift/Option/Command なし・変換ボックスが出ているとき」の既存の条件 (Ctrl+J/K/L/'/;) のまま。置き換えたあとは `control=false` で BackSpace と同じ経路に入るので、変換中・予測候補・固定した文節も BackSpace と同じ処理になる (Back 専用の分岐を新しく書いていない)。
+  - 本家の TIP 側 (`native/tip/TextService.cpp`) の変更は Windows 専用なので入れない。
+- **挙動**:
+
+| 状態 | Ctrl+H | 確認 |
+| --- | --- | --- |
+| 入力中 (`aiueo`) | 1 音消す (`あいうえ`)、確定しない | テスト |
+| 変換中 (`kyouha` + Space) | 変換をやめてかなに戻る (`きょうは`、Converting=false) | テスト (BackSpace と JSON 一致) |
+| 変換中で文節を選択 (`tanniwotoru` + Space + →) | かなに戻る (`たんいをとる`) | 同上 |
+| ライブ変換 | BackSpace と同じ | 同上 |
+| 予測候補を表示中・Tab で選択中 | 1 音消して予測から抜ける (`きょ`) | 同上 |
+| ContinueAfterConversion の固定文節 + 未変換 (`単位を\|取る\|た`) | BackSpace と同じ (未変換の末尾を消す → 固定した文節だけ → 変換前の読みに戻る → 1 音ずつ) | 同上 (3 回押しまで) |
+| Shift+Enter で確定した直後 (設定 ON/OFF とも) | 入力が空なので何もせずアプリへ (`consumed:false`) | テスト |
+| 入力が空 | `consumed:false` でアプリに渡す (Cocoa の削除・各アプリの機能を邪魔しない) | テスト |
+| 英数 (Direct)・アプリ別設定 OFF・Meltype 全体 OFF | アプリへ | テスト |
+| Ctrl+Shift+H・Option+H・Ctrl+Option+H・Cmd+H (入力中) | BackSpace にしない (従来どおり確定してアプリへ。Cmd+H は「アプリを隠す」が動く) | テスト |
+
+- **Swift 側 (コードを読んだ範囲)**: `KeyMapping.virtualKey` は kVK_ANSI_H を個別に扱わず、`charactersIgnoringModifiers` の `h` → 0x48 になる (Ctrl+J/K/L と同じ経路)。`InputController.handle` は Ctrl+H を横取りせず、`modifiers |= 2` と `character=0x08` (Ctrl+H の `characters`) で `NativeCore.handleKey` → `meltype_handle_key` → `MeltypeSession.HandleKey` に渡す。`mac/Sources` に Ctrl・`doCommand`・`interpretKeyEvents` を扱う箇所は IME 側に無い。**Swift の変更は不要**。
+- **テスト** (`SessionFacadeTests`、478 → 483 件。以下の 475/477 などは、単独で当てたときの件数):
+  - `CtrlH_IsBackSpaceWhileComposing` (本家の 2 件を Mac のハーネスに合わせて統合。入力中・変換中・空)
+  - `CtrlH_SameAsBackSpace_InEveryComposingState` (本家に無い追加: 10 状態で BackSpace と Ctrl+H の結果の JSON と、そのあとの Enter の結果が一致)
+  - `CtrlH_AfterShiftEnterCommit_PassesToApp`・`CtrlH_OtherModifiers_AreNotBackSpace`・`CtrlH_DirectAndDisabledApp_PassToApp` (影響を受けないことの確認)
+  - **修正前に赤を確認**: 475/477 (失敗は `CtrlH_IsBackSpaceWhileComposing` の「確定しない」と `CtrlH_SameAsBackSpace…` で、`commits:[あいうえお]`・`consumed:false` になっていた)。ほかの 3 件は修正前から通る (変わらないことの確認)。修正後 477/477。
+- **ドキュメント**: `docs/USAGE.md` のキー表に Ctrl+H の行、`mac/README.md` の Ctrl キーの説明に 1 行。Windows 版の説明 (`USAGE.md` の Ctrl+U/I/P/O の行は本家側) とは別に「Mac」と明記した。
+- **トレードオフ**:
+  - 入力中に Ctrl+H で「履歴・検索の置換」などアプリの Ctrl+H を使えなくなる (空のときは今までどおりアプリへ。入力中に押すと今までは確定してアプリへ渡っていた)。
+  - 変換ボックスのヒント (`Space 変換　←→ 文節　…`) には Ctrl+H を載せていない。
+- **未検証**: **Mac 実機**での Ctrl+H (TextEdit・ブラウザ・ターミナルなど。IMK が Ctrl+H を `handle` に先に渡すか、Cocoa のキーバインディングが先に処理しないかは実機で未確認 — Ctrl+J/K/L が実機で動くなら同じ経路のはず)。JIS/US 配列での差、Windows・Linux。`swift build`・NativeAOT の publish・build.sh による入れ替えは実行していない (Swift は変更なし)。
+
+### P32 査読 (独立した査読員 R3) の結果と対応
+
+- **P0・P1 なし**。Swift のキー経路 (`KeyMapping`・`InputController.handle`・`NativeCore.handleKey`) を読み、Ctrl+H は `charactersIgnoringModifiers` の `h` から 0x48 になり、Ctrl+J/K/L と同じ経路で Core に届くと確認した (Swift は変更不要)。ガード条件を 1 つずつ外すと、`!shift` はテストが検出するが、`!alt`・`!command`・`IsComposing` は外しても結果が変わらない冗長な条件だった (どれも壊れた挙動ではない)。
+- **P2 → 対応**: `HandleKeyCore` のコメントが「表示モードの切り替え」だけを述べていたので、H は BackSpace だと分かるように直した。関数名 `CtrlShortcutToFunctionKey` はそのまま (名前の変更は範囲外)。
+- **P2 (記録のみ)**: テスト `CtrlH_OtherModifiers_AreNotBackSpace` の Option+H・Cmd+H は Ctrl が無いので置き換えの条件に入らず、実装を壊しても通る (実質の検証は Ctrl+Shift+H と Ctrl+Option+H)。「Apple の日本語入力と同じ」とは書かない (この Mac の Apple 日本語入力の `KeySetting_Default.plist` に `control+'h'` の定義は無く、Cocoa の削除コマンド経由と見られる)。Microsoft IME・本家 #150 と同じ。
+- **実機で確かめる点 (推測のまま)**: `charactersIgnoringModifiers` が Ctrl 押下時に `h` を返すこと、IMK が Ctrl+H を Cocoa のキー割り当てより先に `handle` へ渡すこと。`InputController` のトレース出力 (`handle keyCode=…`) で確かめられる。
+- 反映には `mac/build.sh` で NativeAOT の dylib を作り直して入れ直す必要がある (Core の変更なので、`mac/dist` の既存の dylib は古いまま)。
+
+- 作業用のコピー・比較表・評価用の文は作業用フォルダー (`cache/scratch`) にあり、24 時間で消える。再現は `--repro`・`--segments`・`--expect` と、この節の入力で行う。

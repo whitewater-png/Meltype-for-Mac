@@ -72,6 +72,143 @@ internal static class SessionFacadeTests
         Assert.Equal("ｷｮｳﾊ", result.View?.Text);
     }
 
+    private static SessionResult CtrlH(MeltypeSession session) => session.HandleKey('H', '\b', false, true, false, false);
+
+    private static SessionResult BackSpace(MeltypeSession session) => session.HandleKey(VirtualKeys.Back, '\u007f', false, false, false, false);
+
+    [Test]
+    public static void CtrlH_IsBackSpaceWhileComposing()
+    {
+        // 本家 #150 / PR #308: 入力中の Ctrl+H は BackSpace (確定しない)。変換中なら変換をやめてかなに戻す
+        var session = Create();
+        Type(session, "aiueo");
+        var result = CtrlH(session);
+        Assert.True(result.Consumed && result.Commits.Count == 0, "確定しない");
+        Assert.Equal("あいうえ", result.View?.Text);
+
+        Type(session, " ");
+        Assert.True(session.IsComposing, "前提: 変換中 (Space のあと)");
+        result = CtrlH(session);
+        Assert.Equal("あいうえ", result.View?.Text);
+        Assert.True(result.View is { Converting: false }, "変換をやめてかなに戻る");
+        var enter = Type(session, "\n")[0];
+        Assert.Equal("あいうえ", enter.Commits.Single().Text);
+
+        // 入力が空なら、Ctrl+H はアプリの操作 (置換・Cocoa の削除) としてそのまま渡す
+        var empty = CtrlH(session);
+        Assert.True(!empty.Consumed && empty.Commits.Count == 0 && empty.View is null, "入力が空の Ctrl+H はアプリに渡す");
+    }
+
+    /// <summary>Ctrl+H と BackSpace を、同じ状態から押して結果 (JSON) と、そのあとの Enter の結果が同じか調べる。</summary>
+    private static void AssertSameAsBackSpace(string name, Func<MeltypeSession> create, Action<MeltypeSession> setup, int presses = 1)
+    {
+        var back = create();
+        var ctrlH = create();
+        setup(back);
+        setup(ctrlH);
+        Assert.True(back.IsComposing && ctrlH.IsComposing, $"{name}: 前提: 入力中");
+        for (var i = 0; i < presses; i++)
+        {
+            var expected = BackSpace(back);
+            var actual = CtrlH(ctrlH);
+            Assert.Equal(expected.ToJson(), actual.ToJson());
+            Assert.True(actual.Consumed, $"{name}: Ctrl+H は使う");
+        }
+        Assert.Equal(back.IsComposing, ctrlH.IsComposing);
+        Assert.Equal(Type(back, "\n")[0].ToJson(), Type(ctrlH, "\n")[0].ToJson());
+    }
+
+    [Test]
+    public static void CtrlH_SameAsBackSpace_InEveryComposingState()
+    {
+        MeltypeSession Make(CompositionOptions? options = null) =>
+            new(CompositionTests.Detector, new CompositionTests.FakeConverter(), options ?? new CompositionOptions(), () => new Settings());
+        var predictionOptions = new CompositionOptions { PredictionMinLength = () => 1, Predictions = _ => ["きょうは", "きょうと"] };
+        var continuing = new Func<MeltypeSession>(() => Make(new CompositionOptions { ContinueAfterConversion = () => true }));
+
+        AssertSameAsBackSpace("入力中", () => Make(), s => Type(s, "aiueo"), presses: 2);
+        AssertSameAsBackSpace("入力中 (1 音だけ)", () => Make(), s => Type(s, "ka"));
+        AssertSameAsBackSpace("変換中", () => Make(), s => Type(s, "kyouha "));
+        AssertSameAsBackSpace("変換中 (文節を選択)", () => Make(), s => { Type(s, "tanniwotoru "); s.HandleKey(VirtualKeys.Right, null, false, false, false, false); });
+        AssertSameAsBackSpace("ライブ変換", () => Make(new CompositionOptions { LiveConversion = () => true }), s => Type(s, "kyouha"));
+        AssertSameAsBackSpace("予測候補を表示中", () => Make(predictionOptions), s =>
+        {
+            var typed = Type(s, "kyou");
+            Assert.True(typed[^1].View?.Predictions is { Count: > 0 }, "前提: 予測候補が出ている");
+        });
+        AssertSameAsBackSpace("予測候補を選択中", () => Make(predictionOptions), s =>
+        {
+            Type(s, "kyou");
+            var selected = s.HandleKey(VirtualKeys.Tab, null, false, false, false, false);
+            Assert.True(selected.View is { SelectedPrediction: >= 0 }, "前提: 予測候補を選んでいる");
+        });
+        AssertSameAsBackSpace("固定した文節 + 未変換", continuing, s => Type(s, "tanniwotoru ta"), presses: 2);
+        AssertSameAsBackSpace("固定した文節 + 変換した続き", continuing, s => Type(s, "tanniwotoru tanni "), presses: 2);
+        AssertSameAsBackSpace("固定した文節だけ (続きを消し切る)", continuing, s => Type(s, "tanniwotoru ta"), presses: 3);
+    }
+
+    [Test]
+    public static void CtrlH_AfterShiftEnterCommit_PassesToApp()
+    {
+        // Shift+Enter で確定したあとは入力が空。Ctrl+H はアプリへ (Shift+Enter の設定が OFF でも同じ)
+        foreach (var newline in new[] { true, false })
+        {
+            var session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(),
+                new CompositionOptions { ShiftEnterNewline = () => newline }, () => new Settings());
+            Type(session, "aiueo");
+            session.HandleKey(VirtualKeys.Return, '\r', true, false, false, false);
+            Assert.True(!session.IsComposing, "前提: 確定して空");
+            Assert.True(!CtrlH(session).Consumed, $"ShiftEnterNewline={newline}: 空の Ctrl+H はアプリへ");
+        }
+    }
+
+    [Test]
+    public static void CtrlH_OtherModifiers_AreNotBackSpace()
+    {
+        // Ctrl+Shift+H・Option+H・Cmd+H は今までどおり (Ctrl+H だけが BackSpace)
+        var session = Create();
+        Type(session, "aiueo");
+        var ctrlShift = session.HandleKey('H', '\b', true, true, false, false);
+        Assert.True(!ctrlShift.Consumed && ctrlShift.Commits.Any(c => c.Text == "あいうえお"), "Ctrl+Shift+H は確定してアプリへ");
+
+        session = Create();
+        Type(session, "aiueo");
+        var option = session.HandleKey('H', '˙', false, false, true, false);
+        Assert.True(!option.Consumed && option.Commits.Any(c => c.Text == "あいうえお"), "Option+H は確定してアプリへ");
+
+        session = Create();
+        Type(session, "aiueo");
+        var command = session.HandleKey('H', 'h', false, false, false, true);
+        Assert.True(!command.Consumed && command.Commits.Any(c => c.Text == "あいうえお"), "Cmd+H (アプリを隠す) は確定してアプリへ");
+
+        session = Create();
+        Type(session, "aiueo");
+        var ctrlOption = session.HandleKey('H', '\b', false, true, true, false);
+        Assert.True(!ctrlOption.Consumed, "Ctrl+Option+H も BackSpace にしない");
+
+        // 入力が空なら、どれもアプリへ
+        Assert.True(!Create().HandleKey('H', 'h', false, false, false, true).Consumed, "空の Cmd+H はアプリへ");
+        Assert.True(!Create().HandleKey('H', '\b', true, true, false, false).Consumed, "空の Ctrl+Shift+H はアプリへ");
+    }
+
+    [Test]
+    public static void CtrlH_DirectAndDisabledApp_PassToApp()
+    {
+        var session = Create();
+        session.Direct = true;
+        var direct = CtrlH(session);
+        Assert.True(!direct.Consumed && direct.Commits.Count == 0 && direct.View is null, "英数 (直接入力) の Ctrl+H はアプリへ");
+
+        var settings = new Settings { AppRules = [new AppRule { Process = "com.example.Remote", Enabled = false }] };
+        var off = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(), new CompositionOptions(), () => settings);
+        off.SetApp("com.example.Remote");
+        Assert.True(!off.AppEnabled, "前提: アプリ別設定で OFF");
+        Assert.True(!CtrlH(off).Consumed, "OFF のアプリの Ctrl+H はアプリへ");
+
+        var disabled = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(), new CompositionOptions(), () => new Settings { Enabled = false });
+        Assert.True(!CtrlH(disabled).Consumed, "Meltype が OFF の Ctrl+H はアプリへ");
+    }
+
     [Test]
     public static void EnglishWord_SpaceCommitsWithSpace()
     {
