@@ -545,7 +545,10 @@ final class MeltypeInputController: IMKInputController {
                 if marked.location != NSNotFound, marked.length > 0, let shown = lastView?.text,
                    Self.sameText(client.attributedSubstring(from: marked)?.string, shown) {
                     Self.trace("apply: 確定し直しの前に変換中の文字を取り除く marked=\(NSStringFromRange(marked))")
-                    client.insertText("", replacementRange: marked)
+                    // insertText("") では変換中の文字が消えなかった (実機のトレース: 直後も marked が残り、置き換え範囲が無視された)。
+                    // hideComposition と同じ setMarkedText("") で消す。
+                    client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+                    Self.trace("apply: 変換中の文字を取り除いた後 \(Self.ranges(client))")
                 } else if marked.location != NSNotFound, marked.length > 0 {
                     Self.trace("apply: 変換中の文字を取り除かない (中身が違う・読めない) marked=\(NSStringFromRange(marked))")
                 }
