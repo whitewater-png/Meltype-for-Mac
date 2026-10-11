@@ -87,7 +87,7 @@ dotnet run --project src/Meltype.Tests -- --eval                          # 品�
 
 ### Mac・Linux でのテスト
 
-OS に依存しない部分 (`src/Meltype.Core`: 英語 / 日本語の判定・ローマ字・変換ボックスの中身・辞書・学習・設定) と、そのテスト (`src/Meltype.Core.Tests`) は Mac・Linux でも動きます (Mac 版・Linux 版の土台)。.NET 10 SDK を入れて次を実行します。GitHub Actions でも Ubuntu と macOS で毎回流しています。
+OS に依存しない部分 (`src/Meltype.Core`: 英語 / 日本語の判定・ローマ字・変換ボックスの中身・辞書・学習・設定) と、そのテスト (`src/Meltype.Core.Tests`) は Mac・Linux でも動きます (Mac 版・Linux 版の土台)。.NET 10 SDK (10.0.401 以上、`global.json`) を入れて次を実行します。このリポジトリには CI (GitHub Actions) が無いので、コミット前に手元で流します。
 
 ```bash
 dotnet run --project src/Meltype.Core.Tests                 # すべてのテスト

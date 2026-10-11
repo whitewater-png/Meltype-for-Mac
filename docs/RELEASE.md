@@ -1,5 +1,9 @@
 # リリースの手順
 
+> **Mac 版 (このリポジトリ) の実際の手順について**: 以下は本家 (Windows) の手順書を引き継いだもので、GitHub Actions (`mac.yml` など) によるビルド・署名・公証を前提にしていますが、
+> このリポジトリには `.github/workflows` が無く、CI は動いていません。Mac 版は作者の Mac で `mac/build.sh` → `make-zip.sh` / `make-pkg.sh` を実行し、
+> ad-hoc 署名 (公証なし) の zip と pkg を `gh release create` で添付しています。Developer ID 署名・公証・CI は運用コストのため行っていません (限界は `SECURITY.md` を参照)。
+
 ## 版を出す (テスト版・公開版共通)
 
 1. 版を上げる: `src/Meltype/Meltype.csproj`・`src/Meltype.Core/Meltype.Core.csproj` の `<Version>`、
