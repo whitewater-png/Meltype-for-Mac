@@ -1726,5 +1726,6 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
 - **レビューで分かった訂正**: 周辺テキストの一部を azooKey に context として渡しているという領域レビューの指摘は誤りで、`Converter.swift` の `learn(context:)`・`clauses(for:context:)` は context を受け取るだけで azooKey には渡していない (学習は azooKey 自身の候補だけ)。
 - **見送り (理由はコスト・運用負荷)**: Release の作者署名と Updater での検証 (M1)、`install.sh` の検証範囲への取り込み (M2(a))、CI/ビルド来歴 (M9 本体)、コード種別アプリで英字語の学習を OFF にする設定 (M5)、不正ハンドルの ID 間接化 (M7(b))。SECURITY.md の既存の「限界」の記述で足りると判断。
 - **検証**: Core テスト 519 件 (518 → 519)、`build.sh --no-install`、`codesign --verify --deep --strict`、`check-mac-aot-settings.py` 4 件、`bash -n`。
-- **未検証**: Mac 実機での M7 の通知 (dylib を壊しての表示)、pkg の postinstall の `exit 1` が Installer でどう見えるか、`DescribeKind` のログ文の Windows 側 (対象外)。
+- **Mac 実機の確認** (2026-10-11、TextEdit、ビルド 21 を入れ替え): `kyouhaiitennkidesu`→今日はいい天気です、`ko1`→こ1、`Hello world`→Hello world が期待どおり (退行なし)。起動時の自動更新確認も動作 (`update.json` の `lastCheck` 更新)。
+- **未検証**: M2(b) の更新ダイアログの文言 (入れた版が公開済み Release より新しく、ダイアログ自体が出ない。次の Release で確認)、M7 の通知 (dylib を壊しての表示)、pkg の postinstall の `exit 1` が Installer でどう見えるか、`DescribeKind` のログ文の Windows 側 (対象外)。
 - **後に残した候補**: `docs/RELEASE.md:8,44`・`docs/DEVELOPMENT.md:90` に CI (mac.yml) が動いている前提の古い記述が残っている。ABI の版数不一致のときも通知を出す。
