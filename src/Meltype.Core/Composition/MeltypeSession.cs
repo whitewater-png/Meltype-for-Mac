@@ -365,8 +365,9 @@ public sealed class MeltypeSession
         if (!consumed && !VirtualKeys.IsModifier(vk))
         {
             _controller.ForgetLastCommit();
-            // Cmd+Return・Ctrl+Return・Shift+Tab などは、アプリの操作で改行・タブが入るとは限らないので足さない
-            if (!modifier && !shift) _controller.NoteBreakKeyPassedToApp(vk);
+            // Cmd+Return・Ctrl+Return などは、アプリの操作で改行が入るとは限らないので足さない。
+            // Shift+Return は足す (チャットアプリは Enter が送信で、改行は Shift+Enter。Hermes の実機のトレースで見つかった)。Shift+Tab は足さない
+            if (!modifier) _controller.NoteBreakKeyPassedToApp(vk, shift);
         }
         Feed(down with { IsUp = true });
         if (modifier && _controller.IsComposing) Feed(new KeyEvent(control ? VirtualKeys.LControl : VirtualKeys.LMenu, 0, false, true, false, down.TimeMs));

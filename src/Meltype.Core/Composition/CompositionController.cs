@@ -1885,7 +1885,7 @@ public sealed class CompositionController
     /// 変換中でない Enter・Tab をアプリに渡した。アプリの入力欄には改行・タブが入るので、自分の確定の記録 (直後の 1.5 秒は入力欄より優先して使う) にも入れる。
     /// 入れないと、2 行目の文頭の語が直前の行の最後の文字につながって見え (Hi therePlease)、英文と読めない (実機のトレースで見つかった)。
     /// </summary>
-    public void NoteBreakKeyPassedToApp(int vk)
+    public void NoteBreakKeyPassedToApp(int vk, bool shift = false)
     {
         if (_lastCommitText is null) return;
         // BackSpace で、記録の最後の改行・タブが消える (I want ⏎⌫to go)
@@ -1894,7 +1894,7 @@ public sealed class CompositionController
             if (_lastCommitText.EndsWith('\n') || _lastCommitText.EndsWith('\t')) _lastCommitText = _lastCommitText[..^1];
             return;
         }
-        var joined = _lastCommitText + (vk == VirtualKeys.Return ? "\n" : vk == VirtualKeys.Tab ? "\t" : "");
+        var joined = _lastCommitText + (vk == VirtualKeys.Return ? "\n" : vk == VirtualKeys.Tab && !shift ? "\t" : "");
         _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
     }
 

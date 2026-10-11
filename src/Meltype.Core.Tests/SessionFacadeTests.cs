@@ -368,6 +368,13 @@ internal static class SessionFacadeTests
         var tabBackTexts = tabBackResults.SelectMany(r => r.Commits).Select(c => c.Text).ToList();
         Assert.True(!tabBackTexts.Any(t => t.Contains('と') || t.Contains('ご')), "BackSpace で消したタブも記録から戻す: " + string.Join("|", tabBackTexts));
 
+        // Shift+Return は改行 (チャットアプリは Enter が送信で、改行は Shift+Enter。Hermes の実機のトレースで見つかった)
+        var shiftReturn = Create();
+        Type(shiftReturn, "Hi there\n");
+        shiftReturn.HandleKey(VirtualKeys.Return, null, true, false, false, false, null);
+        var shiftCorrections = Type(shiftReturn, "Please take susi\n").SelectMany(r => r.Commits).Where(c => c.DeleteBefore > 0).Select(c => c.Original).ToList();
+        Assert.True(!shiftCorrections.Contains("take "), "Shift+Return の直後の行頭: " + string.Join("|", shiftCorrections));
+
         // 修飾キー付きの Return・Tab (Cmd+Return・Shift+Tab) は、改行・タブが入るとは限らないので記録に足さない (査読 R15・R16)
         foreach (var (vk, shift, command) in new[] { (VirtualKeys.Return, false, true), (VirtualKeys.Tab, true, false) })
         {
