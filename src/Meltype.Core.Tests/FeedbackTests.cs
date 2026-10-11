@@ -116,6 +116,131 @@ internal static class FeedbackTests
         }
     }
 
+    /// <summary>Q2 で足した AI のモデル名・ツール名 (dictionaries/propernouns.txt の「AI モデル・ツール」)。小文字で打つ形。</summary>
+    private static readonly string[] AiNames =
+    [
+        "gemma", "paligemma", "medgemma", "llama", "codellama", "tinyllama", "llava", "llamafile",
+        "mistral", "mixtral", "pixtral", "codestral", "devstral", "qwen", "phi", "grok",
+        "roberta", "distilbert", "starcoder", "vicuna", "alpaca", "orca", "zephyr", "codex", "hunyuan", "ernie", "florence", "jamba",
+        "lora", "qlora", "gguf", "onnx", "veo",
+        "cline", "crewai", "comfyui", "openrouter", "openwebui", "cerebras", "civitai", "unsloth",
+    ];
+
+    private static string Enter(string typed)
+    {
+        var k = new CompositionTests.Keyboard();
+        k.Type(typed + "\n");
+        return k.Host.Document;
+    }
+
+    [Test]
+    public static void Q2_AiModelNames_StayEnglish()
+    {
+        // AI のモデル名・ツール名は、ローマ字として読めたり、英単語表に無かったりして崩れていた
+        // (gemma4 → げっま4、llama → っぁま、codellama → こでっlあま、qwen → qうぇん、mixtral → mixtらl)。
+        // 辞書だけで決まるように、スペルチェッカー無しと、同梱の英単語表 (BuiltInWordChecker。--repro と同じ) の両方で確かめる。
+        foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
+        {
+            CompositionTests.Detector.SpellChecker = checker;
+            try
+            {
+                var label = checker is null ? "スペルチェッカー無し" : "英単語表";
+                foreach (var name in AiNames)
+                {
+                    Assert.Equal(name, Enter(name), $"{label}: {name}");
+                    var capital = char.ToUpperInvariant(name[0]) + name[1..];
+                    Assert.Equal(capital, Enter(capital), $"{label}: {capital}");
+                    Assert.Equal(name + "4", Enter(name + "4"), $"{label}: {name}4");
+                    Assert.Equal(name + "を", Enter(name + "wo"), $"{label}: {name}wo");
+                    Assert.Equal(name + "で", Enter(name + "de"), $"{label}: {name}de");
+                }
+                // 実機で報告された形 (gemma4 → げっま4) と、バージョン・助詞・記号がつく形
+                foreach (var (typed, expected) in new[]
+                {
+                    ("gemma4", "gemma4"), ("gemma3", "gemma3"), ("gemma-4", "gemma-4"), ("gemma4wo", "gemma4を"), ("gemma4ha", "gemma4は"),
+                    ("llama3", "llama3"), ("llama3.1", "llama3.1"), ("llama.cpp", "llama.cpp"), ("codellama", "codellama"),
+                    ("qwen2.5", "qwen2.5"), ("qwen3", "qwen3"), ("mistralno", "mistralの"), ("mixtral8x7b", "mixtral8x7b"), ("phi4", "phi4"),
+                    ("lorano", "loraの"), ("pip install qwen", "pip install qwen"), ("llama gemma qwen", "llama gemma qwen"),
+                })
+                {
+                    Assert.Equal(expected, Enter(typed), $"{label}: {typed}");
+                }
+            }
+            finally
+            {
+                CompositionTests.Detector.SpellChecker = null;
+            }
+        }
+    }
+
+    [Test]
+    public static void Q2_AiModelNames_ShowEnglishWhileTyping()
+    {
+        // 打っている途中の表示も、語が打ち終わった時点で英字 (入力中に げっま のまま見えない)
+        foreach (var name in new[] { "gemma", "gemma4", "llama", "llama3", "codellama", "qwen", "mixtral", "comfyui" })
+        {
+            Assert.Equal(name, Showing(name), name);
+        }
+    }
+
+    [Test]
+    public static void Q2_AiModelNames_CollidingWithJapanese_AreNotInTheDictionary()
+    {
+        // 日本語の語と同じ綴り (kimi = きみ、sora = そら、haiku = はいく、yi = い) や、打ち間違いの直し (olmo = omo の o の隣の l、molmo = momo) で
+        // 日本語になる綴りは辞書に入れない (入れると、日本語を打ったのに英字で確定する)。大文字で始めれば辞書が無くても英字。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("kimi", "きみ"), ("sora", "そら"), ("haiku", "はいく"), ("yi", "い"), ("suno", "すの"), ("pika", "ぴか"), ("kiro", "きろ"),
+                ("olmo", "おも"), ("molmo", "もも"),
+                ("Kimi", "Kimi"), ("Sora", "Sora"), ("Suno", "Suno"), ("Olmo", "Olmo"), ("OLMo", "OLMo"), ("Molmo", "Molmo"),
+            })
+            {
+                Assert.Equal(expected, Enter(typed), typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void Q2_JapaneseWordsStartingLikeAiNames_AreUnchanged()
+    {
+        // 辞書の語の頭 4 文字以上は、打っている途中だけ英字に見える (CompositionDetector の growing && HasPrefix)。
+        // 日本語の語の末尾が、辞書の語の頭と同じ綴りになる語 (〜みに = mini、〜ねも = nemo、あうと = auto、あいで = aide) は
+        // 表示が崩れるので、その頭を持つ語 (MiniMax・Ministral・Nemotron・AutoGPT・AutoGen・Aider・Manus) は辞書に入れなかった。
+        // 入れたときに表示も確定も変わらないことを、今の答えで固定する。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("chinamini", "ちなみに"), ("tanoshimini", "たのしみに"), ("oyasumini", "おやすみに"), ("okanemo", "おかねも"), ("kanemo", "かねも"),
+                ("chekkuauto", "ちぇっくあうと"), ("shattoauto", "しゃっとあうと"), ("aidea", "あいであ"), ("mini", "みに"), ("auto", "あうと"),
+                ("umanushi", "うまぬし"), ("gemu", "げむ"), ("geta", "げた"), ("jamu", "じゃむ"), ("kodomo", "こども"), ("imagawa", "いまがわ"),
+                // 辞書に入れなかった AI の名前は、今までの答えのまま (既知の限界)
+                ("minimax", "みにmax"), ("nemotron", "ねもちろん"), ("aider", "あいで"), ("autogen", "あうとげん"), ("manus", "まぬs"),
+                // codegemma (code + gemma) は、辞書の語 gemma の前に こで がつくので、gemma だけ英字になる (今は直せない)
+                ("codegemma", "こでgemma"),
+            })
+            {
+                Assert.Equal(expected, Enter(typed), typed);
+            }
+            foreach (var (typed, expected) in new[] { ("chinamini", "ちなみに"), ("okanemo", "おかねも"), ("chekkuauto", "ちぇっくあうと"), ("mini", "みに"), ("aide", "あいで") })
+            {
+                Assert.Equal(expected, Showing(typed), "表示: " + typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
     [Test]
     public static void Issue375_DoubledLetterBeforeParticle_IsAcceptedTradeOff()
     {
@@ -962,6 +1087,89 @@ internal static class RomajiTypoTests
         {
             CompositionTests.Detector.SpellChecker = null;
         }
+    }
+
+    [Test]
+    public static void Q3_ReadableEnglishWords_StayEnglishInsideJapanese()
+    {
+        // 本家 #411: 英語を打つつもりの change が ちゃんげ になる (これは change してほしい → これはちゃんげしてほしい)。
+        // change・chance・before・season などは、ローマ字として最後まで読めて日本語の語にならず、英語の中でよく使う語なので、
+        // dictionaries/english-readable.txt に入れて、日本語の文の中でも英字にする。BuiltIn の英単語表で確かめる (NSSpellChecker でも同じ答えになることは別に比べた)。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("chance", "chance"), ("korehachancewokakunin", "これはchanceをかくにん"),
+                ("soregachancedayo", "それがchanceだよ"), ("kyouhachancesuru", "きょうはchanceする"),
+                ("korehabeforeshitehoshii", "これはbeforeしてほしい"), ("soregaregiondayo", "それがregionだよ"), ("korehahopedayo", "これはhopeだよ"),
+                ("seasonwoshiraberu", "seasonをしらべる"), ("situationwokakunin", "situationをかくにん"),
+                ("positionwokimeru", "positionをきめる"), ("korehamaintainshitehoshii", "これはmaintainしてほしい"), ("databasewokesu", "databaseをけす"),
+                ("vitaminwotoru", "vitaminをとる"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void Q3_ReadableEnglishWords_LeaveJapaneseAndTheKnownLimitsAlone()
+    {
+        // english-readable.txt に語を足したとき、日本語の語の中・前後に偶然その綴りが現れても日本語のままであること。
+        // 下の入力は、足す語を選ぶときに readings.txt のローマ字 (単独・助詞つき・語の組み合わせ) と辞書の説明文のローマ字で悪化した形 (ride・shade・nine・gone・note・mouse など)。
+        // 助詞と同じ綴りで始まる・終わる語 (note・mouse・nine・side・code・line・white) は、日本語の語と区別できないので入れていない。今の答えを固定する (限界)。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("hitorideni", "ひとりでに"), ("kagaishade", "かがいしゃで"), ("ainude", "あいぬで"), ("worea", "をれあ"), ("attoiumanine", "あっというまにね"),
+                ("aigone", "あいごね"), ("anpine", "あんぴね"), ("ayamachine", "あやまちね"), ("isouroute", "いそうろうて"), ("atsumarine", "あつまりね"), ("sazone", "さぞね"),
+                ("AutoIMEnotesuto", "AutoIMEのてすと"), ("dochiramouserga", "どちらもuserが"), ("Meltype.cwokesu", "Meltype.cをけす"),
+                ("imagenzai", "いまげんざい"), ("devinte-ji", "でゔぃんてーじ"),
+                // 査読 R9: retain・gotten を外した (〜れたいんです・〜ってんです)
+                ("wasuretaindesu", "わすれたいんです"), ("wakaretaindesu", "わかれたいんです"), ("ogottendesu", "おごってんです"), ("nigottendayo", "にごってんだよ"),
+                // 査読 R7/R8 で見つかった型: 訓令式 (tu/si)・れ+あそん・すれば・れ+ふせ。tube・basin・reason・ensure・refuse・devin を外したので日本語のまま
+                ("betubetu", "べつべつ"), ("motubeki", "もつべき"), ("nakerebasinpai", "なければしんぱい"), ("koreasonde", "これあそんで"), ("ouensureba", "おうえんすれば"), ("korefusegu", "これふせぐ"), ("oreasondekuru", "おれあそんでくる"),
+                // ちゃん付けの名前+げ…: change を入れないので日本語のまま (change 自体は ちゃんげ のまま = 本家 #411 は直さない判断)
+                ("yuuchangenki", "ゆうちゃんげんき"), ("hanakochangeki", "はなこちゃんげき"), ("korehachangeshitehoshii", "これはちゃんげしてほしい"),
+                ("tomatowotabeta", "とまとをたべた"), ("korehamakeshitehoshii", "これはまけしてほしい"), ("nikkoutetsuduki", "にっこうてつづき"),
+                // 限界 (入れていない語): 今までの答えのまま
+                ("korehacodewokaku", "これはこでをかく"), ("korehasidegaii", "これはしでがいい"), ("korehawhitedayo", "これはうぃてだよ"), ("korehanotewotoru", "これはのてをとる"),
+                ("korehaimagewokesu", "これはいまげをけす"), ("korehaideawodasu", "これはいであをだす"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void Q3_EnglishReadable_Dictionary_EntriesAreWellFormed()
+    {
+        // 足す語の決まり: 4 文字以上の小文字の英字で、ローマ字として読める (読めない語は英語と判定されるので、ここに入れる意味が無い)
+        var words = Detection.DictionarySource.Load("english-readable.txt", null).ToList();
+        Assert.True(words.Count >= 100, "Q3 で足した語が読み込まれている: " + words.Count);
+        Assert.True(words.Contains("chance") && words.Contains("feature") && !words.Contains("change"), "chance (Q3) と feature (#12) が入り、change は入らない");
+        foreach (var word in words)
+        {
+            Assert.True(word.Length >= 4 && word.All(char.IsAsciiLetterLower), "4 文字以上の小文字の英字: " + word);
+            Assert.True(CompositionTests.Detector.Romaji.AnalyzeFragment(word).IsValid, "ローマ字として読める語 (features の s のような最後の子音は残ってよい): " + word);
+        }
+        Assert.Equal(words.Count, words.Distinct().Count(), "重複が無い");
     }
 
     [Test]

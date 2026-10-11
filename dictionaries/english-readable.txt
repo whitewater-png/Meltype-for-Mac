@@ -2,4 +2,21 @@
 # english.txt の語でも、ローマ字として最後まで読める語 (sushi, repo, make) は前後の文脈で決める (日本語の語のこともあるため)。
 # ここには、読んでも日本語の語にならず、日本語を打つつもりで打つことがまず無い語だけを入れる (feature = ふぇあつれ、Issue #12)。
 # 4 文字以上。日本語の語と同じ綴り (tomato, piano) や、日本由来の語 (sake, suzuki) は入れない。
+# Q3 (retain・gotten も入れない: wasuretaindesu (忘れたいんです)・ogottendesu (奢ってんです) が壊れる。査読 R9)
+# Q3 (change は入れない: 「ゆうちゃん元気」yuuchangenki など、ちゃん付けの名前+げ… と同じ綴りで衝突するため。リョウさんの判断: ちゃん付けの名前を優先):
+# Q3: 「これは change してほしい」のように日本語の文の中で、よく使う英単語 (change → ちゃんげ、before → べふぉれ) が日本語になる問題の対策で足した語。
+#   選び方: english-words.txt の 4 文字以上で、ローマ字として最後まで読め、読みが readings.txt・loanwords.txt・brands.txt の語やその頭にならない語のうち、
+#   英語の頻度 (wordfreq の Zipf) が 4.0 以上のもの。助詞と同じ綴りで始まる・終わる語 (note, mouse, nine, side, code, line, white …) と、
+#   日本語の入力に偶然その綴りが現れて悪化した語 (ride, shade, image, open, area …) は入れない (日本語の語の途中・前後と区別できないため)。
 feature features future futures nature mature figure figures measure measures tenure rename remote remotes
+abandon achieve alike alive animation appearance arrange assume attendance aviation bacon beaten
+before begin behave cape cause chance cheese choice choose contain cottage database dive
+donation eaten emotion encourage face fake fashion federation fence footage foundation
+generation guarantee heaven heritage hidden hope imagination initiative innovation innovative intense
+intensive intention invasion invention invitation kitchen lake lean lease leave lemon lesson life like lion
+live loan logo loose lose love maintain marriage massage massive meantime mention narrative navigation
+negative offense offensive olive operation opposition orientation origin pale passage passion passive pause
+peace pension petition poison pole position positive possession regime region reputation
+revenge revenue rookie rotation safe savage season sensitive sentence separation severe
+situation sole suppose teenage tissue variation venue veteran vintage vision
+vitamin warehouse warren whole whose

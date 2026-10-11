@@ -77,3 +77,12 @@ Suica DCafe ProBot Carlbot Disboard TaCZ NSFW
 # 本家が足した Ariana (ありあな → アリアナ) と Iann (いあん → イアン) は入れない: 日本語の名前としてよく打つ綴りで、小文字で打つと英字に変わってしまう。
 # (Ariana は大文字で始めれば辞書なしでも英字。Ariana Grande は Grande だけで直る)
 Khalifa Grande Sheeran Marshmello Beabadoobee Chainsmokers Dior Dobby
+# AI モデル・ツール (小文字で打つと ローマ字として読まれて崩れていたもの: gemma4 → げっま4、llama → っぁま、qwen → qうぇん)
+# kimi (きみ)・sora (そら)・haiku (はいく)・yi (い)・suno (すの)・pika (ぴか)・kiro (きろ)・olmo (おも)・molmo (もも) は日本語の語と衝突するので入れない。
+# Devin (でゔぃん: でヴィンテージを devinte-ji と打つ形で衝突) と Imagen (いまげん) も入れない。Imagen は「今現在」のローマ字 imagenzai が imagenざい になる (Q3 の守りのテストで見つかった。Q2 と Q3 を組み合わせたときだけ現れる衝突)。
+# Magistral も入れない: 頭が magi で、magire (紛れ) を打つ途中の表示が英字に崩れる (査読 R9)。
+# MiniMax・Ministral (頭が mini)・Nemotron (nemo)・Aider (aide)・AutoGPT・AutoGen (auto)・Manus (manu) も入れない: 頭の 4 文字が日本語の語の終わり (ちなみに・おかねも・アイデア・アウト) と同じで、打っている途中の表示が英字に崩れる。
+Gemma PaliGemma MedGemma Llama CodeLlama TinyLlama LLaVA llamafile Mistral Mixtral Pixtral Codestral Devstral
+Qwen Phi Grok RoBERTa DistilBERT StarCoder Vicuna Alpaca Orca Zephyr Codex Hunyuan ERNIE Florence Jamba
+LoRA QLoRA GGUF ONNX Veo
+Cline CrewAI ComfyUI OpenRouter OpenWebUI Cerebras Civitai Unsloth
