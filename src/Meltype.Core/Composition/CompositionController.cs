@@ -1895,21 +1895,66 @@ public sealed class CompositionController
     };
 
     /// <summary>
-    /// 直前に英語で確定した語が、英語の機能語 (Are・Thank) のすぐ後ろの you / are / we / me / she か。
-    /// そうなら、後ろに日本語が続いても (Are you すし？) 日本語に確定し直さない。
+    /// go・so・do・to など、ローマ字としても読める英単語 (代名詞以外) の直前に来る英語の機能語。
+    /// 上の一覧に、代名詞・助動詞・否定・頻度や動作を表す語などを足したもの (I go・we go・not go・please go・come here・also see)。
+    /// ' を含む縮約形 (I'll go・can't see・let's go) は、一覧に無くても機能語として扱う。
+    /// 名詞 (New York no tenki の York、dark mode no settei の mode、time・back・way …) は含めない: 名詞のあとの no・to・he は助詞のつもりのことが多い。
+    /// </summary>
+    private static readonly HashSet<string> WordsBeforeAmbiguousWord = new(WordsBeforePronoun, StringComparer.OrdinalIgnoreCase)
+    {
+        "i", "you", "we", "they", "he", "she", "it", "me", "us", "them", "be", "may", "might", "must", "not", "never", "please", "going", "gonna", "wanna",
+        "also", "always", "just", "really", "only", "even", "still", "ever", "oh", "been", "go", "come", "look", "stay", "get", "got", "went", "wait", "click", "live", "feel", "thanks", "ready", "able", "used",
+    };
+
+    /// <summary>助詞 (と・の・へ) と同じ綴りの英単語。代名詞のあとに来たら助詞のつもりのことが多い (I love you no koto = I love you のこと)。</summary>
+    private static readonly HashSet<string> ParticleLikeWords = new(StringComparer.OrdinalIgnoreCase) { "to", "no", "he" };
+
+    /// <summary>
+    /// to・no・he (助詞と同じ綴り) の直前に来たとき、英語の続きと見なす語。go・so・do などと違い、to・no・he は日本語の助詞のつもりで打つことが多いので、
+    /// 題名や名詞の末尾になりうる語 (Let It Go no uta、YouTube Live no haishin、SQL where no baai、Python and Go no hikaku) は含めない。
+    /// 助動詞・否定・頻度を表す語など、文の途中にしか来ない語だけにする (査読 R10)。
+    /// </summary>
+    private static readonly HashSet<string> WordsBeforeParticleLikeWord = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "not", "never", "please", "going", "gonna", "wanna", "also", "always", "just", "really", "only", "even", "still", "ever", "been", "may", "might", "must", "got", "went", "ready", "able", "used",
+    };
+
+    /// <summary>縮約形か (I'll・can't・we're・I've・I'd・let's)。L'Arc・Moody's のような ' を含む名前は含めない (査読 R10)。</summary>
+    private static bool IsContraction(string word)
+    {
+        var lower = word.ToLowerInvariant();
+        return lower.EndsWith("n't", StringComparison.Ordinal) || lower.EndsWith("'ll", StringComparison.Ordinal) || lower.EndsWith("'re", StringComparison.Ordinal)
+            || lower.EndsWith("'ve", StringComparison.Ordinal) || lower.EndsWith("'m", StringComparison.Ordinal) || lower.EndsWith("'d", StringComparison.Ordinal)
+            || lower is "let's" or "it's" or "that's" or "what's" or "there's" or "here's" or "he's" or "she's" or "who's";
+    }
+
+
+    /// <summary>
+    /// 直前に英語で確定した語が、英語の機能語 (Are・Thank・I) のすぐ後ろの、英語の文の続きか。
+    /// そうなら、後ろに日本語が続いても (Are you すし？、I want to go すし) 日本語に確定し直さない。
+    /// - you / are / we / me / she: 直前が <see cref="WordsBeforePronoun"/> のとき (本家 #265。「iPhone 用」の you は直す)
+    /// - go・so・do・to など、それ以外の語: 直前が <see cref="WordsBeforeAmbiguousWord"/> のとき (本家 #317)。
+    ///   日本語由来の語 (sushi・ramen: I love sushi + がすき) と 1 文字の i は、今までどおり確定し直す
     /// 英語の語の後ろ、は入力欄のキャレットの前 (自分の確定の記録・入力欄から読んだ文字) で見る。分からなければ false (従来どおり)。
     /// </summary>
-    private bool EnglishPronounAfterEnglish(CommitRecord previous)
+    private bool StaysEnglishAfterFunctionWord(CommitRecord previous)
     {
-        if (!EnglishPronouns.Contains(previous.Raw) || _precedingText is null) return false;
+        if (_precedingText is null) return false;
         var preceding = NoBreakToSpace(_precedingText);
         var original = NoBreakToSpace(previous.Text);
         if (!preceding.EndsWith(original, StringComparison.Ordinal)) return false;
-        var before = preceding[..^original.Length].TrimEnd(' ');
+        // Mac は ' を ’ (U+2019) で入れることがある。文字数は変わらないので、そろえて読む
+        var before = preceding[..^original.Length].TrimEnd(' ').Replace('\u2019', '\'');
         var start = before.Length;
-        while (start > 0 && char.IsAsciiLetter(before[start - 1])) start--;
+        while (start > 0 && (char.IsAsciiLetter(before[start - 1]) || before[start - 1] == '\'')) start--;
         // 直前が記号 (Hello, you) や英字でない文字のときは、従来どおり (語を取り出せない)
-        return start < before.Length && (start == 0 || before[start - 1] == ' ') && WordsBeforePronoun.Contains(before[start..]);
+        if (start >= before.Length || (start > 0 && before[start - 1] != ' ')) return false;
+        var word = before[start..];
+        if (EnglishPronouns.Contains(previous.Raw)) return WordsBeforePronoun.Contains(word);
+        if (previous.Raw.Length < 2 || CompositionDetector.IsJapaneseOriginWord(previous.Raw.ToLowerInvariant())) return false;
+        // to・no・he は、題名や名詞の末尾になりうる語の後ろ (Let It Go no uta) では助詞のつもりのことが多いので、狭い一覧にある語のときだけ残す
+        if (ParticleLikeWords.Contains(previous.Raw)) return WordsBeforeParticleLikeWord.Contains(word) || IsContraction(word);
+        return IsContraction(word) || WordsBeforeAmbiguousWord.Contains(word);
     }
 
     /// <summary>
@@ -1936,8 +1981,8 @@ public sealed class CompositionController
         }
         else if (previous.English && !english && !_detector.IsAmbiguousWord(raw) && raw.Any(char.IsAsciiLetter))
         {
-            // 英語の語のすぐ後ろで確定した you / are などは、後ろに日本語が続いても英語のまま (Are you すし？)。
-            if (EnglishPronounAfterEnglish(previous)) return;
+            // 英語の機能語のすぐ後ろで確定した語 (Are you・I want to go) は、後ろに日本語が続いても英語のまま (Are you すし？)。
+            if (StaysEnglishAfterFunctionWord(previous)) return;
             // 英語で確定した語を日本語に (Space で空白を入れていたら取る)。
             targets = [previous];
             replacement = _detector.Romaji.ConvertLenient(previous.Raw.ToLowerInvariant(), final: true);

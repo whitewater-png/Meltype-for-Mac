@@ -14,6 +14,7 @@ ramune gyoza takoyaki okonomiyaki onigiri nori dashi mirin sakura hanami ninjuts
 tamagotchi uniqlo muji rakuten toshiba hitachi panasonic fujitsu canon nikon ricoh kyocera mitsubishi
 sumitomo mizuho nomura daikin shimano asics mazinger gundam naruto dragonball doraemon totoro ghibli
 # 日本人の姓は日本語として打つことの方が多いので、ここには入れない。
+# (この段落は CompositionDetector.IsJapaneseOriginWord が読む: 見出しの「日本語由来」と、空行で終わる形を変えない。ここの語は英文の途中でも日本語に確定し直す)
 
 # --- 技術用語 ---
 github gitlab bitbucket git svn typescript javascript java python node nodejs npm npx yarn pnpm deno bun

@@ -1729,3 +1729,76 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
 - **Mac 実機の確認** (2026-10-11、TextEdit、ビルド 21 を入れ替え): `kyouhaiitennkidesu`→今日はいい天気です、`ko1`→こ1、`Hello world`→Hello world が期待どおり (退行なし)。起動時の自動更新確認も動作 (`update.json` の `lastCheck` 更新)。
 - **未検証**: M2(b) の更新ダイアログの文言 (入れた版が公開済み Release より新しく、ダイアログ自体が出ない。次の Release で確認)、M7 の通知 (dylib を壊しての表示)、pkg の postinstall の `exit 1` が Installer でどう見えるか、`DescribeKind` のログ文の Windows 側 (対象外)。
 - **後に残した候補**: `docs/RELEASE.md:8,44`・`docs/DEVELOPMENT.md:90` に CI (mac.yml) が動いている前提の古い記述が残っている。ABI の版数不一致のときも通知を出す。
+
+## 追加項目 P35 (英文の途中の go・so・do・to を日本語に確定し直さない: 本家 #317、P27 と併用)
+
+> docs/IMPROVEMENT_PLAN.md への追記用の下書き。基準は HEAD=6c005b0 (`P35.patch` は現在の HEAD c3fcf4d にも `git apply --check` で当たる)。**Mac 実機・Swift 側は未確認**。Windows・Linux は対象外。
+
+- **現象**: 英文の途中で `go` `so` `do` `to` `be` `in` `on` `he` `no` `an` `here` `see` `make` … (英語の単語で、ローマ字としても最後まで読める語) を打ち、そのすぐ後ろに日本語に見える語 (`susi`・`ningen?`・`gasuki`) が続くと、前の英語の語を Enter で日本語に確定し直してしまう。
+  - `I want to go susi` → `I want to ごすし` (期待: `I want to go すし`)
+  - `It is so susi` → `It is そすし`、`I have to do ningen?` → `I have to どにんげん？`、`I have to be ningen` → `I have to べにんげん`、`Thank you so susi?` → `Thank you そすし？`、`I will go nihon` → `I will ごにほん`、`We can see susi` → `We can せえすし`、`Please take susi` → `Please たけすし`、`Today I go susi` → `Today I ごすし`
+  - 現状の再現 (HEAD、同梱の英単語表の `--repro`。Space 確定と入力中の表示は変わらず、**Enter の確定結果だけ**が変わる): 下の表。
+  - どの語が壊れるかの実測: 同梱の英単語表から「ローマ字として読める綴りの小文字 1〜8 字の語」888 語を `I want to {語} susi` に入れ、確定し直しの分岐を止めた版と比べると **317 語**が日本語に変わった (`go so do to in on he no be an here see make take name time one made home game …`)。`go・so・do・to` だけではない。
+- **原因** (HEAD=6c005b0): 日本語に変わるのは `CompositionController.CorrectPreviousCommit` (L1917) の第 2 分岐 (L1935 `else if (previous.English && !english && !_detector.IsAmbiguousWord(raw) …)`) だけ。`CommitText` (L2084 で呼び、L2086-2090 で `IsAmbiguousWord(raw)` の語だけ `CommitRecord` に積む。`IsAmbiguousWord` は `CompositionDetector` L406) が「英語とも日本語とも読める語」を文脈なしで英語として確定しておき、**次の語が日本語**と分かると、前の語を `ConvertLenient` でかなに直す (`sushi` + `gasuki` → すしがすき、のための仕組み)。P27 (L1900 `EnglishPronounAfterEnglish`、L1938) はこの分岐の入口で `you/are/we/me/she` だけを止めていた。ほかの語は止める条件が無かった。
+  - 入力の表示 (入力中) は変わらない: 確定し直しは確定の後で起きる。
+  - 別経路 (今回は直さない): `Let me go susi?` → `Let めごすし？`、`Where to go ningen?` → `Where とごにんげん？` は、確定し直し (`bs:` のイベント) を通らず、**最初の確定の時点**で `me`/`to`/`go` が日本語になっている (前が英語 1 語だけで「英文」と見なされない)。`CorrectPreviousCommit` を止めても同じ結果。
+- **候補の比較** (同じ入力群、同梱の英単語表 BuiltIn。正解は「前の英語の語を残す」= 確定し直しの分岐を止めた版の出力、「従来の正しい確定し直し」= 変更前の出力):
+
+  | 案 | 内容 | 直る入力 (英文の中: g2 の E 7,080 件のうち直す必要があるのは 5,448) | 従来の確定し直しを壊す入力 (母数 10,608 件 = 日本語の文 J 4,134 + 英語名のあとの助詞 K 1,120 + K2 1,248 + 日本語の文の先頭の英語名 M 1,600 + 日本語由来の語 O 2,096 + 代名詞 P 220 + 文末記号 X 190。内訳に出る数は J・K・K2・M だけで、O・P・X は全案で 0) |
+  | --- | --- | --- | --- |
+  | A | 本家の条件 (前の語の前が英語 かつ 日本語由来でない) を `CorrectPreviousCommit` に足す。キャレットの前の文字から読む。代名詞は P27 のまま | 5,340 | J 1,764 + K 1,040 + K2 1,040 + M 1,300 = **5,144** |
+  | B | 同じ条件を `CommitRecord` に `AfterEnglish` を持たせて実装 (本家と同じ形) | 5,340 | **5,144** (A と全 25,341 行で出力が同じ) |
+  | D | B を「直前が英文 (2 語以上)」に絞る | 5,340 | K 1,040 + K2 1,040 + M 1,300 = **3,380** (J は 0) |
+  | C | P27 の代名詞の集合を go so do to … に広げるだけ (前の語の一覧は P27 のまま) | 864 | 0 |
+  | **採用 (F)** | 代名詞以外の曖昧な語も、**直前が英語の機能語**のとき残す。一覧は P27 のものに代名詞・助動詞・頻度や動作の語を足したもの。日本語由来の語と 1 文字の `i` は今までどおり。to・no・he は代名詞の後ろでは今までどおり | 5,202 | **0** |
+
+  - 全体の数 (採用案、BuiltIn、約 25,000 入力。下の「前後比較」参照): 自然な英語の言い回し 297 件 (go/to/so/do/no/be/in/on/he/an/here/see/make の前に付く言い回し × 日本語の語 3 つ) のうち、A/B は 297、D は 204、**F は 270**、C は 96。
+  - **本家の条件 (A/B/D) が壊す型** (Survey の「混成版で通る」は P27 のテストには通るが、この型は比較入力に無かった): ① 英語の固有名詞・名詞句のあとの助詞 `New York no tenki` → `New York no てんき` (期待 `New York のてんき`)、`Google Chrome to ringo wo taberu` → `Google Chrome to りんごをたべる`、`Visual Studio Code no settei`、`dark mode no settei`、`pull request to tsukau`、`Hello World so tsukau` (K・K2 の 2,368 件のうち 2,080 件が崩れる)。② 英語名 1 語のあと `Apple here susi`・`iPhone go susi` (J の 1,764 件)。③ 歌詞のような `I love you no koto` (あなたのこと)・`I miss you to issho ni` (360〜435 件)。名詞のあとの `no/to/he` は日本語の助詞のことが多く、英文のつもりの `to` と綴りで区別できない。区別できる手がかりは「直前の語が機能語か」だけだった。
+- **採用案**: F。`CorrectPreviousCommit` の第 2 分岐の入口 (P27 の `EnglishPronounAfterEnglish` を一般化した `StaysEnglishAfterFunctionWord`) で、直前に確定した語 (`previous`) の**すぐ前の英語の語** (キャレットの前の文字から読む。P27 と同じ) を見る。
+  - `you/are/we/me/she`: 従来どおり `WordsBeforePronoun` に入っているときだけ (P27 のテストを一切変えない)。
+  - それ以外の曖昧な語 (go so do to be in on he no an here see make take name time …): 前の語が `WordsBeforeAmbiguousWord` (= `WordsBeforePronoun` + 代名詞 i you we they he she it me us them、be may might must not never please going gonna wanna also always just really only even still ever oh been go come look stay get got went wait click live feel thanks ready able used) か、`'` を含む縮約形 (I'll・can't・let's) のとき、日本語に直さない。
+  - 例外 (今までどおり日本語に直す): ① 日本語由来の語 (`sushi ramen anime sake kimono radio …`。本家 #317 の `IsJapaneseOriginWord` を取り込み。english.txt の「日本語由来」の段落を読む) ② 1 文字の `i` (小文字の `i` のまま残しても `I` にはならず、直す利点が無い) ③ `to・no・he` で、前の語が代名詞 (I love you + no koto) ④ キャレットの前の文字が分からない・前の語を取り出せない (記号・日本語・行頭) とき ⑤ 前が名詞 (York・mode・Tower …)。
+  - `CommitRecord` は変えない (B と A の出力は 25,341 行で同じ。P27 が使っている「キャレットの前の文字」で足りるので、記録の形を増やさなかった)。本家の `AfterEnglish` は取り込んでいない。
+- **変更したファイル** (`P35.patch`、4 ファイル、+約 150 行 / −8 行。テストを除くと約 70 行):
+
+  | ファイル | 内容 |
+  | --- | --- |
+  | `src/Meltype.Core/Composition/CompositionController.cs` | `WordsBeforeAmbiguousWord`・`ParticleLikeWords`・`PersonalPronouns` を追加。`EnglishPronounAfterEnglish` を `StaysEnglishAfterFunctionWord` に改名して、代名詞以外の曖昧な語も判定。`CorrectPreviousCommit` の呼び出しを置き換え |
+  | `src/Meltype.Core/Composition/CompositionDetector.cs` | `IsJapaneseOriginWord` (本家 #317 から。english.txt の「日本語由来」の段落を読む) |
+  | `dictionaries/english.txt` | 「日本語由来」の段落をコードが読むことを示すコメント 1 行 (単語は変えていない) |
+  | `src/Meltype.Core.Tests/CompositionTests.cs` | テスト 4 件 (下記) |
+- **テスト**: 518 → 522 件、全て通る。`CompositionTests`: `AutoCorrect_ShortEnglishWordInsideEnglishSentence_IsNotRewrittenToJapanese` (本家のテスト `AutoCorrect_KeepsEnglishWordInsideEnglishSentence` を参考に、`I want to go susi`・`It is so susi`・`I have to do ningen?`・`I have to be ningen`・`Thank you so susi?`・`I will go nihon`・`We can see susi`・`Please take susi`・`Today I go susi`・`Please come here susi`・`Maybe I'll go susi`・`You can't see susi` の 12 文と、確定し直しで文字を消さないこと)、`AutoCorrect_ShortEnglishWordAfterNounOrAtStart_StillRewrittenToJapanese` (日本語を守る: `New York no tenki`・`Google Chrome to ringo wo taberu`・`Visual Studio Code no settei`・`dark mode no settei`・`pull request to tsukau`・`Hello World so tsukau`・行頭の `go susi`・`to ringo`・`I want sushi gasuki`・`I like ramen daisuki`・`I like sake daisuki`・1 文字の `I think i ninaru`・代名詞のあとの `I love you no koto`・`I miss you to issho ni`・`Thank you no kokoro`)、`AutoCorrect_ShortEnglishWordInsideEnglishSentence_NeedsKnownCaretText` (自分の記録だけで前の語が分からないときは従来どおり)、`JapaneseOriginWords_AreReadFromTheEnglishDictionarySection` (sushi ramen anime sake kimono gundam は該当、go so do to you python github want は非該当)。
+  - **赤の確認**: 12 文は、Core の 2 ファイルを HEAD に戻して全件が赤 (`I want to ごすし` など) になることを 1 件ずつ確認。日本語を守るテストは HEAD でも通る (守るためのテストなので当然)。
+  - **変異テスト** (条件を 1 つずつ外す): 日本語由来の判定を外す、`i` の除外を外す、代名詞の一覧を外す、動作の語の一覧を外す、代名詞以外の規則を止める、P27 の代名詞を常に残す、機能語の条件を外して常に残す、to/no/he の代名詞除外を外す、縮約形の規則を外す、の 9 通りすべてで、どれかのテストが赤になった。
+  - 判定品質 (`--eval-json`) は変更前と**ファイルが完全に同じ**: 1242/1244 (外れの 2 件も同じ)。
+- **前後比較** (変更前 = HEAD と採用案。同梱の英単語表 (BuiltIn) と NSSpellChecker 相当 (`ns.swift` で調べた語を `FileWordChecker` に渡す方式。Mac 実機そのものではない) の両方、各入力で入力中の表示・Enter 確定・Space 確定・Space 後の表示の 4 つを比べた):
+  - 入力 29,736 件 (重複を除いた数) = コーパス 5,040 + 自作 約 24,700。自作の内訳 (組ごとの件数。組どうしで重なる分があるので足しても総数と合わない): 英文の頭 20 通り × 曖昧な語 58 語 × 日本語の語 6 通り (文末 `?` を含む) 7,080、前の語が名詞や動詞の英文 1,280、自然な言い回し 924 と自作の文 1,645 (うち 20 文は英語と日本語の混ざった自然な文)、日本語の文の中の英語の短い語 4,134、英語の名前 + 助詞 (K 1,120・K2 1,248、先頭が日本語の文の中 M 1,600)、日本語由来の語 131 語 × 4 通りの前置き × 4 通りの続き 2,096、代名詞 220、文末記号と英語の文の後ろの日本語の語 190、既存の確定し直し (`i want`・`make sure you have`・`I love sushi gasuki` など) 2,264、代名詞 + to/no/he/so/do 540。Space 確定と Enter 確定の違いは、全入力で両方を記録して比べた。
+  - 入力中の表示・Space 後の表示: **0 件の差** (BuiltIn・NS とも)。差が出るのは Enter / Space の確定結果だけ (Enter 8,496 件、Space 535 件。BuiltIn)。
+  - 期待どおりの改善: 英文の中の曖昧な語が英語のまま残る 8,076 件 (BuiltIn) / 8,073 件 (NS)、`I want といぇちtomorrow` → `I want to いぇちtomorrow` 型 8 件、英語の機能語 (love・want・like) の後の非日本語由来の英単語 (yoga・tea・time・name …) が英語のまま 201 件、`I love you so koto` → `I love you so こと` など代名詞の後の so・do 型 210 件 (BuiltIn)。
+  - **退行 (従来正しかった確定し直しが変わった)**: 日本語の文・英語名 + 助詞・先頭が日本語・日本語由来の語・P27 の代名詞・文末記号の 10,608 件 (重複を除くと 10,318 件。BuiltIn・NS とも) で **0 件**。コーパス 5,040 件は元々この分岐を通らず 0 件の差。既存の確定し直し (`i want to go` など 日本語→英語 の向き、`I love sushi gasuki` など 英語→日本語 の向き) は 2,264 件のうち変化があったのは上の 201 + `i want to go susi` の 1 件だけ (どれも英語の機能語の後の英単語が英語のまま残る向き)。
+  - 反対側の数: 本家の条件 (A/B) をそのまま入れると、同じ 10,608 件のうち **5,144 件**で従来の正しい確定し直しが壊れる (D は 3,380 件)。
+  - BuiltIn と NS で「変わる・変わらない」が食い違うのは 33 件 (`Please do kore wo kudasai` と、`koto` を NS が英語の語と答える `I love you so koto` 系)。どちらも今回の変更が原因ではなく、変更前から BuiltIn と NS で違う判定。
+- **トレードオフ** (得と損の両方):
+  - 得: 英文の途中の短い英単語 (`go so do to be in on he no an here see make take name time …` の 317 語、日本語の語が後ろに続くとき) が日本語に化けない。自然な英語の言い回し 297 件のうち 270 件 (91%) が直る。P27 の仕組みの延長なので、P27 のテストは一切変えていない。
+  - 損 (本家の版より直る数が少ない): 前の語が機能語の一覧に無い英文では直らない。`It is time to nemuru` → `It is time とねむる`、(`Have you been to nihon?` は been が一覧にあるので直る)、`come here` は直るが `over here`・`up here`・`down here`・`right here`・`out here` は直らない、`Please over here susi` (over は一覧に無い)、`I like to make ramen desu` の ramen のように日本語由来の語 (`ramen sake judo karate kimono radio` など。これらは日本語のつもりのことがある)。本家の版 (B) は 297 件すべて直す。
+  - 損 (従来は直っていた): 英文の機能語の後に、`yoga・tea・time・name・made・mama・papa・sauna・one・tuna` のような日本語でも使う英単語を打ち、そのあとに日本語を続けると、英語のまま残る (`I want mama ni aitai` → `I want mama にあいたい`。従来は `I want ままにあいたい`)。`to tame ni` (と + ために) のように、機能語 `to` のあとの `tame ni` も英語の tame のまま残る。
+  - 損: `you to watashi` (あなたと私)・`I no namae` のような、代名詞のあとの to/no/he は従来どおり日本語に直すが、代名詞のあとの `so`/`do` は英語のまま残る (`I love you so koto` → `I love you so こと`。`そ`/`ど`が日本語の助詞として単独で使われることは少ないとみた)。
+  - 損: 機能語の一覧は固定の単語リストで、頻度のデータは無い。一覧に入れた語 (like・for・with・and・but・from・about・that …) は名詞の後で助詞のつもりで打つこともあるが、**直前の語が機能語の英文**の中で、さらに**曖昧な語**と**日本語の語**が続くという 3 つの条件が揃ったときだけなので、実際に当たるのはまれとみた (今回の自作入力では 0 件)。
+  - 損: 道具の限界として、一覧に入れる語を増やすほど名詞の後の助詞を壊す危険が増える。名詞の可能性が高い語 (time・back・way・up・down・out・over・right・work・next) は意図的に入れていない。
+- **限界・今回は直していないもの**:
+  - 最初の確定の時点で日本語になる型 (`Let me go susi?` → `Let めごすし？`、`Where to go ningen?` → `Where とごにんげん？`、`They go nihon`)。前が英語 1 語だけだと英文と見なされない。`CorrectPreviousCommit` では直らない別の経路 (最初の判定) の話で、別の項目にする。
+  - 前の語が `me/you/are/she` で、その前が機能語ではない型 (`Can you you susi`・`Let me figure susi` の `me`)。P27 の範囲のまま。
+  - 日本語由来の語の一覧は english.txt の「日本語由来」の段落をそのまま読む。`radio` `tea` のような語がこの段落に無い/ある は辞書次第 (`radio` は入っている)。段落の見出しや空行の形を変えると読めなくなる (辞書にコメントを入れ、テストで固定した)。
+  - 本家の `CommitRecord.AfterEnglish` は取り込んでいない。本家との差が広がるので、本家を取り込み直すときは `StaysEnglishAfterFunctionWord` との統合が必要。
+- **Survey / 管理表の補足** (親セッションが docs を更新するときの材料): `UPSTREAM_PR_SURVEY.md` の #317 の評価「代名詞は P27、それ以外は本家の条件、の混成版で通る」は、**P27 のテストは通るが、名詞のあとの助詞 (`New York no tenki`) や歌詞 (`I love you no koto`) を壊す**。実測で本家の条件のままだと従来の正しい確定し直しが 5,144 件壊れたので、条件を「直前が機能語」に絞った。変更の大きさは約 70 行 (テスト除く)。
+- **未検証**: Mac 実機での入力 (TextEdit・Chrome など、キャレットの前の文字を読めない入力欄での挙動は、`PrecedingText = null` のテストで従来どおりを確かめたのみ)、Swift 側 (`NSSpellChecker` を実際に呼ぶ経路。ここでは調べた語を表にして渡す方式で代用)、Windows・Linux は対象外。独立した査読 (別のモデル・別の入力) は未実施: この下書きの数字は実装者自身の入力群での測定で、「実装者の比較入力に無い型」を探して K・K2・PN の型を見つけたが、査読者が別の型を見つける余地がある。
+
+### P35 査読 (R10・R11) の結果と対応
+
+- **R10 の P1 → 対応済み**: 英語の題名・名詞の末尾の語 (Go・Be・Live・where・if・for・and・click・look) の後ろの `no`・`to`・`he` が、従来の の・と・へ から英語のまま残る退行 (`Let It Go no uta`・`YouTube Live no haishin`・`SQL where no baai`・`Python and Go no hikaku`)。`to`・`no`・`he` の直前の語は、文の途中にしか来ない狭い一覧 (`WordsBeforeParticleLikeWord`: not・never・please・also・just・really など 23 語) と縮約形だけに絞った。これで R10 の退行 13 例は BuiltIn・NS とも変更前と同じ答えに戻った。
+- **R10 の P2 → 対応済み**: ` を含む名前 (`L'Arc`・`Moody's`・`D'Artagnan`) を縮約形扱いしない (`IsContraction`: n't・'ll・'re・'ve・'m・'d と let's など 9 語だけ)。
+- **P2 → 限界として残す**: ① 冠詞 `a` の後ろ (`I have a ringo` → `ありんご`)。② `Only you susi`・`Not you susi` など P27 側 (`you/are/we/me/she`) の一覧が狭い。③ `’` (U+2019) は `see`・`here` 型でしか効かない (`I’ll go susi` は最初の確定で `go` が日本語になり、この分岐に届かない。`IsEnglishSentence` が ASCII だけを見るため。文字数のずれによる誤動作は無し)。④ `Let me go susi?`・`Where to go ningen?`・`They go nihon` (最初の確定で日本語になる別経路)。
+- **残る退行 (狭い一覧の語で終わる題名)**: `Never Say Never no uta`・`Best ever no …`・`SQL not no …`・行頭の `Please no …`。c5 の日本語の意図 1,375 件のうち 17 件。トレードオフとして受け入れた。
+- **R11 の確認 (BuiltIn・NS)**: R10 の退行例 13 件は 0 件。英語のまま残る差分は 113,014 → 58,428 件に減った (外した型は変更前に戻る)。`go to nihon` は従来どおり (`ごとにほん`)。`--eval-json` は 1242/1244 のままでファイルが完全一致。
+- **テスト**: 522 → 523 件 (CompositionTests の 4 件に、R10・R11 の例を足した)。`ParticleLikeWords` から `he` を外す変異で赤になることを確認。代名詞の除外判定は、狭い一覧に代名詞が無いので不要と分かり削除した。
+

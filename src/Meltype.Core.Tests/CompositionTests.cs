@@ -1068,6 +1068,106 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void AutoCorrect_ShortEnglishWordInsideEnglishSentence_IsNotRewrittenToJapanese()
+    {
+        // 本家 #317: 英文の途中の go・so・do・to (ローマ字では ご・そ・ど・と) は、後ろに日本語 (すし) が続いても確定し直さない。
+        // 英語の機能語 (want to・is・I・will …) のすぐ後ろのときだけ。
+        foreach (var (typed, expected) in new[]
+        {
+            ("I want to go susi\n", "I want to go すし"),
+            ("It is so susi\n", "It is so すし"),
+            ("I have to do ningen?\n", "I have to do にんげん？"),
+            ("I have to be ningen\n", "I have to be にんげん"),
+            ("Thank you so susi?\n", "Thank you so すし？"),
+            ("I will go nihon\n", "I will go にほん"),
+            ("We can see susi\n", "We can see すし"),
+            ("Please take susi\n", "Please take すし"),
+            ("Today I go susi\n", "Today I go すし"),
+            ("Please come here susi\n", "Please come here すし"),
+            ("Maybe I'll go susi\n", "Maybe I'll go すし"),
+            // to・no・he の前が、文の途中にしか来ない語 (not・please・also) のときは英語のまま
+            ("I promise not to susi\n", "I promise not to すし"),
+            ("We also to susi\n", "We also to すし"),
+            // 縮約形 (n't 以外: 're 've 'm 'd と let's it's that's) と、その後ろの no・to (査読 R11)
+            ("Let's go susi\n", "Let's go すし"), ("We're here susi\n", "We're here すし"), ("I'd see susi\n", "I'd see すし"),
+            ("We've seen susi\n", "We've seen すし"), ("It's so susi\n", "It's so すし"), ("That's no susi\n", "That's no すし"), ("I'm to susi\n", "I'm to すし"),
+            ("You can't see susi\n", "You can't see すし"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, k.Host.Document, typed);
+            Assert.True(!k.Host.Events.Any(e => e.StartsWith("bs:") || e.StartsWith("replace")), typed + " 消さない: " + string.Join(" ", k.Host.Events));
+        }
+    }
+
+    [Test]
+    public static void AutoCorrect_ShortEnglishWordAfterNounOrAtStart_StillRewrittenToJapanese()
+    {
+        // 上の規則を、名詞のあとの助詞 (New York の・Google Chrome と)・文頭・日本語由来の語には広げない。今までどおり日本語に確定し直す。
+        foreach (var (typed, expected) in new[]
+        {
+            ("New York no tenki\n", "New York のてんき"),
+            ("Google Chrome to ringo wo taberu\n", "Google Chrome とりんごをたべる"),
+            ("Visual Studio Code no settei\n", "Visual Studio Code のせってい"),
+            ("dark mode no settei\n", "dark mode のせってい"),
+            ("pull request to tsukau\n", "pull request とつかう"),
+            ("Hello World so tsukau\n", "Hello World そつかう"),
+            // 査読 R10: 英語の題名・名詞の末尾 (Go・Be・Live・where・if・for・and・click・look) の後ろの no・to・he も助詞のつもり
+            ("Let It Go no uta\n", "Let It Go のうた"),
+            ("Let It Be no kashi\n", "Let It Be のかし"),
+            ("YouTube Live no haishin\n", "YouTube Live のはいしん"),
+            ("SQL where no baai\n", "SQL where のばあい"),
+            ("Excel if no kinou\n", "Excel if のきのう"),
+            ("Python and Go no hikaku\n", "Python and Go のひかく"),
+            ("React for no naka\n", "React for のなか"),
+            ("Python click no hou ga\n", "Python click のほうが"),
+            // (L'Arc・Moody's のような ' を含む名前は縮約形ではない。テスト用キーボードは ' を ’ にするので --repro で確認した)
+            // 代名詞の後ろの to・no・he (I love you no koto)
+            ("I love you no koto\n", "I love you のこと"),
+            // he も助詞 (へ) のつもりのことが多い。直前が記号・日本語に直接つながるときは読まず従来どおり (査読 R11)
+            ("Let It Go he ningen\n", "Let It Go へにんげん"), ("Hello world,also to susi\n", "Hello world,also とすし"),
+            ("go susi\n", "ごすし"),
+            ("to ringo\n", "とりんご"),
+            ("I want sushi gasuki\n", "I want すしがすき"),
+            ("I like ramen daisuki\n", "I like らめんだいすき"),
+            ("I like sake daisuki\n", "I like さけだいすき"),
+            // 代名詞の後ろの no・to・he は助詞のつもり (歌詞のように I love you のこと と打つ)。so・do は英語の so・do なので上の規則で英語のまま
+            ("I love you no koto\n", "I love you のこと"),
+            ("I miss you to issho ni\n", "I miss you といっしょに"),
+            ("Thank you no kokoro\n", "Thank you のこころ"),
+            // 1 文字の i は、英語の文の中でも今までどおり (小文字の i のまま残しても I にはならないので、直す利点が無い)
+            ("I think i ninaru\n", "I think いになる"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void JapaneseOriginWords_AreReadFromTheEnglishDictionarySection()
+    {
+        // 「日本語由来」の段落 (sushi・ramen・anime …) だけが対象。技術用語や go・so のような短い語は含めない。
+        foreach (var word in new[] { "sushi", "ramen", "anime", "sake", "kimono", "gundam" }) Assert.True(CompositionDetector.IsJapaneseOriginWord(word), word);
+        foreach (var word in new[] { "go", "so", "do", "to", "you", "python", "github", "want" }) Assert.True(!CompositionDetector.IsJapaneseOriginWord(word), word);
+    }
+
+    [Test]
+    public static void AutoCorrect_ShortEnglishWordInsideEnglishSentence_NeedsKnownCaretText()
+    {
+        // キャレットの前の文字が分からない (自分の確定の記録を信じる時間を過ぎ、入力欄からも読めない) ときは、今までどおり。
+        var k = new Keyboard();
+        k.Host.PrecedingText = "I want to ";
+        k.Type("go ");
+        Assert.Equal("go ", k.Host.Document, "前が英語なので英語で確定");
+        k.Host.PrecedingText = null;
+        k.Type("susi\n");
+        Assert.Equal("ごすし", k.Host.Document, "自分の記録 (go ) だけでは、その前の語 (to) が分からないので機能語かどうか見られない: 従来どおり日本語に直す");
+    }
+
+    [Test]
     public static void AutoCorrect_NotWhenCaretIsElsewhere()
     {
         // 「i 」の後にクリックで別の場所へ移った (Meltype はクリックを知らない) 想定。キャレットの前が記録と違うので消さない。
