@@ -1,5 +1,6 @@
 # Meltype for Mac
-<img width="1536" height="1024" alt="Meltype_Logo" src="https://github.com/user-attachments/assets/a81f7936-b86a-4988-92c3-4df879211061" />
+<img width="1536" height="1024" alt="Meltype_Logo_v2" src="https://github.com/user-attachments/assets/225ebf1c-925a-4e6b-bd27-bc7385cdcf82" />
+
 
 
 **雪解けのように、半角/全角の壁を溶かす日本語入力 — Mac 版。**
