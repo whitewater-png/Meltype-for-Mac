@@ -1802,3 +1802,12 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
 - **R11 の確認 (BuiltIn・NS)**: R10 の退行例 13 件は 0 件。英語のまま残る差分は 113,014 → 58,428 件に減った (外した型は変更前に戻る)。`go to nihon` は従来どおり (`ごとにほん`)。`--eval-json` は 1242/1244 のままでファイルが完全一致。
 - **テスト**: 522 → 523 件 (CompositionTests の 4 件に、R10・R11 の例を足した)。`ParticleLikeWords` から `he` を外す変異で赤になることを確認。代名詞の除外判定は、狭い一覧に代名詞が無いので不要と分かり削除した。
 
+
+## 追加項目 Q4 (Mac 版: 確定し直しで古い英語が消えず、日本語だけが足される)
+
+- **現象** (Mac 実機、TextEdit と Hermes のデスクトップアプリ、Enter で確定): `I love sushi gasuki` → `I love sushi すしがすき` (期待 `I love すしがすき`)、`New York no tenki` → `New York no のてんき`、`Let It Go no uta` → `Let It Go no のうた`。P35 より前の版でも同じ (Core の `--repro` は期待どおりで、Swift の置き換えだけが効いていなかった)。P22 の実機確認の手順 1 (`sushi がすき` → `すしがすき`) は、未検証のまま残っていた項目。
+- **原因** (推定。トレースは未取得): Core が返す edit 列は `{deleteBefore=n, original, text=置き換え後の語}` → `{0, 変換中の文字}` の順 (`CorrectPreviousCommit` は `CommitText` の中で、変換中の文字の確定より前に呼ばれる)。Swift の `apply` は変換中の文字 (marked) が入力欄に残ったまま、1 つ目の edit を `insertText(text, replacementRange: 確定済みの文字の範囲)` で入れる。TextEdit・Hermes は範囲を無視して marked の範囲だけを置き換えたと考えると、報告された 3 例がすべて説明できる (古い英語は残り、marked が日本語に置き換わり、続く edit が足される)。Apple の資料 (IMKTextInput・NSTextInputClient) は、marked があるときの `replacementRange` の扱いを定めていない。
+- **修正** (`mac/Sources/MeltypeIME/InputController.swift`、約 17 行): 確定し直しの edit (`deleteBefore > 0`、再変換でない) の前に、入力欄の変換中の範囲が、直前に表示した変換中の文字 (`lastView.text`) と同じと確かめられたときだけ、`insertText("", replacementRange: marked)` で取り除く。違う・読めないときは従来どおり (取り除かない。トレースに残る)。取り除いても変換中の文字は、直後の edit が運ぶので消えない。
+- **テスト**: `SessionFacadeTests.AutoCorrect_EditIsAlwaysFollowedByTheEditThatCarriesTheComposingText` (確定し直しの edit の直後に `deleteBefore = 0` の edit が続く約束を固定。確定し直しが 3 回以上出ていることも確かめる)。524 件。Swift 側は自動テストが無い。
+- **査読** (R12・R13): P0・P1 なし。R12 の P1 (marked の長さを確かめない) は `lastView.text` との照合で対応。ホストが `attributedSubstring` を返さない・ずれる場合は取り除かず、従来どおり (直らないだけで、文字は消えない)。
+- **未確認**: 実機 (空文字の `insertText` の後の marked の解除・キャレット位置・Hermes を含む Electron 系の挙動)。`Let  It` (TextEdit で空白が二重)・Hermes の `Let IT Go` (`It` が `IT`) の原因は不明。`'` を含む英文 (`Let's go susi`・`We're here susi`) は Core のテスト用キーボードと実機のキー経路が違い、別件として調べる。

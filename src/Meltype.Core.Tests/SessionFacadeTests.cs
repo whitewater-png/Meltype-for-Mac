@@ -307,6 +307,32 @@ internal static class SessionFacadeTests
     }
 
     [Test]
+    public static void AutoCorrect_EditIsAlwaysFollowedByTheEditThatCarriesTheComposingText()
+    {
+        // Mac の Swift (InputController.apply) は、確定し直しの edit (deleteBefore > 0) の前に、入力欄の変換中の文字を取り除く
+        // (取り除かないと、ホストが置き換え範囲を無視して変換中の範囲だけを置き換え、古い英語が消えない)。
+        // 取り除いても変換中の文字が消えないのは、同じ結果の中で、確定し直しの edit の直後に deleteBefore = 0 の edit が続くから。
+        // (確定し直し CorrectPreviousCommit の経路の約束。SwitchHeldToJapanese の純粋な削除 (text が空) は別で、そのとき変換中の文字は無い)
+        var corrections = 0;
+        foreach (var typed in new[] { "I love sushi gasuki\n", "New York no tenki\n", "i want\n", "I want to go susi\n" })
+        {
+            var session = Create();
+            foreach (var result in Type(session, typed))
+            {
+                var edits = result.Commits.ToList();
+                for (var i = 0; i < edits.Count; i++)
+                {
+                    if (edits[i].DeleteBefore == 0) continue;
+                    corrections++;
+                    Assert.True(i + 1 < edits.Count && edits[i + 1].DeleteBefore == 0 && edits[i + 1].Text.Length > 0,
+                        typed.Trim() + ": 確定し直しの edit の直後に、変換中の文字を運ぶ edit が続く: " + result.ToJson());
+                }
+            }
+        }
+        Assert.True(corrections >= 3, "確定し直しの edit が実際に出ている (出なければ何も確かめていない): " + corrections);
+    }
+
+    [Test]
     public static void ForgetLastCommit_StopsAutoCorrect()
     {
         var session = Create();

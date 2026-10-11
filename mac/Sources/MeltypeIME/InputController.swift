@@ -509,6 +509,7 @@ final class MeltypeInputController: IMKInputController {
         var pendingReplacement = replacement
         for edit in result.commits {
             var range = NSRange(location: NSNotFound, length: NSNotFound)
+            let pendingReplacementWasNil = pendingReplacement == nil
             if let replacement = pendingReplacement {
                 range = replacement
                 pendingReplacement = nil
@@ -531,6 +532,22 @@ final class MeltypeInputController: IMKInputController {
                     Self.trace("apply: 確定し直しを飛ばす (中身が違う) actual=\(Self.cut(client.attributedSubstring(from: range)?.string)) range=\(NSStringFromRange(range))")
                     NSLog("Meltype: 確定し直しを飛ばしました (入力欄の中身が記録と違う・読めない。消す予定 %d 文字)", original.count)
                     continue
+                }
+            }
+            // 確定し直しで、変換中の文字が残ったまま置き換え範囲 (その前の確定済みの文字) を渡すと、ホスト (TextEdit・Hermes など) は
+            // 範囲を無視して変換中の範囲だけを置き換えることがある。古い英語が消えずに日本語が足される (I love sushi すしがすき)。
+            // Core は確定し直し (CorrectPreviousCommit) の edit (deleteBefore > 0) の直後に、変換中の文字を運ぶ edit (deleteBefore = 0) を続けて返す
+            // (CorrectPreviousCommit は CommitText の中で、変換中の文字の確定より前に呼ばれる。英数状態の純粋な削除は別で、そのとき変換中の文字は無い)。なので、変換中の文字は
+            // 先に取り除いておいても消えない。取り除くのは、入力欄の変換中の範囲が、自分が出した変換中の文字と同じと確かめられたときだけ
+            // (範囲が不正確なホストで、後ろの確定済みの文字まで消さないため)。違えば従来どおり。
+            if edit.deleteBefore > 0, pendingReplacementWasNil {
+                let marked = client.markedRange()
+                if marked.location != NSNotFound, marked.length > 0, let shown = lastView?.text,
+                   Self.sameText(client.attributedSubstring(from: marked)?.string, shown) {
+                    Self.trace("apply: 確定し直しの前に変換中の文字を取り除く marked=\(NSStringFromRange(marked))")
+                    client.insertText("", replacementRange: marked)
+                } else if marked.location != NSNotFound, marked.length > 0 {
+                    Self.trace("apply: 変換中の文字を取り除かない (中身が違う・読めない) marked=\(NSStringFromRange(marked))")
                 }
             }
             Self.trace("apply: insertText text=\(Self.cut(edit.text)) replacementRange=\(NSStringFromRange(range)) 直前 \(Self.ranges(client))")
