@@ -1881,6 +1881,23 @@ public sealed class CompositionController
     /// <summary>キャレットが動いたかもしれないとき (Meltype を通らなかったキー・クリック)。直前の語は確定し直さない。</summary>
     public void ForgetLastCommit() => _correctable.Clear();
 
+    /// <summary>
+    /// 変換中でない Enter・Tab をアプリに渡した。アプリの入力欄には改行・タブが入るので、自分の確定の記録 (直後の 1.5 秒は入力欄より優先して使う) にも入れる。
+    /// 入れないと、2 行目の文頭の語が直前の行の最後の文字につながって見え (Hi therePlease)、英文と読めない (実機のトレースで見つかった)。
+    /// </summary>
+    public void NoteBreakKeyPassedToApp(int vk)
+    {
+        if (_lastCommitText is null) return;
+        // BackSpace で、記録の最後の改行・タブが消える (I want ⏎⌫to go)
+        if (vk == VirtualKeys.Back)
+        {
+            if (_lastCommitText.EndsWith('\n') || _lastCommitText.EndsWith('\t')) _lastCommitText = _lastCommitText[..^1];
+            return;
+        }
+        var joined = _lastCommitText + (vk == VirtualKeys.Return ? "\n" : vk == VirtualKeys.Tab ? "\t" : "");
+        _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
+    }
+
     /// <summary>ローマ字としても読める英語の代名詞 (you → よう、are → あれ、we → うぇ)。</summary>
     private static readonly HashSet<string> EnglishPronouns = new(StringComparer.OrdinalIgnoreCase) { "you", "are", "we", "me", "she" };
 
@@ -1948,7 +1965,9 @@ public sealed class CompositionController
         var start = before.Length;
         while (start > 0 && (char.IsAsciiLetter(before[start - 1]) || before[start - 1] == '\'')) start--;
         // 直前が記号 (Hello, you) や英字でない文字のときは、従来どおり (語を取り出せない)
-        if (start >= before.Length || (start > 0 && before[start - 1] != ' ')) return false;
+        // 語の前は、文頭・空白・行頭 (改行・タブの直後) のいずれか。2 行目以降の文は行頭から始まる (実機のトレースで見つかった)。
+        // 日本語・記号・数字に直接つながるとき (これはwe) は読まない。
+        if (start >= before.Length || (start > 0 && before[start - 1] is not (' ' or '\n' or '\r' or '\t'))) return false;
         var word = before[start..];
         if (EnglishPronouns.Contains(previous.Raw)) return WordsBeforePronoun.Contains(word);
         if (previous.Raw.Length < 2 || CompositionDetector.IsJapaneseOriginWord(previous.Raw.ToLowerInvariant())) return false;

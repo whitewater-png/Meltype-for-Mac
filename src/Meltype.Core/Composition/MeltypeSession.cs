@@ -362,7 +362,12 @@ public sealed class MeltypeSession
         // このキーをアプリに送り直した (= 使わなかった) なら、アプリに渡す。
         var consumed = swallowed && !_host.ReplayedCurrent;
         // アプリに渡したキーでキャレットが動くかもしれないので、確定し直しの記録は捨てる (Windows の MeltypeEngine と同じ)。
-        if (!consumed && !VirtualKeys.IsModifier(vk)) _controller.ForgetLastCommit();
+        if (!consumed && !VirtualKeys.IsModifier(vk))
+        {
+            _controller.ForgetLastCommit();
+            // Cmd+Return・Ctrl+Return・Shift+Tab などは、アプリの操作で改行・タブが入るとは限らないので足さない
+            if (!modifier && !shift) _controller.NoteBreakKeyPassedToApp(vk);
+        }
         Feed(down with { IsUp = true });
         if (modifier && _controller.IsComposing) Feed(new KeyEvent(control ? VirtualKeys.LControl : VirtualKeys.LMenu, 0, false, true, false, down.TimeMs));
         if (shift && _controller.IsComposing) Feed(new KeyEvent(VirtualKeys.LShift, 0, false, true, false, down.TimeMs));

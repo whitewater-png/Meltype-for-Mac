@@ -333,6 +333,54 @@ internal static class SessionFacadeTests
     }
 
     [Test]
+    public static void AutoCorrect_EnglishSentenceOnTheSecondLine_IsKept()
+    {
+        // 実機のトレース (2026-10-11): 自分の確定の記録は、アプリに素通ししたキー (変換中でない Enter の改行) を知らないので、
+        // 2 行目の文頭の語が直前の行の最後の文字につながって見え (Hi therePlease take)、英文と読めず、take が たけ に直った。
+        // 1 回目の Enter は確定、2 回目の Enter が改行 (アプリに渡す)。
+        var session = Create();
+        var results = Type(session, "Hi there\n\nPlease take susi\n");
+        var corrections = results.SelectMany(r => r.Commits).Where(c => c.DeleteBefore > 0).Select(c => c.Original).ToList();
+        Assert.True(!corrections.Contains("take "), "2 行目の Please の後ろの take を、後ろの日本語に合わせて直さない: " + string.Join("|", corrections));
+        // 同じ行なら今までどおり
+        var oneLine = Type(Create(), "Please take susi\n").SelectMany(r => r.Commits).Where(c => c.DeleteBefore > 0).Select(c => c.Original).ToList();
+        Assert.True(!oneLine.Contains("take "), "1 行目でも直さない");
+
+        // Tab (アプリに渡す) の直後の行頭も同じ
+        var tab = Create();
+        Type(tab, "Hi there\n");
+        tab.HandleKey(VirtualKeys.Tab, null, false, false, false, false, null);
+        var tabCorrections = Type(tab, "Please take susi\n").SelectMany(r => r.Commits).Where(c => c.DeleteBefore > 0).Select(c => c.Original).ToList();
+        Assert.True(!tabCorrections.Contains("take "), "Tab の直後の行頭: " + string.Join("|", tabCorrections));
+
+        // 改行を BackSpace で消したら、記録からも消える (I want ⏎⌫to go susi は同じ行の英文)
+        var back = Create();
+        var backResults = Type(back, "I want \n\bto go susi\n");
+        // 記録に改行が残ると、to・go が最初の確定の時点で と・ご になる (I want とごすし)
+        var backTexts = backResults.SelectMany(r => r.Commits).Select(c => c.Text).ToList();
+        Assert.True(!backTexts.Any(t => t.Contains('と') || t.Contains('ご')), "BackSpace で消した改行は記録から戻す: " + string.Join("|", backTexts));
+
+        // Tab を BackSpace で消した場合も同じ (査読 R16)
+        var tabBack = Create();
+        var tabBackResults = Type(tabBack, "I want ");
+        tabBack.HandleKey(VirtualKeys.Tab, null, false, false, false, false, null);
+        tabBackResults.AddRange(Type(tabBack, "\bto go susi\n"));
+        var tabBackTexts = tabBackResults.SelectMany(r => r.Commits).Select(c => c.Text).ToList();
+        Assert.True(!tabBackTexts.Any(t => t.Contains('と') || t.Contains('ご')), "BackSpace で消したタブも記録から戻す: " + string.Join("|", tabBackTexts));
+
+        // 修飾キー付きの Return・Tab (Cmd+Return・Shift+Tab) は、改行・タブが入るとは限らないので記録に足さない (査読 R15・R16)
+        foreach (var (vk, shift, command) in new[] { (VirtualKeys.Return, false, true), (VirtualKeys.Tab, true, false) })
+        {
+            var modified = Create();
+            var modifiedResults = Type(modified, "I want ");
+            modified.HandleKey(vk, null, shift, false, false, command, null);
+            modifiedResults.AddRange(Type(modified, "to go susi\n"));
+            var texts = modifiedResults.SelectMany(r => r.Commits).Select(c => c.Text).ToList();
+            Assert.True(!texts.Any(t => t.Contains('と') || t.Contains('ご')), $"修飾キー付き (vk={vk}) は改行を足さない: " + string.Join("|", texts));
+        }
+    }
+
+    [Test]
     public static void ForgetLastCommit_StopsAutoCorrect()
     {
         var session = Create();

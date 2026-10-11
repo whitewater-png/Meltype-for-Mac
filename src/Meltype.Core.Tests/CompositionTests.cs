@@ -1168,6 +1168,38 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void AutoCorrect_ShortEnglishWordInsideEnglishSentence_AtTheStartOfALine()
+    {
+        // 実機のトレース (2026-10-11): 2 行目以降の文は、直前の文字が「改行」で、語の前を空白か文頭のときだけ読む規則では読めず、
+        // We're here susi の here が へれ に直った (1 行目だけを打つテスト用キーボードでは出なかった)。行頭 (改行・タブの直後) も文頭と同じに読む。
+        // 入力欄は ’ (U+2019) にすることがあるので、We’re も試す。自分の確定の記録を信じる 1.5 秒を過ぎた後 (ゆっくり打った場合) の、入力欄から読む経路を試す。
+        foreach (var (before, first, second, typed, expected) in new[]
+        {
+            ("Hi there\nWe're ", "here ", "here ", "susi\n", "here すし"),
+            ("Hi there\nWe\u2019re ", "here ", "here ", "susi\n", "here すし"),
+            ("Hi there\r\nI want to ", "go ", "go ", "susi\n", "go すし"),
+            // 代名詞 (P27): 行頭の Are の後ろの you
+            ("Hi there\nAre ", "you ", "you ", "susi\n", "you すし"),
+        })
+        {
+            var k = new Keyboard();
+            k.Host.PrecedingText = before;
+            k.Type(first);
+            k.Host.PrecedingText = before + second;
+            Thread.Sleep(1700); // OwnCommitTrustMs
+            k.Type(typed);
+            Assert.Equal(expected, k.Host.Document, before.Replace("\n", "\\n") + first + typed.Trim());
+        }
+        // 直前が日本語・記号に直接つながる語 (これはplease) は、今までどおり読まない
+        var jp = new Keyboard();
+        jp.Host.PrecedingText = "これはwe ";
+        jp.Type("go ");
+        jp.Host.PrecedingText = "これはwe go ";
+        jp.Type("susi\n");
+        Assert.Equal("ごすし", jp.Host.Document, "日本語に直接つながる we は機能語と見ない: 従来どおり");
+    }
+
+    [Test]
     public static void AutoCorrect_NotWhenCaretIsElsewhere()
     {
         // 「i 」の後にクリックで別の場所へ移った (Meltype はクリックを知らない) 想定。キャレットの前が記録と違うので消さない。
