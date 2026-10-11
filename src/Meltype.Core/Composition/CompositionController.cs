@@ -1166,6 +1166,7 @@ public sealed class CompositionController
     /// <summary>
     /// ユーザー辞書の読みが含まれていれば、その部分は登録した単語の文節にし、残りだけを変換エンジンで変換する
     /// (きごうとうふくめ → 記号等|含め)。含まれていなければ普通に変換する。
+    /// ユーザーが登録した語のうち短い語が、変換エンジンの文節の途中から始まるときは、その語は使わない (<see cref="AlignUserWords"/>)。
     /// </summary>
     private List<Clause> ConvertJapanese(string kana)
     {
@@ -1198,6 +1199,8 @@ public sealed class CompositionController
             return result;
         }
         if (_options.UserDictionary?.Split(kana) is not { } pieces) return ConvertWithEngine(kana);
+        pieces = AlignUserWords(kana, pieces, out var wholeByEngine);
+        if (wholeByEngine is not null) return wholeByEngine;
         var clauses = new List<Clause>();
         var registered = new List<Clause>();
         foreach (var (reading, word) in pieces)
@@ -1223,14 +1226,73 @@ public sealed class CompositionController
     }
 
     /// <summary>
+    /// この文字数より短い読みのユーザーの語は、変換エンジンの文節の途中から始まるときは使わない (<see cref="AlignUserWords"/>)。
+    /// この文字数以上の読みの語は、途中から始まっても使う。
+    /// 短い語 (しの → 紫乃) は、わたしのことがすき の途中の しの のように、ほかの語の一部に偶然現れやすい。
+    /// 長い語 (めるたいぷ → Meltype) は偶然つながりにくく、変換エンジンは未知の語を助詞とくっつけて区切りがち
+    /// (きょうは|めるたいぷを|つかう のように、助詞の後ろの語が文節の途中になる) なので、途中から始まっても使うほうが登録した意図に合う。
+    /// 実際の azooKey で登録語入りの約 140 文を比べた結果: 3 文字にすると、本家の問題例 (しの) が直り、変更前に使えていた登録語が落ちるのは 2 文字の語だけになる。
+    /// 4 文字以上にすると、3 文字の語 (さくら・ひなた・ゆうき などの名前) が助詞の後ろで落ちる。
+    /// </summary>
+    internal const int InsideClauseMinReadingLength = 3;
+
+    /// <summary>
+    /// ユーザーが登録した語 (自作の専門用語集の語を含む) の読みが、変換エンジンの文節の途中から始まるなら、その語では区切らない (本家 #374・PR #385)。
+    /// しの → 紫乃 を登録すると、わたしのことがすき の途中の しの で区切って 綿紫乃事が好き になっていた
+    /// (変換エンジンは わたしの|ことが|すき と区切るので、しの は文節の途中から始まる)。文節の頭から始まる語 (しのがきた の しの) は今までどおり。
+    /// 対象は、読みが <see cref="InsideClauseMinReadingLength"/> 文字より短い語だけ。それ以上の長さの語は、途中から始まっても使う
+    /// (実際の azooKey は きょうは|めるたいぷを|つかう のように助詞とくっつけて区切るので、文節の頭かどうかだけで決めると、助詞の後ろの登録語が落ちる)。
+    /// 同梱の語句 (phrases.txt) と同梱の専門用語集の強制語は、変換エンジンが区切りを間違える語を補うものなので、そのまま使う。
+    /// 使わなくなった語は、文節の区切りを Shift+←→ で変えれば、候補から選べる。
+    /// 変換エンジンを余分に呼ぶのは、読みの先頭以外から始まる、短い (しきい値より短い) ユーザーの語が入っているときだけ (先頭は必ず文節の頭)。
+    /// 結果はキャッシュ付きの ConvertWithEngine と同じなので、同じ読みは打つたびにまた変換しない。
+    /// 変換エンジンが文節に区切れなかったとき (ConvertClauses が null) は、文節の頭が分からないので、何も変えずに元の語の割り当てを返す。
+    /// 使う語が 1 つも残らなければ、変換エンジンの結果 (wholeByEngine) をそのまま返す。
+    /// </summary>
+    private List<(string Reading, string? Word)> AlignUserWords(string kana, List<(string Reading, string? Word)> pieces, out List<Clause>? wholeByEngine)
+    {
+        wholeByEngine = null;
+        if (_options.UserDictionary is not { } dictionary) return pieces;
+        var position = 0;
+        var inside = false;
+        foreach (var (reading, word) in pieces)
+        {
+            if (position > 0 && word is not null && reading.Length < InsideClauseMinReadingLength && dictionary.IsUserReading(reading)) inside = true;
+            position += reading.Length;
+        }
+        if (!inside) return pieces;
+        var engine = ConvertWithEngine(kana, out var failed);
+        // 失敗した変換は、読み全体を 1 文節にした結果 (文節の頭が位置 0 だけ) なので、使うと先頭以外の語が全部落ちる
+        if (failed || string.Concat(engine.Select(c => c.Reading)) != kana) return pieces;
+        var starts = new HashSet<int>();
+        for (int i = 0, offset = 0; i < engine.Count; offset += engine[i].Reading.Length, i++) starts.Add(offset);
+        var aligned = new List<(string Reading, string? Word)>();
+        position = 0;
+        foreach (var (reading, word) in pieces)
+        {
+            var keep = word is not null && (reading.Length >= InsideClauseMinReadingLength || !dictionary.IsUserReading(reading) || starts.Contains(position));
+            // 使わない語の読みは、前後の変換エンジンに渡す部分とつなげる
+            if (!keep && aligned.Count > 0 && aligned[^1].Word is null) aligned[^1] = (aligned[^1].Reading + reading, null);
+            else aligned.Add(keep ? (reading, word) : (reading, null));
+            position += reading.Length;
+        }
+        if (aligned.All(p => p.Word is null)) wholeByEngine = engine;
+        return aligned;
+    }
+
+    /// <summary>
     /// 日本語のかなを変換エンジンで文節に区切って変換する。各文節の最初の候補は次の順で決める:
     ///   1. 文脈の手がかり辞書 (前後に 気温 があれば あつい → 暑い)
     ///   2. ユーザーが前に選び直した変換 (学習)
     ///   3. 変換エンジンの結果 (入力欄のキャレットの前の文字を文脈として渡している)
     /// </summary>
-    private List<Clause> ConvertWithEngine(string kana)
+    private List<Clause> ConvertWithEngine(string kana) => ConvertWithEngine(kana, out _);
+
+    /// <summary>failed は、変換エンジンが文節に区切れなかった (ConvertClauses が null を返した) ことがあったとき true。その結果は、読み全体を 1 文節にしたものになる。</summary>
+    private List<Clause> ConvertWithEngine(string kana, out bool failed)
     {
-        if (kana.Length <= ConvertChunkLength) return ConvertWithEngineOnce(kana);
+        failed = false;
+        if (kana.Length <= ConvertChunkLength) return ConvertWithEngineOnce(kana, out failed);
         // 長い読みは区切って変換する (変換エンジンの時間は読みの長さに比例するので、1 文字打つたびに全体を変換し直すと、長くなるほど重くなる)。
         // 区切りは「読みの前の部分」だけで決まるので、続きを打っても前の区切りは変わらず、前の部分の変換結果は覚えてあるものを使える。
         var clauses = new List<Clause>();
@@ -1241,7 +1303,8 @@ public sealed class CompositionController
             {
                 // 2 つ目以降の区切りには、前の区切りの変換結果が文脈 (キャレットの前の文字) になる。
                 if (previous.Length > 0) _chunkContext = (true, ContextOf(previous));
-                var converted = ConvertWithEngineOnce(chunk);
+                var converted = ConvertWithEngineOnce(chunk, out var chunkFailed);
+                failed |= chunkFailed;
                 clauses.AddRange(converted);
                 previous += string.Concat(converted.Select(c => c.Text));
             }
@@ -1328,7 +1391,9 @@ public sealed class CompositionController
         _detector.ClearSpanCache();
     }
 
-    private List<Clause> ConvertWithEngineOnce(string kana)
+    private List<Clause> ConvertWithEngineOnce(string kana) => ConvertWithEngineOnce(kana, out _);
+
+    private List<Clause> ConvertWithEngineOnce(string kana, out bool failed)
     {
         // 文脈が無いまま「に」で始まる読みを変換すると、変換エンジンは「に」を語の頭と読む (になってしまう → 担ってしまう)。
         // 前の文脈が取れないときは、仮の文脈「これ」を付けて助詞として読ませる (これ + になってしまう → になってしまう)。
@@ -1337,6 +1402,8 @@ public sealed class CompositionController
         var parts = context is not null
             ? ConvertWithContext(kana, context)
             : EngineClauses(kana, kana.Length >= 3 && kana[0] == 'に' ? "これ" : null);
+        // 文節に区切れなかったときは、全体を 1 文節にする。この 1 文節は変換エンジンの区切りではない (failed で呼び出し元に知らせる)
+        failed = parts is null;
         parts ??= [new ConversionClause(kana, _converter.Convert(kana) ?? kana)];
         // 読み全体が補助辞書・絵文字の辞書の語 (かんがえるかお → 🤔) なら、文節に分けずに 1 つの文節にして候補を出す。
         if (parts.Count > 1 && _options.Candidates?.Contains(kana) == true)

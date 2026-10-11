@@ -13,6 +13,9 @@ public sealed record UserWord(string Reading, string Word);
 /// ユーザー辞書 (%LOCALAPPDATA%\Meltype\userdict.txt、1 行に「読み[Tab]単語」)。
 /// 変換で最優先に使う: 変換する読みの中に登録した読みが含まれていれば、その部分は変換エンジンの区切りに関係なく
 /// 登録した単語にする (きごうとう → 記号等 を登録すると、きごうとうふくめ → 記号等|含め)。
+/// ただし、ユーザーが登録した語 (自作の専門用語集の語を含む) のうち読みが短い語 (CompositionController.InsideClauseMinReadingLength 文字より短い語) が
+/// 変換エンジンの文節の途中から始まるときは使わない (<see cref="IsUserReading"/>・CompositionController.AlignUserWords。
+/// しの → 紫乃 で わたしのことがすき が 綿紫乃事が好き になるのを防ぐ)。長い語は途中からでも使う。同梱の語句・同梱の専門用語集は、従来どおり。
 /// トレイの「ユーザー辞書...」(Windows)・「Meltype 辞書」の画面 (Mac) から登録・編集・削除する。
 ///
 /// ファイルが正: Mac では IME と「Meltype 辞書」の画面が別のプロセスで同じファイルを扱うので、
@@ -542,6 +545,13 @@ public sealed class UserDictionary
         foreach (var term in bundled) if (!merged.Contains(term)) merged.Add(term);
         return merged;
     }
+
+    /// <summary>
+    /// <see cref="Split"/> が使う語のうち、利用者が自分で用意した語の読みか: ユーザー辞書の語と、自作の専門用語集の語 (ユーザー辞書から移した語を含む。
+    /// 移しても変換が変わらないよう、ユーザー辞書の語と同じ扱い)。同梱の語句 (phrases.txt) と同梱の専門用語集だけにある読みは false。
+    /// ユーザー辞書か自作の専門用語集にもある読みは、Split でそちらが先に使われるので true。
+    /// </summary>
+    public bool IsUserReading(string reading) => Current.ByReading.ContainsKey(reading) || Terms.TryGetUserForced(reading, out _);
 
     /// <summary>
     /// かなを、登録した読みの部分とそれ以外に分ける。先頭から見て、その位置から始まる最も長い登録済みの読みを取る。

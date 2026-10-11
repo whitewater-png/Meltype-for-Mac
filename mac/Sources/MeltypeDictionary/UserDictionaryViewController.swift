@@ -334,7 +334,7 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
 
     @objc func addWord(_ sender: Any?) {
         guard let window else { return }
-        let editor = WordEditor(.init(title: "単語を登録", explanation: "登録した語は、変換で最優先に使われます (専門用語集・変換エンジンより先)。", confirmTitle: "登録", key: WordKey(reading: "", word: "")),
+        let editor = WordEditor(.init(title: "単語を登録", explanation: "登録した語は、変換で最優先に使われます (専門用語集・変換エンジンより先)。ただし読みが 2 文字以下の語は、変換エンジンが文節の途中と判断した場所では使われません。", confirmTitle: "登録", key: WordKey(reading: "", word: "")),
                                 validate: { [dictionary] in dictionary.check($0, except: nil) },
                                 submit: { [weak self] key in self?.perform(.add(key), message: "「\(key.word)」(\(key.reading)) を登録しました", hiddenMessage: "登録しました (検索条件に合わないため表示されていません)", select: [key]) },
                                 toReading: { [dictionary] in dictionary.toReading($0) })
