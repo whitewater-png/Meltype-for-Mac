@@ -1549,3 +1549,75 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
 - 期待どおりに動いたもの: P33 `3×4`・`10÷2` (`電話を3回かける` は変わらない)、P31 `pingをうつ`・`lo-fi`・`gpgが`・候補の `氣`、P30 `しの→紫乃` を登録して `私のことが好き` (紫乃が割り込まない)・`めるたいぷ→Meltype` を登録して `今日はMeltypeを使う`、P32 Ctrl+H (問題なし)。これで P32 の「Ctrl+H が IMK から Core に届く」という未確認の前提も確かめられた。
 - 確認していないもの: P31 の `しゃーなし` が先頭候補か・`huihui`・`cwdde`、P30 のライブ変換の遅延、P33 で選んだ `×` が学習に混ざらないか、P32 の変換中 (Space の後) と何も打っていないときの Ctrl+H。
 
+
+## 追加項目 Q1 (語末に孤立して残った z / q が Enter で消える: 前が 1 音だけのとき、打ち間違いの直しで消さない)
+
+ベースは HEAD 2a5c765。Mac 実機 (インストールした IME)・Swift・Windows/Linux は未確認。
+
+- **現象**: 子音 + 母音 + `z` / `q` で終わる入力を Enter で確定すると、末尾の `z` / `q` が消える。`baz` → `ば`、`kaz` → `か`、`saz` → `さ`、`baq` → `ば`、メモのファイル名 `foo_bar_baz` → `foo_bar_ba`。入力中の表示 (`showing`) は `ばz`・`foo_bar_baz` で正しく、Enter の結果だけが違う。Space で変換を始めた読みも同じく `ば` になる (`foo_bar_baz` + Space は `foo_bar_ba `)。`bak`・`bab`・`bax`・`bal`・`baw`・`bah` は残る。
+  - 既存の挙動で、P25〜P29 の回帰ではない。v1.1.4 (00c9a7a) を自分でビルドして `baz`・`baq` が `ば` になることを確認した (`RomajiTypoCorrector.cs` は Mac 版の最初のコミット c3c247f から変わっていない)。
+  - **z と q だけの問題ではない** (下の表)。
+- **原因**: `CompositionController` の Enter / Space / 記号の処理が先に `CompositionText.FixTypos()` を呼び、その中の `RomajiTypoCorrector.Fix()` が、末尾に残った 1 文字を「打ち間違いの余計な 1 文字」として消している。実行して確かめたもの (`Fix` に標準エラー出力を足した使い捨てのビルド): `baz` → `[Fix] letters=baz final=True first=2 -> Wrong=baz Right=ba Kana=ば`、`baq` → `Wrong=baq Right=ba`、`bak` → `null`。
+  - 該当の行 (`src/Meltype.Core/Composition/RomajiTypoCorrector.cs`、修正前):
+    - `Fix()` の「語末に子音が 1 つ残っただけ (yoroshikuy) なら、隣のキーを一緒に押したときだけ消す」(`first == letters.Length - 1 && AnalyzeFragment(letters).IsValid` の枝)。`Neighbors` (QWERTY の隣のキー) で、`z` は `asx`、`q` は `wa` なので、`a` の後ろの `z`・`q` は「隣のキーを一緒に押した」と数えられ、`ば` が付属語 (`FunctionWords` に `ば` がある) として `Segment(...).Known` になるため消される。`bak` は `k` の隣 (`iojlm`) に `a` が無いので消えない。
+    - `q` は `q` 単独ではローマ字として読めない (`AnalyzeFragment("baq")` は無効) ので上の枝に入らず、後ろの候補探索 (`Consider`: 余計な 1 文字 / 隣のキーに置き換え) で `ba` (削除、費用 0.5 + `ば` 0.8) が選ばれる。`biq` → `びあ` のように `q` が `a` に置き換わる枝もある。
+  - 呼び出し側 (`CompositionText.FixTypos`): 「今の表示で英字に見えている部分」「5 文字以上の英単語を含む部分」は直さないが、`baz`・`foo_bar_baz` の `baz` は英単語として数えられない (BuiltIn・NS とも) ので直しの対象になる。
+  - `ConvertLenient` (表示用の変換) は関係しない: `Display(final: true)` は `baz` で `ばz` を返す (使い捨てのデバッグ出力で確認)。P26 (`z` + `h/j/k/l` の矢印) も関係しない: 矢印の処理は `CompositionText.Append` の先頭 (`_pending` が `z` 1 文字・単位がすべて矢印のとき) だけで、`FixTypos` は矢印の単位を飛ばすだけ。
+- **孤立した末尾の文字の表 (修正前)**: 子音 `b c d f g h j k l m p q r s t v w x y z` を、語頭 / 母音の後 (5 通り) / 子音 + 母音の後 (30 通り) / `desu` の後 / `foo_bar_ba` の後に付けて (計 988 入力、BuiltIn と NS の両方) Enter で確定した。母音と `n` は対象外。
+
+  | 文字 | 修正前に Enter で末尾が落ちた入力 (760 入力中) | 例 |
+  | --- | --- | --- |
+  | q | 15 | `baq`・`kaq`・`taq`・`haq` → 末尾が消える、`aq`・`biq`・`keq` → `ああ`・`びあ`・`けあ` (q が a に置き換わる) |
+  | s | 8 | `bas`・`kas`・`sas`・`tas`・`tes`・`ses`・`hes`、`foo_bar_bas` |
+  | z | 6 | `baz`・`kaz`・`saz`・`taz`・`haz`、`foo_bar_baz` |
+  | j | 4 | `ij`・`uj`・`sij`、`desuj` |
+  | k | 4 | `ik`・`sik`・`tok`・`mok` |
+  | h / l / r / y | 各 2 | `uh`・`desuh`、`tol`・`mol`、`ser`・`ter`、`uy`・`desuy` |
+  | d | 1 | `hed` |
+  | b c f g m p t v w x | 0 | |
+
+  入力中の表示 (`showing`) が落ちた入力は、この 988 入力では 0 件 (BuiltIn・NS とも。英単語と答えられた語 (BuiltIn の `hes`、NS の `uh`・`mol`・`eq`) は表示も英字になるが、末尾は残る)。落ちるのは Enter (と Space・記号の直前の `FixTypos`) だけ。語頭 (`z`・`q` 単独や子音 1 文字 + 末尾) は `first <= 0` で直さない。
+  - 規則は「隣のキー」の対応そのもの: 母音の後ろでこの子音が隣のキーになる組 (`a` の隣の `q w s z`、`i` の隣の `u o j k`、`u` の隣の `y i h j`、`o` の隣の `i p k l`、`e` の隣の `w r s d`)。`jazz`・`quiz`・`pizza`・`buzz`・`fizz` などの英単語は英語と判定されるので直しの対象にならない。
+- **修正** (`RomajiTypoCorrector.Fix` の先頭、`first <= 0` の次に 5 行): 読めない英字が最後に 1 つ残っただけ (`first == letters.Length - 1`) で、その前が 1 音以下 (`AnalyzeFragment(letters[..first])` の `Tokens.Count` + 入力途中の子音 `n` を 1 音と数えて 2 未満) なら、打ち間違いとは決めず直さない (`null`)。
+  - 理由: 1 音 (`ば`・`か`・`さ`) は付属語としても数えられるので、直しの根拠にならない。略語・変数名・ファイル名の末尾を消していた。2 音以上 (`yoroshikuy` の `よろしく`、`desuh` の `です`、`kanb` の `かん`) の後ろの余計な 1 文字は、今までどおり直す。
+  - z・q だけを除く案は採らなかった: 原因は文字によらず同じで、`bas`・`tes`・`ik`・`tok` など他の子音も同じ形で落ちていた。逆に z・q だけを除くと、他の子音が同じ形で落ち続けるまま残る。「z / q を他の子音と同じように残す」は、全部の子音で同じ規則にしたほうが満たしやすい。z・q だけに絞る場合は、`Fix` の同じ場所に `extra is 'z' or 'q'` を足すだけ (試していない)。
+  - P26 の矢印・`zu` → `zj` の打ち間違いの直し (`mizjwonomu` → `みずをのむ`、`hazkimeru` → `はじめる`、`mazjnoke`、`kozlsite`) は、読めない文字が末尾ではない (または前が 1 音でない) ので変わらない。テストで確認済み。
+- **変更したファイル**:
+  - `src/Meltype.Core/Composition/RomajiTypoCorrector.cs` (+5 行)
+  - `src/Meltype.Core.Tests/FeedbackTests.cs` (+54 行、テスト 2 件)
+- **テスト**: 505 → 508 件、すべて通る (査読後に、Space・記号の直前と既知の限界を固定するテストを 1 件足した)。`--eval-json` は 1242/1244 のまま、例ごとの結果も変更前と同じ (外れは `[英語] my name is taro`・`[混在] apinoerror` の 2 件)。
+  - `RomajiTypoTests.RomajiTypos_LoneKanaThenStrayConsonant_KeepsTheConsonant`: `baz`→`ばz`・`kaz`・`saz`・`taz`・`haz`・`baq`・`kaq`・`bas`・`kas`・`aq`→`あq`・`foo_bar_baz`・`foo_bar_baq`・`kanz`→`かんz`。打っている間の表示と Enter の結果が同じことも見る。
+  - `RomajiTypoTests.RomajiTypos_LoneKanaThenStrayConsonant_DoesNotTouchEnglishOrOtherFixes`: `jazz`・`quiz`・`pizza`・`buzz`・`fizz`・`qr`・`xz`・`zzz`・`qa`・`kazu`・`bax`・`bak`・`bab` が変わらない。2 音以上の直し (`yorosikuy`・`desuh`・`desuy`・`kanb`・`sanh`・`arigatpu`・`onegaishimsu`・`bakz`・`hazkimeru`・`mazjnoke`・`kozlsite`) が今までどおり。打ち間違いの直しを切ると `baz` が `ばz` のまま (原因が直しにあることの固定)。
+  - 赤→緑: 修正前に 1 件目が `baz 期待値: ばz / 実際: ば` で赤、修正後に緑 (2 件目は守りのテストで、修正前も緑)。
+  - 変異テスト (使い捨てのコピーで 1 つずつ。元に戻して `cmp` で確認): 閾値 `< 2` → `< 1` で 1 件目が赤、`< 3` で `desuh` が赤、`first == letters.Length - 1 &&` を外すと 3 件 (`mizjwonomu`・`shitmeasu`・`bakz`) が赤、規則ごと外すと 1 件目が赤、入力途中の `n` を数えない変更は最初のテストでは見逃されたので `kanb`・`sanh` を足して赤になることを確認した。
+- **前後比較** (変更前 = HEAD、変更後 = 同じ + この修正。`--probe` = 打って入力中の表示・Enter の結果・Space の結果を返す使い捨ての道具。BuiltIn と、`NSSpellChecker` が答えた語を表にして流す NS の両方。入力はどれも 1 行 1 入力):
+
+  | 入力 | 件数 | 差分 (BuiltIn / NS) |
+  | --- | --- | --- |
+  | 既存のコーパス (corpus.txt) | 5,040 | 0 / 0 |
+  | readings.txt の全語をローマ字にしたもの | 20,174 | 0 / 0 |
+  | 上の語 + 助詞 8 種 (ga de to wo ni ha no mo) | 161,392 | 0 / 0 |
+  | 孤立した末尾の文字の表 (上) | 988 | 43 / 43 |
+  | z / q を含む自作入力 (実在の英語・略語・コード識別子・変数名・コマンド・日本語のローマ字と打ち間違い・文) | 570 | 126 / 126 |
+  | 格子 (左 12 種 × 1 音 10 種 × 末尾の子音 20 種 × 右 8 種) | 19,200 | 1,644 / 1,644 |
+
+  - 差分は全件が「末尾の消されていた文字が残る」方向。内訳: (a) Enter / Space の結果に消えていた文字が足されただけ、(b) `aq`→`ああ`・`biq`→`びあ` のように `a` に置き換わっていた `q` が残る、(c) NS で `bas`・`haz`・`yas`・`das`・`uh`・`eq`・`mol`、BuiltIn で `hes` は、直す前は `ば`・`は` などの日本語に確定していたが、直さなくなったので打ったままの英字で確定する (入力中の表示は元から `hes`・`uh` など英字 / `ばs` で、表示と Enter がそろう)、(d) `Hello ik` → 変更前 `Hello i` / 変更後 `Hello いk` のように、英語・URL・`README.md` の後ろの 1 音 + 子音で、消した後の 1 文字が英語に見えていたものが、日本語の 1 音 + 子音になる (BuiltIn 100 件。`Hello `・`README.md `・`https://` の後ろの `i`・`u`・`ha` + 子音。NS はこれに加えて、NS が英単語と答える `bas`・`haz`・`uh` が、日本語に確定していたものから英字に確定する 7 件 + `.bas.` など 12 件 = 107 件)。(e) 記号の前 (`baz?`・`(baz)`・`"baz"`・`def baz():`・`baz_`) も、同じ `FixTypos` を通るので `ばz？` のように残る (入力中の表示が変わる分も同じ原因)。
+  - 手で確かめた上の例外: 差分の中に、英単語 (`jazz`・`quiz`・`pizza`・`buzz`・`fizz`)・`qa`・`qr`・`zzz`・`xz`・`kazu`・2 音以上の直し・日本語の語 (readings)・矢印 (`zh` など) は 1 件も無い。
+  - 入力中の表示と Enter の結果が違う入力 (英字だけの 1,162 入力のうち): BuiltIn で 134 → 73 件、NS で 182 → 125 件。残りは、Enter で語全体が英単語と判定される入力 (`sag`・`sam`・`say` など。z・q 以外の子音も同じで、今までどおり) で、末尾が z / q のものは BuiltIn で 0 件、NS で 3 件 (`haz`・`oz`: NS が英単語と答える)。
+- **トレードオフ**:
+  - 前が 1 音だけの「本物の打ち間違い」の直しが無くなる: `aq` (= `aa` の打ち間違い?) → `ああ`、`ik`・`uh`・`ser`・`tok` のように 1 音 + 隣のキーを一緒に押したもの → 1 音だけ。いずれも 1 音だけの入力で、根拠が弱い (略語・変数名と区別できない)。
+  - **前が 2 音以上でも、最後が 1 文字の付属語で終わるものは、z・q が消えるまま**: `kyouhaz` → `きょうは`、`foobaz` → `ふぉおば`、`tabetaz`・`mataz`・`okaz`・`abz`、`kyouhaq` → `きょうは`。`Segment` の「最後の区切りが付属語 (`は`・`ば`・`た`)」を根拠にしているため。`foo_bar_baz` のように `_` などで区切られた最後の 1 音は直った。区切りのない `foobaz` が残るのは、同じ原因で、最後の区切りの長さ (2 音以上の語か) まで見るともっと広く直せる (未実装。実装するなら `Segment` が最後の区切りの長さを返す形にして、直す条件を「最後の区切りが 2 音以上」にする。`tabetaz`・`mataz` の直しも失われる)。
+  - `desu` の後ろの `h`・`j`・`y` (`desuh` → `です`) は、直しの対象のまま (2 音。`yoroshikuy` と同じ設計)。
+  - 打ち間違いの直しが切れていても (設定)、元から消えない。
+  - Space で変換を始めた読みも同じ関数を通るので、`baz` + Space の読みは `ばz` になる (実エンジン azooKey でどう変換されるかは未確認)。
+- **未検証**: Mac 実機 (TextEdit など) で `baz`・`kaz`・`foo_bar_baz` を Enter する確認。実機の `NSSpellChecker` は答えが BuiltIn と違うが、`--probe` では NS の答えを表にして流した (`NSSpellChecker` を直接使うのは語の有効性の問い合わせだけで、`CallbackWordChecker` のキャッシュや Swift 側の経路は通っていない)。Swift・`MeltypeSession.HandleKey` の経路 (記号キーが vk `0x07`) は試していない。Windows・Linux。Space 後の azooKey の変換結果。
+
+### Q1 査読 (独立した査読員 R5) の結果と対応
+
+- **P0 なし**。1 音の先頭 135 種 × 末尾 a〜z × 文脈 11 種 × 後ろ 5 種の計 130,910 入力を、修正前と BuiltIn・NSSpellChecker の両方で比べた。差分は各 2,945 件で、(a) 消えていた文字が残る、(b) `q` が `a` に置き換わっていたのが `q` のまま残る、(c) `hes`・`wok`・`uh`・`haz` などが英字のまま確定する、のどれかだった。「修正前は英字のまま確定していたのに修正後は日本語になる」入力は 0 件。readings.txt の全語 20,174 件に `z`・`q` を付けた 40,348 入力 (NS の差分 229 件) とコーパス 5,040 件でも、実在の日本語の誤削除は出なかった。`--eval` は 1242/1244 のまま。P26 の `z`+`hjkl` の矢印と `zj` の直し、`bazh`・`kazl` などは差分 0 件。条件を外す変異 (入力途中の `n` を数える項・閾値 `< 2` を `< 3`) で、どちらもテストが赤になる。
+- **P1 → 対応済み (固定)**: 前が 2 音以上で最後が 1 文字の付属語 (`ば`・`は`・`た`・`か`) で終わるもの (`foobaz`→`ふぉおば`、`kyouhaz`→`きょうは`、`tabetaz`→`たべた`、`aaz`→`ああ`、`kkaz`→`っか`) は、`z`・`q` が今も Enter で消える。直すと `tabetaz`→`たべた` のような本物の打ち間違いの補正も失われるので、直していない。この限界が将来うっかり広がる・塞がるときに赤になるよう、現在の答えを固定するテスト `RomajiTypos_Q1_AlsoHoldsBeforeSymbols_AndTheKnownLimitsArePinned` を足した。`foo_baz` は直るのに `foobaz` は直らない、という非対称が残る。
+- **P2 → 対応済み**: テストが Enter だけだったので、記号の直前 (`baz?`・`def baz():`) も同じ `FixTypos` を通ることを同じテストで固定した。なお `baz,` は `ばz` ではなく `ば‥` になる。`z,` はローマ字入力の規則 (`z,` → `‥`、`z.` → `…`、`z-` → `〜`) で、打ち間違いの補正ではない (変えていない)。
+- **P2 (記録のみ)**: 英語の文脈で `Hello tok` は、入力中の表示は `tok` (英字) なのに Enter は `Hello とk` になる (修正前は `Hello to`)。文字は減らなくなったが、英語の文の中にかなが混ざる形に変わる (BuiltIn 約 100 件・NS 107 件)。入力中の表示と Enter の結果が食い違う形は残る。`baz` 単独は `ばz` で確定する (英語なら `baz` のままが理想だが、これは英語判定の別問題)。
+- **未検証**: 実機の Mac と Swift 側の経路、Space 後の azooKey の変換結果。
+
+- 作業用のコピー・比較表・評価用の入力は作業用フォルダー (`cache/scratch`) にあり、24 時間で消える。再現は `--repro`・`--segments`・`--expect` と、この節の入力で行う。

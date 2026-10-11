@@ -824,6 +824,87 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void RomajiTypos_LoneKanaThenStrayConsonant_KeepsTheConsonant()
+    {
+        // Q1: 子音 + 母音 + z / q で Enter すると、末尾の z / q が消えていた (baz → ば、foo_bar_baz → foo_bar_ba)。
+        // 原因は「語末に子音が 1 つ残った。隣のキーなら打ち間違いとして消す」(RomajiTypoCorrector.Fix) が、前が 1 音 (ば・か・さ) だけでも働くこと。
+        // z・q は a の隣のキー (s・d・k・r なども母音の隣)。前が 1 音だけでは打ち間違いの根拠が無い (略語・変数名・ファイル名かもしれない) ので消さない。
+        foreach (var (typed, expected) in new[]
+        {
+            ("baz", "ばz"), ("kaz", "かz"), ("saz", "さz"), ("taz", "たz"), ("haz", "はz"), ("baq", "ばq"), ("kaq", "かq"),
+            ("bas", "ばs"), ("kas", "かs"), ("aq", "あq"), ("foo_bar_baz", "foo_bar_baz"), ("foo_bar_baq", "foo_bar_baq"), ("kanz", "かんz"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed);
+            var showing = k.Showing;
+            k.Type("\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+            // 打っている間に見えていたものと、Enter で入るものが同じ
+            Assert.Equal(showing, k.Host.Document, typed + " の表示");
+        }
+    }
+
+    [Test]
+    public static void RomajiTypos_LoneKanaThenStrayConsonant_DoesNotTouchEnglishOrOtherFixes()
+    {
+        // Q1 の規則 (前が 1 音だけなら消さない) が、英単語・略語・ほかの打ち間違いの直しを変えない
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("jazz", "jazz"), ("quiz", "quiz"), ("pizza", "pizza"), ("buzz", "buzz"), ("fizz", "fizz"), ("qr", "qr"), ("xz", "xz"), ("zzz", "っっz"),
+                ("qa", "qあ"), ("kazu", "かず"), ("bax", "ばx"), ("bak", "ばk"), ("bab", "ばb"),
+                // 前が 2 音以上の打ち間違いは今までどおり直す (余計な 1 文字・隣のキー・z の打ち間違い)
+                ("yorosikuy", "よろしく"), ("desuh", "です"), ("desuy", "です"), ("arigatpu", "ありがとう"), ("onegaishimsu", "おねがいします"),
+                ("kanb", "かん"), ("sanh", "さん"), ("bakz", "ばか"), ("hazkimeru", "はじめる"), ("mazjnoke", "まずのけ"), ("kozlsite", "こぞして"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+            // 打ち間違いを直さない設定なら、もともと消えない (原因が打ち間違いの直しにあることを固定する)
+            var off = new CompositionTests.Keyboard();
+            off.CorrectTypos = false;
+            off.Type("baz\n");
+            Assert.Equal("ばz", off.Host.Document);
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void RomajiTypos_Q1_AlsoHoldsBeforeSymbols_AndTheKnownLimitsArePinned()
+    {
+        // Q1 の補足 (査読 R5): Space・記号の直前の確定も同じ FixTypos を通る。baz? や def baz(): でも z を消さない。
+        // 既知の限界: 前が 2 音以上で、最後が 1 文字の付属語 (ば・は・た) で終わるものは、z・q が今も消える
+        // (foobaz → ふぉおば、kyouhaz → きょうは)。直すと tabetaz → たべた のような本物の打ち間違いの補正も失われるので、直していない。
+        // 将来この限界を塞ぐ・広げるときに赤になるよう、現在の答えを固定する
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("baz?", "ばz？"), ("def baz():", "def ばz():"),
+                ("foobaz", "ふぉおば"), ("kyouhaz", "きょうは"), ("tabetaz", "たべた"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
     public static void ShortHeadThenCapital_IsName()
     {
         // 本家 #266 (本家 1640142 の例): McAfeeto が McA|feeto で切れて McAふぇえと になっていた。Mc・Le の後ろの大文字で終わる頭 (McA・LeB) は略語ではなく名前の途中

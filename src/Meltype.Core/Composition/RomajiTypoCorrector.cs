@@ -129,6 +129,11 @@ public sealed class RomajiTypoCorrector
         var first = FirstUnreadable(letters, final);
         // 語頭の打ち間違いはまれで、英字 1 文字 + 日本語 (sだけが) のこともあるので見ない。
         if (first <= 0) return null;
+        // 読めない英字が最後に 1 つ残っただけで、その前が 1 音だけ (baz の ba、kaq の ka) なら、打ち間違いとは決めない。
+        // 1 音 (ば・か・さ) は付属語としても数えるので、直しの根拠にならない。略語・変数名・ファイル名 (foo_bar_baz) の末尾を消していた。
+        // 2 音以上 (yoroshikuy の よろしく、desuh の です) の後ろの余計な 1 文字は、今までどおり直す。
+        if (first == letters.Length - 1 && _romaji.AnalyzeFragment(letters[..first]) is { IsValid: true } lead &&
+            lead.Tokens.Count + (lead.Partial.Length > 0 ? 1 : 0) < 2) return null;
         // 読めない子音の後ろに 2 文字以上打つまでは待つ (続きを打つと読めることがある: shimsu の s の後の u)。
         if (!final && letters.Length - first - 1 < 2) return null;
         // 語末に子音が 1 つ残っただけ (yoroshikuy) なら、隣のキーを一緒に押したときだけ消す
