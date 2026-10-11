@@ -45,6 +45,36 @@ internal static class FeedbackTests
     }
 
     [Test]
+    public static void Issue369_Huihui_StaysEnglish()
+    {
+        // Issue #369: huihui (AI のモデルを出している huihui-ai) が ふいふい (→ 回回) になっていた。ふいふい は日本語の語ではない
+        foreach (var (typed, expected) in new[] { ("huihui", "huihui"), ("huihuino", "huihuiの"), ("fuifui", "ふいふい") })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Issue375_DoubledLetterBeforeParticle_IsAcceptedTradeOff()
+    {
+        // #375 の修正 (語の最後の文字と助詞の頭が同じでも区切る) の代償として、同梱の単語表が知らない英語の語の
+        // 「二重字 + 助詞の頭」(slotto など) は、英単語ではなく 語 + 助詞 と読む。ここで現在の挙動を固定する
+        // (本家の変更と同じ。実機の NSSpellChecker は slot を知っているので、実機とは答えが違うことがある)
+        var k = new CompositionTests.Keyboard();
+        k.Type("slotto\n");
+        Assert.Equal("slotと", k.Host.Document, "slotto");
+        // 日本語の語は、二重字の綴りでも変わらない
+        foreach (var (typed, expected) in new[] { ("kitto", "きっと"), ("zuttoiku", "ずっといく"), ("matteite", "まっていて") })
+        {
+            var j = new CompositionTests.Keyboard();
+            j.Type(typed + "\n");
+            Assert.Equal(expected, j.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void ShiftedSingleConsonant_StaysUppercase()
     {
         foreach (var c in "WRTYPSDGHKLZXVBNM")
@@ -603,7 +633,10 @@ internal static class LanguageLearningTests
                 ("cyiisai", "ちぃいさい"), ("yiu", "いう"), ("wu", "う"), ("ceito", "せいと"),
                 ("translatebot[Thinking is thinking]", "translatebot「Thinking is thinking」"), ("fuwafuwanacornyorifuwafuwanachocolatenohougayum", "ふわふわなcornよりふわふわなchocolateのほうがyum"),
                 ("hey yo say!", "hey yo say!"), ("korosuzobot", "ころすぞbot"),
-                ("appuruulottitukereba", "あっぷるうぉっちつければ"), ("JapanesetoEnglishwohodohodonimazetahougagoodkamoshirenai", "JapaneseとEnglishをほどほどにまぜたほうがgoodかもしれない"), ("JavaScriptwokaku", "JavaScriptをかく"), ("iPaddeiisonnnadekakunakute", "iPadでいいそんなでかくなくて"), ("atohahelppe-jitoka", "あとはhelpぺーじとか"), ("HHireta", "HHいれた"), ("grokga", "grokが"), ("grokniyoruto", "grokによると"), ("guri-nnshanottara51kmijoukukan", "ぐりーんしゃのったら51kmいじょうくかん"), ("shitaraavgadete", "したらavがでて"), ("jimotogeoguessershitetara", "じもとgeoguesserしてたら"), ("jiketsurtashite", "じけつrtaして"),
+                ("appuruulottitukereba", "あっぷるうぉっちつければ"), ("JapanesetoEnglishwohodohodonimazetahougagoodkamoshirenai", "JapaneseとEnglishをほどほどにまぜたほうがgoodかもしれない"), ("JavaScriptwokaku", "JavaScriptをかく"), ("iPaddeiisonnnadekakunakute", "iPadでいいそんなでかくなくて"), ("atohahelppe-jitoka", "あとはhelpぺーじとか"), ("HHireta", "HHいれた"), ("grokga", "grokが"), ("cwdde", "cwdで"), ("pwdde", "pwdで"), ("cwdga", "cwdが"), ("grokniyoruto", "grokによると"), ("guri-nnshanottara51kmijoukukan", "ぐりーんしゃのったら51kmいじょうくかん"), ("shitaraavgadete", "したらavがでて"), ("jimotogeoguessershitetara", "じもとgeoguesserしてたら"), ("jiketsurtashite", "じけつrtaして"),
+                // Issue #375: 知らない英字の語の最後の文字と助詞の頭が同じ (cwd + de) でも区切る (語の頭から読めないので っ の綴りではない)
+                // 知らない語 (BuiltIn / NSSpellChecker のどちらも英単語と答えない語) でも同じ: gpg+ga・jwt+to・tdd+de
+                ("gpgga", "gpgが"), ("jwtto", "jwtと"), ("tddde", "tddで"),
                 // summary.json (2026-10-05): 音の途中から始まる英単語 (kara|na|l の anal、da|me|x の amex) で小書き文字が崩れていた
                 ("yakaranala", "やからなぁ"), ("damexe", "だめぇ"), ("hotelya", "hotelや"),
                 // 笑いの w (文末の w が消えていた、ww が っw になっていた)。英単語の最後の w はそのまま

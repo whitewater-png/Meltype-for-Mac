@@ -720,7 +720,7 @@ internal static class CompositionTests
         // えーmail、こーおp になっていた
         foreach (var (typed, expected) in new[]
         {
-            ("e-mail", "e-mail"), ("co-op", "co-op"), ("e-maildeokuru", "e-mailでおくる"), ("x-ray", "x-ray"), ("r-18", "r-18"), ("sub-6", "sub-6"), ("GPT-6.7", "GPT-6.7"),
+            ("e-mail", "e-mail"), ("co-op", "co-op"), ("e-maildeokuru", "e-mailでおくる"), ("x-ray", "x-ray"), ("lo-fi", "lo-fi"), ("Lo-fi", "Lo-fi"), ("sci-fi", "sci-fi"), ("lo-fiwokiku", "lo-fiをきく"), ("r-18", "r-18"), ("sub-6", "sub-6"), ("GPT-6.7", "GPT-6.7"),
             ("e-to", "えーと"), ("su-pa-", "すーぱー"), ("o-bun", "おーぶん"),
         })
         {
@@ -1378,6 +1378,40 @@ internal static class CompositionTests
         }
     }
 
+    /// <summary>しゃーなし・しゃあなし を 西なし にする変換エンジン (Mozc の苦手な語の代わり)。</summary>
+    private sealed class NishinashiConverter : IKanjiConverter
+    {
+        public string? Convert(string hiragana) => hiragana.Replace("しゃーなし", "西なし").Replace("しゃあなし", "西なし");
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null) => [new(hiragana, Convert(hiragana)!)];
+    }
+
+    [Test]
+    public static void Shanashi_IsNotConvertedToPlaceName()
+    {
+        // #368: sha-nashi (しゃーなし) を、変換エンジンが 西なし にしていた。同梱の語句でかなのまま最初の候補にする
+        foreach (var (typed, expected) in new[] { ("sha-nashi", "しゃーなし"), ("shaanashi", "しゃあなし") })
+        {
+            var k = new Keyboard(converter: new NishinashiConverter(), userDictionary: new UserDictionary(null));
+            k.Type(typed + " ");
+            Assert.Equal(expected, k.Host.View!.Candidates[0], string.Join(" ", k.Host.View!.Candidates));
+            k.Press(VirtualKeys.Return);
+            Assert.Equal(expected, k.Host.Document);
+        }
+        // 文の中でも西なしにしない
+        var sentence = new Keyboard(converter: new NishinashiConverter(), userDictionary: new UserDictionary(null));
+        sentence.Type("sorehasha-nashidayo\n");
+        Assert.True(!sentence.Host.Document.Contains("西"), sentence.Host.Document);
+    }
+
+    [Test]
+    public static void Ki_OffersOldKanji()
+    {
+        // #371: き の候補に 気 の旧字体 氣 も出す
+        var k = new Keyboard();
+        k.Type("ki ");
+        Assert.True(k.Host.View!.Candidates.Contains("氣"), string.Join(" ", k.Host.View!.Candidates));
+    }
+
     [Test]
     public static void WiWe_OfferOldKana()
     {
@@ -1932,6 +1966,68 @@ internal static class CompositionTests
         })
         {
             Assert.Equal(expected, CompositionController.AddSpacesAroundEnglish(text, before, after), text);
+        }
+    }
+
+    [Test]
+    public static void SpaceAroundEnglish_WhenTypingInTheCompositionBox()
+    {
+        // #248: 英数を使わず、変換ボックスの中で英語と日本語を判定して打っても、設定「英単語の前後に半角スペース」が効く
+        Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("kyouhaGooglenipushshita\n", "きょうは Google に push した"),
+                ("pingwoutsu\n", "ping をうつ"),
+                ("meetingga\n", "meeting が"),
+                ("kyouhashoppingniiku\n", "きょうは shopping にいく"),
+                // 別々に確定しても、前に確定した英単語との間に入れる
+                ("GitHub\nni\n", "GitHub に"),
+            })
+            {
+                var k = new Keyboard { SpaceAroundEnglish = true };
+                k.Type(typed);
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            Detector.SpellChecker = null;
+        }
+    }
+
+    /// <summary>ping・pong を英単語と答えるスペルチェッカー (実機の NSSpellChecker は ping を英単語と答える。同梱の一覧 BuiltIn は答えない)。</summary>
+    private sealed class PingIsWordChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) => lower is "ping" or "pong" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void Ping_StaysEnglish_WhateverTheSpellCheckerSays()
+    {
+        // #320: ping の判定が、スペルチェッカーが知っているか (実機) 知らないか (同梱の一覧) で入力中の表示と確定結果がずれていた。
+        // 英語の一覧 (english.txt) に ping・pong を足して、どちらでも ping のまま
+        foreach (Detection.IWordChecker checker in new Detection.IWordChecker[] { Detection.BuiltInWordChecker.Shared, new PingIsWordChecker() })
+        {
+            Detector.SpellChecker = checker;
+            try
+            {
+                foreach (var (typed, expected) in new[] { ("ping", "ping"), ("pingwoutsu", "pingをうつ"), ("pong", "pong"), ("pongga", "pongが") })
+                {
+                    var k = new Keyboard();
+                    k.Type(typed);
+                    var showing = k.Showing;
+                    k.Type("\n");
+                    Assert.Equal(expected, k.Host.Document, $"{typed} ({checker.GetType().Name}) の確定");
+                    if (typed == "pingwoutsu") Assert.Equal(expected, showing, $"{typed} ({checker.GetType().Name}) の入力中の表示");
+                }
+            }
+            finally
+            {
+                Detector.SpellChecker = null;
+            }
         }
     }
 

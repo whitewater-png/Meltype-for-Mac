@@ -1172,3 +1172,66 @@ Google ドキュメントで、確定済みの文字 (例: 「v1.1.2】Mel」の
 - **候補 2**: Mac 実機と `--repro` の差を測れるようにする。テストハーネスの `IWordChecker` を記録型にして一括比較中に問い合わせた語を集め、Swift スクリプトで `NSSpellChecker` の答えを JSON にし、その表を返す checker で同じ一括比較を回す (P26 の `zh` のように、実機のスペルチェッカーだけが英単語と答える語を事前に見つけるため)。
 - **候補 3 (既知の制限)**: `report.docxni` (`docx|に`)・`Node.jsigai` (`js|以外`)・`classha` は、分ける位置が `CompositionUnit` の境目に限られるため分けられない。直すには強制した境目で単位を作り直す変更が `CompositionText` に及ぶ。
 - 比較用のビルド・入力・正解のデータは作業用フォルダー (`~/.hermes/profiles/henrietta/cache/scratch`) にあり、残らない。入力と正解 (約 11 MB) を残すなら、別の置き場所 (リポジトリ外か `docs/` 以外の追跡しないフォルダー) に移す判断が要る。再現の手段は `--repro`・`--segments` と、スキル `meltype-mac-maintenance` の `scripts/compare_repro.py`。
+
+## 追加項目 P31 (判定の小さな修正と辞書の追加: 本家 #381・#320・#312・#384・#382・#383)
+
+- **現象**: 本家の open な PR 6 件ぶん。ベースは HEAD `d2f0206`。
+  - #381 (issue #375): 知らない英字の語の最後の文字と助詞の頭が同じだと区切られない。`cwdde` → `cwdde` (`cwdで` にならない)、`gpgga` → `gpgga`、`jwtto` → `jwtto`、`tddde` → `tっっで`、`nvmmade` → `nvmmaで`。
+  - #320 (issue #248): `ping`・`pong` が英語の一覧に無い。同梱の英単語表では `ping` → `ぴんg`、`pingwoutsu` → `ぴんがをうつ`。**NSSpellChecker は ping を英単語と答える**ので、実機では入力中の表示 `pingをうつ` と確定 `ぴんがをうつ` が食い違っていた (base の NS 判定器で `pingwo`: showing `pingを` / committed `ぴんがを` を確認)。
+  - #312: `lo-fi` → `ぉーふぃ`、`sci-fi` → `scいーふぃ` (NS では `sci-ふぃ`)。`HyphenatedWords` に無い。
+  - #384 (issue #368): 変換エンジンが `しゃーなし` を `西なし` にする。
+  - #382 (issue #369): `huihui` (AI のモデルを出している huihui-ai) が `ふいふい` になる。
+  - #383 (issue #371): `き` の候補に 気 の旧字体 `氣` が無い。
+- **対応**: 本家の差分をそのまま取り込んだ (Core は 2 行、辞書は 5 行。変更したファイル: `CompositionDetector.cs`・`dictionaries/{english,phrases,propernouns,candidates}.txt`・テスト 2 ファイル)。
+  - #381: `CompositionDetector` の `UnknownWordThenJapanese` (`TrailingParticles` を見る条件) から `stem[^1] == rest[0] ||` を削る。
+  - #320: `dictionaries/english.txt` に `ping pong`。
+  - #312: `CompositionDetector.HyphenatedWords` に `lo-fi`・`sci-fi`。
+  - #384: `dictionaries/phrases.txt` に `しゃーなし`・`しゃあなし` (同梱の語句。ユーザー辞書の後・変換エンジンの前に効く)。
+  - #382: `dictionaries/propernouns.txt` に `Huihui`。
+  - #383: `dictionaries/candidates.txt` に `き 気 氣` (候補の最後側に足すだけ。変換エンジンが 気 を返せば重ならない)。
+- **辞書の同梱手順の確認 (#383 ほか辞書 4 つ)**: **追加の作業は要らない**。`Meltype.Core.csproj` の `<EmbeddedResource Include="..\..\dictionaries\*.txt">` が `dictionaries/*.txt` をまとめて埋め込む。manifest・ハッシュ・コピー先の一覧は無く、`mac/build.sh` は辞書を個別にコピーしない (`dotnet publish` した `libMeltypeNative.dylib` に入る)。`Exports.cs` も辞書を読まない (`CandidateDictionary.Load` / `UserDictionary` / `ProperNouns` が埋め込みを読む)。`tools/check-dictionaries.mjs` はエラー 0・警告 0。**Mac 実機に反映するには `mac/build.sh` で dylib を作り直して入れ直す必要がある** (`mac/dist` の既存の dylib は古い辞書のまま。今回は作り直していない)。
+- **本家の差分から変えた点 (テストのみ)**:
+  - #381: `TesterReports_20261003` に `gpgga`・`jwtto`・`tddde` を足した (`cwdde` は BuiltIn では赤だが NS では元から通る。`gpgga` などは NS でも赤)。
+  - #320: 本家の `SpaceAroundEnglish_WhenTypingInTheCompositionBox` に加え、**`ping`・`pong` を英単語と答える判定器 (`PingIsWordChecker`、実機の NS と同じ答え) を差し込む `Ping_StaysEnglish_WhateverTheSpellCheckerSays`** を足した。BuiltIn と NS 型の両方で、確定結果と入力中の表示 (`pingwoutsu`) が `ping` で一致することを見る。
+  - #384: 変換エンジンの偽物が `しゃあなし` も `西なし` にするようにして、`shaanashi` と、文の中 (`sorehasha-nashidayo`) も見る。
+- **テスト** (472 → 478 件、全部通る。査読後に Issue375_DoubledLetterBeforeParticle_IsAcceptedTradeOff を 1 件足した):
+  - 新規 5 件: `CompositionTests.Ki_OffersOldKanji` (#383)、`Ping_StaysEnglish_WhateverTheSpellCheckerSays` (#320)、`SpaceAroundEnglish_WhenTypingInTheCompositionBox` (#320)、`Shanashi_IsNotConvertedToPlaceName` (#384)、`FeedbackTests.Issue369_Huihui_StaysEnglish` (#382)。
+  - 追記 2 件: `CompositionTests.HyphenatedEnglishWords_StayEnglish` (#312: `lo-fi`・`Lo-fi`・`sci-fi`・`lo-fiwokiku`)、`LanguageLearningTests.TesterReports_20261003` (#381)。
+  - **赤を先に確認**: テストだけ足した状態で 7 件が落ちた (`HyphenatedEnglishWords_StayEnglish` は `lo-fi` が `ぉーふぃ`、`Ki_OffersOldKanji` は候補 `き キ ｷ ki ｋｉ`、`Ping_...` は `ping` が `ぴんg`、`Shanashi_...` は先頭候補が `西なし`、`SpaceAroundEnglish_...` は `ぴんがをうつ`、`Issue369_...` は `ふいふい`、`TesterReports_20261003` は `cwdde`)。修正後に 477/477。`Shanashi_...` の追加分 (`shaanashi`・文の中) も、`phrases.txt` を戻すと落ちることを確認した。
+  - 品質テスト (`--eval-json`): 変更前 1242/1244 → 変更後 1242/1244 (外れる 2 件も同じ `my name is taro`・`apinoerror`、1,244 件の個別の成否は全件同じ)。BuiltIn のみ。
+- **前後比較** (`--expect` で Enter 確定した結果。`work/regress.py`): 変更前 (HEAD) と変更後を、BuiltIn と NS の両方で同じ入力に流した。NS は、実際に `IsWord` に来た語を `NSSpellChecker.checkSpelling(language: "en")` (Mac の `isWordCallback` と同じ呼び方) に投げて答えを集め、新しい問い合わせが出なくなるまで繰り返してから `MELTYPE_WORDS_FILE` で差し込む。全件の差分は `P31-diffs.md`。
+
+  | 入力 | 件数 | 差分 BuiltIn | 差分 NS |
+  |---|---|---|---|
+  | コーパス (review/work/corpus.txt) | 5,040 | 18 | 10 |
+  | readings.txt の全語をローマ字にした語 + 助詞 8 種 (ga de to wo ni ha no mo) | 161,392 (20,174 語。かなに戻せない 7 語は除く) | **0** | **0** |
+  | 同、助詞なし | 20,174 | **0** | **0** |
+  | 語尾と助詞の頭が同じ英字の語 (辞書の英字語 + de/desu/ga/to/tte/wo/ni/no/na/ha/mo/made) | 26,641 | 30 | 29 |
+  | 個別に選んだ入力 (cwd・gpg・ping・pong・lo-fi・sci-fi・huihui・しゃーなし・き など) | 179 | 57 | 40 |
+
+  - **実在の日本語を壊したものは 0 件**。差分は全件、目で見て期待どおりの改善 (英字の語 + 助詞が区切られる、`ping`/`lo-fi`/`sci-fi`/`huihui` が英字のまま)。日本語の語 + 助詞 (約 16 万件) は 1 件も変わらない (コードの条件上も、`stem[^1] == rest[0]` の判定に届くのは、頭の読める部分が 2 文字未満の知らない語だけ)。
+  - コーパスの差分 (BuiltIn 18): `cwdde`→`cwdで`、`pwdde`→`pwdで`、`gpgga`→`gpgが`、`jwtto`→`jwtと`、`tddde`→`tっっで`→`tddで`、`nvmmade`→`nvmまで`、`nvmmo`→`nvmも`、`rpmmade`→`rpmまで`、`rpmmo`→`rpmも`、`huihui`/`huihuiha`/`huihuino`、`lo-fi`/`lo-fiwokiku`/`sci-fi`、`pingwoutsu`→`pingをうつ`、`pingpong`→`pingpong`、`ponggo`→`pongご`。NS の 10 件は、BuiltIn の 18 件のうち `gpgga`・`jwtto`・`tddde`・`pingwoutsu`・`huihui` 系 3 件・`lo-fi` 系 2 件・`sci-fi` (NS は `sci-ふぃ` → `sci-fi`)。残る 8 件 (`cwdde`・`pwdde`・`nvmmade`・`nvmmo`・`rpmmade`・`rpmmo`・`pingpong`・`ponggo`) は、**NS では変更前から修正後と同じ結果** (`cwdで` など)。理由 (NS がどの途中の語を英単語と答えて区切りが変わるのか) までは調べていない。
+  - **BuiltIn と NS の違い** (個別 179 件でも同じ): BuiltIn だけ変わる 17 件 = `cwdde`・`cwddesu`・`pwdde`・`nvmmo`・`nvmmade`・`rpmmo`・`rpmmade`・`ping`・`ping!`・`pong`・`pong.`・`pingga`・`pongga`・`pingno`・`pingpong`・`pingpongu`・`pings`。NS だけ変わる入力は 0 件。両方で変わるのは `gpgga`・`jwtto`・`tddde`・`tdddesu` (#381 で実機に効くもの)、`pingwo`・`pingde`・`pingto`・`pongwo`・`pongde`・`pingfu` (#320。NS の base は `ぴんがを`/`ぴんがで`/`ぴんと` で入力中の表示 `pingを` と食い違い)、`lo-fi`・`sci-fi` 系、`huihui` 系。
+- **トレードオフ**:
+  - #381: 区切りが増えるぶん、英字の語 + 日本語の判定は「知らない語の最後の文字 + 助詞」になる。上の約 16 万件の日本語では 0 件だったが、読みが 2 文字未満になる知らない英字の語が実は日本語の「っ」の綴り (`kitta` のような) の一部だったときは区切られる。26,641 件の英字の語では、`slotto`→`slotと`・`plotto`→`plotと`・`presetto`→`presetと` のように、`slot`+`to` / `preset`+`to` と読むほうに寄る (`surotto` ではなく `slotto` と打った人は英語の意図の可能性が高い)。
+  - #320: `pingu`・`pinga`・`ponge`・`pinpon` (日本語の読み) は変わらない。BuiltIn だけ `pings` が `ぴんが` → `ぴんgs`、`pingpongu` が `ぴんごんぐ` → `pingぽんぐ`、`pingfu` が `ぴんぎふ` → `pingふ` になる (変更前も日本語として意味のある結果ではない。NS は `pings` を英単語と答えるので Mac 実機では `pings` は変わらない)。
+  - #312: ハイフン入りの語を 2 つ足しただけ。`ro-fi`・`lo-ru`・`lo-ka` など `lo-` で始まる日本語の打ち方は変わらない。
+  - #384: 同梱の語句は文の中の `しゃーなし` にも効く (`sorehasha-nashidayo` で `西` が出ない)。`しゃなし` のように `ー` が無い読みや、`しゃーなしに` のような続きは別の語として変換エンジンに任せる。
+  - #382: `huihui` を英字のままにするぶん、`ふいふい` と打ちたい人は `fuifui` を使う (`fuifui` → `ふいふい` は変わらない)。**`huihui-ai` (モデルの正式名) は直らない** (`huihui-あい`。ハイフンの規則 `HyphenatedWords` に `huihui-ai` を足せば直せるが、本家の PR にも無いので入れていない。必要なら別項目)。`huihuiai` は `ふいふいあい` のまま。
+  - #383: `氣` は候補の後ろのほうに出るだけで、先頭候補は変わらない。
+- **未検証**:
+  - Mac 実機・Swift 側は未確認 (今回は Core と辞書のみ。Swift・`Exports.cs` は触っていない。dylib も作り直していない)。
+  - #384: azooKey が実際に `しゃーなし` を `西なし` にするかは実機未確認。テストは偽の変換エンジンで「同梱の語句が先頭候補になる」ことを見ただけ。
+  - #383: azooKey が `き` の候補に 氣 を返すか、返す順番も実機未確認 (同梱側は後ろに足す)。
+  - NS 判定器での比較は、実機と同じ呼び出し (`checkSpelling(language: "en")`) を 1 回ぶんの Mac で集めた答え。ユーザーが macOS の辞書に学習させた語・OS のバージョン違いでは答えが変わりうる。`--eval-json` の品質は BuiltIn のみ (NS の判定器では未実施)。
+  - 比較の入力は自作 (コーパス・readings のローマ字化・辞書の英字語)。実際に人が打つ入力の分布ではない。ローマ字化は 7 語を除く全語を機械的に変換した (ん・っ・拗音の規則は単純なもの)。
+  - Windows・Linux の実機。
+
+### P31 査読 (独立した査読員 R2) の結果と対応
+
+- **P0 なし**。BuiltIn と NSSpellChecker の両方で、26 万語から作った入力 (二重字 + 助詞の頭 2,438 語)・readings 25,000 件・誤打 1 文字を入れた入力・笑いの繰り返し 1,135 件などを、変更前と比べた。実在の日本語の語や文を壊した例は見つからなかった。`tools/check-dictionaries.mjs` はエラー 0・警告 0。
+- **P1 (テスト不足) → 対応済み**: #381 の「区切る」方向のテストしか無く、代償 (`slotto` → `slotと` のように、同梱の単語表が知らない英語の二重字 + 助詞の頭は、語 + 助詞と読む) を固定するテストが無かった。`Issue375_DoubledLetterBeforeParticle_IsAcceptedTradeOff` を足し、現在の挙動と、日本語の二重字の綴り (`kitto`・`zuttoiku`・`matteite`) が変わらないことを固定した。
+- **P2**: 一覧に無い実在の英語で、新しく区切られる語がある (BuiltIn のみ: `stretto`・`stiletto`・`larghetto`・`preforbidden` など。NS でも `mlechchha`)。NS が知らない語はほぼ珍語で、実害は小さいと判断した。実装者が「理由を調べていない」とした 8 件 (`cwdde`・`pwdde`・`nvmmade`・`nvmmo`・`rpmmade`・`rpmmo`・`pingpong`・`ponggo`) は、NS が `cwd`・`pwd`・`nvm`・`rpm`・`ping`・`pong` を英単語と答えるため、変更前から別の経路で区切られていたと確認した。`kyouhacwddeninaru` のように語が打ち始めにないと #381 は効かない (本家と同じ仕様)。誤打した日本語は「ゴミ → 別のゴミ」になる (`qattoude` → `qatとうで`)。
+- **未検証**: 実機の azooKey が `しゃーなし` を `西なし` にするか・`き` に `氣` を返す順番。NS の答えはこの Mac 1 台ぶん。Windows・Linux の実機。
+
+- 作業用のコピー・比較表・評価用の文は作業用フォルダー (`cache/scratch`) にあり、24 時間で消える。再現は `--repro`・`--segments`・`--expect` と、この節の入力で行う。
