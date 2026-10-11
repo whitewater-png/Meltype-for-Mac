@@ -4,7 +4,7 @@
 #
 # ダブルクリックでインストールできる Meltype-mac-<version>.pkg を作る (先に ./build.sh で build/Meltype.app を作っておく)。
 #   cd mac && ./make-pkg.sh
-# 署名していない (ad-hoc 署名の Meltype.app をそのまま入れる) ので、開くときは右クリック →「開く」が必要。
+# 署名していない (ad-hoc 署名の Meltype.app をそのまま入れる) ので、開くときに許可が必要 (macOS 15 以降は システム設定 → プライバシーとセキュリティ →「このまま開く」。macOS 14 以前は右クリック →「開く」)。
 set -euo pipefail
 cd "$(dirname "$0")"
 
