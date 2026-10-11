@@ -386,6 +386,233 @@ public sealed class CompositionController
         return true;
     }
 
+    /// <summary>
+    /// ローマ字のまま入った文か (英字を含み、半角の英数字・記号・空白だけ)。
+    /// 本家 #332 (CompositionController.IsRomajiText) を取り込んだ。改行・タブ・全角の文字を含むものは、今までの再変換に任せる。
+    /// </summary>
+    internal static bool IsRomajiText(string text) =>
+        text.Any(char.IsAsciiLetter) && text.All(c => c is >= ' ' and <= '~') && text.Trim().Length > 0;
+
+    /// <summary>
+    /// ローマ字のまま入った文 (Meltype が止まっていた・英数のまま打った) を、読みに戻さず Meltype の判定で日本語にして、変換中の候補として見せる (Mac の選択 + Shift+Space)。
+    /// 候補は 日本語にした文 → 選んだままの文。Enter で選んだ文字と置き換え、Esc / BackSpace で選んだままに戻す。
+    /// 日本語だと言える所が無い (英文・URL・パス・コード。<see cref="IsRomajiEvidence"/>・<see cref="IsParticleAfterEnglish"/>・<see cref="RomajiMinShare"/>) ときは、何もせず false (今までの再変換に任せる)。
+    /// 学習はしない (打ち直した文ではないため)。
+    /// 本家 #332 の移植 (候補の出し方は本家と同じ。変換は ConvertJapanese にして、ユーザー辞書・学習した変換を使う。本家は日本語だと言える所の判定をしない = 英文の to・on・so も日本語にする)。
+    /// </summary>
+    internal bool ReconvertRomaji(string text)
+    {
+        if (IsComposing || !IsRomajiText(text)) return false;
+        var parts = SplitRomajiText(text, out var hasEvidence, out var hasParticle);
+        if (!(hasParticle || (hasEvidence && EnoughJapanese(parts))))
+        {
+            Diagnostics.Log.Info("再変換: 選んだ文字に、日本語にする所がありませんでした。");
+            return false;
+        }
+        // 選んだことでキャレットは動いている。直前に確定した語を、あとで確定し直さない (確定し直すと、選んだ文字ではなく手前の文字を消す)
+        _correctable.Clear();
+        BeginComposition();
+        // 選んだ文字の前後の空白は、置き換えても残す
+        var converted = new string(' ', text.Length - text.TrimStart(' ').Length)
+            + JoinRomajiParts(parts, kana => string.Concat(ConvertJapanese(kana).Select(c => c.Text)))
+            + new string(' ', text.Length - text.TrimEnd(' ').Length);
+        if (converted.Trim().Length == 0 || converted == text)
+        {
+            _text.Clear();
+            return false;
+        }
+        _reconvertOriginal = text;
+        _reconvertRomaji = true;
+        foreach (var c in converted) _text.AppendKana(c, c);
+        _text.Mode = DisplayMode.Hiragana;
+        // 候補を開くだけなので、Expanded にして変換エンジンの追加候補 (読み = 日本語にした文) を引かない
+        _clauses = [new Clause(converted, false, [converted, text]) { Expanded = true }];
+        _selectedClause = 0;
+        _converting = true;
+        _gate.Capture();
+        return true;
+    }
+
+    /// <summary>日本語の区間の英字が、文全体の英字の <see cref="RomajiMinShare"/> 以上か。英文に紛れた 1 語 (Hello, my name is Ryo.) で日本語にしないための下限。</summary>
+    private static bool EnoughJapanese(List<RomajiPart> parts)
+    {
+        var total = parts.Sum(p => p.Letters);
+        var japanese = parts.Where(p => !p.English).Sum(p => p.Letters);
+        return total > 0 && japanese >= total * RomajiMinShare;
+    }
+
+    /// <summary>日本語の区間の英字が文全体に占める割合の下限 (前後比較で決めた値)。</summary>
+    internal const double RomajiMinShare = 0.25;
+
+    /// <summary>ローマ字の文の 1 区間。English は英語 (Text は打ったまま)、でなければ日本語 (Text はかな)。NewWord は、空白で区切った語の先頭か。</summary>
+    private readonly record struct RomajiPart(bool English, string Text, bool NewWord, int Letters = 0);
+
+    /// <summary>
+    /// ローマ字の文を、空白で区切った語ごとに英語 / 日本語に分ける (打ったときと同じ判定。前の語が英語なら、それも手がかりにする)。
+    /// hasEvidence は、日本語の区間に「日本語だという証拠」が 1 つでもあるか (<see cref="IsRomajiEvidence"/>)。hasParticle は、英語の語のすぐ後ろ (同じ語の中) に助詞が続くか (<see cref="IsParticleAfterEnglish"/>)。
+    /// どちらも無ければ、ローマ字に見える英文を日本語にしてしまわないよう、何もしない。
+    /// 記号を含む語 (URL・パス・メール・ファイル名・コマンドの引数・製品名) は、判定にかけず英字のまま残す。
+    /// </summary>
+    private List<RomajiPart> SplitRomajiText(string text, out bool hasEvidence, out bool hasParticle)
+    {
+        var parts = new List<RomajiPart>();
+        hasEvidence = false;
+        hasParticle = false;
+        bool? previousEnglish = null;
+        foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (IsCodeLikeWord(word))
+            {
+                parts.Add(new RomajiPart(true, word, true, word.Count(char.IsAsciiLetter)));
+                previousEnglish = true;
+                continue;
+            }
+            // 前の語が日本語でも「日本語の続き」とはしない (空白で区切って打った語なので、語の途中ではない)。
+            // 前までが英文 (英語 2 語以上) という手がかり (PrecedingEnglishSentence) は使わない: pull request no / Visual Studio Code no の no が英語のまま残るため (docs/IMPROVEMENT_PLAN.md の P36 の前後比較)。
+            // 使うのは、直前が感動詞 1 語のとき (爆弾にはなれない oh no! の no を の にしない) だけ。
+            var typed = new CompositionText(_detector)
+            {
+                Level = () => _options.Level(),
+                TypoCorrector = _options.RomajiTypos,
+                CorrectTypos = () => _options.CorrectTypos(),
+                Punctuation = () => _options.Punctuation(),
+                FullWidthSymbols = () => _options.FullWidthSymbols(),
+                PrecedingEnglish = previousEnglish == true ? true : null,
+                PrecedingEnglishSentence = previousEnglish == true && AfterSingleEnglishWord(JoinRomajiParts(parts, kana => kana)) && IsEnglishSentence(JoinRomajiParts(parts, kana => kana) + " "),
+            };
+            foreach (var c in word) typed.Append(c);
+            typed.FixTypos();
+            var segments = typed.FinalSegments();
+            var first = true;
+            CompositionSegment? before = null;
+            var lastEnglish = false;
+            foreach (var (segment, kana) in segments)
+            {
+                // 日本語と判定されても、かなに読めた所が 1 つも無い (my の m + y のように、読み切れない英字だけ) 区間は英語として扱う
+                var english = segment.IsEnglish || (kana.Any(char.IsAsciiLetter) && kana.All(c => c < 0x80));
+                parts.Add(new RomajiPart(english, english ? segment.Raw : kana, first, segment.Raw.Count(char.IsAsciiLetter)));
+                first = false;
+                if (IsRomajiEvidence(before, segment, kana)) hasEvidence = true;
+                if (IsParticleAfterEnglish(before, segment)) hasParticle = true;
+                before = segment;
+                lastEnglish = english;
+            }
+            previousEnglish = segments.Count > 0 && lastEnglish;
+        }
+        return parts;
+    }
+
+    /// <summary>
+    /// 日本語のローマ字だと言える区間か: 前後の数字・文末の記号 (2026nen の 2026、arigatou! の !) を除いた中身が英字だけ (長音の - は可) で 3 文字以上、
+    /// かなが 2 つ以上読め (Take|shi の shi、by|F|ri|day の ri のように、英単語の端が 1 音だけ読めたものを除く)、英単語 (to・no・so・do・name …) でもない。
+    /// to・on・so のような英文の中の短い語や、a3f9c1d のような英数字の並びだけでは、日本語にしない。
+    /// 大文字で始まる語 (Kenji・Tanaka-san) と、敬称だけの語 (san・kun・chan・sama) も証拠にしない: 英文の中の人名は、直後に ! . , ? が付くと「語として確定」して日本語に読めるが、
+    /// それだけでは日本語だと言えない (Thanks, Kenji! / Hi Tanaka! / Thanks, Takeshi san!)。文頭の Kyou・Ohayou のような大文字の語は、語ごとの判定で元から英語になるので、この規則で失うものは無い。
+    /// </summary>
+    private bool IsRomajiEvidence(CompositionSegment? before, CompositionSegment segment, string kana)
+    {
+        if (segment.IsEnglish || kana.Count(c => c is >= 'ぁ' and <= 'ヿ') < 2) return false;
+        // 大文字で始まる英語の語のすぐ後ろ (Naka|mura、Take|shi のように、人名・固有名詞を途中で区切ったもの) は、証拠にしない
+        if (before is { IsEnglish: true } && char.IsAsciiLetterUpper(before.Value.Raw[0])) return false;
+        var core = segment.Raw.Trim("0123456789.,!?~'".ToCharArray());
+        if (core.Length > 0 && char.IsAsciiLetterUpper(core[0])) return false;
+        if (RomajiHonorifics.Contains(core)) return false;
+        return core.Length >= RomajiEvidenceLetters && core.All(c => char.IsAsciiLetter(c) || c == '-') && core.Count(char.IsAsciiLetter) >= RomajiEvidenceLetters
+            && !_detector.IsKnownEnglishWord(core);
+    }
+
+    /// <summary>敬称。単独の語 (Takeshi san の san) は、英文の中の人名にも付くので、日本語の証拠にしない (sensei は英単語の表にあるので、元から証拠にならない: 入れても結果が変わらなかった)。</summary>
+    private static readonly HashSet<string> RomajiHonorifics = new(StringComparer.Ordinal) { "san", "kun", "chan", "sama" };
+
+    private static readonly HashSet<string> RomajiParticles = new(StringComparer.Ordinal) { "de", "wo", "ha", "ga", "ni", "to", "no", "mo", "wa", "he", "ya", "kara", "made", "yori", "dake", "nado", "desu", "dayo" };
+
+    /// <summary>
+    /// 小文字の英語の語のすぐ後ろ (同じ語の中) に続く助詞 (sdk|to、xml|de): 英文の中の別の語にはならない、日本語だと言える形。
+    /// 大文字で始まる語は除く (Cly|de、Typ|ha、Ma|nto のような固有名詞・人名 Mako|to は、語の終わりが助詞に見えるだけ)。
+    /// </summary>
+    private static bool IsParticleAfterEnglish(CompositionSegment? before, CompositionSegment segment) =>
+        before is { IsEnglish: true, Raw.Length: >= 2 } && char.IsAsciiLetterLower(before.Value.Raw[0]) && !segment.IsEnglish && RomajiParticles.Contains(segment.Raw);
+
+    /// <summary>文 (ここまでの区間をつないだもの) の最後の日本語より後ろが、英語 1 語だけか (oh、hey)。</summary>
+    private static bool AfterSingleEnglishWord(string text)
+    {
+        var start = text.Length;
+        while (start > 0 && text[start - 1] < 0x80) start--;
+        return text[start..].Split(' ', StringSplitOptions.RemoveEmptyEntries).Length == 1;
+    }
+
+    /// <summary>ローマ字の再変換で、日本語だと言える区間に必要な英字の数。英文の中の短い語 (to・on・so) だけで日本語にしないための下限。</summary>
+    internal const int RomajiEvidenceLetters = 3;
+
+    /// <summary>
+    /// URL・パス・メール・ファイル名・コマンドの引数・コード・製品名のように、そのまま英字で残す語か:
+    /// 記号 (/ \ : = @ _ < > { } ( ) [ ] | & $ # * ; % ^ ` " +)、先頭の - / .、英数字の間の .、小文字のあとの大文字 (iPhone・azooKey)。
+    /// 文末の . , ! ? や、長音の - は含めない。日本語を Shift で区切って打った語 (TanakaMakoto) も、今までどおり何もしない。
+    /// </summary>
+    private static bool IsCodeLikeWord(string word)
+    {
+        if (word.Length > 1 && word[0] == '-' && (word[1] == '-' || char.IsAsciiLetterOrDigit(word[1]))) return true;
+        if (word.Length > 1 && word[0] == '.' && char.IsAsciiLetterOrDigit(word[1])) return true;
+        for (var i = 0; i < word.Length; i++)
+        {
+            var c = word[i];
+            if (i > 0 && char.IsAsciiLetterUpper(c) && char.IsAsciiLetterLower(word[i - 1])) return true;
+            if (c is '/' or '\\' or ':' or '=' or '@' or '_' or '<' or '>' or '{' or '}' or '(' or ')' or '[' or ']' or '|' or '&' or '$' or '#' or '*' or ';' or '%' or '^' or '`' or '"' or '+') return true;
+            if (c == '.' && i > 0 && i < word.Length - 1 && char.IsAsciiLetterOrDigit(word[i - 1]) && char.IsAsciiLetterOrDigit(word[i + 1])) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// SplitRomajiText の結果を 1 つの文にする。日本語の区間は続くものをつなげて convert (かな → 変換結果) にかけ、
+    /// 空白で区切って打った語の境目の、英語の前後には空白を残す (asita no meeting de review shimasu → 明日の meeting で review します)。
+    /// 空白なしで打った語の中 (kyouhagoogledekensaku) では空白を足さない。
+    /// </summary>
+    private static string JoinRomajiParts(List<RomajiPart> parts, Func<string, string> convert)
+    {
+        var output = new StringBuilder();
+        var kana = new StringBuilder();
+        void FlushKana()
+        {
+            if (kana.Length > 0) output.Append(convert(kana.ToString()));
+            kana.Clear();
+        }
+        foreach (var (english, part, newWord, _) in parts)
+        {
+            if (english)
+            {
+                FlushKana();
+                if (newWord && output.Length > 0 && output[^1] != ' ') output.Append(' ');
+                output.Append(part);
+                continue;
+            }
+            // 英語のあとに空白で区切って続く日本語は、空白を残す (続く日本語どうしは空白なしでつなげる)
+            if (kana.Length == 0 && newWord && output.Length > 0 && output[^1] != ' ') output.Append(' ');
+            kana.Append(part);
+        }
+        FlushKana();
+        return output.ToString();
+    }
+
+    /// <summary>ローマ字の再変換で開いた変換ボックスか (学習しない・Esc / BackSpace でそのまま元に戻す)。</summary>
+    private bool _reconvertRomaji;
+
+    /// <summary>ローマ字の再変換をやめて、選んでいた元の文字を書き戻す (変換ボックスは閉じる)。</summary>
+    private void CancelRomajiReconversion()
+    {
+        _text.Clear();
+        _converting = false;
+        _clauses = [];
+        _selectedClause = 0;
+        _reconvertRomaji = false;
+        ResetPrediction();
+        if (_reconvertOriginal is { } original)
+        {
+            _reconvertOriginal = null;
+            _host.CommitText(original);
+        }
+    }
+
     /// <summary>無効化・フォーカス喪失などで、未確定の内容をそのまま確定する。</summary>
     public void CommitPending()
     {
@@ -415,6 +642,7 @@ public sealed class CompositionController
     {
         _text.Clear();
         _reconvertOriginal = null;
+        _reconvertRomaji = false;
         _converting = false;
         _clauses = [];
         _headCount = 0;
@@ -692,6 +920,7 @@ public sealed class CompositionController
         _text.KanaInput = _options.KanaInput();
         ResetPrediction();
         _reconvertOriginal = null;
+        _reconvertRomaji = false;
         var id = ++_compositionId;
         // 自分が確定した直後は、アプリ側のテキストがまだ更新されていないかもしれないので自分の記録を信じる。
         var recentOwnCommit = Environment.TickCount64 - _lastCommitTime < OwnCommitTrustMs;
@@ -875,6 +1104,16 @@ public sealed class CompositionController
     {
         var shift = _swallowedShift.Count > 0;
         var clause = _clauses[_selectedClause];
+        if (_reconvertRomaji)
+        {
+            // ローマ字の再変換: 読みに戻れないので、Esc / BackSpace は選んだままの文に戻してやめる。区切りは変えられない。
+            if (vk is VirtualKeys.Escape or VirtualKeys.Back)
+            {
+                CancelRomajiReconversion();
+                return true;
+            }
+            if (shift && vk is VirtualKeys.Left or VirtualKeys.Right) return true;
+        }
         switch (vk)
         {
             // 候補ウィンドウの番号どおりに選んで、そのまま確定する (範囲外の番号はキーだけ消費して何もしない)。
@@ -1813,7 +2052,8 @@ public sealed class CompositionController
         if (fixEnglish && !converting && _text.Mode == DisplayMode.Auto) text = FixEnglishTypo(text);
         var english = converting ? _clauses.All(c => c.IsEnglish) : _text.IsAlphanumericAt(final: true);
         var chosen = (converting || fixedOnly) && _clauses.Any(c => c.Changed);
-        if (converting) Learn();
+        // ローマ字の再変換は、打ち直した文ではないので学習しない (日本語にした文を読みとして覚えない)
+        if (converting && !_reconvertRomaji) Learn();
         else
         {
             if (fixedOnly) Learn();
@@ -2140,6 +2380,7 @@ public sealed class CompositionController
         }
         _text.Clear();
         _reconvertOriginal = null;
+        _reconvertRomaji = false;
         _converting = false;
         _clauses = [];
         _headCount = 0;

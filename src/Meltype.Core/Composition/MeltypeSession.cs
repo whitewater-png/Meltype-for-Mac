@@ -273,8 +273,15 @@ public sealed class MeltypeSession
         _host.Begin(null, false, null, null);
         // 段落のような長い選択を誤って再変換にかけない (読みに戻す処理と変換が重くなるため)。
         if (text.Length > MaxReconvertLength) return _host.Result(consumed: false);
-        if (Direct || !AppEnabled || !_settings().Enabled || _controller.IsComposing || ReadingOf(text) is not { } reading ||
-            !_controller.ReconvertKana(reading, text))
+        if (Direct || !AppEnabled || !_settings().Enabled || _controller.IsComposing) return _host.Result(consumed: false);
+        // ローマ字のまま入った文 (Meltype が止まっていた・英数のまま打った) は、読みに戻さず Meltype の判定で日本語にする (本家 #332)。
+        // 日本語だと言える所が無ければ (GitHub → ぎっとはぶ のように履歴・意味辞書から読みに戻す文字もここ) ReconvertRomaji は false を返し、今までの再変換に進む。
+        if (CompositionController.IsRomajiText(text) && _controller.ReconvertRomaji(text))
+        {
+            _controller.Pump();
+            return _host.Result(consumed: true);
+        }
+        if (ReadingOf(text) is not { } reading || !_controller.ReconvertKana(reading, text))
         {
             return _host.Result(consumed: false);
         }

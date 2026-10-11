@@ -174,6 +174,8 @@ final class MeltypeInputController: IMKInputController {
             let selection = client.selectedRange()
             if selection.location != NSNotFound, selection.length > 0, selection.length <= Self.maxReconvertLength,
                let selected = client.attributedSubstring(from: selection)?.string,
+               // 読めた長さが選択の長さと違うホスト (一部しか返さない) では、読んでいない後ろの文字まで置き換えてしまうので、何もしない
+               (selected as NSString).length == selection.length,
                let result = NativeCore.shared.reconvert(session, text: selected), result.consumed {
                 apply(result, to: client, replacing: selection)
                 return true

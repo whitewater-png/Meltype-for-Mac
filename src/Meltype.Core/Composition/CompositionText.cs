@@ -666,6 +666,28 @@ public sealed class CompositionText
         return builder.ToString();
     }
 
+    /// <summary>
+    /// 確定のときの区間分け (RenderSegments と同じ): 区間と、確定したときのかな (日本語の区間のみ。語末の n は ん にし、読み切れない子音は英字のまま後ろに付ける)。
+    /// 再変換で、ローマ字の語を英語 / 日本語に分けるのに使う。
+    /// </summary>
+    internal List<(CompositionSegment Segment, string Kana)> FinalSegments()
+    {
+        var result = new List<(CompositionSegment, string)>();
+        var segments = Segments(final: true);
+        for (var i = 0; i < segments.Count; i++)
+        {
+            var segment = segments[i];
+            if (segment.IsEnglish)
+            {
+                result.Add((segment, segment.Raw));
+                continue;
+            }
+            // 最後の区間だけ、入力途中の子音 (語末の n → ん) が残っている
+            result.Add((segment, segment.Kana + (i == segments.Count - 1 ? PendingText(final: true) : "")));
+        }
+        return result;
+    }
+
     /// <summary>英語判定を無視してすべてかなにしたもの (F6)。</summary>
     public string AllKana(bool final) => string.Concat(_units.Select(u => u.Kana)) + PendingText(final);
 
