@@ -1349,7 +1349,9 @@ public sealed class CompositionController
         {
             var others = string.Concat(clauses.Where((_, k) => k != i).Select(c => c.Text));
             var surrounding = (PrecedingForConversion ?? "") + others + (_followingText ?? "");
-            var preferred = _options.ContextRules?.Choose(clauses[i].Reading, surrounding) ?? _options.History?.Get(clauses[i].Reading);
+            // 数字のすぐ後ろの かける・わる は × ÷ (3かける4 → 3×4)。覚えた変換より優先する。たす・ひく などは記号を候補の 2 番目に足す (本家 #321・#293)
+            var math = AddMathSymbol(clauses, i);
+            var preferred = math ?? _options.ContextRules?.Choose(clauses[i].Reading, surrounding) ?? _options.History?.Get(clauses[i].Reading);
             // 変換エンジンは、文節が「から」だけだと記号 (～) にしてしまう。記号だけの変換結果は、ひらがなの後ろに回す。
             preferred ??= IsSymbolOnly(clauses[i].Text) && clauses[i].Reading.All(c => c is >= 'ぁ' and <= 'ゖ') ? clauses[i].Reading : null;
             // 英単語に挟まれて助詞だけの文節になると、変換エンジンは漢字にしてしまう (github + に + push → 二)。助詞はかなのまま。
@@ -1366,6 +1368,73 @@ public sealed class CompositionController
         }
         return clauses;
     }
+
+    /// <summary>
+    /// 計算の言葉 (かける・わる …) で始まる文節の読み。前に数字が付いていてもよい (3かける)。後ろには何が続いてもよい
+    /// (azooKey は 3|かける4は12 のように、かけるの後ろの数字と助詞まで 1 つの文節にする)。
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex MathOperator =
+        new(@"^(?<a>(?:[0-9０-９]+(?:[.．][0-9０-９]+)?)?)(?<op>かける|わる|たす|ひく|ぷらす|まいなす|いこーる)(?<rest>.*)$", System.Text.RegularExpressions.RegexOptions.Singleline);
+
+    private static bool IsDigit(char c) => char.IsAsciiDigit(c) || c is >= '０' and <= '９';
+
+    private static readonly char[] MathSymbols = ['×', '÷', '+', '＋', '-', '－', '−', '=', '＝'];
+
+    /// <summary>
+    /// 数字のすぐ後ろの計算の言葉の文節に、記号の候補を足す (3かける4 → 3×4、1たす1 → 1+1: 本家 #321・#293)。
+    /// かける・わる は、前が数字で、後ろが数字か文の終わりのときだけ記号を最初の候補にする (その文字列を返す)。
+    /// 後ろに言葉が続く (3かける人、10わるい) ときは動詞なので動かさない。
+    /// たす・ひく などは動詞 (足す・引く) のことも多いので、2 番目の候補に足すだけ (null を返す)。
+    /// 5分かける・3時間かける のように、数字と かける の間に単位があれば前が数字ではないので何もしない。
+    /// + - = の全角・半角は、前の数字に合わせる。
+    /// </summary>
+    private string? AddMathSymbol(List<Clause> clauses, int i)
+    {
+        var clause = clauses[i];
+        if (clause.IsEnglish || clause.Candidates.Count == 0 || MathOperator.Match(clause.Reading) is not { Success: true } match) return null;
+        var digits = match.Groups["a"].Value;
+        var rest = match.Groups["rest"].Value;
+        var before = digits.Length > 0 ? digits : i > 0 ? clauses[i - 1].Text : PrecedingForConversion ?? "";
+        if (before.Length == 0 || !IsDigit(before[^1])) return null;
+        // 数字の前が英字 (mp3・A4) なら、数ではなく名前の一部
+        var start = before.Length;
+        while (start > 0 && (IsDigit(before[start - 1]) || before[start - 1] is '.' or '．')) start--;
+        if (start > 0 && char.IsAsciiLetter(before[start - 1])) return null;
+        var op = match.Groups["op"].Value;
+        // 後ろが数字で始まるか、文の終わりか (かける人・わるい・かけるなら のように言葉が続くなら動詞)
+        var numeric = rest.Length > 0 ? IsDigit(rest[0])
+            : i + 1 < clauses.Count ? clauses[i + 1].Text is [var head, ..] && IsDigit(head)
+            : _followingText is not [var following, ..] || !char.IsLetter(following);
+        if (!numeric) return null;
+        var full = !char.IsAsciiDigit(before[^1]);
+        var symbol = op switch
+        {
+            "かける" => "×",
+            "わる" => "÷",
+            "たす" or "ぷらす" => full ? "＋" : "+",
+            "ひく" or "まいなす" => full ? "－" : "-",
+            _ => full ? "＝" : "=",
+        };
+        // 変換エンジンの文字列のうち、動詞の部分 (掛ける・書ける・悪) だけを記号にする。後ろの数字・助詞 (4は12) はそのまま
+        var engine = clause.Candidates[0];
+        var lead = 0;
+        if (digits.Length > 0) while (lead < engine.Length && (IsDigit(engine[lead]) || engine[lead] is '.' or '．')) lead++;
+        var tailStart = rest.Length == 0 ? engine.Length : lead;
+        while (tailStart < engine.Length && !IsDigit(engine[tailStart])) tailStart++;
+        var tail = rest.Length == 0 ? "" : tailStart < engine.Length ? engine[tailStart..] : rest;
+        var text = engine[..lead] + symbol + tail;
+        if (op is "かける" or "わる") return text;
+        // たす・ひく: 変換エンジンがすでに記号を最初にしていれば足さない
+        if (engine.IndexOfAny(MathSymbols) >= 0) return null;
+        clause.Candidates.Remove(text);
+        clause.Candidates.Insert(Math.Min(1, clause.Candidates.Count), text);
+        return null;
+    }
+
+    /// <summary>計算の言葉の文節で、記号の候補 (×、+) を選んだか。学習しない (覚えると 電話をかける まで × になる)。</summary>
+    private static bool IsMathSymbolChoice(Clause clause) =>
+        MathOperator.Match(clause.Reading) is { Success: true } match && (match.Groups["rest"].Value is not [var head, ..] || IsDigit(head))
+        && clause.Text.IndexOfAny(MathSymbols) >= 0;
 
     /// <summary>する の活用 (した・して・しない・しよう・したい …) で始まる読み。</summary>
     private static readonly string[] SuruForms = ["する", "すれ", "した", "して", "しま", "しな", "しよ", "しと", "しちゃ", "しろ", "され", "させ", "せず"];
@@ -1857,6 +1926,8 @@ public sealed class CompositionController
             if (clause.Text == clause.Reading || clause.Text == CompositionText.ToKatakana(clause.Reading) || clause.Text == CompositionText.ToHalfWidthKatakana(clause.Reading) || clause.Text == clause.Raw) continue;
             // 英訳は上で英訳の記録に入れた (ここで覚えると次から 1 番目に出てしまう)。
             if (clause.Translations.Contains(clause.Text)) continue;
+            // 計算の記号 (かける → ×) も覚えない
+            if (IsMathSymbolChoice(clause)) continue;
             history.Remember(clause.Reading, clause.Text);
         }
     }
@@ -1911,7 +1982,7 @@ public sealed class CompositionController
         }
         foreach (var clause in _clauses)
         {
-            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit))
+            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause))
             {
                 Flush();
                 continue;
