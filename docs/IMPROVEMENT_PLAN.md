@@ -1621,3 +1621,92 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
 - **未検証**: 実機の Mac と Swift 側の経路、Space 後の azooKey の変換結果。
 
 - 作業用のコピー・比較表・評価用の入力は作業用フォルダー (`cache/scratch`) にあり、24 時間で消える。再現は `--repro`・`--segments`・`--expect` と、この節の入力で行う。
+
+## 追加項目 P34 (アーティスト名・記号入りの名前を英字のままにする: 本家 #303・PR #315 の改良導入)
+
+- **現象** (ベースは HEAD `2a5c765`。Mac 版 Core の `--repro` / テストの Keyboard で確認。本家 issue #303 の例):
+  - 辞書にない人名が「大文字の語 + 日本語」やローマ字として読める綴りに区切られる: `Wiz Khalifa` → `Wiz Kはぃふぁ`、`Ariana Grande` → `Ariana Granで`、`Ed Sheeran` → `Ed Sheえらん`、`Marshmello` → `Marshめっぉ`、`beabadoobee` → `べあばどおべえ`、`The Chainsmokers` → `The ちゃいんsmokers`、`iann dior` → `いあんぢor`、`999dobby` → `999どっby`。
+  - 記号を混ぜて書く名前・略語が崩れる: `B.o.B` → `B.お。B`、`U.S.A.` → `う.S.A。`、`T.K.O.` → `T.K.お。`、`R.I.P.` → `R.I.P。`、`Chri$tian Gate$` → `Chり＄ちあんGate$`、`Ke$ha` → `け＄は`。
+- **原因**:
+  - 名前: 辞書 (`propernouns.txt`) に無く、`FindSpans` が「大文字の語 + 助詞で始まるローマ字」(`K|halifa`、`Gran|de`) や「知っている短い語 + 残り」(`She|eran`、`Marsh|mello`) の規則で区切る。`beabadoobee`・`dior`・`dobby` は、ローマ字として最後まで読めて英語の根拠が無いので日本語になる。
+  - 記号入り: 英単語に見えないので、`.` は日本語の句読点 (`。`)、`$` は全角 `＄` として扱われ、英字の部分もローマ字に読まれる。P29 の `DotSuffixEnd` は「英語の語 + `.`」の後ろだけを見るので、`B`・`U` のような 1 文字の頭では働かない。
+- **本家 PR #315 の中身と、Mac 版にそのまま入らなかった点**: 本家は (1) `propernouns.txt` に 10 語、(2) `IsStylizedName` (正規表現 2 つ) を `Segment` の「構造のあるトークン (`@`・`_`・`://`・キャメルケース 2 回以上)」の条件に足す、の 2 つ。**Mac 版の `Segment` にはこの「構造のあるトークン」の分岐が無く、本家の hunk は当たらない**ため、`IsStylizedName` は Mac 版の `Segment` に自前で足した (調査員の試作と同じ置き場所)。本家の正規表現の形は残して、`$` の規則だけ狭めた (下記)。
+- **修正** (最小限。確信が無いときは今までの判定に戻す):
+  1. `dictionaries/propernouns.txt` に「音楽」を足す。**8 語**: `Khalifa Grande Sheeran Marshmello Beabadoobee Chainsmokers Dior Dobby`。本家の 10 語のうち `Ariana`・`Iann` は入れない (理由は「辞書の判断」)。他の辞書・既存の語との重複は 0 (`grep -il` で `dictionaries/*.txt` に無いことを確認、`node tools/check-dictionaries.mjs` はエラー 0・警告 0)。形式は既存の行と同じ (空白区切り・正しい大文字小文字・`#` の見出し)。
+  2. `CompositionDetector.Segment` の、先頭の矢印 (P26) の切り出しの直後・`FindSpans` の前に、**入力全体 (変換ボックスの先頭から最後まで、空白を含まない) が記号入りの名前の形なら、英語の 1 区間にして返す**。形は次の 2 つだけ (`IsStylizedName`)。
+     - 英字 1 文字ずつを `.` でつないだ、大文字を含む略語: `^(英字.)+英字.?\z` (`B.o.B`・`U.S.A.`・`T.K.O.`・`R.I.P.`・`A.B`)。
+     - 大文字で始まり、`$` の両側に英字がある名前: `^英字+(\$英字+)+\z` (`Ke$ha`・`Chri$tian`・`A$AP`)。
+     - 本家との違い: **語末の `$` (`Kyou$`) は含めない** (本家は `[A-Za-z]*` で含める)。`Kyou$` は日本語 `きょう＄` のままにする。
+     - 適用しない場合: かな入力 (`kanaInput`)・判定の強さが手動 (Manual。Shift で打った大文字始まりの語だけを英語にする設定で、変更前から `Marshmello` などは英字。記号入りは従来どおり)・3 文字未満・`.` `$` が無い・先頭が `.`/`$`。
+     - 先に返すので、P29 の `DotSuffixEnd` (`FindSpans` の中) や `FixTypos` と順序の競合は起きない。形に当たらない入力は 1 行も通らない (`IndexOfAny` で早く抜けるので、記号の無い入力の 1 キーごとの追加コストは文字列を 1 回つなぐ程度)。`Memory` (利用者が覚えさせた語) は見ない: `Memory` は `[a-z]` だけの語しか覚えない (`LanguageMemory.RememberCore`) ので、記号入りの名前には効かない。
+- **変更したファイル**: `dictionaries/propernouns.txt` (+4 行)、`src/Meltype.Core/Composition/CompositionDetector.cs` (+20 行)、`src/Meltype.Core.Tests/FeedbackTests.cs` (+60 行)。Swift・`Exports.cs`・`Meltype.Mac.Native` は触っていない。
+- **テスト** (508 → **511 件**、全部通る。査読後に、既知の限界と入力中の表示を固定するテストを 1 件足した。以下の 505 → 507 は単独で当てたときの件数): `FeedbackTests.Issue303_ArtistNames_StayEnglish` (本家のテストを移植 + `T.K.O.`・`R.I.P.`・`A$AP`・`Ke$haga`・`dior`・`Iann Dior`。`Anisiyouka`→`Aにしようか`・`Tokyonisumu`→`Tokyoにすむ` の「大文字の語 + 助詞は今までどおり区切る」を含む)、`Issue303_StylizedNameRule_LeavesJapaneseTypingAlone` (今までの答えを固定する守りのテスト。BuiltIn の英単語表を使う)。
+  - **赤を先に確認**: テストだけ足した状態で `Issue303_ArtistNames_StayEnglish` が `Wiz Khalifa` → `Wiz Kはぃふぁ` で落ちた (守りのテストは元から通る。変更前の答えを固定するため)。辞書だけ足すと次は `B.o.B` → `B.お。B` で落ち、規則を足して通った。
+  - **ミューテーション確認** (規則の条件を 1 つずつ外して、守りのテストが赤になることを確認): 語末の `$` を許す → `Kyou$` で赤、ドットの「大文字を含む」を外す → `a.b.c` で赤、Manual 除外を外す → 手動の `Ke$ha` で赤、`$` の「大文字で始まる」を外す → `ke$ha` で赤、規則ごと外す → `B.o.B` で赤。辞書の語は、外すと `Wiz Khalifa` で赤。
+  - 守りのテストの固定対象: `10.5`・`No.5`・`A.I.`・`3.14`・`$100`・`1$`・`kyou$`・`Kyou$`・`Ke$`・`ke$ha`・`foo$bar`・`Hello.wakarimashita`・`example.com`・`foo.bar`・`A.I.nohanashi`・`U.S.A.no`・`a.b.c`・`x.y.z`・`Mr.Tanaka`・`Meltype.dll` (P29)・辞書に入れなかった `ariana`・`iann`・`kyouhaarianawo`・`kyouhaiannwo` と、辞書の語の頭になる日本語の語 `aria`・`ariawase`・`chai`・`chain`・`chairo`、手動の `Ke$ha`・`B.o.B`。
+  - 品質テスト (`--eval-json`): 変更前 1242/1244 → 変更後 **1242/1244** (外れる 2 件も同じ `my name is taro`・`apinoerror`。1,244 件の個別の成否は全件同じ)。BuiltIn のみ。
+- **前後比較** (`--expect` で Enter 確定した結果と、`--prefixes` で 1 文字ずつ打った各時点の表示。変更前 HEAD と変更後を、BuiltIn (BI) と NSSpellChecker の答えを差し込んだ判定器 (NS) の両方で同じ入力に流した。道具は P31 の `regress.py` を流用。NS は P31 と同じく、実際に `IsWord` に来た語を `checkSpelling(language: "en")` に投げて集め、新しい問い合わせが出なくなるまで繰り返す)。全件の差分は `P34-diffs.md` と `diffs/*.tsv`。
+
+  | 入力 | 件数 | 差分 BI | 差分 NS |
+  |---|---|---|---|
+  | コーパス (review/work/corpus.txt) | 5,040 | **0** | **0** |
+  | readings.txt の全語をローマ字にした語 | 20,174 | **0** | **0** |
+  | 同 + 助詞 8 種 (ga de to wo ni ha no mo) | 161,392 | **0** | **0** |
+  | P29 の拡張子・ドメイン系の入力を集めたもの (「.」を含む) | 47,861 | 5 | 5 |
+  | 自然な文の自作 ($ . 入り・辞書の語入り) | 130 | 34 | 31 |
+  | 辞書の語の周り (語・先頭大文字・全大文字・途中まで・助詞・前置き) | 2,507 | 794 | 537 |
+  | $ . の自作 (固定 87 件 + 組み合わせ 6,000 件) | 6,008 | 528 | 512 |
+  | 英字 1 文字ずつの . つなぎ (`A.b`・`A.B.`・`A.B.C.` など) | 9,512 | 5,612 | 5,612 |
+
+  - **期待どおりの改善以外の差分は 0 件**: 差分の入力を機械的に (a) 空白で区切った 1 区間が記号入りの名前の形、(b) 辞書に足した 8 語のどれかを含む、に分けると、どの組でも (a)(b) のどちらでもない入力の差分は 0 件。規則の形に当たる入力 (BI・NS とも約 8,000 件) は、変更後に全件が入力どおり (英字のまま)。
+  - P29 系 47,861 件の差分 5 件は `U.K.`・`U.S.`・`U.K. dearu`・`U.S. nitsuite`・`U.S.A ni iku` (変更前 `う.K。` など。いずれも英字になった)。P29 の拡張子・ドメイン (`Meltype.dll`・`yahoo.co.jp` など) は 1 件も変わらない。
+  - 日本語 20,174 語 (+ 助詞 161,392 件) の確定結果は不変。**辞書追加の語で始まる語 (調査員の言う aria・ariawase・chaimu・china・chairo・chairudo) の確定も不変**。
+  - 自然な文の例 (BI): `B.o.B wo kiku` `B.お。B をきく` → `B.o.B をきく`、`Ke$ha no uta` `け＄はのうた` → `Ke$ha のうた`、`Wiz Khalifa wo kiku` → `Wiz Khalifa をきく`、`Ariana Grande wo kiku` `Ariana Granでをきく` → `Ariana Grande をきく`、`Starbucks no Grande` `Starbucks のGranで` → `Starbucks のGrande`、`U.S.A. ni iku` `う.S.A。にいく` → `U.S.A. にいく`。名前の後ろの空白は残る (P29 と同じ決まり。`Ke$ha no` → `Ke$ha の`)。
+  - **本家のテストの 14 例**での正解数 (14 件中): 変更前 2 → 規則だけ 6 → 辞書だけ (8 語) 9 → **最終 (規則 + 8 語) 13** → 本家の 10 語 + 規則 14。最終で外れる 1 件は `iann dior` (`いあんdior`)。
+
+- **辞書の判断 (Ariana・Iann を入れなかった理由と、入れない選択肢との比較)**
+  - 1 語ずつ外して比べた (BI/NS、`P34-wordtable.md`)。**`Ariana` と `Iann` だけが、日本語の名前としてよく打つ綴りと衝突する**: `ariana` = ありあな (アリアナ)、`iann` = いあん (イアン。語末の ん は `nn` で打つので `iann` が普通の打ち方)。本家の 10 語を入れると、`ariana` + Space / Enter が `ariana ` (英字のまま確定して、アリアナへの変換に進めない)、`iann` + Space が `iann ` になる (実測)。`kyouhaarianawo` → `きょうはarianaを` のように文の途中でも英字になる。`Ariana` は大文字で始めれば辞書なしでも変更前から英字なので、辞書で増えるのは小文字だけ。readings.txt にこの 2 語は無い (上の 16 万件の比較で、10 語を入れた版でも差分が 0 件だったことから)ので、機械的な比較には出てこない。上の実測は個別に打った入力による。
+  - 残る 8 語は、ローマ字として読めない (`kh`・`gr`・`rsh`・`dior` の r・`dobby` の bb など) か、日本語の語として自然に打つ綴りではない (`sheeran` = しぇえらん、`beabadoobee`、`chainsmokers`)。1 語ずつ外すと、その語を含む入力だけが変更前の答えに戻り、他は変わらない。
+  - 代償: 小文字の `iann dior` は `いあんdior` (dior だけ英字)、小文字の `ariana grande` は `ありあなgrande` (BI では本家の 10 語なら英字)。`Iann Dior`・`Ariana Grande` (大文字始まり) は直る。一語足せば戻せる (本家の行をそのまま使う場合は `Khalifa Ariana Grande Sheeran Marshmello Beabadoobee Chainsmokers Iann Dior Dobby` にする)。
+
+  | 選択肢 | 本家の 14 例の正解 | 日本語の語・名前への影響 |
+  |---|---|---|
+  | 辞書なし (記号の規則だけ) | 6 | なし。名前 8 語は変更前のまま崩れる |
+  | **8 語 (最終)** | **13** | 入力中の表示が 1 時点だけ英字に見える語がある (下記)。確定は不変 |
+  | 本家の 10 語 | 14 | 上の 2 語 (`ariana`・`iann`) が英字のまま確定。`aria`・`ariawase` も入力中に英字に見える |
+
+- **入力中の表示 (「表示だけ英字」になる語)**: 辞書の語の頭 4 文字以上が、打っている途中だけ英字になる (`CompositionDetector` の `growing && _proper.HasPrefix(...)` の規則。Space / Enter での確定は変わらない)。readings.txt の全 20,174 語を 1 文字ずつ打って比べると、変わるのは **5 語**: `chaina`・`chaini-zu` (`chai`・`chain` の時点)、`chaimu`・`chairudo`・`chairo` (`chai` の時点)。BI と NS で同じ。コーパスでは `chainsawwa`・`chairudo`・`chairudoga`。例: `chai` と打った時点で `ちゃい` → `chai` に変わり、次の文字で `ちゃいろ` に戻る。**`chai` / `chain` / `shee` で止めて Space を押した場合**、変換候補は `ちゃい`/`ちゃいん`/`しぇえ` のまま (変更前と同じ。表示 `chai` だけが違う)。`aria`・`ariawase` は 8 語では変わらない (`Ariana` を外したため。本家の 10 語では `aria` の時点で英字に見えた)。`shee` は日本語の語に無いので影響なし。`dior` は変更後 `dior` (変更前 `ぢor`)。`china` は変更前も `china` (英語の語)。
+  - 入れない選択肢との比較: `Chainsmokers` を外せば `chai`/`chain` の 5 語の見え方は戻るが、`The Chainsmokers` は崩れたまま。見え方だけの差 (確定は不変) と名前が崩れる損を比べて、入れる側にした。
+  - 記号入りの規則の入力中の表示: `U.S.A.` などは `U.S.A.` まで打った時点で英字、続けて `no` と打つと変更前と同じ `う.S.A.の` に戻る (`U.S.A.no` の確定は変更前と同じ)。`B.A.` の時点は `B.A。` → `B.A.` になる (変更前は `。` に変わっていた)。
+
+- **トレードオフ・既知の制限**:
+  - 名前 + 助詞は区切らない (`#268` の取り下げと同じ方針。名前 + 助詞を区切る処理は再提案しない)。`Ke$haga` → `Ke$haga` (変更前は `け＄はが`。本家も同じ)、`U.S.A.no` → `う.S.A.の` (変更前のまま。`U.S.A.` + 助詞は分けない)。辞書の語でも、`beabadoobee` + `dayo`/`mitai`/`kara`/`made`/`ttara`/`janai`/`nara`、`sheeran` + `ni`/`no`/`nara` (`nn` が ん になる曖昧さ)、`chainsmokersha` (`sha`) は、変更前と同じく日本語のまま (退行ではない)。`khalifa` + `ga`/`de`/`to`/`wo` などは英字 + 助詞に区切られる。
+  - 名前が文の途中にあると、規則は効かない: `kyouhaB.o.B`・`kyouhaU.S.A.`・`kyouhaKe$ha` は変更前のまま (`きょうはB。お。B` など)。入力全体がその形のときだけ。Space で区切って打てば効く (`kyouha B.o.B`)。辞書の語は文の途中でも効く (`kyouhakhalifawo` → `きょうはkhalifaを`)。
+  - `Kyou$` は変更前のまま `きょう＄` (本家は `Kyou$`)。`$100`・`1$`・`kyou$`・`10.5`・`No.5`・`A.I.`・`3.14` は変更なし。
+  - `$` を英字の間に挟んだ、大文字で始まる入力は、英字のままになる: `Hello$dayo` (変更前 `Hello$だよ`)・`Foo$bar` (変更前 `ふぉお＄bar`)・`Python$hwa`。日本語としてこの形を打つ人は想定しにくいが、ゼロとは言えない。小文字始まり (`ke$ha`・`foo$bar`) は変更なし。
+  - 英字 1 文字ずつの `.` つなぎで大文字を含むものは、ほぼ何でも英字になる (`A.e`・`I.e` は変更前 `A.え`・`I.え`、`a.B` は `あ。B`、`O.K` は `お.K`)。日本語として使う綴りは見つからなかった (`a.b.c`・`x.y.z`・小文字だけは変更なし)。
+  - 辞書の語は、小文字・大文字始まり・全大文字のどれでも英字になる。日本語の語・名前として同じ綴りを打つ人 (例えば `grande` を `ぐらんで` の打ち間違いとして使う) は想定していない。`diorama` は変更前から `ぢおらま` のまま (英単語の判定は別の話)。
+  - 手動 (Manual) では記号入りの規則を使わない (`Ke$ha` → `け＄は`、`B.o.B` → `B.お。B`)。大文字で始まる辞書の語 (`Marshmello`・`Khalifa`) は手動でも英字になる (変更後のビルドで確認。手動の判定は変えていない)。
+  - `Official髭男dism` は本家 PR も扱っていない (`higedanndism` を 髭男 に変換する話。辞書・変換の候補の問題)。
+  - Windows・Linux は対象外 (同じ Core だが、ここでは見ない)。
+- **未検証**:
+  - Mac 実機 (TextEdit など)・Swift・`Exports.cs`・dylib の作り直し (`mac/build.sh`)・`codesign`・辞書アプリの自己テストは、今回やっていない。Core のテストと `--repro` / `--expect` / `--prefixes` だけ。辞書は `mac/build.sh` で dylib を作り直さないと実機に反映されない。
+  - NS 判定器での比較は、実機と同じ呼び出し (`checkSpelling(language: "en")`) の答えを 1 回ぶんの Mac で集めたもの。利用者が macOS の辞書に学習させた語・OS のバージョン違いでは答えが変わりうる。`--eval-json` の品質は BuiltIn のみ。
+  - 比較の入力は自作 (コーパス・readings のローマ字化・P29 の入力・自作の `$` `.` 入り)。実際に人が打つ入力の分布ではない。ローマ字化は 7 語を除く全語を機械的に変換した。
+  - 実機の azooKey が `chai` / `Khalifa` などの Space 変換の候補をどう出すか。Enter 確定の結果ではなく、入力中の表示 (`chai`) が実際の打ち心地でどう見えるか。
+  - 性能: 追加分は 1 キーごとに文字列を 1 回つなぎ、`.` / `$` が無い入力はすぐ抜ける。実測はしていない。
+  - 実機で打って確かめる候補 (JIS 配列。`$` は Shift + 4、`.` はそのキー): `Wiz Khalifa` / `Ed Sheeran` / `Marshmello` / `B.o.B` / `U.S.A.` / `Ke$ha` / `Chri$tian Gate$` が英字のまま確定される、`Anisiyouka` → `Aにしようか`、`kyou$` → `きょう＄`、`10.5`・`No.5`・`$100`、`chairo` が `ちゃいろ`。
+
+### P34 査読 (独立した査読員 R6) の結果と対応
+
+- **P0 なし**。コーパス 5,040 件は BuiltIn・NS とも差分 0。自作の敵対入力 (略語 `E.g.`・`I.e.`・`Ph.D.`・`S.O.S`・`M.I.T.`・`N.Y.C.` と `$` を含む名前に助詞や前置きを付けた約 2,900 件、辞書 8 語の大文字小文字・助詞・前置きの組み合わせ約 13,000 件、`/usr/share/dict/words` で 8 語のどれかを含む英単語 51 語) で、日本語の語が英字に変わる退行は見つからなかった。差分はすべて「名前が英字のまま確定される」改善か、辞書の語そのもの・その語 + 助詞・その語を含む綴り間違いだった。判定の強さ 4 段階のうち Manual だけ記号入りの規則が効かない (計画どおり)。
+- **P1 → 対応済み (固定。広げる案は未実装)**: 名前の直後に記号が付く形 (`Ke$ha,`・`Ke$ha!`・`(B.o.B)`・`"Ke$ha"`・`B.o.B's`・`U.S.A.,`) は規則が効かず、変更前の崩れた答え (`け＄は、`・`(B.お。B)`・`う.S.A。、`) のまま。規則は空白で区切った 1 語全体が名前の形のときだけ働く (`kyouha B.o.B`→`今日はB.o.B` は効く)。本家 PR #315 の正規表現も入力全体に当てる形で、同じ制限と見られる (本家の挙動そのものは未確認)。末尾の `, . ! ? ; : ) " ' ’` と先頭の `( "` を許す案があるが、「確信が無いときは今までの判定に戻す」方針と、回帰の再査読の手間から、今回は入れていない。使ってみて困るなら別項目にする。
+- **P1 (テスト不足) → 対応済み**: 守りのテストが Enter だけだったので、`Issue303_StylizedName_KnownLimits_AreWordByWord_AndShowTheNameWhileTyping` を足し、(1) 空白で区切った文の中 (`kyouha B.o.B`・`kyouha Ke$ha dayo`)、(2) 記号が付く形の現在の答え (限界)、(3) 1 文字ずつ打つ途中の表示 (`B.o.B`・`Ke$ha`・`U.S.A.`) を固定した。
+- **P2 (記録のみ)**:
+  - BuiltIn のみの退行: 辞書の語で始まる英単語が壊れる (`grandeurs`→`grandeうrs`、`grandeeism`→`grandeえいsm`、`grandesque`→`grandesqうえ`)。NS はこの 3 語を英単語と答えるので実機の Mac では起きない。Windows・Linux のスペルチェッカーでの結果は未確認。
+  - `marshmellowwo` (marshmallow の綴り間違い + を) が BuiltIn・NS とも `marshmellowを` から `marshmelloっを` に変わる。単独の `marshmellow` は変わらない。`khalifatwo` は BuiltIn のみ `khalifatを` から `khalifatwo` に変わる。大文字始まりの `Beabadoobeega` は `Beabadoobeeが` に区切られる (khalifa + 助詞と同じ方針)。
+  - `chai`・`chain` の時点で、打ちかけの表示は英字になるが、Enter・Space の変換は日本語 (`ちゃい`・`ちゃいん`) のまま (確定は不変)。
+  - `Hello$dayo`・`Kyou$ha` のように大文字始まりで `$` を英字の間に挟む入力が英字になる (既知)。
+- **未検証**: Mac 実機での入力と、dylib の作り直し (`mac/build.sh`) 後の確認。ルールの条件を 1 つずつ外す変異テストは、実装者が 5 通りで実施済みで、査読員は実行していない。
+
+- 作業用のコピー・比較表・評価用の入力は作業用フォルダー (`cache/scratch`) にあり、24 時間で消える。再現は `--repro`・`--segments`・`--expect` と、この節の入力で行う。

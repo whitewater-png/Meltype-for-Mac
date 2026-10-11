@@ -112,6 +112,12 @@ public sealed class CompositionDetector
             if (arrows == units.Count && pending.Length == 0) return [arrowSegment];
             return [arrowSegment, .. Segment([.. units.Skip(arrows)], pending, precedingEnglish, followingEnglish, level, englishSentence, kanaInput, final)];
         }
+        // 記号を混ぜて書く名前・略語 (B.o.B、U.S.A.、Chri$tian、Ke$ha) は、入力全体がその形のときだけ英字のまま 1 語にする (本家 #303・PR #315)。
+        // 英単語に見えないので、FindSpans (日本語の打ちかけとして B.お。B などに区切る) や P29 の DotSuffixEnd には回さない。
+        if (!kanaInput && level != DetectionLevel.Manual && Raw(units, 0, units.Count) + pending is var stylized && IsStylizedName(stylized))
+        {
+            return [new CompositionSegment(true, "", stylized)];
+        }
         var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final);
         if (kanaInput) return segments;
         // 英語の後ろの , . は半角にしたが、すぐ後ろに日本語が続いた (Ok,konnna → Ok、こんな) なら、日本語の文の句読点にして分け直す。
@@ -130,6 +136,20 @@ public sealed class CompositionDetector
         }
         return segments;
     }
+
+    /// <summary>
+    /// 記号を混ぜて書く名前・略語か (本家 #303・PR #315 の IsStylizedName を、Mac 版の Segment に合わせて狭めた)。次の 2 つだけ。
+    /// ・英字 1 文字ずつを . でつないだ、大文字を含む略語 (B.o.B、U.S.A.、T.K.O.)。後ろに日本語が続く形 (U.S.A.no) は含まない。
+    /// ・大文字で始まり、$ の両側に英字がある名前 (Chri$tian、Ke$ha、A$AP)。語末の $ (Kyou$) と先頭の $ ($100)・数字つき (1$) は含まない。
+    /// どちらも入力全体 (変換ボックスの先頭から最後まで。空白は含まない) がその形のときだけ。数字・単位・ドメイン (10.5、No.5、example.com) は対象外。
+    /// </summary>
+    private static bool IsStylizedName(string token) =>
+        token.Length >= 3 && token.IndexOfAny(['.', '$']) > 0 && // 1 キーごとに呼ばれるので、記号が無い入力はここで除く
+        (token.Any(char.IsAsciiLetterUpper) && DottedLetters.IsMatch(token) ||
+         char.IsAsciiLetterUpper(token[0]) && DollarName.IsMatch(token));
+
+    private static readonly System.Text.RegularExpressions.Regex DottedLetters = new(@"^(?:[A-Za-z]\.)+[A-Za-z]\.?\z");
+    private static readonly System.Text.RegularExpressions.Regex DollarName = new(@"^[A-Za-z]+(?:\$[A-Za-z]+)+\z");
 
     private List<CompositionSegment>? UnknownWordThenJapanese(IReadOnlyList<CompositionUnit> units, string pending, List<CompositionSegment> segments, DetectionLevel level, string whole)
     {

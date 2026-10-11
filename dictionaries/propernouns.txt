@@ -73,3 +73,7 @@ America Europe Africa Australia Canada Mexico Brazil Germany France Italy Spain 
 # テスターのチャット (summary.json) で英字のまま打たれていた名前
 ReVanced Lavalink Skeb FANBOX Ryzen RTX Zenfone IntelliSense Unix
 Suica DCafe ProBot Carlbot Disboard TaCZ NSFW
+# 音楽 (アーティスト名。ローマ字として読める・大文字の語 + 日本語に区切れてしまう名前。本家 #303)
+# 本家が足した Ariana (ありあな → アリアナ) と Iann (いあん → イアン) は入れない: 日本語の名前としてよく打つ綴りで、小文字で打つと英字に変わってしまう。
+# (Ariana は大文字で始めれば辞書なしでも英字。Ariana Grande は Grande だけで直る)
+Khalifa Grande Sheeran Marshmello Beabadoobee Chainsmokers Dior Dobby

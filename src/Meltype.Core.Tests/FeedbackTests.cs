@@ -45,6 +45,66 @@ internal static class FeedbackTests
     }
 
     [Test]
+    public static void Issue303_ArtistNames_StayEnglish()
+    {
+        // 本家 #303 (PR #315): 大文字の語 + 日本語 (K|はぃふぁ、She|えらん、Gran|で) に区切られていた名前と、記号を混ぜて書く名前。
+        // 名前は dictionaries/propernouns.txt の「音楽」、記号入りの名前は CompositionDetector.IsStylizedName。
+        foreach (var (typed, expected) in new[]
+        {
+            ("Wiz Khalifa", "Wiz Khalifa"), ("Ariana Grande", "Ariana Grande"), ("Ed Sheeran", "Ed Sheeran"),
+            ("Marshmello", "Marshmello"), ("beabadoobee", "beabadoobee"), ("The Chainsmokers", "The Chainsmokers"),
+            ("Iann Dior", "Iann Dior"), ("dior", "dior"), ("999dobby", "999dobby"),
+            ("B.o.B", "B.o.B"), ("U.S.A.", "U.S.A."), ("T.K.O.", "T.K.O."), ("R.I.P.", "R.I.P."),
+            ("Chri$tian Gate$", "Chri$tian Gate$"), ("Ke$ha", "Ke$ha"), ("A$AP", "A$AP"), ("Ke$haga", "Ke$haga"),
+            // 大文字の語 + 助詞は今までどおり区切る
+            ("Anisiyouka", "Aにしようか"), ("Tokyonisumu", "Tokyoにすむ"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Issue303_StylizedNameRule_LeavesJapaneseTypingAlone()
+    {
+        // 記号入りの名前の規則は「入力全体が 英字 1 文字ずつを . でつないだ略語」か「大文字で始まり、語の中に $ がある名前」のときだけ。
+        // 日本語としてよく打つ . や $ (数字・単位・ドメイン・文の終わり・語末の $) と、前後に日本語が続く形は今までの判定のまま。
+        // 期待値は変更前の Core の答え (スペルチェッカーは同梱の英単語表)。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("10.5", "10.5"), ("No.5", "No.5"), ("A.I.", "A.I."), ("3.14", "3.14"), ("$100", "＄100"), ("1$", "1＄"),
+                ("ke$ha", "け＄は"), ("foo$bar", "ふぉお＄bar"), ("kyou$", "きょう＄"), ("Kyou$", "きょう＄"), ("Ke$", "け＄"), ("Hello.wakarimashita", "Hello。わかりました"), ("example.com", "example.com"),
+                ("foo.bar", "ふぉお。bar"), ("A.I.nohanashi", "A.I.のはなし"), ("U.S.A.no", "う.S.A.の"),
+                ("a.b.c", "あ。b。c"), ("x.y.z", "x。y。z"), ("Mr.Tanaka", "Mr。Tanaka"), ("Meltype.dll", "Meltype.dll"),
+                // 辞書に入れなかった綴り (ariana = アリアナ、iann = イアン) と、辞書の語の頭になる日本語の語は、今までどおり
+                ("ariana", "ありあな"), ("iann", "いあん"), ("kyouhaarianawo", "きょうはありあなを"), ("aria", "ありあ"), ("ariawase", "ありあわせ"),
+                ("chai", "ちゃい"), ("chain", "ちゃいん"), ("chairo", "ちゃいろ"), ("kyouhaiannwo", "きょうはいあんを"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+            // 手動 (Manual) は Shift で打った大文字始まりの語だけを英語にする設定なので、この規則は使わない (今までどおり)
+            foreach (var (typed, expected) in new[] { ("Ke$ha", "け＄は"), ("B.o.B", "B.お。B") })
+            {
+                var k = new CompositionTests.Keyboard { Level = DetectionLevel.Manual };
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, "手動: " + typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
     public static void Issue369_Huihui_StaysEnglish()
     {
         // Issue #369: huihui (AI のモデルを出している huihui-ai) が ふいふい (→ 回回) になっていた。ふいふい は日本語の語ではない
@@ -896,6 +956,39 @@ internal static class RomajiTypoTests
                 var k = new CompositionTests.Keyboard();
                 k.Type(typed + "\n");
                 Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void Issue303_StylizedName_KnownLimits_AreWordByWord_AndShowTheNameWhileTyping()
+    {
+        // P34 の補足 (査読 R6): 記号入りの名前の規則は「空白で区切った 1 語が名前の形のとき」だけ働く。
+        // 名前の直後に記号が付く形 (Ke$ha, / (B.o.B) / U.S.A.,) は効かず、変更前の崩れた答えのまま (本家 PR #315 の正規表現も入力全体に当てる形で、同じ制限)。
+        // 広げるときに赤になるよう、現在の答えを固定する。空白で区切った文の中では名前になる
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("kyouha B.o.B\n", "今日はB.o.B"), ("kyouha Ke$ha dayo\n", "今日はKe$ha だよ"),
+                ("Ke$ha,\n", "け＄は、"), ("(B.o.B)\n", "(B.お。B)"), ("U.S.A.,\n", "う.S.A。、"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed);
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+            // 1 文字ずつ打つ途中の表示も、名前が出来上がった時点で英字になる
+            foreach (var (typed, expected) in new[] { ("B.o.B", "B.o.B"), ("Ke$ha", "Ke$ha"), ("U.S.A.", "U.S.A.") })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed);
+                Assert.Equal(expected, k.Showing, typed + " の入力中の表示");
             }
         }
         finally
