@@ -33,6 +33,12 @@ if [[ ! -x "$BIN" ]]; then
     exit 0
 fi
 
+# 検査に落ちても Installer はファイルを置いた後なので Meltype.app は残る。exit 1 で Installer が失敗を表示する。ad-hoc 署名なので見つかるのは主に破損 (署名し直した改ざんは検出できない)。
+if ! /usr/bin/codesign --verify --deep --strict "$APP" >/dev/null 2>&1; then
+    echo "Meltype.app の署名の検査に失敗しました (壊れているか、書き換えられています)。登録をスキップします。"
+    exit 1
+fi
+
 # root で入った場合に備えて、持ち主をユーザーに直す
 if [[ "$(id -u)" == 0 ]]; then
     chown -R "$CONSOLE_USER" "$APP" 2>/dev/null || true

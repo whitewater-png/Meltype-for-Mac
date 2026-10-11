@@ -199,9 +199,11 @@ final class UpdateManager {
     /// 最新なら nil、そうでなければ利用者に見せる理由。判定そのもの (ダウンロードしてよいか) は本体の evaluateUpdate だけが行う。
     static func whyNoOffer(releaseJson: Data, currentVersion: String) -> String? {
         guard let object = try? JSONSerialization.jsonObject(with: releaseJson) as? [String: Any],
-              let tag = object["tag_name"] as? String else {
+              let rawTag = object["tag_name"] as? String else {
             return "更新の情報を読み取れませんでした。時間をおいて、もう一度お試しください。"
         }
+        // 表示に使うので、制御文字 (改行など) を除き、64 文字までに切り詰める (Release の tag_name は外から来る文字列)
+        let tag = String(String(rawTag.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }).prefix(64))
         // 「v1.2.3-mac」→ 1.2.3
         var version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
         if let dash = version.firstIndex(of: "-") { version = String(version[..<dash]) }
@@ -310,7 +312,7 @@ final class UpdateManager {
         let buttons: String
         let defaultButton: String
         if updatable {
-            text += "「更新する」を押すと、GitHub からダウンロードし、SHA-256 を確かめてから入れ替えます。入れ替えたあと、次にキーを打ったときから新しい版になります。"
+            text += "「更新する」を押すと、GitHub からダウンロードし、SHA-256 を確かめ、ダウンロードした Meltype.app の隔離属性 (Gatekeeper の確認) を外してから入れ替えます。入れ替えたあと、次にキーを打ったときから新しい版になります。"
             buttons = "{\"あとで\", \"詳細\", \"更新する\"}"
             defaultButton = "更新する"
         } else {
@@ -635,7 +637,7 @@ enum Updater {
         posix_spawn_file_actions_init(&actions)
         defer { posix_spawn_file_actions_destroy(&actions) }
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
-        posix_spawn_file_actions_addopen(&actions, 1, logFile.path, O_WRONLY | O_CREAT | O_TRUNC, 0o600)
+        posix_spawn_file_actions_addopen(&actions, 1, logFile.path, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o600)
         posix_spawn_file_actions_adddup2(&actions, 1, 2)
 
         let arguments = ["/bin/bash", "-c", script, "meltype-update", folder.path, work.path, version, logFile.path, dataDirectory.appendingPathComponent("update.lock").path]

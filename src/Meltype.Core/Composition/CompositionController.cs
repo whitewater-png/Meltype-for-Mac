@@ -498,7 +498,9 @@ public sealed class CompositionController
                 return;
             }
             // 英字以外のキー・Shift で判定を打ち切り、英語として出してから、そのキーを普通に処理する。
-            Diagnostics.Log.Info($"英数状態の判定を打ち切り: キー 0x{vk:X2} (Shift {_swallowedShift.Count})");
+            // キーの値は残さない: FileLog だけ ON (打った文字は記録しない設定) でも、数字・記号の仮想キーコードが並ぶと
+            // 英字+数字の列 (パスワードに多い) が読み取れてしまう。分類だけ記録する。
+            Diagnostics.Log.Info($"英数状態の判定を打ち切り: {VirtualKeys.DescribeKind(vk)} のキー (Shift {_swallowedShift.Count})");
             ReleaseHeldAsEnglish();
         }
 

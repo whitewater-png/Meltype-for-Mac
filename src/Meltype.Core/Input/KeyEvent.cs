@@ -31,6 +31,9 @@ internal static class VirtualKeys
     /// <summary>上段の数字キー (0〜9)。候補の番号選びに使う。</summary>
     public static bool IsDigit(int vk) => vk is >= 0x30 and <= 0x39;
 
+    /// <summary>ログ用に、キーを大まかな種類だけで表す (数字 / Enter / Space / 英字以外)。キーの値は残さない。</summary>
+    public static string DescribeKind(int vk) => IsDigit(vk) ? "数字" : vk == Return ? "Enter" : vk == Space ? "Space" : "英字以外";
+
     /// <summary>半角/全角キー (日本語キーボードでは押すたびに 0xF3 / 0xF4 が交互に来る。0x19 の環境もある)。</summary>
     public static bool IsHankakuZenkaku(int vk) => vk is OemAuto or OemEnlw or Kanji;
 

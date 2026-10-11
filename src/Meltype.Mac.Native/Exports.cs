@@ -184,7 +184,9 @@ public static unsafe class Exports
     [UnmanagedCallersOnly(EntryPoint = "meltype_destroy")]
     public static void Destroy(IntPtr handle)
     {
-        // 二重解放・不正なハンドルで InvalidOperationException になっても、IME のプロセスごと落とさない (例外は UnmanagedCallersOnly の外へ出せない)。
+        // GCHandle.FromIntPtr は、解放済み・不正なハンドルでは例外にならず未定義動作になり得る (例外で止まるのはゼロ値だけ)。
+        // なので二重 destroy をここで防げるわけではなく、Swift 側が単一所有 (init で作り deinit で 1 回だけ destroy) であることが前提。
+        // 例外が出る場合でも、IME のプロセスごと落とさない (例外は UnmanagedCallersOnly の外へ出せない)。
         try
         {
             if (handle != IntPtr.Zero) GCHandle.FromIntPtr(handle).Free();

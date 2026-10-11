@@ -209,7 +209,7 @@ public sealed class InputSession
         // Space が変換として働いてしまうので、ここでは切り替えない。
         MarkBoundary(e.Vk);
         if (VirtualKeys.IsImeToggle(e.Vk)) _userCorrected = true;
-        var interrupted = Evaluate(settings, isFinal: true) with { Verdict = Verdict.Unknown, Summary = $"キー {e.Vk:X2} で判定を打ち切り" };
+        var interrupted = Evaluate(settings, isFinal: true) with { Verdict = Verdict.Unknown, Summary = $"{VirtualKeys.DescribeKind(e.Vk)} のキーで判定を打ち切り" };
         BeginFlush(interrupted, e.TimeMs);
         return true;
     }

@@ -201,13 +201,36 @@ final class NativeCore {
     private let setTermDomainFunction: SetTermDomainFunction?
     private let updateEvaluateFunction: UpdateEvaluateFunction?
 
+    /// 読み込めなかったことを、IME が動いているあいだ 1 回だけ利用者に知らせる。
+    /// IME は背面専用 (LSBackgroundOnly) で自前のダイアログを出せないので、UpdateManager と同じく osascript に任せる。
+    /// init の中で同期的に UI を出さず、メインスレッドで後回しにする (初期化の順序を崩さない)。
+    private static var didNotifyLoadFailure = false
+    private static func notifyLoadFailureOnce() {
+        DispatchQueue.main.async {
+            guard !didNotifyLoadFailure else { return }
+            didNotifyLoadFailure = true
+            UpdateManager.runOsascript([
+                "-e", "on run argv",
+                "-e", "display dialog (item 1 of argv) with title \"Meltype\" buttons {\"OK\"} default button \"OK\" giving up after 120",
+                "-e", "end run",
+                "--", "Meltype の判定エンジン (libMeltypeNative.dylib) を読み込めませんでした。日本語入力は無効のまま、キーはそのままアプリに渡します。Meltype を入れ直してください。",
+            ]) { _, _ in }
+        }
+    }
+
     private init() {
-        let path = (Bundle.main.privateFrameworksPath ?? "") + "/libMeltypeNative.dylib"
+        // Frameworks のパスが取れないときに "/libMeltypeNative.dylib" (ルート直下) を開きに行かないよう、nil なら dlopen せず失敗扱いにする
+        let path = Bundle.main.privateFrameworksPath.map { $0 + "/libMeltypeNative.dylib" }
         // 初期化が終わるまで self のプロパティは使えないので、ローカルの handle から関数を探す。
-        let handle = dlopen(path, RTLD_NOW)
+        let handle = path.flatMap { dlopen($0, RTLD_NOW) }
         library = handle
-        if handle == nil, let error = dlerror() {
-            NSLog("Meltype: %@ を読み込めませんでした: %@", path, String(cString: error))
+        if handle == nil {
+            if let path, let error = dlerror() {
+                NSLog("Meltype: %@ を読み込めませんでした: %@", path, String(cString: error))
+            } else {
+                NSLog("Meltype: libMeltypeNative.dylib の場所 (Frameworks) が分かりません")
+            }
+            Self.notifyLoadFailureOnce()
         }
         func symbol<T>(_ name: String, as type: T.Type) -> T? {
             guard let handle, let pointer = dlsym(handle, name) else { return nil }

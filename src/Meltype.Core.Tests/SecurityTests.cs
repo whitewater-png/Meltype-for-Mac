@@ -187,6 +187,33 @@ internal static class SecurityTests
     }
 
     [Test]
+    public static void Log_EnglishModeAbort_DoesNotRecordVirtualKeyCodes()
+    {
+        // 英数状態の判定を英字以外のキーで打ち切ったとき、ログに仮想キーコード (数字なら 0x31) を残さない:
+        // 打った文字を記録しない設定でも、英字+数字の列 (パスワードに多い) が読み取れてしまうため
+        var path = Path.Combine(TempDirectory(), "meltype.log");
+        var savedRecordText = Meltype.Diagnostics.Log.RecordText;
+        try
+        {
+            Meltype.Diagnostics.Log.RecordText = false;
+            Meltype.Diagnostics.Log.SetFileOutput(path);
+            var keyboard = new CompositionTests.Keyboard(direct: true);
+            keyboard.Type("ko"); // 判定待ちの英字 (abc のように英語と決まる列だと、打ち切りまで行かない)
+            keyboard.Press(0x31);
+            keyboard.Press(0x0D);
+            Meltype.Diagnostics.Log.FlushFile();
+            var log = File.ReadAllText(path);
+            Assert.True(log.Contains("英数状態の判定を打ち切り"), "テストの前提: 判定を打ち切った記録が出る");
+            Assert.True(!log.Contains("0x31") && !log.Contains("キー 0x"), "仮想キーコードは残さない");
+        }
+        finally
+        {
+            Meltype.Diagnostics.Log.SetFileOutput(null);
+            Meltype.Diagnostics.Log.RecordText = savedRecordText;
+        }
+    }
+
+    [Test]
     public static void Settings_NullElements_AreDropped_NotTreatedAsBroken()
     {
         // 古い版 (移行が走る) の config.json に null の要素があっても、既定値に戻さず (.broken にせず) 読む

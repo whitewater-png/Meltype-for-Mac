@@ -1710,3 +1710,21 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
 - **未検証**: Mac 実機での入力と、dylib の作り直し (`mac/build.sh`) 後の確認。ルールの条件を 1 つずつ外す変異テストは、実装者が 5 通りで実施済みで、査読員は実行していない。
 
 - 作業用のコピー・比較表・評価用の入力は作業用フォルダー (`cache/scratch`) にあり、24 時間で消える。再現は `--repro`・`--segments`・`--expect` と、この節の入力で行う。
+
+## 追加項目 S1 (セキュリティレビューの対応: ログの仮想キーコード・pkg の署名検査・読み込み失敗の通知ほか)
+
+- **経緯**: 2026-10-11 に Mac 版全体のセキュリティレビューを行った (4 領域: 自動更新・入力データ・FFI 境界・ビルドと配布。統合レポートは独立した査読 3 回)。**重大度「高」は無し**。「中」10 件のうち、作者署名の基盤 (Ed25519/Developer ID)・CI による来歴・新しい設定項目は運用コストのため見送り、残りを最小の変更で入れた。
+- **修正** (実装は Sonnet、査読は Opus、軽微修正は Haiku の分担):
+  1. **M3** `CompositionController.cs:501`・`InputSession.cs:212`: 英数判定を打ち切ったキーの仮想キーコード (`0x31` など) をログに出さない。`FileLog` だけ ON (打った文字は記録しない設定) でも、数字・記号のコードが並ぶと英字+数字の列 (パスワードに多い) が読めてしまうため。`VirtualKeys.DescribeKind` で「数字 / Enter / Space / 英字以外」の分類だけ残す。守りのテスト `Log_EnglishModeAbort_DoesNotRecordVirtualKeyCodes` を追加 (修正前のコードで落ちることを査読員が確認)。
+  2. **M8** `mac/pkg/scripts/postinstall`: 登録の前に `codesign --verify --deep --strict` を行い、失敗なら `exit 1` (Installer が失敗を表示)。ad-hoc 署名なので見つかるのは主に破損。ファイル自体は置かれたまま残る (限界)。
+  3. **M7** `NativeCore.swift`: `libMeltypeNative.dylib` を読み込めなかったとき (`privateFrameworksPath` が nil の場合を含む) に、プロセスの寿命で 1 回だけダイアログで知らせる (従来は NSLog のみで、利用者は IME が無効なことに気づけなかった)。素通し (fail-open) の挙動は変えない。`Exports.cs` の `Destroy` のコメントを実態 (不正なハンドルは未定義動作、Swift 側の単一所有が前提) に合わせた。
+  4. **M2(b)** `Updater.swift`: 更新ダイアログに、隔離属性 (Gatekeeper の確認) を外して入れ替える旨を明記。
+  5. **低** `Updater.swift`: 表示に使う `tag_name` から制御文字を除き 64 文字に切り詰め (URL 検証には影響しない)。`update.log` の open に `O_NOFOLLOW`。
+  6. **M9 (軽量部分)** `mac/build.sh`: `swift build` に `--force-resolved-versions` (Package.resolved と食い違えば失敗させる)。存在しない `mac.yml` を指すコメントを修正。`global.json` (SDK 10.0.401、`rollForward: latestFeature`) を追加。
+  7. **文書** `SECURITY.md`: 秘匿入力でない欄での言語学習の条件 (英字のみ 2 文字以上・小文字化) と `AppRules` の書き方、Hardened Runtime の無い ad-hoc 署名の限界を明記。`mac/README.md`: pkg の SHA-256 確認と SDK の版。
+- **運用**: 実機に残っていた過去のトレースログ 2 本 (`imk-trace.log`・`imk-trace.log.round1`) を作業用フォルダーへ退避 (24 時間で消える)。
+- **レビューで分かった訂正**: 周辺テキストの一部を azooKey に context として渡しているという領域レビューの指摘は誤りで、`Converter.swift` の `learn(context:)`・`clauses(for:context:)` は context を受け取るだけで azooKey には渡していない (学習は azooKey 自身の候補だけ)。
+- **見送り (理由はコスト・運用負荷)**: Release の作者署名と Updater での検証 (M1)、`install.sh` の検証範囲への取り込み (M2(a))、CI/ビルド来歴 (M9 本体)、コード種別アプリで英字語の学習を OFF にする設定 (M5)、不正ハンドルの ID 間接化 (M7(b))。SECURITY.md の既存の「限界」の記述で足りると判断。
+- **検証**: Core テスト 519 件 (518 → 519)、`build.sh --no-install`、`codesign --verify --deep --strict`、`check-mac-aot-settings.py` 4 件、`bash -n`。
+- **未検証**: Mac 実機での M7 の通知 (dylib を壊しての表示)、pkg の postinstall の `exit 1` が Installer でどう見えるか、`DescribeKind` のログ文の Windows 側 (対象外)。
+- **後に残した候補**: `docs/RELEASE.md:8,44`・`docs/DEVELOPMENT.md:90` に CI (mac.yml) が動いている前提の古い記述が残っている。ABI の版数不一致のときも通知を出す。

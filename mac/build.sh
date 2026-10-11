@@ -58,11 +58,11 @@ dotnet publish ../src/Meltype.Mac.Native/Meltype.Mac.Native.csproj -c Release -r
     --source https://api.nuget.org/v3/index.json -o "$BUILD/native"
 
 echo "== 2/3 IME (Swift) をビルド (初回は azooKey の変換エンジンと辞書のダウンロードに時間がかかります)"
-swift build -c release
+swift build -c release --force-resolved-versions
 
 echo "== 3/3 Meltype.app を組み立て"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
-BIN="$(swift build -c release --show-bin-path)"
+BIN="$(swift build -c release --force-resolved-versions --show-bin-path)"
 cp "$BIN/MeltypeIME" "$APP/Contents/MacOS/Meltype"
 # 辞書の管理画面「Meltype 辞書」(ふつうのアプリ)。IME は背面専用 (LSBackgroundOnly) で自分のウインドウがキーボード入力を受けられないので、
 # 別のアプリにして Meltype.app の中 (Contents/Helpers。codesign が入れ子のコードとして扱う場所) に入れ、入力メニューの「設定・辞書…」から開く。
@@ -148,7 +148,7 @@ for executable in "$APP/Contents/MacOS/Meltype" "$HELPER/Contents/MacOS/MeltypeD
     done < <(otool -l "$executable" | awk '$1=="cmd"&&$2=="LC_RPATH"{r=1;next} r&&$1=="path"{print $2;r=0}')
 done
 # 署名: 環境変数 MELTYPE_MAC_IDENTITY (Developer ID Application の証明書の名前) があれば配布用に署名する
-# (Hardened Runtime・タイムスタンプ付き。公証 (notarization) は mac.yml で行う)。無ければ自分の Mac で使うための署名。
+# (Hardened Runtime・タイムスタンプ付き。公証 (notarization) はまだ行っていない (CI 無し))。無ければ自分の Mac で使うための署名。
 # 中から外へ: Frameworks の中身 → 辞書の管理画面 (Contents/Helpers) → Meltype.app。
 # 辞書の管理画面は外側の Frameworks の libMeltypeNative.dylib を読むので、配布用の署名ではどちらも同じ証明書 (同じ Team ID) で署名する
 # (Hardened Runtime のライブラリの検証は、同じ Team ID のものだけを読み込ませる)。

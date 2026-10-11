@@ -20,7 +20,7 @@ Mac の正式な IME の仕組み (Input Method Kit) で動く Meltype です。
 
 - macOS 13 以降。配布している zip は Apple シリコン (M1 以降) 用です。ソースからのビルドは、ビルドした Mac の CPU 用になります (Apple シリコンの Mac なら Apple シリコン用、Intel の Mac なら Intel 用。Intel 用のビルドは配布していません)
 - Xcode、またはコマンドライン ツール (`xcode-select --install`)
-- .NET 10 SDK (<https://dotnet.microsoft.com/download>。または `curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0`)
+- .NET 10 SDK（10.0.401 以上。`global.json` の指定どおり。<https://dotnet.microsoft.com/download>。または `curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0`）
 
 ## ビルドとインストール
 
@@ -89,7 +89,7 @@ shasum -a 256 ~/Downloads/Meltype-mac.zip   # ファイル名は実際のもの�
 cd mac && ./build.sh && ./make-pkg.sh   # dist/Meltype-mac-<version>.pkg ができます
 ```
 
-ダブルクリックでインストールできる `.pkg` を作ります (「このユーザーのみ」に入れるので、管理者パスワードは不要です)。署名していないので、開くときは右クリック →「開く」が必要です。
+ダブルクリックでインストールできる `.pkg` を作ります (「このユーザーのみ」に入れるので、管理者パスワードは不要です)。pkg は署名していないので、開くときは右クリック →「開く」が必要です。心配なときは、リリースページの SHA-256 と `shasum -a 256` の結果を比べてから開いてください。
 **動作確認中です** (実際のインストールは、まだ別の Mac で確認できていません)。
 
 ## アンインストール
