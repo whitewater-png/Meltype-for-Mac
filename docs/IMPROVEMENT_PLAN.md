@@ -1122,3 +1122,46 @@ Google ドキュメントで、確定済みの文字 (例: 「v1.1.2】Mel」の
   - 査読で見つかった小さな点: `McAfee-to` (ハイフン周りで `c` が消える)、閉じ側のコードフェンス ` ``` ` 単独は全角のまま。
 - **Mac 実機の確認 (2026-10-10、メンテナー、TextEdit・JIS 配列)**: P25 `` この`config`を確認します ``・`` `git status`で確認 ``・`` `npm install`を実行 `` が期待どおり (バッククォートは JIS では Shift + @)、P26 `zh` が `←` (macOS のスペルチェッカーが `zh` を英単語と答えるため、最初は `zh` だけ矢印にならなかった。直して確認)、`zlib`・`zhang` は英字のまま、P27 `Are you すし？`、P28 `McAfeeと`。
 - **未検証**: 矢印を含む読みを Space で azooKey に渡したときの挙動、BackSpace で矢印を消したときの挙動 (コードを読んだ範囲では単位・待機中の文字の整合は保たれる)。Windows・Linux の実機。
+
+## 追加項目 P29 (拡張子・ドメインの形 `英語の語.拡張子` を英字のままにする: 本家 #254・#260)
+
+- **現象**: `MeltypeTip.dll` が `MeltypeTip。dっl`、`Meltype.aab` が `Meltype.ああb`、`Meltype.config` が `Meltype.coんふぃg` のように、`英語の語.拡張子` の拡張子がかなになる。本家 #260 の 580 語のうち 574 語が崩れていた (Mac 版 Core の `--repro`)。
+- **対応**: 本家 yksr-melt/Meltype の Pull Request #267 (本家で取り込み済み) を Mac 版の Core に取り込み、**独立した査読 (6 回・のべ 7 体) で見つかった悪化を直した**。Mac 版に本家の `ScoredSegmentation.cs` (区切りを点数で選ぶα版) は無いので、その部分だけ除いた。
+- **取り込み (本家と同じ)**: `CompositionDetector.DotSuffixEnd` (新規)・`FileExtensions` (新規)・`FindSpans` の「ドメインの `.` の後ろ」の古い規則の置き換え・`CompositionText.EnglishMask` (`英語の語.` の後ろの英字を、確定の前の打ち間違いの直しの対象にしない)。
+- **本家のままだと起きた悪化** (本家にも同じ問題がある可能性が高い。本家の実機では未確認): `.` の後ろの名前に確信が無くても丸ごと英字に決めるため、今まで日本語にできていた入力が崩れる。
+  - 拡張子・ドメイン・英単語の後ろの日本語がローマ字のまま残る: `Meltype.mp4wokesu`、`yahoo.co.jpde`、`readme.mdwo`、`Meltype.plistwokesu`、`Meltype.systemwo`、`README.mddayo`、`app.exportttara`
+  - 英単語が途中からかなになる: `cloud.storage` → `cloud.sとらげ`、`Meltype.video` → `Meltype.viでお`
+  - 数字・略語・三点リーダーの後ろの日本語が英字になる: `No.5kaime`、`A.I.nohanashi`、`Hmm...souka`
+  - 日本語の打ち間違いが直らない: `Hello.wakarimashta` (変更前は `Hello。わかりました`)
+- **Mac 版での修正** (`DotSuffixEnd`。方針は「確信が無いときは、今までの判定に戻す」):
+  - `.` で始まる名前だけを見る (`...` の 3 つ目の `.` を名前に取り込まない)。
+  - 分ける位置は最後のラベル (`co.jpde` なら `jpde`) の中で、次の順に探す。「数字・`.` を含む名前は丸ごと英字」はこの後。
+    - (0a) 一覧にある拡張子・ドメイン (`Known`・新しい一覧 `SplitStems`) の頭 + 助詞。長い頭から (`com|made|kesu` を `comma|de`・`co|mmade` と切らない。`m|kara|kesu` を `mka|rakesu` としない)。助詞の後ろは、読める語・英単語・大文字の略語や数字 (`mp4|を|MP3に`、`Next.js|の|SSR`) のどれか。
+    - (1) 長い英単語の頭 + 助詞、または + 4 文字以上の英単語でない読める語・「っ」で始まる語 (`golden|ga`、`extension|ganai`、`export|ttara`、`documentation|dayo`、`task|kke`)。
+    - (0b) 一覧にある拡張子・ドメインの頭 + 助詞以外の日本語 (`README.md|だよ`・`くらい`・`っぽい`、`github.com|じゃない`)。3 文字以上の読める語は何でも、2 文字は短い一覧 (`FollowWordsShort`: `da`・`ka`・`ne`・`jan` など) だけ。頭が 2 文字以下なら `SplitStems` のときだけ (`mka`・`usda` を `m|か`・`us|だ` としない)。頭より長い英単語で始まる名前 (`tar|get`) では使わない。
+    - (2) 短い頭から: 数字入りの拡張子 (`mp4`・`7z`)、一覧に無い読めない頭 (`plist`・`ahk`・`db`・`id`) + 助詞、`FollowWordsLong` の長い頭 (`plist|dayo`)、「っ」で始まる語 (`pub|ttara`)。英単語の途中で分けないように、頭 + 助詞が英単語の頭 (`pho|to` = photo) なら分けない、助詞の後ろが 2 文字以下の読める語 (`gitig|no|re`、`car|to|on`) で頭に母音があるなら分けない、「っ」の後ろが助詞なら名前の最後の文字 + 助詞 (`plist|to|kesu`) とする。母音以外の 1 文字の頭 (`s|no`、`v|wo|kesu`、`s|ni|push`) は、助詞 `to` の後ろに語が続くとき (英単語が続くときは `mo` も) は分けない (`s|to|rage`、`s|mo|king`)。13 文字以上の名前は、助詞だけ・助詞 + 3 文字以上の読める語のときだけ。
+  - ラベル全体がふつうの英単語 (`video`・`storage`) なら途中で分けない。ラベル全体が読める語 (`desu`) なら、ドメインの後ろの助詞・「っ」で始まる語だけ分ける (`tetr.io|de`、`tetr.io|ttara`)。
+  - 数字の後ろの日本語 (`No.5kaime`、`No.1.2bai`、`Rev.1-3pe-ji`、`No.1tte`)・1 文字の略語の連続の後ろの日本語 (`A.I.ha`)・日本語の語の打ち間違い (`TypoDetector` で日本語の語と 1 文字違い)・助詞の `made` だけが続く入力 (ドメインの後ろは英字のまま: `github.commade`) は、英字に決めず今までどおり判定する。
+  - 打っている途中の「っ」(`OK.tt` → `OK.っt`) は英字に決めない。「っ」で始まり単位がすべてかなになる語 (`OK.tte`) は読める語とみなす。
+  - `FileExtensions` のうち、日本語としてよく打つ綴り (2 文字以下と `rei`: `ii`・`mo`・`ko`・`go`) は、それだけで英字に決めない (`OK.ii yo` → `OK.いいよ`)。実在する拡張子で、末尾が助詞・打ち間違い・「っ」に見えるもの (`lha`・`gcno`・`tga`・`ssa`・`tta`・`mka`・`usda` など) は一覧に足した。`swo` は `.s` + を と区別できないので入れない。
+- **テスト**: `CompositionTests.DotSuffix_FileExtensionsStayEnglish` (本家のテストを移植) と `DotSuffix_ParticlesAfterSuffix_AndPlainWordsAndUnchanged` (Mac 版の追加: 上の悪化の再発防止と、変わらないもの約 50 例)。470 → 472 件。
+- **変更前後の比較** (`--repro` の Enter で確定した結果。入力は自作 + 査読者が作ったもの、計 41,857 件 + 11,594 件 + 6,844 件。41,857 件のうち 30,551 件は正解を先に決めてある):
+  - 正解の数 (30,551 件): 変更前 17,055 件 → 本家のまま 14,438 件 → **修正後 26,937 件**。変更前は正しかったのに修正後に間違えるのは 18 件で、すべて下のトレードオフ (本家のままだと 7,898 件)。
+  - 「拡張子・ドメイン + 日本語」2,387 件 (`README.md|だよ`・`くらい`・`じゃん` など): 変更前は正しく修正後に間違えるもの 12 件 (修正の途中の版では 872 件)。
+  - 6 回目の査読の正解付き 3,203 件: 変更前 1,251 件 → 修正後 1,879 件。変更前は正しく修正後に間違えるもの 15 件 (すべて下のトレードオフ)。
+  - 本家 #260 の 580 語 (`Meltype.<拡張子>`): 566 語が打ったとおりの英字 (変更前は 6 語)。残りは `Meltype.swo` (`Meltype.sを`) と、日本語としてよく打つ短い綴りの 13 語 (`Meltype.go` → `Meltype.ご` など。変更前と同じ)。
+  - 正解の無い入力で変更前より悪くなったように見えるものは、目で見たかぎり、変更前も間違い (英単語の打ち間違い・`Hello.demo` の `deも`)、ローマ字の音の単位が境目をまたぐもの、`-`・`/` でつないだ不自然な入力、意味の無い入力 (`amazon.wonipush`)、下のトレードオフのどれか。
+  - 速さ: 200 文字の入力で、変更前より遅くならない (6 回目の査読で計測)。
+- **トレードオフ**:
+  - 1 文字の拡張子 + 助詞 `to` + 語 (`Meltype.stopush`・`vtokesu`)、+ `mo` + 英単語 (`smopush`) は英字のまま (英単語 `storage`・`smoking` と区別できない)。
+  - 拡張子と助詞の境目を、ローマ字の音の単位 (`cha`・`sha`・`xn`・`nn`・`si`・`dyo`) がまたぐもの (`Meltype.vimrchadame`、`Meltype.classha`、`report.docxni`、`Node.jsigai`) は分けられない (変更前も多くは崩れていた)。
+  - ドメインの後ろが読めて、全体が英単語に見えるもの: `Meltype.depose`・`defame` は崩れる (`de` + 読める語)、`file.code`・`file.memo`・`file.auto` は英単語として英字のまま (変更前は `file.coで`・`file.meも`)、`logo.aide` は `aide` が英単語なので `logo。あいで`、`config.doctoredde` は `doc|to` で切れる。
+  - 分けた後ろが英単語として辞書にある日本語 (`photo.jpg|kana`、`Meltype.caf|made`) と、1 文字の `e` (`video.mp4e` → 変更前 `mp4え`) は英字のまま。
+  - 入れ替わり型の日本語の打ち間違い (`Hello.yoroshkiu`) は、判定部から `RomajiTypoCorrector` を使えないので直らない (変更前は `よろしく`)。
+  - `FileExtensions` の 3 文字以上の読める拡張子 (`ini`・`ace`・`iso`・`ufo`) は、英語の語 + `.` の後ろでは英字になる。
+  - 名前と日本語の間に打った空白は残る (`final.mp4 ni commit` → `final.mp4 にcommit`。変更前は `final.mp4にcommit`)。英単語の後ろの空白 (`Python ga suki` → `Python がすき`) と同じ決まりにそろった。
+  - 打っている途中、拡張子 + 助詞 + 語の子音を打つたびに後ろがローマ字に戻ることがある (`sub.srtの` → `sub.srtnoj` → `sub.srtのじ`)。確定の結果は正しい。
+  - Mac 実機は macOS のスペルチェッカーで英単語の判定が変わるので、`IsKnownEnglishWord` を使う箇所 (英単語の頭・英単語が続く助詞・頭より長い英単語) は `--repro` と違うことがある。英単語と答える語が増えるほど、途中で分けない側に寄る。`IsKnownEnglishWord` は結果を覚えないので、Mac 実機では 1 回の判定で `NSSpellChecker` を数十回呼ぶ (1 回 0.1 ms ほど。実機の体感は未確認)。
+- **Mac 側の性能の手当て (`src/Meltype.Mac.Native/Exports.cs` の `CallbackWordChecker`)**: `IsKnownEnglishWord` の結果を Core は覚えないので、`DotSuffixEnd` は 1 キーで `NSSpellChecker` を数十回呼ぶ (候補ごとに頭の英単語を長い方から調べる)。Windows 版の `WindowsSpellChecker` と同じく、Mac 側の `IsWord` に語ごとのキャッシュ (20,000 件で捨てる) を足した。Core は変えていない。答えは入力中ずっと使うので、macOS の辞書に語を学習させても次の起動まで反映されない (Windows 版と同じ割り切り)。Swift 側はスペルチェッカーが使えない間も「正しい綴り」と答えるので、その間に覚えた語は復帰後も次の起動まで英単語扱いのまま (従来も同じ答えだったので、差は固定されることだけ。実害が出たら Swift 側で「判定不能」を別の値にして覚えない対応)。`--repro` は同梱の単語リストを使うので、この変更は一括比較の結果に関係しない。
+- **Mac 実機の確認 (2026-10-11、メンテナー、TextEdit・JIS 配列、キャッシュ入りのビルド)**: `setup.exeを実行`・`report.pdfを開く`・`MeltypeTip.dll`・`Meltype.config`・`README.mdだよ`・`github.comにpush`・`Meltype.です`・`final.mp4をけす`・`No.5回目`・`pythonがすき` の 10 件がすべて期待どおり (漢字は azooKey の変換)。打っている途中の引っかかりは感じないとのこと。
+- **未検証**: Windows・Linux の実機。Mac 実機での長い入力 (200 文字級) の体感。

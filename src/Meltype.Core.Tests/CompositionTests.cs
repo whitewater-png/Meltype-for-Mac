@@ -1136,6 +1136,76 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void DotSuffix_FileExtensionsStayEnglish()
+    {
+        // 本家 #260・#254 (本家 PR #267 のテストを移植): 英語の語.拡張子 の拡張子がひらがなになる (MeltypeTip.dっl、Meltype.coんふぃg、Meltype.ご。mod)
+        var cases = new Dictionary<string, string>
+        {
+            ["MeltypeTip.dll"] = "MeltypeTip.dll", ["Meltype.aab"] = "Meltype.aab", ["Meltype.config"] = "Meltype.config", ["Meltype.index"] = "Meltype.index",
+            ["Meltype.ini"] = "Meltype.ini", ["Meltype.go.mod"] = "Meltype.go.mod", ["Meltype.abi.json"] = "Meltype.abi.json", ["Meltype.so.1"] = "Meltype.so.1",
+            ["Meltype.e57"] = "Meltype.e57", ["Meltype.cargo/config.toml"] = "Meltype.cargo/config.toml", ["Meltype.db-journal"] = "Meltype.db-journal",
+            // 表示で英字にした拡張子を、確定でローマ字の打ち間違いとして直さない (amr → あめ、bas → ば)
+            ["Meltype.amr"] = "Meltype.amr", ["Meltype.bas"] = "Meltype.bas", ["Meltype.ann"] = "Meltype.ann",
+            // 長い名前の途中の助詞・ドメインの頭では分けない
+            ["Meltype.gitignore"] = "Meltype.gitignore", ["Meltype.gcno"] = "Meltype.gcno", ["Meltype.automount"] = "Meltype.automount",
+            // 拡張子・ドメインの後ろの助詞からは日本語
+            ["MeltypeTip.dllwokesu"] = "MeltypeTip.dllをけす", ["setup.exewojikkou"] = "setup.exeをじっこう", ["github.comnipush"] = "github.comにpush",
+            ["tetr.iode"] = "tetr.ioで", ["google.comdekensaku"] = "google.comでけんさく",
+        };
+        foreach (var (typed, expected) in cases)
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, $"「{typed}」");
+        }
+        // 最後までローマ字として読める語は日本語のまま (ドメインの de を英字にして deす にしていた)
+        var desu = new Keyboard();
+        desu.Type("Meltype.desu\n");
+        Assert.True(desu.Host.Document.EndsWith("です", StringComparison.Ordinal), desu.Host.Document);
+    }
+
+    [Test]
+    public static void DotSuffix_ParticlesAfterSuffix_AndPlainWordsAndUnchanged()
+    {
+        // Mac 版の追加: 本家 PR #267 のままだと、今まで日本語にできていた入力が悪化した (査読で発見)
+        var cases = new Dictionary<string, string>
+        {
+            // 数字入りの拡張子・co.jp・TV・2 文字のドメインの後ろの助詞は、日本語にする (mp4wokesu を英字のまま残さない)
+            ["Meltype.mp4wokesu"] = "Meltype.mp4をけす", ["Meltype.7zwojikkou"] = "Meltype.7zをじっこう", ["yahoo.co.jpde"] = "yahoo.co.jpで",
+            ["amazon.co.jpdekaimono"] = "amazon.co.jpでかいもの", ["Wakatte.TVde"] = "Wakatte.TVで", ["mail.google.comwo"] = "mail.google.comを",
+            ["Meltype.pdfnipush"] = "Meltype.pdfにpush", ["Meltype.prprojwokesu"] = "Meltype.prprojをけす", ["Meltype.json.jsonwo"] = "Meltype.json.jsonを",
+            // よく使う拡張子の後ろの助詞だけでも日本語にする
+            ["readme.mdwo"] = "readme.mdを", ["test.jsonha"] = "test.jsonは", ["index.htmlno"] = "index.htmlの",
+            // 普通の英単語は、途中で分けない (vi|で|お にしない)
+            ["Meltype.video"] = "Meltype.video", ["cloud.storage"] = "cloud.storage", ["Test.organ"] = "Test.organ", ["git.promote"] = "git.promote",
+            // 一覧に無い拡張子・英単語・短い名前・1 文字の拡張子の後ろの助詞も日本語にする (査読で見つかった悪化)
+            ["Meltype.plistwokesu"] = "Meltype.plistをけす", ["Meltype.outwo"] = "Meltype.outを", ["Meltype.dbwo"] = "Meltype.dbを",
+            ["Meltype.libnipush"] = "Meltype.libにpush", ["Meltype.systemwo"] = "Meltype.systemを", ["user.idga"] = "user.idが",
+            ["Meltype.storyboardwo"] = "Meltype.storyboardを", ["Meltype.cwokesu"] = "Meltype.cをけす", ["Meltype.swokesu"] = "Meltype.sをけす",
+            ["Meltype.jpnikki"] = "Meltype.jpにっき", ["mail.google.commadekesu"] = "mail.google.comまでけす", ["Meltype.dwgmade"] = "Meltype.dwgまで",
+            // 英単語の途中で切らない (gol|de|nga、pho|to|shop)
+            ["user.goldenga"] = "user.goldenが", ["Meltype.photoshop"] = "Meltype.photoshop", ["Meltype.smoke"] = "Meltype.smoke",
+            // 数字・略語・三点リーダーの後ろの日本語は、今までどおり (No.5kaime、A.I.ha、Hmm...souka)
+            ["No.5kaime"] = "No.5かいめ", ["No.1.2bai"] = "No.1.2ばい", ["A.I.nohanashi"] = "A.I.のはなし", ["Hmm...souka"] = "Hmm...そうか",
+            // 一覧にあっても日本語としてよく打つ綴り・日本語の打ち間違いは、今までどおり (OK.ii yo、Hello.wakarimashta)
+            ["OK.ii yo"] = "OK.いいよ", ["Hello.wakarimashta"] = "Hello。わかりました",
+            // 拡張子・ドメインの後ろの、助詞以外の日本語・大文字の略語 (README.md|だよ、mp4|を|MP3に)
+            ["README.mddayo"] = "README.mdだよ", ["github.comjanai"] = "github.comじゃない", ["Meltype.plistdayo"] = "Meltype.plistだよ",
+            ["video.mp4woMP3ni"] = "video.mp4をMP3に", ["github.commade"] = "github.commade",
+            // 「っ」で始まる日本語 (OK.って)
+            ["OK.tte"] = "OK.って",
+            // 変わらないもの: バージョン番号・URL
+            ["1.5"] = "1.5", ["v2.0"] = "v2.0", ["https://github.com/foo"] = "https://github.com/foo",
+        };
+        foreach (var (typed, expected) in cases)
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, $"「{typed}」");
+        }
+    }
+
+    [Test]
     public static void BuiltInPhrases_AreSplitOut()
     {
         // 報告: 白馬の王子様 → ハクバノ王子サマ、ばらまいてた愛 → ばらまいて他愛

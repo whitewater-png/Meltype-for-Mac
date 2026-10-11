@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Yukishiro
 
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -991,13 +992,30 @@ public static unsafe class Exports
         }
     }
 
+    /// <summary>
+    /// Swift 側の NSSpellChecker で英単語かを調べる。結果は語ごとに覚えておく (Windows 版の WindowsSpellChecker と同じ)。
+    /// 判定部は 1 キーごとに同じ語を何度も問い合わせる (拡張子の後ろの区切り探しでは、候補ごとに頭の英単語を長い方から調べる) ので、
+    /// 覚えないと 1 キーで UTF-8 変換 + 呼び出しを数十回繰り返す。
+    /// 覚えた答えは入力中の間ずっと使う (ユーザーが macOS の辞書に語を学習させても、次の起動まで反映されない。Windows 版と同じ割り切り)。
+    /// </summary>
     private sealed class CallbackWordChecker : IWordChecker
     {
+        private readonly ConcurrentDictionary<string, bool> _cache = new(StringComparer.Ordinal);
+
         public bool IsAvailable => s_isWord != null;
 
         public bool IsWord(string lower)
         {
             if (s_isWord == null || lower.Length < 2) return false;
+            if (_cache.TryGetValue(lower, out var known)) return known;
+            var result = Ask(lower);
+            if (_cache.Count > 20000) _cache.Clear();
+            _cache[lower] = result;
+            return result;
+        }
+
+        private static bool Ask(string lower)
+        {
             var pointer = ToUtf8(lower, out var buffer);
             try
             {
