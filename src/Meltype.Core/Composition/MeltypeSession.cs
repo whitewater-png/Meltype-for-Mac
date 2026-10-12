@@ -281,15 +281,25 @@ public sealed class MeltypeSession
             _controller.Pump();
             return _host.Result(consumed: true);
         }
-        // ASCII のローマ字の複数語 (英文) の選択では、OS の読みを使わない: 英文がでたらめなかなになる (this is a pen → てひせぃさぺん、Thanks, Kenji! → てはんくすけんじ)。
+        // 英文 (かな・漢字を含まず、空白・改行で区切られた複数語) の選択では、OS の読みを使わない: 英文がでたらめなかなになる (this is a pen → てひせぃさぺん、Thanks, Kenji! → てはんくすけんじ)。
+        // 末尾の改行・全角空白・“ ” — などの全角の記号が 1 つ混ざっただけでも同じ (実機の TextEdit で、段落ごと選んだ英文が変換されて見つかった)。
         // 履歴・意味辞書の読みは残す。空白の無い 1 語 (Takeshi → たけし) は従来どおり OS の読みも使う。
-        var useOsReading = !(CompositionController.IsRomajiText(text) && text.Trim().Contains(' '));
+        var useOsReading = !IsLatinMultiWordText(text);
         if (ReadingOf(text, useOsReading) is not { } reading || !_controller.ReconvertKana(reading, text))
         {
             return _host.Result(consumed: false);
         }
         _controller.Pump();
         return _host.Result(consumed: true);
+    }
+
+    /// <summary>英字を含み、かな・漢字 (半角かなを含む) を含まず、前後を除いた中に空白・改行・タブがある文字列 (複数語の英文)。</summary>
+    internal static bool IsLatinMultiWordText(string text)
+    {
+        var trimmed = text.Trim();
+        if (!trimmed.Any(char.IsAsciiLetter)) return false;
+        if (!trimmed.Any(char.IsWhiteSpace)) return false;
+        return !trimmed.Any(c => c is >= '\u3040' and <= '\u30FF' or >= '\u3400' and <= '\u4DBF' or >= '\u4E00' and <= '\u9FFF' or >= '\uFF66' and <= '\uFF9F');
     }
 
     /// <summary>text の読み (ひらがな)。かなならそのまま、次に変換履歴 (直前の誤変換を直す用途で一番当たる)、意味辞書、OS の順 (useOsReading が偽なら OS は尋ねない)。無ければ null。</summary>

@@ -649,6 +649,50 @@ internal static class ReconvertRomajiTests
     }
 
     [Test]
+    public static void Reconvert_LatinMultiWordText_NeverUsesTheOsReading()
+    {
+        // 末尾の改行・全角空白・スマート引用符・ダッシュが混ざった英文は IsRomajiText が偽になるが、OS のでたらめな読みにも落とさない
+        // (実機の TextEdit で、段落ごと選んだ英文が変換されて見つかった)。
+        foreach (var selected in new[]
+        {
+            "Thanks, Kenji!\n", "Thanks, Kenji!\r\n", "Thanks, Kenji!\t", "\nThanks, Kenji!", "Thanks, Kenji!\nSee you on Monday.",
+            "\u201CHello\u201D world", "Thanks \u2014 see you on Monday", "Hello\u3000World", "it\u2019s a pen", "this is a pen\u2026",
+        })
+        {
+            var result = CreateWithOsReading().Reconvert(selected);
+            Assert.True(!result.Consumed, "英文は OS の読みの候補を出さない: " + selected.Replace("\n", "\\n"));
+        }
+        // 変わらないもの: 空白の無い 1 語、かな・漢字を含む選択は従来どおり OS の読みを使う
+        Assert.True(CreateWithOsReading().Reconvert("Takeshi").Consumed, "空白の無い 1 語 (OS の読みを使う)");
+        Assert.True(CreateWithOsReading().Reconvert("今日 明日").Consumed, "漢字の複数語");
+        Assert.True(CreateWithOsReading().Reconvert("今日").Consumed, "漢字 1 語");
+    }
+
+    [Test]
+    public static void IsLatinMultiWordText_Boundaries()
+    {
+        Assert.True(MeltypeSession.IsLatinMultiWordText("Thanks, Kenji!"), "英文");
+        Assert.True(MeltypeSession.IsLatinMultiWordText("Thanks, Kenji!\n"), "末尾の改行");
+        Assert.True(MeltypeSession.IsLatinMultiWordText("a\nb"), "改行で区切られた複数語");
+        Assert.True(MeltypeSession.IsLatinMultiWordText("Hello\u3000World"), "全角空白で区切られた複数語");
+        Assert.True(!MeltypeSession.IsLatinMultiWordText("Takeshi"), "空白の無い 1 語");
+        Assert.True(!MeltypeSession.IsLatinMultiWordText(" Takeshi \n"), "前後の空白だけは複数語ではない");
+        Assert.True(!MeltypeSession.IsLatinMultiWordText("今日は Thanks"), "かなを含む");
+        Assert.True(!MeltypeSession.IsLatinMultiWordText("今日 明日"), "漢字を含む");
+        Assert.True(!MeltypeSession.IsLatinMultiWordText("\uFF76\uFF85 abc"), "半角かなを含む");
+        // かな・漢字・半角かなの範囲の端を 1 つずつ固定する (内側は「日本語を含む」で偽、外側は真)。査読 R22 の指摘
+        foreach (var inside in new[] { "\u3040", "\u30FF", "\u3042", "\u30FC", "\u3400", "\u4DBF", "\u4E00", "\u9FFF", "\uFF66", "\uFF9F" })
+            Assert.True(!MeltypeSession.IsLatinMultiWordText(inside + " a b"), "日本語の文字を含む: U+" + ((int)inside[0]).ToString("X4"));
+        foreach (var outside in new[] { "\u303F", "\u3100", "\u33FF", "\u4DC0", "\u4DFF", "\uA000", "\uFF65", "\uFFA0", "\u300C", "\u3001" })
+            Assert.True(MeltypeSession.IsLatinMultiWordText(outside + " a b"), "範囲の外 (日本語として数えない): U+" + ((int)outside[0]).ToString("X4"));
+        Assert.True(!MeltypeSession.IsLatinMultiWordText("ありがとう Thanks"), "ひらがな");
+        Assert.True(!MeltypeSession.IsLatinMultiWordText("カタカナ abc def"), "カタカナ");
+        Assert.True(!MeltypeSession.IsLatinMultiWordText("漢 abc def"), "漢字");
+        Assert.True(!MeltypeSession.IsLatinMultiWordText("1 2 3"), "英字を含まない");
+        Assert.True(!MeltypeSession.IsLatinMultiWordText(""), "空");
+    }
+
+    [Test]
     public static void IsRomajiText_OnlyAsciiWithLetters()
     {
         Assert.True(CompositionController.IsRomajiText("kyouha iitenki desu ne"), "ローマ字の文");
