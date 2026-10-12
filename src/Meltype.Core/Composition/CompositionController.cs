@@ -388,10 +388,26 @@ public sealed class CompositionController
 
     /// <summary>
     /// ローマ字のまま入った文か (英字を含み、半角の英数字・記号・空白だけ)。
-    /// 本家 #332 (CompositionController.IsRomajiText) を取り込んだ。改行・タブ・全角の文字を含むものは、今までの再変換に任せる。
+    /// 本家 #332 (CompositionController.IsRomajiText) を取り込んだ。途中に改行・タブ・全角の文字を含むものは、今までの再変換に任せる。
+    /// 選択の前後の空白・改行・タブは、<see cref="TrimLineEdges"/> で先に切り離してから渡す (ReconvertRomaji がやる)。
     /// </summary>
     internal static bool IsRomajiText(string text) =>
         text.Any(char.IsAsciiLetter) && text.All(c => c is >= ' ' and <= '~') && text.Trim().Length > 0;
+
+    /// <summary>
+    /// 選択の前後に付いた空白・改行 (\n・\r\n)・タブを切り離す: (前, 本体, 後)。段落を 3 回クリックすると末尾に改行が付き、Windows 系の文書は \r\n、表計算のセルはタブが付く。
+    /// 本体の途中の改行・タブは切り離さない (複数行・複数セルの選択は <see cref="IsRomajiText"/> が偽にして、今までどおり候補を出さない)。
+    /// 空白と改行・タブ以外 (全角空白・垂直タブ・U+2029 など) は切り離さない: 確信が持てない文字は、今までの判定に任せる。
+    /// </summary>
+    internal static (string Lead, string Core, string Trail) TrimLineEdges(string text)
+    {
+        static bool IsEdge(char c) => c is ' ' or '\n' or '\r' or '\t';
+        var start = 0;
+        while (start < text.Length && IsEdge(text[start])) start++;
+        var end = text.Length;
+        while (end > start && IsEdge(text[end - 1])) end--;
+        return (text[..start], text[start..end], text[end..]);
+    }
 
     /// <summary>
     /// ローマ字のまま入った文 (Meltype が止まっていた・英数のまま打った) を、読みに戻さず Meltype の判定で日本語にして、変換中の候補として見せる (Mac の選択 + Shift+Space)。
@@ -402,8 +418,10 @@ public sealed class CompositionController
     /// </summary>
     internal bool ReconvertRomaji(string text)
     {
-        if (IsComposing || !IsRomajiText(text)) return false;
-        var parts = SplitRomajiText(text, out var hasEvidence, out var hasParticle);
+        // 前後の改行・タブ (と空白) は本体から切り離して判定・変換し、候補と置き換えにそのまま付け直す (Enter は選んだ範囲全体を置き換えるので、改行を落とさない)
+        var (lead, core, trail) = TrimLineEdges(text);
+        if (IsComposing || !IsRomajiText(core)) return false;
+        var parts = SplitRomajiText(core, out var hasEvidence, out var hasParticle);
         if (!(hasParticle || (hasEvidence && EnoughJapanese(parts))))
         {
             Diagnostics.Log.Info("再変換: 選んだ文字に、日本語にする所がありませんでした。");
@@ -412,10 +430,10 @@ public sealed class CompositionController
         // 選んだことでキャレットは動いている。直前に確定した語を、あとで確定し直さない (確定し直すと、選んだ文字ではなく手前の文字を消す)
         _correctable.Clear();
         BeginComposition();
-        // 選んだ文字の前後の空白は、置き換えても残す
-        var converted = new string(' ', text.Length - text.TrimStart(' ').Length)
+        // 選んだ文字の前後の空白・改行・タブは、置き換えても残す
+        var converted = lead
             + JoinRomajiParts(parts, kana => string.Concat(ConvertJapanese(kana).Select(c => c.Text)))
-            + new string(' ', text.Length - text.TrimEnd(' ').Length);
+            + trail;
         if (converted.Trim().Length == 0 || converted == text)
         {
             _text.Clear();

@@ -637,6 +637,191 @@ internal static class ReconvertRomajiTests
         }
     }
 
+    /// <summary>前後に改行・タブ・空白が付いた、日本語のローマ字の文 (選んだ文字, 候補の先頭に出る文)。段落を 3 回クリックすると末尾に改行が付く。Windows 系の文書は \r\n。表計算のセルの選択はタブ。</summary>
+    private static readonly (string Selected, string Expected)[] RomajiSentencesWithEdges =
+    [
+        ("Kyouha iitenki desu ne\n", "きょうはいいてんきですね\n"),
+        ("\nasita no meeting de review shimasu", "\nあしたの meeting で review します"),
+        ("asita no meeting de review shimasu\r\n", "あしたの meeting で review します\r\n"),
+        ("kyouha iitenki desu ne\t", "きょうはいいてんきですね\t"),
+        ("\tkyouha iitenki desu ne\t", "\tきょうはいいてんきですね\t"),
+        (" \n kyouha iitenki desu ne \r\n ", " \n きょうはいいてんきですね \r\n "),
+        ("PR no review onegai shimasu\n\n", "PR の review おねがいします\n\n"),
+    ];
+
+    [Test]
+    public static void Reconvert_RomajiWithEdgeNewlinesAndTabs_ShowsCandidateKeepingTheEdges()
+    {
+        // 選んだ文字の前後の改行・タブ (段落の 3 回クリック・\r\n・表計算のセル) は、ローマ字として扱う本体から切り離し、候補と置き換えにそのまま付け直す
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (selected, expected) in RomajiSentencesWithEdges)
+            {
+                var label = selected.Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
+                var session = Create();
+                var result = session.Reconvert(selected);
+                Assert.True(result.Consumed, label + ": 再変換を始めたらキーは使う");
+                Assert.True(result.View is { Converting: true }, label + ": 候補を出す");
+                Assert.Equal(expected, result.View?.Text, label);
+                Assert.Equal(expected + "|" + selected, string.Join("|", result.View!.Candidates), label + ": 候補は 日本語にした文 → 選んだままの文");
+                Assert.Equal(0, result.Commits.Count, "Enter まで置き換えない");
+                // Enter: 選んだ範囲全体 (改行を含む) を置き換えるので、改行を落とさない
+                Assert.Equal(expected, Press(session, VirtualKeys.Return).Commits.Single().Text, label + ": Enter");
+                Assert.True(!session.IsComposing, label + ": 確定したら閉じる");
+
+                // Space: 2 番目の候補 (選んだままの文) → Enter で同じ文字に戻る。もう 1 回 Space で日本語にした文に戻る
+                session = Create();
+                session.Reconvert(selected);
+                Assert.Equal(selected, Press(session, VirtualKeys.Space).View?.Text, label + ": Space");
+                Assert.Equal(expected, Press(session, VirtualKeys.Space).View?.Text, label + ": Space (巡回)");
+                Press(session, VirtualKeys.Space);
+                Assert.Equal(selected, Press(session, VirtualKeys.Return).Commits.Single().Text, label + ": 選んだままの文を確定");
+
+                // Esc / BackSpace: 選んでいた文字 (前後の改行を含む) を 1 回だけ書き戻す
+                foreach (var vk in new[] { VirtualKeys.Escape, VirtualKeys.Back })
+                {
+                    session = Create();
+                    session.Reconvert(selected);
+                    var cancel = Press(session, vk);
+                    Assert.True(cancel.Consumed, label + ": 取り消しに使う");
+                    Assert.Equal(selected, cancel.Commits.Single().Text, label + ": 元の文字に戻す");
+                    Assert.True(cancel.View is null && !session.IsComposing, label + ": 変換ボックスは閉じる");
+                    Assert.True(Press(session, vk).Commits.Count == 0, label + ": 書き戻しは 1 回だけ");
+                }
+
+                // Shift+← / Shift+→: 区切りは変えられないが、キーはアプリに渡さない
+                session = Create();
+                var first = session.Reconvert(selected).View!;
+                foreach (var vk in new[] { VirtualKeys.Left, VirtualKeys.Right })
+                {
+                    var shift = session.HandleKey(vk, null, true, false, false, false);
+                    Assert.True(shift.Consumed, label + ": Shift+矢印はアプリに渡さない");
+                    Assert.Equal(first.Text, shift.View?.Text, label + ": Shift+矢印");
+                    Assert.Equal(first.Candidates, shift.View?.Candidates, label + ": Shift+矢印");
+                }
+                Assert.Equal(expected, Press(session, VirtualKeys.Return).Commits.Single().Text, label + ": Shift+矢印のあとの Enter");
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void Reconvert_RomajiWithEdgeNewlines_BodyResultEqualsTheResultWithoutThem()
+    {
+        // 前後の改行・タブを足しても、本体の結果は変わらない (改行を除いた文字の候補と一致する)
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var body in new[] { "kyouha iitenki desu ne", "Kyou wa genki desu. Asita mo ganbarimasu.", "README.md wo yonde kudasai", "sdkto", "  kyouha  ", "Thanks, Kenji!", "this is a pen", "https://github.com/yksr-melt/Meltype/pull/332", "git commit -m fix", "Takeshi san" })
+            {
+                var plain = Create().Reconvert(body);
+                foreach (var (lead, trail) in new[] { ("", "\n"), ("\n", ""), ("", "\r\n"), ("", "\t"), ("\n", "\n"), ("\t", "\r\n") })
+                {
+                    var edged = Create().Reconvert(lead + body + trail);
+                    Assert.Equal(plain.Consumed, edged.Consumed, $"{body}: 改行を付けても候補が出る / 出ないは同じ");
+                    Assert.Equal(plain.View?.Text is { } t ? lead + t + trail : null, edged.View?.Text, $"{body}: 候補は本体の結果に前後を付けたもの");
+                }
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void Reconvert_RomajiWithNewlineInside_OrNothingElse_IsLeftAlone()
+    {
+        // 安全側: 選択の途中に改行・タブがある (複数行・複数セルの選択) は、これまでどおり候補を出さない。前後を除いて何も残らない選択、200 文字の上限も同じ
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var selected in new[]
+            {
+                "kyouha\niitenki desu ne", "kyouha iitenki\r\ndesu ne", "kyouha\tiitenki desu ne", "kyouha iitenki desu ne\nasita no meeting de review shimasu", "\nkyouha iitenki\ndesu ne\n",
+                "\n", "\r\n", "\t", " \n ", "\n\n\n", "\n123\n", "\n...\n", "\n\u3000kyouha iitenki desu ne", "kyouha iitenki desu ne\u3000\n", "kyouha iitenki desu ne\u000B", "kyouha iitenki desu ne\u2029",
+            })
+                Assert.True(PassesThrough(selected), selected.Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t") + ": 今までどおり何もしない");
+
+            // 200 文字の上限は、前後の改行を含めた選択全体で見る (Swift 側も選択全体の長さで弾く)
+            var body = string.Concat(Enumerable.Repeat("kyouha iitenki desu ne ", 8)).TrimEnd();
+            Assert.True(body.Length <= 200 - 2, "テスト入力が上限に近い");
+            Assert.True(Create().Reconvert(body + "\n").Consumed, "上限内なら改行付きでも出る");
+            var padded = body + new string('\n', 200 - body.Length);
+            Assert.Equal(200, padded.Length);
+            Assert.True(Create().Reconvert(padded).Consumed, "ちょうど 200 文字");
+            Assert.True(!Create().Reconvert(padded + "\n").Consumed, "201 文字は出ない");
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void Reconvert_EnglishCodeAndPaths_WithEdgeNewlines_AreLeftAlone()
+    {
+        // 英文・コード・URL・パスの前後に改行・タブが付いても、候補なしのまま (OS の読みの候補も出ない)
+        foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
+        {
+            CompositionTests.Detector.SpellChecker = checker;
+            try
+            {
+                foreach (var body in new[]
+                {
+                    "Thanks, Kenji!", "this is a pen", "I want to go home", "See you tomorrow", "Hello, my name is Ryo.", "I met Takeshi yesterday", "Tanaka Makoto",
+                    "git commit -m fix", "export PATH=$HOME/bin:$PATH", "const x = 42;", "ls -la /tmp", "SELECT * FROM users WHERE id = 1", "C:\\Users\\ryo\\memo.txt report.pdf",
+                })
+                {
+                    foreach (var (lead, trail) in new[] { ("", "\n"), ("\n", ""), ("", "\r\n"), ("", "\t"), ("\n", "\n"), (" ", " \n ") })
+                    {
+                        var selected = lead + body + trail;
+                        var result = CreateWithOsReading().Reconvert(selected);
+                        Assert.True(!result.Consumed, $"{body}: 前後に改行があっても候補なし ({selected.Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t")}, {(checker is null ? "辞書なし" : "同梱の英単語表")})");
+                    }
+                }
+            }
+            finally
+            {
+                CompositionTests.Detector.SpellChecker = null;
+            }
+        }
+    }
+
+    [Test]
+    public static void Reconvert_SingleAsciiWord_WithEdgeNewlines_BehavesLikeWithoutThem()
+    {
+        // 空白の無い 1 語は、前後に改行が付いても付かないときと同じ (OS の読みを使う / 使わないも、候補が出る / 出ないも)
+        foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
+        {
+            CompositionTests.Detector.SpellChecker = checker;
+            try
+            {
+                foreach (var body in new[] { "Takeshi", "GitHub", "README.md", "ryo@example.com", "https://github.com/yksr-melt/Meltype/pull/332", "/Users/ryo/Downloads/report.pdf", "kyou", "sdkto", "Kyouha", "OK" })
+                {
+                    var plain = CreateWithOsReading();
+                    plain.ReadingProvider = text => text.Trim() is "Takeshi" ? "たけし" : null;
+                    var plainResult = plain.Reconvert(body);
+                    foreach (var trail in new[] { "\n", "\r\n", "\t" })
+                    {
+                        var edged = CreateWithOsReading();
+                        edged.ReadingProvider = text => text.Trim() is "Takeshi" ? "たけし" : null;
+                        var edgedResult = edged.Reconvert(body + trail);
+                        Assert.Equal(plainResult.Consumed, edgedResult.Consumed, $"{body}: 改行を付けても同じ ({(checker is null ? "辞書なし" : "同梱の英単語表")})");
+                    }
+                }
+            }
+            finally
+            {
+                CompositionTests.Detector.SpellChecker = null;
+            }
+        }
+    }
+
     [Test]
     public static void Reconvert_Romaji_IgnoredWhileComposingOrDirect()
     {
@@ -704,6 +889,43 @@ internal static class ReconvertRomajiTests
         Assert.True(!CompositionController.IsRomajiText("kyouhaです"), "かなが混ざる");
         Assert.True(!CompositionController.IsRomajiText("line1\nline2"), "改行を含む (複数行は今までの再変換に任せる)");
         Assert.True(!CompositionController.IsRomajiText("a\tb"), "タブを含む");
+    }
+
+    [Test]
+    public static void TrimLineEdges_OnlySpacesNewlinesAndTabsAtTheEdges()
+    {
+        static string Show(string t) => t.Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
+        foreach (var (text, lead, core, trail) in new[]
+        {
+            ("abc", "", "abc", ""),
+            ("abc\n", "", "abc", "\n"),
+            ("\nabc", "\n", "abc", ""),
+            ("abc\r\n", "", "abc", "\r\n"),
+            ("abc\t", "", "abc", "\t"),
+            (" \n\t\r abc \r\t\n ", " \n\t\r ", "abc", " \r\t\n "),
+            ("a b\nc d\n", "", "a b\nc d", "\n"),
+            ("a\tb", "", "a\tb", ""),
+            ("", "", "", ""),
+            ("\n", "\n", "", ""),
+            (" \r\n\t ", " \r\n\t ", "", ""),
+            // 切り離すのは空白・\n・\r・\t の 4 つだけ: 全角空白・垂直タブ・改ページ・NEL・LS・PS・NBSP は本体のまま (IsRomajiText が偽にして、今までの判定に任せる)
+            ("abc\u3000", "", "abc\u3000", ""),
+            ("\u000Babc", "", "\u000Babc", ""),
+            ("abc\u000C", "", "abc\u000C", ""),
+            ("abc\u0085", "", "abc\u0085", ""),
+            ("abc\u2028", "", "abc\u2028", ""),
+            ("abc\u2029", "", "abc\u2029", ""),
+            ("\u00A0abc", "", "\u00A0abc", ""),
+            // 外側が切り離せない文字 (全角空白) なら、その内側の改行も切り離さない (外側から順に削るだけ)
+            ("\u3000\nabc", "", "\u3000\nabc", ""),
+        })
+        {
+            var (l, c, t) = CompositionController.TrimLineEdges(text);
+            Assert.Equal(lead, l, "前: " + Show(text));
+            Assert.Equal(core, c, "本体: " + Show(text));
+            Assert.Equal(trail, t, "後: " + Show(text));
+            Assert.Equal(text, l + c + t, "つなぐと元に戻る: " + Show(text));
+        }
     }
 
     private static void Type(MeltypeSession session, string text)
