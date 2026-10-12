@@ -981,8 +981,9 @@ public sealed class CompositionText
         // # はハッシュタグ・チャンネル名 (Discord の #雑談) で使うので半角のまま (Space で ＃)。
         '#' => '#',
         '/' => '/',
-        // JIS キーボードの ￥ キー
-        '\\' => '￥',
+        // \ は、パス・エスケープ・正規表現などで使うので、日本語の中でも半角のまま (US 配列の \ キーが \ を打つため)。
+        // 以前は JIS キーボードの ￥ キー向けに ￥ にしていた。JIS の ￥ キーが Mac でどの文字を返すかは未確認 (docs/US_LAYOUT_PLAN.md の工程 1・実機確認)。
+        '\\' => '\\',
         _ when c is >= '!' and <= '~' && !char.IsAsciiLetterOrDigit(c) && FullWidthSymbols() => (char)(c + 0xFEE0),
         _ => c,
     };
