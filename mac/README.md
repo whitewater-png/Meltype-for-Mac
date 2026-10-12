@@ -101,7 +101,7 @@ cd mac && ./build.sh && ./make-pkg.sh && ./make-dmg.sh   # dist/Meltype-mac-<ver
 ```
 
 pkg だけをブラウザでダウンロードして開くと、「“Meltype-mac-<version>.pkg” は、開発元が未確認のため開けません」と出て、次に何をすればよいか分からないまま止まってしまうことがあります。
-そこで、pkg を dmg に入れて配ります。dmg を開くと Finder のウインドウの背景に開き方の図が出て、その横に pkg が置いてあります。
+そこで、pkg を dmg に入れて配ります。dmg を開くと Finder のウインドウの背景に開き方の図が出て、その横に pkg が置いてあります。1.1.5 の次の版からのリリースでは pkg を単体では添付せず、zip と dmg だけにします (`docs/RELEASE.md`)。
 
 dmg の中身:
 

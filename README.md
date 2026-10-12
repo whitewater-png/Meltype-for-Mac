@@ -57,7 +57,7 @@ Mac の標準的な IME の仕組み (Input Method Kit) で動く Meltype です
 
 ![dmg を開いたときのウインドウ](docs/images/mac-dmg-window.png)
 
-同じ案内は、dmg の中の「開けないときは.txt」にも書いてあります。**dmg と pkg は動作確認中です** (うまくいかないときは zip を使うか、Issue で教えてください)。
+同じ案内は、dmg の中の「開けないときは.txt」にも書いてあります。**dmg は動作確認中です** (うまくいかないときは zip を使うか、Issue で教えてください)。
 
 ### 配布版 (zip)
 1. [Releases](https://github.com/whitewater-png/Meltype-for-Mac/releases) から `Meltype-mac-<version>.zip` をダウンロードして展開する
