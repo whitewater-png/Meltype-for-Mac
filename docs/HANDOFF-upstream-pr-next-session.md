@@ -1,14 +1,14 @@
 # 引き継ぎ: 本家 PR の取り込み (P30〜P36) と実機の不具合 (Q1〜Q5) の続き
 
-> 2026-10-12 夕の時点 (かな入力・US 配列のマージのあと)。**基準コミット: `b33e571`** (このファイルをコミットすると HEAD は 1 つ進む。必ず `git log --oneline -5` と `git status --short` で現状を確かめてから始める)。
+> 2026-10-12 夕の時点 (かな入力・US 配列のマージのあと)。**基準コミット: `f5de00a`** (このファイルをコミットすると HEAD は 1 つ進む。必ず `git log --oneline -5` と `git status --short` で現状を確かめてから始める)。
 > 別セッションが同じ作業ツリーを使っている。**このファイルを `git add -A` で巻き込まない・他の `docs/HANDOFF-*.md` (exception-recovery、strip-build-paths) には触らない。**
 > 状態の正本は `docs/UPSTREAM_PR_TRACKER.md` (項目ごとの状態) と `docs/IMPROVEMENT_PLAN.md` (設計・数字・限界)。この文書はそれを読むための道案内。
 
 ## 0. 先にやること
-1. `cd /Users/ryo/Meltype && git status --short && git log --oneline -5 && git log origin/main..HEAD --oneline | wc -l` (未 push は 41 件のはず。**push していない**。`/Users/ryo/Meltype` の作業ツリーは、別セッションが `exp/zenzai-eval` などに切り替えていることがある。`git branch --show-current` を見て、`main` でなければそこへコミットしない。`main` へは一時の `git worktree add` で入れ、`git update-ref refs/heads/main <新> <旧>` で更新するとよい)。
-2. 入っているアプリ: `~/Library/Input Methods/Meltype.app` は 1.1.5 (build 21)、**2026-10-12 16:38 ビルド** (別セッションが `verify/kana-us-merge` から入れ替えたもの。P36・S2 に加え、かな入力・US 配列を含む。`main` のマージ後そのものではない)。`defaults read io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK` は「存在しない」になっていること (トレースログは切ってある)。
+1. `cd /Users/ryo/Meltype && git status --short && git log --oneline -5 && git log origin/main..HEAD --oneline | wc -l` (未 push は 43 件のはず。**push していない**。`/Users/ryo/Meltype` の作業ツリーは、別セッションが `exp/zenzai-eval` などに切り替えていることがある。`git branch --show-current` を見て、`main` でなければそこへコミットしない。`main` へは一時の `git worktree add` で入れ、`git update-ref refs/heads/main <新> <旧>` で更新するとよい)。
+2. 入っているアプリ: `~/Library/Input Methods/Meltype.app` は 1.1.5 (build 21)、**2026-10-12 17:20 ビルド** (`main` の `f5de00a` を、切り離した一時の作業ツリーでビルドして入れ替えたもの。P36・S2・かな入力・US 配列を含み、`exp/zenzai-eval` の変更は含まない)。`defaults read io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK` は「存在しない」になっていること (トレースログは切ってある)。
 3. テスト: `bash --noprofile --norc -c 'export PATH=$HOME/.dotnet:$PATH; cd src/Meltype.Core.Tests && dotnet run -c Release'` → **559/559** (かな入力・US 配列のマージ後)。
-4. かな入力 (JIS) と US 配列対応は、別セッションが `main` に取り込んだ (`afe2ccd`・`11c135f`)。マージ後のテストは 559 件通り、`tools/check-mac-aot-settings.py` は期待値が古くなって失敗していたので直した (`b33e571`。`InputStyle` は Mac の設定に出る)。**実機のかな入力・US 配列の確認は、この引き継ぎの作業では行っていない。**
+4. かな入力 (JIS) と US 配列対応は、別セッションが `main` に取り込んだ (`afe2ccd`・`11c135f`)。マージ後のテストは 559 件通り、`tools/check-mac-aot-settings.py` は期待値が古くなって失敗していたので直した (`b33e571`。`InputStyle` は Mac の設定に出る)。**実機の確認 (2026-10-12、JIS キーボード、`main` の 17:20 ビルド、TextEdit): 設定の「入力方式」の表示と切り替え、かな入力 (`Shift+E` = ぃ など・英単語のときの英字表示)、ローマ字入力 (`kyouha,.` → `きょうは、。`、`` kono`config`wo `` → `` この`config`を ``。バッククォートは JIS の Shift+@)、`¥` キーは `¥`、Option + `¥` は `\` (半角) で、問題なし。US 配列そのもの (`docs/US_LAYOUT_CHECKLIST.md` の U1〜U13) は US キーボードが無いので未確認。**
 
 ## 1. 守ること (ガードレール)
 - **`exp/zenzai-eval` は、精度向上の検証用ブランチ (別セッションの作業。リョウさんに確認済み)。`/Users/ryo/Meltype` の作業ツリーがそのブランチに切り替わり、未コミットの変更 (`Package.swift`・`Converter.swift` など) があることがある。そこへはコミットしない・その変更を巻き込まない。`main` にはコミットしない。**
@@ -70,7 +70,7 @@
 - 他: Hermes の `We'うぇへれすし` (原因未調査。Q5 の Shift+Enter で説明できる可能性)、TextEdit の `Let  It Go` (空白が二重)、`HI there` (再現せず。Shift を離すのが遅れた打ち方の影響と見ている)、`gemma4-27b`→`gemma4ー27b`、`ollama run` の `run` が `るん`、`gpt-oss`→`gpt-おっs`。
 
 ## 5. リョウさんの判断を待っていること
-1. **push・版の更新・リリース** (未 push 41 件)。
+1. **push・版の更新・リリース** (未 push 43 件)。
 2. 空白の無い 1 語の英単語で OS の読みを切るか (でたらめ約 724 件が消える一方、`Suzuki`・`Sakura` など正しい読み約 40 件も消える)。今は「残す」。
 3. `docs/HANDOFF-exception-recovery.md` (別セッションのもの。実装済みなのに「未着手」と書いている古い文書) の扱い。
 4. `change` を英字にする回避策 (大文字 `Change`・末尾の空白・ユーザー辞書) を試すか。
