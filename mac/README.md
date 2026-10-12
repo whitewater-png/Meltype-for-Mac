@@ -82,6 +82,7 @@ shasum -a 256 ~/Downloads/Meltype-mac.zip   # ファイル名は実際のもの�
 
 `build.sh` は、ビルドした実行ファイルの RPATH からビルドしたマシンの絶対パス (`/Library/Developer/CommandLineTools/...`) を `install_name_tool -delete_rpath` で除いてから署名します。
 組み立てたあとの `otool -l build/Meltype.app/Contents/MacOS/Meltype` で、`LC_RPATH` に `/usr/lib/swift`・`@loader_path`・`@executable_path/../Frameworks` だけが残っていることを確かめられます。
+あわせて、署名の前に `strip -S` で、実行ファイル (`Meltype`・`MeltypeDictionary`) に残るデバッグ用の記録 (ビルドしたマシンのホームフォルダー配下の絶対パスを含む) を取り除きます (関数名などの通常のシンボルは残ります)。`grep -a -o -E '/Users/[A-Za-z0-9._-]+/' build/Meltype.app/Contents/MacOS/Meltype | wc -l` が 0 になることで確かめられます。署名したあとに strip すると署名が壊れるので、署名より前でなければなりません。
 
 ## ワンクリックのインストーラー (.pkg)
 

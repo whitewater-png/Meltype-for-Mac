@@ -147,6 +147,15 @@ for executable in "$APP/Contents/MacOS/Meltype" "$HELPER/Contents/MacOS/MeltypeD
         esac
     done < <(otool -l "$executable" | awk '$1=="cmd"&&$2=="LC_RPATH"{r=1;next} r&&$1=="path"{print $2;r=0}')
 done
+# 実行ファイルには、ビルドしたマシンのホームフォルダー配下の絶対パス (/Users/<名前>/…/mac/.build/ など) が、デバッグ用の記録 (stabs) として残る。
+# 配布先の Mac では使わず、ユーザー名と作業フォルダーの場所が配布物から読めてしまうので、署名の前に取り除く
+# (C# 側の libMeltypeNative.dylib は、上の StripSymbols=true で同じことをしている)。
+# -S が取り除くのはデバッグ用の記録だけで、関数名などの通常のシンボルは残る。strip するのは .app の中のコピーで、.build の下の元の実行ファイルは変わらない。
+# .app の中のコピーはリンカーが付けた署名 (linker-signed) の状態なので、strip は警告を出さない。署名は直後の codesign で付け直す。
+# (署名したあとに strip すると「署名が無効になる」と警告が出て、codesign --verify が失敗する。必ず署名より前に行うこと。)
+for executable in "$APP/Contents/MacOS/Meltype" "$HELPER/Contents/MacOS/MeltypeDictionary"; do
+    strip -S "$executable"
+done
 # 署名: 環境変数 MELTYPE_MAC_IDENTITY (Developer ID Application の証明書の名前) があれば配布用に署名する
 # (Hardened Runtime・タイムスタンプ付き。公証 (notarization) はまだ行っていない (CI 無し))。無ければ自分の Mac で使うための署名。
 # 中から外へ: Frameworks の中身 → 辞書の管理画面 (Contents/Helpers) → Meltype.app。
