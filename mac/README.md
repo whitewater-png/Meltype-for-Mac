@@ -93,6 +93,32 @@ cd mac && ./build.sh && ./make-pkg.sh   # dist/Meltype-mac-<version>.pkg がで�
 ダブルクリックでインストールできる `.pkg` を作ります (「このユーザーのみ」に入れるので、管理者パスワードは不要です)。pkg は署名していないので、最初に 1 回だけ許可が必要です。macOS 15 以降は、一度ダブルクリックして開こうとしてから システム設定 → プライバシーとセキュリティ → 下のほうの「このまま開く」を押します (ログインパスワードを聞かれることがあります。「このまま開く」は、開こうとしてから約 1 時間だけ押せます)。macOS 14 以前は、右クリック →「開く」です。心配なときは、リリースページの SHA-256 と `shasum -a 256` の結果を比べてから開いてください。
 **動作確認中です** (実際のインストールは、まだ別の Mac で確認できていません)。
 
+### 配布用の dmg (pkg と開き方の案内をまとめたもの)
+
+```bash
+cd mac && ./build.sh && ./make-pkg.sh && ./make-dmg.sh   # dist/Meltype-mac-<version>.dmg ができます
+./make-dmg.sh <pkg のパス>                                # その pkg を包んで、pkg と同じフォルダーに dmg を作ります
+```
+
+pkg だけをブラウザでダウンロードして開くと、「“Meltype-mac-<version>.pkg” は、開発元が未確認のため開けません」と出て、次に何をすればよいか分からないまま止まってしまうことがあります。
+そこで、pkg を dmg に入れて配ります。dmg を開くと Finder のウインドウの背景に開き方の図が出て、その横に pkg が置いてあります。1.1.5 の次の版からのリリースでは pkg を単体では添付せず、zip と dmg だけにします (`docs/RELEASE.md`)。
+
+dmg の中身:
+
+- `Meltype-mac-<version>.pkg` (上で作った pkg そのもの)
+- `開けないときは.txt` (背景の図と同じ内容を文字で書いたもの)
+- 背景の画像 (`.background.tiff`。隠しファイルなので、ふだんは見えません)
+
+開いたときの見た目: [../docs/images/mac-dmg-window.png](../docs/images/mac-dmg-window.png)
+
+作るときと配るときの注意:
+
+- 同じ名前の dmg がもうあるときは、上書きせずにエラーで止まります。作り直すときは、前の dmg をよそへ移してから実行してください。
+- Finder のウインドウの並び (アイコンの位置・背景) は、[dmgbuild](https://github.com/dmgbuild/dmgbuild) (MIT) で直接書きます (Finder は操作しません。macOS 26 の Finder は AppleScript で設定した背景を保存しないため)。dmgbuild は初回だけ `mac/.build/dmg-venv` に pip で入れるので、**初回は Python 3.10 以降とネットワークが必要**です (例: `brew install python`)。入れる版とハッシュは `pkg/dmg/requirements.txt` で固定しています。
+- 背景の図は `pkg/dmg/make-background.swift`、文字版は `pkg/dmg/README.txt`、配置は `pkg/dmg/settings.py` です。文面を変えるときは 2 つをそろえ、窓の大きさを変えるときは、幅は `make-background.swift` の `W` と `settings.py` の `window_rect` をそろえ、窓の高さは `H` より大きくします (macOS 26 の Finder ではツールバーの分だけ中身が狭くなり、そろえるとスクロールバーが出るため)。
+- 開き方の案内は上の pkg と同じです (macOS 15 以降は「このまま開く」、macOS 14 以前は右クリック →「開く」→「開く」)。
+- **まだ実機で確かめていないこと**: dmg そのもののダブルクリックで警告が出るか、読み取り専用の dmg の中の pkg に「このまま開く」が効くか、macOS 13/14 での右クリックの経路。
+
 ## アンインストール
 
 zip の **`Uninstall Meltype.command`** のダブルクリック、またはターミナルで次を実行します (手順の詳細・消すもの・手で消す方法は、トップの [README.md](../README.md) の「アンインストール」を見てください)。

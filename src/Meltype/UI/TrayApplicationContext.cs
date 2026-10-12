@@ -59,6 +59,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             SpaceAroundEnglish = () => _engine.Settings.SpaceAroundEnglish,
             Punctuation = () => _engine.Settings.Punctuation,
             FullWidthSymbols = () => _engine.Settings.FullWidthSymbols,
+            Parentheses = () => _engine.Settings.Parentheses,
+            Braces = () => _engine.Settings.Braces,
             KanaInput = () => _engine.Settings.InputStyle == InputStyle.Kana,
             ModeIndicator = () => _engine.Settings is { Enabled: true, Mode: InputMode.Keyboard, ShowModeIndicator: true },
             ModeIndicatorOnFocus = () => _engine.Settings.ShowModeIndicatorOnFocus,

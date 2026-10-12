@@ -194,6 +194,8 @@ public sealed class MeltypeSession
             SpaceAroundEnglish = () => shared.Current.SpaceAroundEnglish,
             Punctuation = () => shared.Current.Punctuation,
             FullWidthSymbols = () => shared.Current.FullWidthSymbols,
+            Parentheses = () => shared.Current.Parentheses,
+            Braces = () => shared.Current.Braces,
             TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
         return new MeltypeSession(detector, converter, options, () => shared.Current) { ReadingProvider = reader };

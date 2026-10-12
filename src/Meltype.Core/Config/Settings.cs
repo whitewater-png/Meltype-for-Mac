@@ -67,6 +67,20 @@ public enum PunctuationStyle
     [Description("，。")] CommaJapanese,
 }
 
+/// <summary>日本語の中で打った丸括弧 ( ) の幅。</summary>
+public enum ParenthesisWidth
+{
+    [Description("半角 ( )")] HalfWidth,
+    [Description("全角 （ ）")] FullWidth,
+}
+
+/// <summary>日本語の中で打った中括弧 { } の幅。</summary>
+public enum BraceWidth
+{
+    [Description("半角 { }")] HalfWidth,
+    [Description("全角 ｛ ｝")] FullWidth,
+}
+
 public enum InputMode
 {
     /// <summary>Meltype 自身の変換ボックスで入力する (半角/全角 不要)。</summary>
@@ -218,6 +232,14 @@ public sealed class Settings
     [Category("1. 全般"), DisplayName("記号を全角にする"),
      Description("日本語の中で打った ! ? ~ などの記号を全角 (！？～) にします。OFF にすると、打ったままの半角で入ります (チャットで !? を半角にしたいとき)。")]
     public bool FullWidthSymbols { get; set; } = true;
+
+    [Category("1. 全般"), DisplayName("丸括弧 ( ) の幅"),
+     Description("日本語の中で打った ( ) を、半角 ( ) にするか全角 （ ） にするか。英語の中や、すぐ後ろが英語のときは、この設定にかかわらず半角です。[ ] は日本語と判定したときは「」、英語と判定したときは [ ] で、自動判定のままです。")]
+    public ParenthesisWidth Parentheses { get; set; } = ParenthesisWidth.HalfWidth;
+
+    [Category("1. 全般"), DisplayName("中括弧 { } の幅"),
+     Description("日本語の中で打った { } を、全角 ｛ ｝ にするか半角 { } にするか。英語の中や、すぐ後ろが英語のときは、この設定にかかわらず半角です。")]
+    public BraceWidth Braces { get; set; } = BraceWidth.FullWidth;
 
     [Category("1. 全般"), DisplayName("予測変換"),
      Description("ひらがなを数文字打つと、続きの候補 (ユーザー辞書・変換エンジン・過去に確定した語) を変換ボックスの下に出します。Tab で候補に入り、Enter で確定します。英語と判定した語には出しません。現在は Mac 版だけで表示されます。")]

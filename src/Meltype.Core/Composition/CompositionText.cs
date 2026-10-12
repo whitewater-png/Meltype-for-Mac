@@ -747,6 +747,12 @@ public sealed class CompositionText
     /// <summary>! ? ~ などの記号を全角にするか (設定)。</summary>
     public Func<bool> FullWidthSymbols { get; set; } = () => true;
 
+    /// <summary>日本語の中で打った ( ) の幅 (設定)。</summary>
+    public Func<ParenthesisWidth> Parentheses { get; set; } = () => ParenthesisWidth.HalfWidth;
+
+    /// <summary>日本語の中で打った { } の幅 (設定)。</summary>
+    public Func<BraceWidth> Braces { get; set; } = () => BraceWidth.FullWidth;
+
     /// <summary>
     /// 英字を続けて打った部分 (ローマ字) の打ち間違いを直す (onegaishimsu → onegaishimasu)。直したら true。
     /// 確定・変換の直前 (Space・Enter・記号) に呼ぶ。打っている途中は続きを打つと読めることがあり、
@@ -963,9 +969,13 @@ public sealed class CompositionText
         '.' => Punctuation() == PunctuationStyle.Comma ? '．' : '。',
         '[' => '「',
         ']' => '」',
-        // ASCII の括弧はチャット本文でもそのまま使われるため、入力した幅を保つ。
-        '(' => '(',
-        ')' => ')',
+        // ( ) はチャット本文でもそのまま使われるため、既定は入力した幅 (半角)。設定で全角にできる。
+        // 英語の区間や、すぐ後ろが英語のときは、HalfWidthOpeners などが半角に戻す。
+        '(' => Parentheses() == ParenthesisWidth.FullWidth ? '（' : '(',
+        ')' => Parentheses() == ParenthesisWidth.FullWidth ? '）' : ')',
+        // { } は既定が全角 (従来は「記号を全角にする」に従っていた)。設定で半角にできる。
+        '{' => Braces() == BraceWidth.FullWidth ? '｛' : '{',
+        '}' => Braces() == BraceWidth.FullWidth ? '｝' : '}',
         // 設定で全角にしない場合は ! ? ~ を含め、下の「その他の記号」も打ったままの半角にする。
         _ when c is '!' or '?' or '~' && !FullWidthSymbols() => c,
         // ! ? は Microsoft IME と同じく全角 (テスターのチャットでも、日本語の後ろの ？ ！ は 96% が全角だった)。

@@ -146,6 +146,8 @@ internal static class CompositionTests
         public bool SpaceAroundEnglish { get; set; }
         public PunctuationStyle Punctuation { get; set; } = PunctuationStyle.Japanese;
         public bool FullWidthSymbols { get; set; } = true;
+        public ParenthesisWidth Parentheses { get; set; } = ParenthesisWidth.HalfWidth;
+        public BraceWidth Braces { get; set; } = BraceWidth.FullWidth;
         public bool Prediction { get; set; } = true;
 
         /// <summary>変換中の Shift+Enter で確定してキーをアプリに渡すか (CompositionOptions.ShiftEnterNewline)。既定は ON。</summary>
@@ -217,6 +219,8 @@ internal static class CompositionTests
                 SpaceAroundEnglish = () => SpaceAroundEnglish,
                 Punctuation = () => Punctuation,
                 FullWidthSymbols = () => FullWidthSymbols,
+                Parentheses = () => Parentheses,
+                Braces = () => Braces,
                 Prediction = () => Prediction,
                 Suggestions = suggestions,
                 DictionarySuggest = () => SuggestEnabled,
@@ -554,6 +558,28 @@ internal static class CompositionTests
         var full = new Keyboard();
         full.Type("kyouha!?~\n");
         Assert.Equal("きょうは！？～", string.Join("|", full.Host.Output));
+    }
+
+    [Test]
+    public static void Brackets_WidthFollowsSettings()
+    {
+        // 既定: ( ) は半角、{ } は全角
+        var normal = new Keyboard();
+        normal.Type("kyouha(ha)\n");
+        Assert.Equal("きょうは(は)", string.Join("|", normal.Host.Output));
+        var braces = new Keyboard();
+        braces.Type("kyouha{ha}\n");
+        Assert.Equal("きょうは｛は｝", string.Join("|", braces.Host.Output));
+
+        // 設定: ( ) を全角に
+        var full = new Keyboard { Parentheses = ParenthesisWidth.FullWidth };
+        full.Type("kyouha(ha)\n");
+        Assert.Equal("きょうは（は）", string.Join("|", full.Host.Output));
+
+        // 設定: { } を半角に
+        var half = new Keyboard { Braces = BraceWidth.HalfWidth };
+        half.Type("kyouha{ha}\n");
+        Assert.Equal("きょうは{は}", string.Join("|", half.Host.Output));
     }
 
     [Test]

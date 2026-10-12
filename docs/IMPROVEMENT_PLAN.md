@@ -2101,3 +2101,13 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **見送り (適用していない)**: 調査員が作った任意の M3 の訂正パッチ (M3 は S1 (`9084282`) で対応済み。M-3 の経路は Windows 専用で、HEAD では `DescribeKind` の分類だけをログに出している)。R30 が、同じコミットが M8 (postinstall に `codesign --verify` を足し、失敗なら `exit 1`)・M7・M2(b) も直していることを指摘した。M3 だけ「対応済み」にすると、冒頭の「今すぐ…M8」と表 M8 の「常に `exit 0`」が現状と食い違ったまま残るので、まとめて直すときに一緒に扱う (`scratch/sec225v2/SECURITY_REVIEW-m3.patch` は 24 時間で消える)。
 - **未確認**: azooKey を通した学習 (`learnCallback`)。Swift・IMK の実機での動作。Windows 実機。2 文字の語で languages.json に残る条件。F7・F8・F9 のすべての組み合わせ (代表だけ測った)。F6〜F8 のあとの Space だけでは残らず、F6 → Space → Esc では残る違いの経路。
 - **前提の変化**: Mac で Direct が学習しない・`Hold` が通らないという前提は、英数状態の自動判定を Mac に入れる (P11) と変わる。そのときは、`SwitchHeldToJapanese` の作り直し (P37 の節) と、この M5 の見直しを合わせて見直す。
+
+## 追加項目 D1 (pkg の「開発元が未確認のため開けません」で止まる利用者向けに、開き方の図解つき dmg で配る)
+
+- **きっかけ**: pkg を Chrome で落とした利用者が「“Meltype-mac-1.1.5.pkg” は、開発元が未確認のため開けません」で止まった (macOS 14 以前の形のダイアログ)。この表示は Gatekeeper が pkg を開く前に出すので、pkg の中 (welcome.html など) には案内を置けない。署名・公証は運用コストのため行わない方針 (リョウさんの判断) なので、案内を pkg の外に置く。リョウさんの判断 (2026-10-12): 案 A (dmg) と案 B (README・リリース本文の図解) の両方。
+- **実装**: `mac/make-dmg.sh` (新規) が pkg を dmg に包む。dmg を開くと Finder の窓の背景に開き方の図 (macOS 15 以降は「このまま開く」、14 以前は右クリック →「開く」→「開く」) が出て、左に pkg、下に同じ内容の `開けないときは.txt` が並ぶ。背景は `mac/pkg/dmg/make-background.swift` が描き (1x・2x を tiff に)、配置は dmgbuild (`mac/pkg/dmg/settings.py`) で `.DS_Store` を直接書く。既存の dmg は上書きしない。中の pkg は入力とバイト単位で同じ。
+- **Finder の AppleScript をやめた理由**: macOS 26.6.2 の Finder は、AppleScript で設定した背景 (`background picture`) を `.DS_Store` に保存しなかった (実測。アイコンの位置と窓の大きさは保存された)。dmgbuild 1.6.7 は macOS 26.2 の背景の不具合に対応済み (dmgbuild #273 / #275)。
+- **得と損**: 得 = ダウンロード直後に開き方が目に入る。署名基盤なしで済む。損 = リリース手順が 1 つ増える。dmgbuild を PyPI から初回だけ入れる (Python 3.10 以降とネットワークが必要。版とハッシュは `mac/pkg/dmg/requirements.txt` で固定、wheel のみ)。dmg 自体も署名なしで、pkg の許可の手順は減らない (案内が見えるようになるだけ)。
+- **文書**: `README.md` に「配布版 (dmg)」節と窓のスクリーンショット (`docs/images/mac-dmg-window.png`)、`mac/README.md` に作り方、`docs/RELEASE.md` に手順と添付・SHA-256 を足した。アプリ内の更新は zip だけを名前で探す (`Updater.swift:25`) ので、dmg を添付しても影響しない。
+- **確認**: 公開済み 1.1.5 の pkg のコピーで dmg を作り、`hdiutil verify`・UDZO/HFS+・中の pkg の SHA-256 が公開値 (`eceb709e…`) と一致・`/Users/` や利用者名が 0 件・再実行で上書きしない (rc 1)・空白や `&` を含むパス名・相対パス、を確認。Finder で開いて背景と配置をスクリーンショットで確認 (macOS 26.6.2)。査読 2 回 (指摘はすべて反映。`com.apple.provenance` の印は外せないので見送り)。
+- **未検証 (実機)**: ブラウザで落とした (隔離属性つきの) dmg をダブルクリックしたときに警告が出るか。読み取り専用の dmg の中の pkg に「このまま開く」が効くか。macOS 13/14 の右クリックの経路。`spctl -a -t open` は dmg に対して「rejected / no usable signature」を返すが、隔離属性の有無で結果が同じなので、実際にマウントが止められるかは分からない。
