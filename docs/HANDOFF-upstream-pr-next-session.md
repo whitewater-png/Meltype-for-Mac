@@ -1,11 +1,11 @@
 # 引き継ぎ: 本家 PR の取り込み (P30〜P36) と実機の不具合 (Q1〜Q5) の続き
 
-> 2026-10-12 夕の時点 (かな入力・US 配列のマージのあと)。**基準コミット: `main` は `4011e23` (P37 まで)、取り込み待ちのブランチ `batch/p36c-p38-p39-sec` は `b0726ff` (その上に 4 コミット)** (このファイルをコミットすると HEAD は 1 つ進む。必ず `git log --oneline -5` と `git status --short` で現状を確かめてから始める)。
+> 2026-10-12 夕の時点 (かな入力・US 配列のマージのあと)。**基準コミット: 取り込み後の `main` の先頭 (`git log --oneline -3` で確認)。P36 続き・P39・P38・S3 は `main` に取り込み済み** (このファイルをコミットすると HEAD は 1 つ進む。必ず `git log --oneline -5` と `git status --short` で現状を確かめてから始める)。
 > 別セッションが同じ作業ツリーを使っている。**このファイルを `git add -A` で巻き込まない・他の `docs/HANDOFF-*.md` (exception-recovery、strip-build-paths) には触らない。**
 > 状態の正本は `docs/UPSTREAM_PR_TRACKER.md` (項目ごとの状態) と `docs/IMPROVEMENT_PLAN.md` (設計・数字・限界)。この文書はそれを読むための道案内。
 
 ## 0. 先にやること
-1. `cd /Users/ryo/Meltype && git status --short && git log --oneline -5 && git log origin/main..HEAD --oneline | wc -l` (`main` の未 push は 47 件のはず (取り込み待ちのブランチの 4 コミットは含まない)。**push していない**。`/Users/ryo/Meltype` の作業ツリーは、別セッションが `exp/zenzai-eval` などに切り替えていることがある。`git branch --show-current` を見て、`main` でなければそこへコミットしない。`main` へは一時の `git worktree add` で入れ、`git update-ref refs/heads/main <新> <旧>` で更新するとよい)。
+1. `cd /Users/ryo/Meltype && git status --short && git log --oneline -5 && git log origin/main..HEAD --oneline | wc -l` (未 push の件数は上のコマンドで確認 (別セッションの分も含む)。**push していない**。`/Users/ryo/Meltype` の作業ツリーは、別セッションが `exp/zenzai-eval` などに切り替えていることがある。`git branch --show-current` を見て、`main` でなければそこへコミットしない。`main` へは一時の `git worktree add` で入れ、`git update-ref refs/heads/main <新> <旧>` で更新するとよい)。
 2. 入っているアプリ: `~/Library/Input Methods/Meltype.app` は 1.1.5 (build 21)、**2026-10-12 17:20 ビルド** (`main` の `f5de00a` を、切り離した一時の作業ツリーでビルドして入れ替えたもの。P36・S2・かな入力・US 配列を含み、`exp/zenzai-eval` の変更は含まない)。`defaults read io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK` は「存在しない」になっていること (トレースログは切ってある)。
 3. テスト: `bash --noprofile --norc -c 'export PATH=$HOME/.dotnet:$PATH; cd src/Meltype.Core.Tests && dotnet run -c Release'` → **559/559** (かな入力・US 配列のマージ後)。
 4. かな入力 (JIS) と US 配列対応は、別セッションが `main` に取り込んだ (`afe2ccd`・`11c135f`)。マージ後のテストは 559 件通り、`tools/check-mac-aot-settings.py` は期待値が古くなって失敗していたので直した (`b33e571`。`InputStyle` は Mac の設定に出る)。**実機の確認 (2026-10-12、JIS キーボード、`main` の 17:20 ビルド、TextEdit): 設定の「入力方式」の表示と切り替え、かな入力 (`Shift+E` = ぃ など・英単語のときの英字表示)、ローマ字入力 (`kyouha,.` → `きょうは、。`、`` kono`config`wo `` → `` この`config`を ``。バッククォートは JIS の Shift+@)、`¥` キーは `¥`、Option + `¥` は `\` (半角) で、問題なし。US 配列そのもの (`docs/US_LAYOUT_CHECKLIST.md` の U1〜U13) は US キーボードが無いので未確認。**
@@ -32,10 +32,10 @@
 | P35 | 英文の途中の `go`・`so`・`do`・`to` を確定し直さない | 完了 (実機確認済み。管理表も更新した) |
 | **P36** | **選んだローマ字の文を Shift+Space で再変換 (本家 #332 の改良導入)** | **完了 (TextEdit・Hermes・LibreOffice で実機確認済み 2026-10-12。他のアプリは未確認)** |
 | P37 | Swift の確定し直しを「`original` が無ければ消さない」に (本家 #86 の考え方) | 完了 (調査の結果、Core のテストだけ足した。Swift は変えない。`original` が nil になるのは Windows 用の英数状態の判定だけで、Mac では通らない。P11 のときに合わせて行う。計画書 P37) |
-| P38 | 配布前の自動チェックのスクリプト `tools/check-release.py` (Mac 専用・読み取り専用。検査項目は `docs/PKG_REVIEW_2026-10.md` §7) | **コミット済み (ブランチ。取り込み待ち)**。査読 R25 の P1 6 件と R29 の P1 を修正。次のリリース前に `python3 tools/check-release.py mac/dist/Meltype-mac-<版>.zip mac/dist/Meltype-mac-<版>.pkg --expect-version <版>` を実行する |
-| P39 | 候補ごとの注釈 (英訳・全角・半角) | **コミット済み (ブランチ。取り込み待ち)。Core の JSON の `view.notes` だけ。Swift は保留** (画面には出ない。再開手順は計画書 P39) |
-| P36 続き | 選んだローマ字文の前後に改行・タブがあっても候補を出す | **コミット済み (ブランチ。取り込み待ち)。Core のみ。実機未確認** (候補に改行を含めて `setMarkedText` に渡すことの実績が無い。確認手順と退路は計画書 P36 の「査読 R27」) |
-| S3 | セキュリティレビューの M5 の見直し (文書だけ) | **コミット済み (ブランチ。取り込み待ち)** |
+| P38 | 配布前の自動チェックのスクリプト `tools/check-release.py` (Mac 専用・読み取り専用。検査項目は `docs/PKG_REVIEW_2026-10.md` §7) | **コミット済み (`main` に取り込み済み)**。査読 R25 の P1 6 件と R29 の P1 を修正。次のリリース前に `python3 tools/check-release.py mac/dist/Meltype-mac-<版>.zip mac/dist/Meltype-mac-<版>.pkg --expect-version <版>` を実行する |
+| P39 | 候補ごとの注釈 (英訳・全角・半角) | **コミット済み (`main` に取り込み済み)。Core の JSON の `view.notes` だけ。Swift は保留** (画面には出ない。再開手順は計画書 P39) |
+| P36 続き | 選んだローマ字文の前後に改行・タブがあっても候補を出す | **コミット済み (`main` に取り込み済み)。Core のみ。実機未確認** (実機に入っているのは、これらを含まない `main` の 17:20 ビルド) (候補に改行を含めて `setMarkedText` に渡すことの実績が無い。確認手順と退路は計画書 P36 の「査読 R27」) |
+| S3 | セキュリティレビューの M5 の見直し (文書だけ) | **コミット済み (`main` に取り込み済み)** |
 
 ## 3. P36 の中身と、実機で確かめること
 **中身** (計画書の P36 の節に、数字・案の比較・限界がある):
@@ -72,27 +72,18 @@
 - 他: Hermes の `We'うぇへれすし` (原因未調査。Q5 の Shift+Enter で説明できる可能性)、TextEdit の `Let  It Go` (空白が二重)、`HI there` (再現せず。Shift を離すのが遅れた打ち方の影響と見ている)、`gemma4-27b`→`gemma4ー27b`、`ollama run` の `run` が `るん`、`gpt-oss`→`gpt-おっs`。
 
 ## 5. リョウさんの判断を待っていること
-1. **push・版の更新・リリース** (未 push 47 件)。
+1. **push・版の更新・リリース** (未 push あり。件数は上の確認コマンド)。
 2. 空白の無い 1 語の英単語で OS の読みを切るか (でたらめ約 724 件が消える一方、`Suzuki`・`Sakura` など正しい読み約 40 件も消える)。今は「残す」。
 3. `docs/HANDOFF-exception-recovery.md` (別セッションのもの。実装済みなのに「未着手」と書いている古い文書) の扱い。
 4. `change` を英字にする回避策 (大文字 `Change`・末尾の空白・ユーザー辞書) を試すか。
 
 ## 6. 次の作業の候補 (おすすめ順)
-1. **取り込み待ちのブランチ `batch/p36c-p38-p39-sec` を `main` に取り込む** (下の「取り込み待ちのブランチ」)。そのあと、**P36 続きの実機確認** (計画書 P36 の「査読 R27」の手順。TextEdit で段落を 3 回クリックして選ぶ形が中心)。P36 本体は実機確認まで完了 (§3)。
+1. **P36 続きの実機確認** (実機を、取り込み後の `main` から入れ替えてから) (計画書 P36 の「査読 R27」の手順。TextEdit で段落を 3 回クリックして選ぶ形が中心)。P36 本体は実機確認まで完了 (§3)。
 2. (P37 は完了。Swift の fail-closed は、英数状態の自動判定を Mac に入れる P11 のときに合わせて行う。計画書 P37 を参照。`docs/SECURITY_REVIEW_2026-10.md` の 225 行目は、Mac でも `DirectModeAutoDetect` が効くと書いているが、コード上は効かないので、前提の見直しの余地がある。)
 3. 小さな改善: 複数語でも英語の語が 1 つも無いときだけ Meltype 自前のローマ字→かなを読みに使う案 (OS の読みを切ったことで候補が出なくなった `ii ne`・`Hiroshi san` 型を直す)。箇条書きの `- ` が `ー` になる既存の問題 (`- kyou wa ...` → `ーきょうわ…`、`Tel: 03-1234-5678` → `03ー1234ー5678`。計画書 P36 の「査読 R27」の P1 別件)。
 4. P39 の Swift 案の再開 (計画書 P39 の再開手順。先に実機で今の「あ」の注釈が見えるかを確かめる)。P38 の P2 (PackageInfo の細かい項目、`HEAD` が読めないときの扱いなど。計画書 P38 の「査読 R29」)。
 
-## 7. 取り込み待ちのブランチ `batch/p36c-p38-p39-sec` (2026-10-12 夜)
-- `main` (`4011e23`) の上に 4 コミット: `bd8e954` (P36 続き)・`36979e6` (P39)・`f57b031` (P38)・`b0726ff` (S3)。先頭 `b0726ff` でテスト **574/574**。各項目は独立した査読を受けている (R25〜R30)。push していない。
-- **取り込めていない理由**: `/Users/ryo/Meltype` (`main`) の作業ツリーで、別のセッションが 10 ファイルを未コミットで編集している (`Settings.cs`・`CompositionService.cs`・`CompositionController.cs`・`MeltypeSession.cs` など)。参照だけを動かすと作業ツリーとずれて危険で、早送りマージは Git が拒否する。**他セッションの未コミットの変更は、このブランチの先頭に衝突なく当たることを `git apply --check` で確認済み**。
-- 取り込み方: そのセッションが先にコミットするのを待ってから、`git merge batch/p36c-p38-p39-sec` (または `--ff-only`。`main` が進んでいれば通常のマージ)。急ぐ場合は、そのセッションの未コミットの変更を `git stash` してから `git merge --ff-only batch/p36c-p38-p39-sec`、`git stash pop` (リョウさんの判断が要る。他セッションの作業には、許可なく触らない)。
-- ブランチの作業ツリーは `scratch/wt-p36c` にあるが、scratch は 24 時間で消える。ブランチのコミットは消えない (`git worktree prune` で登録を掃除する)。
-
-## 7. 作業の道具と進め方 (scratch は 24 時間で消える。残す価値のあるものはスキルと計画書に入れてある)
-- スキル `meltype-mac-maintenance` (Henrietta プロファイル。`references/core-fix-recipes.md`、`upstream-issue-triage.md`、`device-vs-harness-lessons.md`、`shared-worktree-commits.md`) に、前後比較・赤→緑・変異テスト・実機の確認手順・共有作業ツリーでのコミットの要点がある。使えない環境なら、上のガードレールと次を守る。
-- 調査用: `cd src/Meltype.Core.Tests && dotnet bin/Release/net10.0/Meltype.Core.Tests.dll --repro "<keys>" enter|space|none` (`--segments`、`--eval`、`--eval-json` (1242/1244)も)。実機の判定は NSSpellChecker、`--repro` は同梱の英単語表 (BuiltIn) なので、**両方で比べる**。
-- 進め方: 実装者 (複製) → 比較 (BuiltIn・NS) → 変異テストで赤を確認 → 独立した査読 → 本体へ当てる → 全テスト → コミット → 入れ替え → 実機確認 → 管理表と計画書に記録。実装者の比較入力に無い型 (句読点・文頭の大文字・改行・全角記号) を査読で必ず足す。
-- 実機の結果は、リョウさんが「打った>結果」の形で貼る。キーボードは JIS (`'` は Shift+7)。TextEdit・Hermes・LibreOffice で確認する。
-- 却下済み (新しい根拠が無ければ再提案しない): Space / Shift+Space の全角スペース化、Shift 入力の CamelCase 名と助詞の分割、`change` の辞書での英字化。
-- 署名基盤・CI・Developer ID・新しい設定は、運用コストのため行わない方針。
+## 7. 取り込み済みのブランチ `batch/p36c-p38-p39-sec` (2026-10-12 夜)
+- `bd8e954` (P36 続き)・`36979e6` (P39)・`f57b031` (P38)・`b0726ff` (S3) を、別セッションが `main` に入れた 4 コミット (丸括弧の設定・pkg の文字化け修正・dmg 配布 (D1)・リリース手順) とマージして、`main` に取り込んだ (マージ後のテスト **575/575**・`build.sh --no-install`・codesign・AOT 検査・`tools/check-release.py` が通る)。計画書の衝突は、両方の節を残して解決した。
+- 取り込みの途中で、別セッションが `main` の作業ツリーで未コミットの変更を持っていたため、一時はブランチに積んで待った。**`/Users/ryo/Meltype` の作業ツリーは、別セッションが使っているので、`main` への変更は一時の `git worktree add` かブランチ経由で行い、作業ツリーが綺麗なときだけ `git merge --ff-only` で進める**。
+- ブランチ `batch/p36c-p38-p39-sec` は残っている (`main` に含まれているので、不要なら `git branch -d` で消せる。消すのはリョウさんに確認してから)。
