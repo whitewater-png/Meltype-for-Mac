@@ -102,6 +102,8 @@ internal static class MacSettingsTests
         Assert.Equal(true, Item(json, nameof(Settings.LiveConversion)).GetProperty("value").GetBoolean());
         Assert.Equal("Balanced", Item(json, nameof(Settings.DetectionLevel)).GetProperty("value").GetString());
         Assert.Equal("Japanese", Item(json, nameof(Settings.Punctuation)).GetProperty("value").GetString());
+        Assert.Equal("HalfWidth", Item(json, nameof(Settings.Parentheses)).GetProperty("value").GetString());
+        Assert.Equal("FullWidth", Item(json, nameof(Settings.Braces)).GetProperty("value").GetString());
         var min = Item(json, nameof(Settings.PredictionMinLength));
         Assert.Equal(2, min.GetProperty("value").GetInt32());
         Assert.True(min.GetProperty("min").GetInt32() == 1 && min.GetProperty("max").GetInt32() == 5, "予測の最小の文字数は 1〜5");

@@ -66,6 +66,8 @@ internal sealed class CompositionService : ICompositionHost, IDisposable
             CorrectTypos = options.CorrectTypos,
             Punctuation = options.Punctuation,
             FullWidthSymbols = options.FullWidthSymbols,
+            Parentheses = options.Parentheses,
+            Braces = options.Braces,
             // Windows の変換ボックスは予測を描かない。見えない候補に Tab で入ってしまわないよう、予測は出さない。
             Prediction = () => false,
             TranslationHistory = options.TranslationHistory ?? new TranslationHistory(Config.AppPaths.TranslationHistoryFile),

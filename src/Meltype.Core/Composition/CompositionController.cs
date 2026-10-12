@@ -170,6 +170,12 @@ public sealed class CompositionOptions
     /// <summary>! ? ~ などの記号を全角にするか (設定)。</summary>
     public Func<bool> FullWidthSymbols { get; init; } = () => true;
 
+    /// <summary>日本語の中で打った ( ) の幅 (設定)。</summary>
+    public Func<ParenthesisWidth> Parentheses { get; init; } = () => ParenthesisWidth.HalfWidth;
+
+    /// <summary>日本語の中で打った { } の幅 (設定)。</summary>
+    public Func<BraceWidth> Braces { get; init; } = () => BraceWidth.FullWidth;
+
     /// <summary>確定するときに、日本語と英単語の間に半角スペースを入れるか (設定)。</summary>
     public Func<bool> SpaceAroundEnglish { get; init; } = () => false;
 
@@ -306,6 +312,8 @@ public sealed class CompositionController
         _text.CorrectTypos = () => _options.CorrectTypos();
         _text.Punctuation = () => _options.Punctuation();
         _text.FullWidthSymbols = () => _options.FullWidthSymbols();
+        _text.Parentheses = () => _options.Parentheses();
+        _text.Braces = () => _options.Braces();
     }
 
     /// <summary>変換ボックスに入力中か、英数状態で打ち始めの語を判定中か。</summary>
@@ -482,6 +490,8 @@ public sealed class CompositionController
                 CorrectTypos = () => _options.CorrectTypos(),
                 Punctuation = () => _options.Punctuation(),
                 FullWidthSymbols = () => _options.FullWidthSymbols(),
+                Parentheses = () => _options.Parentheses(),
+                Braces = () => _options.Braces(),
                 PrecedingEnglish = previousEnglish == true ? true : null,
                 PrecedingEnglishSentence = previousEnglish == true && AfterSingleEnglishWord(JoinRomajiParts(parts, kana => kana)) && IsEnglishSentence(JoinRomajiParts(parts, kana => kana) + " "),
             };
