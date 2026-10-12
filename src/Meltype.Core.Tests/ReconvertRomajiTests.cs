@@ -71,6 +71,28 @@ internal static class ReconvertRomajiTests
     }
 
     [Test]
+    public static void Reconvert_RomajiSentence_DigitKeys_StayCandidateNumbers()
+    {
+        // 再変換の候補は 2 つ (日本語にした文 → 選んだままの文)。数字キーは番号として使う (0 だけは番号に無いので入力として素通し)。
+        // 「変換直後の数字は入力として打つ」が ON でも、再変換は何も打っていないので、候補の番号のまま
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var typeDigits in new[] { false, true })
+            {
+                var session = Create(new CompositionOptions { TypeDigitsAfterConversion = () => typeDigits });
+                session.Reconvert("kyou wa ii tenki desu");
+                var pick = Press(session, 0x32);
+                Assert.Equal("kyou wa ii tenki desu", pick.Commits.Single().Text, $"数字 2 で 2 番目 (選んだままの文): 設定 {typeDigits}");
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
     public static void Reconvert_RomajiSentence_SpaceShowsOriginal_AndEscCancels()
     {
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;

@@ -201,6 +201,10 @@ public sealed class Settings
      Description("Space で変換したあと、続けて文字を打っても確定せず、打った文字を含めて編集・変換を続ける。OFF のときは、今までどおり変換した結果を確定して新しい入力を始めます。現在は Mac 版だけで動きます (入力メニューの「変換後も続けて入力できる」で切り替え)。")]
     public bool ContinueAfterConversion { get; set; }
 
+    [Category("1. 全般"), DisplayName("変換直後の数字は入力として打つ"),
+     Description("Space で変換した直後に打った数字を、候補の番号ではなく、そのまま数字として入力します (denwa wa 03-1234-5678 や kyou wa 12 の数字が候補の選択にならない)。候補を動かした後 (↓・もう一度 Space・PageDown・← →) は、今までどおり数字キーで候補を選んで確定します。OFF のときは、変換した直後から数字キーで候補を選びます。")]
+    public bool TypeDigitsAfterConversion { get; set; }
+
     [Category("1. 全般"), DisplayName("Shift+Enter で確定して改行"),
      Description("変換中に Shift+Enter を押すと、確定したうえで Shift+Enter をアプリに渡します (チャットや Web アプリでは改行)。OFF のときは Enter と同じく確定だけします。Mac 版は入力メニューの「Shift+Enter で確定して改行」で切り替え。")]
     public bool ShiftEnterNewline { get; set; } = true;

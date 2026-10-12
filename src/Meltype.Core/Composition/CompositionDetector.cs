@@ -589,6 +589,11 @@ public sealed class CompositionDetector
         // 手動でもこれだけは英語にする (Shift を押したのはユーザーの明示的な指定)。
         // 大文字で始まる語の後ろに記号が続く (Ah! Ooh, Wow.) なら、その語で終わっている: スペルチェッカーの語でも英語。
         if (char.IsAsciiLetterUpper(span[0]) && (exact || prefix || atEnd || (spellWord && next is [var symbol, ..] && !char.IsAsciiLetterOrDigit(symbol)))) return true;
+        // 大文字で始まり、ローマ字として最後まで読めない語 (Tel の l) の後ろに : ; が続く (Tel: 03-…、Fax: …) なら、その語で終わっている英語 (項目名)。
+        // 打っている途中 (Tel) は末尾の語として英語なので、: を打っても てl: に変えない。最後まで読める語は日本語のまま。
+        // , . ! ? は日本語の句読点でもあるので対象にしない。
+        if (char.IsAsciiLetterUpper(span[0]) && span.Length >= 3 && next is [var closing, ..] && closing is (':' or ';') &&
+            !(_romaji.AnalyzeFragment(lower) is { IsValid: true, Partial: "" or "n" }) && !(Memory?.Get(lower) is false)) return true;
         if (level == DetectionLevel.Manual) return false;
         // ユーザーが英字 / かなに直して覚えた語。ただし短くてローマ字として読める語 (go、no) は、日本語のすぐ後ろ
         // (nihon|go) では使わない (一度 go を英字で確定しただけで、日本語 が にほんgo になっていた)。
