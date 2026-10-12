@@ -78,6 +78,12 @@ public sealed class CompositionOptions
     public Func<bool> ContinueAfterConversion { get; init; } = () => false;
 
     /// <summary>
+    /// Space で変換した直後 (候補をまだ動かしていない間) に打った数字を、候補の番号ではなく数字の入力として扱うか。
+    /// 区切りのつもりで押した Space の後の数字 (denwa wa 03-1234、kyou wa 12) が、候補の選択になって消えるのを防ぐ。既定は false (今までどおり)。
+    /// </summary>
+    public Func<bool> TypeDigitsAfterConversion { get; init; } = () => false;
+
+    /// <summary>
     /// 変換中の Shift+Enter を、確定したうえでキーをアプリに渡す (チャットや Web アプリで 1 回で確定 + 改行) か。
     /// 既定は true。false のときは Enter 単体と同じく確定のみ。変換ボックスが空のときの Shift+Enter は、どちらでも素通し。
     /// </summary>
@@ -863,6 +869,10 @@ public sealed class CompositionController
                 _spaceStartedConversion = true;
                 StartConversion(preferJapanese: true);
                 return;
+            case VirtualKeys.Space when _headCount == 0 && _text.Mode == DisplayMode.Auto && _text.KeepLoneHyphen():
+                // 箇条書きの - は長音ではない: 半角の - と空白で確定する (- kyou wa)。
+                Commit(suffix: " ", fixEnglish: true);
+                return;
             case VirtualKeys.Space:
                 _text.FixTypos();
                 // 英語と判定した語で終わっているなら、変換ではなく確定して空白を入れる
@@ -1195,8 +1205,18 @@ public sealed class CompositionController
             }
             if (shift && vk is VirtualKeys.Left or VirtualKeys.Right) return true;
         }
+        // 数字・修飾キー以外の操作 (Space・↓・↑・PageUp/Down・← →) をしたら、候補を見て選んでいる: 以後は数字で選べる (TypeDigitsAfterConversion)。
+        if (!VirtualKeys.IsDigit(vk) && !VirtualKeys.IsModifier(vk)) _candidatesMoved = true;
         switch (vk)
         {
+            // 0 は候補の番号に無い (候補は 1 から)。電話番号・番号 (denwa wa 03-…) の先頭の 0 が消えないよう、
+            // 候補では受けず、今の候補で確定して新しい入力にする (ほかのキーと同じ)。
+            case 0x30 when !shift && !_reconvertRomaji:
+                return false;
+            // 設定が ON なら、変換した直後 (候補をまだ動かしていない) の数字は入力として打つ。候補を動かした後は、番号で選べる。
+            // (選んだ文を Shift+Space で再変換したときは、何も打っていないので、最初から番号で選べる)
+            case var typed when VirtualKeys.IsDigit(typed) && !shift && !_candidatesMoved && !_reconvertRomaji && _options.TypeDigitsAfterConversion():
+                return false;
             // 候補ウィンドウの番号どおりに選んで、そのまま確定する (範囲外の番号はキーだけ消費して何もしない)。
             case var digit when VirtualKeys.IsDigit(digit) && !shift:
                 if (!clause.IsEnglish && !clause.Expanded) Expand(clause);
@@ -1426,6 +1446,7 @@ public sealed class CompositionController
         _clauses = clauses;
         _selectedClause = _headCount;
         _converting = true;
+        _candidatesMoved = false;
     }
 
     /// <summary>
@@ -2192,6 +2213,9 @@ public sealed class CompositionController
     private readonly List<CommitRecord> _correctable = [];
     private const int MaxCorrectable = 4;
     private bool _spaceStartedConversion;
+
+    /// <summary>変換を始めてから、候補を動かす操作 (Space・↓・↑・PageUp/Down・← →) をしたか。TypeDigitsAfterConversion が ON のとき、動かす前の数字は入力になる。</summary>
+    private bool _candidatesMoved;
 
     /// <summary>再変換で置き換えた元の文字列 (Esc で取り消すときに書き戻す)。再変換中でなければ null。</summary>
     private string? _reconvertOriginal;

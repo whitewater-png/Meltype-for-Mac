@@ -168,6 +168,7 @@ public sealed class MeltypeSession
             // 入力メニューで切り替える。すべての入力欄にすぐ反映されるよう、各セッションの設定ではなく共有の値を毎回見る。
             ContinueAfterConversion = () => ContinueAfterConversionSetting.IsOn,
             ShiftEnterNewline = () => ShiftEnterNewlineSetting.IsOn,
+            TypeDigitsAfterConversion = () => shared.Current.TypeDigitsAfterConversion,
             AutoCorrect = () => shared.Current is { AutoCorrectAfterCommit: true, DetectionLevel: not DetectionLevel.Manual },
             Level = () => shared.Current.DetectionLevel,
             // かな入力 (JIS)。設定の「入力方式」。既定はローマ字入力なので、変えなければ今までどおり。

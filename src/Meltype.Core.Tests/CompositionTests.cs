@@ -156,6 +156,9 @@ internal static class CompositionTests
         /// <summary>変換後も続けて入力できるか (CompositionOptions.ContinueAfterConversion)。既定は OFF (今までの動作)。</summary>
         public bool Continue { get; set; }
 
+        /// <summary>変換直後の数字を入力として打つか (CompositionOptions.TypeDigitsAfterConversion)。既定は OFF (今までの動作)。</summary>
+        public bool TypeDigits { get; set; }
+
         public bool SuggestEnabled { get; set; } = true;
 
         /// <summary>かな入力で、仮想キーを順に打つ (shift: その打鍵で Shift を押す)。</summary>
@@ -199,6 +202,7 @@ internal static class CompositionTests
                 LiveConversion = () => live,
                 ContinueAfterConversion = () => Continue,
                 ShiftEnterNewline = () => ShiftEnterNewline,
+                TypeDigitsAfterConversion = () => TypeDigits,
                 DirectMode = () => Direct,
                 ClassifyDirect = (letters, final) => DirectEngine.Evaluate(new Detection.DetectionInput(letters, letters.Select(c => (int)char.ToUpperInvariant(c)).ToArray(), final)).Verdict,
                 DirectDecided = japanese => { if (japanese) Direct = false; else _directEnglishWord = true; },
@@ -748,6 +752,24 @@ internal static class CompositionTests
         {
             ("e-mail", "e-mail"), ("co-op", "co-op"), ("e-maildeokuru", "e-mailでおくる"), ("x-ray", "x-ray"), ("lo-fi", "lo-fi"), ("Lo-fi", "Lo-fi"), ("sci-fi", "sci-fi"), ("lo-fiwokiku", "lo-fiをきく"), ("r-18", "r-18"), ("sub-6", "sub-6"), ("GPT-6.7", "GPT-6.7"),
             ("e-to", "えーと"), ("su-pa-", "すーぱー"), ("o-bun", "おーぶん"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Hyphen_AtStartOrAfterDigit_StaysHyphen()
+    {
+        // 箇条書きの - kyou wa が ーきょうわ、10-ji が 10ーじ、03-1234-5678desu が 03ー1234ー5678です になっていた
+        foreach (var (typed, expected) in new[]
+        {
+            ("- kyou wa", "- 今日わ"), ("10-ji", "10-じ"), ("10-ji ni kaigi desu", "10-じにかいぎです"),
+            ("03-1234-5678desu", "03-1234-5678です"), ("2026-10-12", "2026-10-12"), ("03--5", "03--5"),
+            // 長音・英語の区切りは今までどおり
+            ("ra-men", "らーめん"), ("su-pa-", "すーぱー"), ("e-mail", "e-mail"), ("ko-hi-2hai", "こーひー2はい"),
         })
         {
             var k = new Keyboard();
@@ -1507,6 +1529,89 @@ internal static class CompositionTests
         var k = new Keyboard();
         k.Type("a1");
         Assert.Equal("あ1", k.Showing, "変換前の数字は今までどおり文字として入る");
+    }
+
+    [Test]
+    public static void Zero_AfterSpaceConversion_IsTypedNotLost()
+    {
+        // denwa wa 03-1234-5678desu が でんわﾜ-1234-5678です (03 が消える) になっていた: 変換中の 0 は候補の番号ではない
+        foreach (var (typed, expected) in new[]
+        {
+            ("denwa wa 03-1234-5678desu", "でんわわ03-1234-5678です"), ("kyou wa 090", "今日わ090"), ("kawa 0", "川0"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Digits_RightAfterConversion_AreTyped_WhenSettingIsOn()
+    {
+        // 区切りのつもりの Space の後の数字 (kyou wa 12) が、候補の選択になって消えていた
+        var k = new Keyboard { TypeDigits = true };
+        k.Type("kyou wa 12\n");
+        Assert.Equal("今日わ12", k.Host.Document, "変換した直後の数字は入力");
+        k = new Keyboard(moreCandidates: reading => reading == "かわ" ? ManyKawa : []) { TypeDigits = true };
+        k.Type("kawa ");
+        k.Press(VirtualKeys.Down);
+        k.Press(0x32);
+        Assert.Equal("皮", string.Concat(k.Host.Output), "候補を動かしたあとは、数字で候補を選んで確定する (2 番は 皮)");
+    }
+
+    [Test]
+    public static void Digits_WhenSettingIsOn_AfterEachCandidateMove_SelectCandidate()
+    {
+        // 候補を動かす操作 (Space・↓・↑・PageDown・← →) のどれでも、動かしたあとは数字で選べる。動かす前の数字は入力
+        foreach (var move in new[] { VirtualKeys.Space, VirtualKeys.Down, VirtualKeys.Up, VirtualKeys.Next, VirtualKeys.Left, VirtualKeys.Right })
+        {
+            var k = new Keyboard(moreCandidates: reading => reading == "かわ" ? ManyKawa : []) { TypeDigits = true };
+            k.Type("kawa ");
+            k.Press(move);
+            k.Press(0x31);
+            Assert.True(k.Showing is null && k.Host.Output.Count == 1, $"{move:X} の後の 1 は候補の選択で確定する");
+        }
+        // 候補を動かす前に打った数字は入力。そのあとの数字も続けて入力 (変換が確定して新しい入力になる)
+        var typed = new Keyboard(moreCandidates: reading => reading == "かわ" ? ManyKawa : []) { TypeDigits = true };
+        typed.Type("kawa 12\n");
+        Assert.Equal("川12", typed.Host.Document, "動かす前の 1 2 は入力");
+    }
+
+    [Test]
+    public static void Digits_RightAfterConversion_SelectCandidate_WhenSettingIsOff()
+    {
+        var k = new Keyboard(moreCandidates: reading => reading == "かわ" ? ManyKawa : []);
+        k.Type("kawa ");
+        k.Press(0x32);
+        Assert.Equal("皮", string.Concat(k.Host.Output), "OFF なら今までどおり、変換した直後から数字で選ぶ");
+    }
+
+    [Test]
+    public static void Zero_AfterSpaceConversion_WithContinueAfterConversion_IsTyped()
+    {
+        // 「変換後も続けて入力」が ON でも、変換中の 0 は候補の番号ではなく入力 (固定した文節のあとに続く)
+        var k = new Keyboard { Continue = true };
+        k.Type("kyou wa 0");
+        k.Type("\n");
+        Assert.Equal("今日わ0", k.Host.Document, "続けて入力 ON でも 0 は消えない");
+    }
+
+    [Test]
+    public static void Label_BeforeColon_StaysEnglish()
+    {
+        // Tel: が てl: になっていた (Tel だけなら英語)。: ; が続いても、ローマ字として読めない大文字始まりの語は英語のまま
+        foreach (var (typed, expected) in new[]
+        {
+            ("Tel:", "Tel:"), ("Fax:", "Fax:"), ("Tex:", "Tex:"), ("Tel: 03-1234-5678 desu", "Tel: 03-1234-5678 です"),
+            // 最後まで読める語・句読点は今までどおり日本語
+            ("Kyou:", "きょう:"), ("Tel,", "てl、"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
     }
 
     [Test]
