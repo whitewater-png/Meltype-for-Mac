@@ -307,6 +307,36 @@ internal static class SessionFacadeTests
     }
 
     [Test]
+    public static void AutoCorrect_EveryDeletingEditCarriesOriginalOfTheSameLength()
+    {
+        // Mac の Swift (InputController.apply) は、original があれば消す前に入力欄の中身と照合し、違えば飛ばす (Google ドキュメントなど selectedRange が
+        // 不正確なホストで確定済みの文字を消さないため)。original が無い edit は照合されないので、Core が返す deleteBefore > 0 の edit は
+        // 必ず original を持ち、その長さが deleteBefore と同じでなければならない (OriginalOrNull は長さが違うと null を返す)。
+        // Mac の本番と同じ配線 (MeltypeSession.CreateDefault は DirectMode を設定しない) では、DeleteBackward の呼び出しは
+        // 確定し直し (2 引数版、expected あり) だけ。1 引数版 (英数状態の判定 SwitchHeldToJapanese、Windows 用) は通らない。
+        // 1 引数版が Mac の経路に入った (または expected を付け忘れた) ら、この試験が赤になる。
+        var corrections = 0;
+        foreach (var typed in new[]
+        {
+            "I love sushi gasuki\n", "New York no tenki\n", "i want\n", "I want to go susi\n", "I love sushi kyou wa tenki\n",
+            "make sure you have susi\n", "let me know susi\n", "we need sushi ga suki\n", "I will go wo yomu\n", "thank you gasuki\n",
+        })
+        {
+            var session = Create();
+            foreach (var result in Type(session, typed))
+            {
+                foreach (var edit in result.Commits.Where(c => c.DeleteBefore > 0))
+                {
+                    corrections++;
+                    Assert.True(edit.Original is not null, typed.Trim() + ": deleteBefore > 0 の edit は original を持つ: " + result.ToJson());
+                    Assert.Equal(edit.DeleteBefore, edit.Original!.Length, typed.Trim() + ": original の長さは deleteBefore と同じ");
+                }
+            }
+        }
+        Assert.True(corrections >= 5, "確定し直しの edit が実際に出ている (出なければ何も確かめていない): " + corrections);
+    }
+
+    [Test]
     public static void AutoCorrect_EditIsAlwaysFollowedByTheEditThatCarriesTheComposingText()
     {
         // Mac の Swift (InputController.apply) は、確定し直しの edit (deleteBefore > 0) の前に、入力欄の変換中の文字を取り除く

@@ -1907,3 +1907,26 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
 - **引き継ぎ文書との違い**: 文書は「strip の警告 (署名が無効になる) がビルドのログに 2 回出る」と書いていたが、実際のビルドでは **0 回**。`.build` から `.app` にコピーした実行ファイルはリンカーが付けた署名 (linker-signed) の状態で、その状態への `strip -S` は警告を出さず、署名も有効なまま残る。警告が出るのは、署名済みの実行ファイルに strip したとき (査読員が確認)。`build.sh` のコメントを実際の動作に合わせて直した。
 - **得と損**: 得: 配布物 (zip・pkg・自動更新で配る zip) から、ビルドしたマシンのユーザー名と作業フォルダーの場所が消える。`Meltype` が約 1.5 MB 小さくなる。損: ビルド手順が 1 か所増え、「署名より前」という順序の制約が付く。デバッグ用の記録が無くなる (クラッシュログの関数名は、通常のシンボルが残るので読める)。
 - **未検証**: strip した `Meltype` (IMK として) の実際の起動 (査読員は、実機の Meltype と IMK の接続名が衝突するおそれがあるため、複製を起動せず、strip の前後の静的な比較にとどめた) → **実機の入れ替えと入力で確認する**。`llama.framework` が入るビルドの Frameworks は strip の対象外 (今回のビルドには無い)。次のリリースの zip・pkg で、件数が 0 になっていること (P38 の検査項目 `docs/PKG_REVIEW_2026-10.md` §7 の 6 の期待値を 0 にできる。1.1.5 は 1,020 件のまま)。
+
+## 追加項目 P37 (Swift の確定し直しの照合: 本家 #86 の考え方。調査の結果、Core のテストだけ足した)
+
+- **経緯**: 調査文書 (`UPSTREAM_PR_SURVEY.md` の #86) は「Swift の `apply` は `original` (消す予定の文字列) が nil だと照合せずに消す。nil になるのは長さ不一致のときだけで、数行で最後の穴を塞げる」とした。実装の前に、Core で `deleteBefore>0` の edit が生まれる経路と `original` の有無を調べた (調査員、2026-10-12)。
+- **分かったこと**: `DeleteBackward` の呼び出し元は Core に 2 か所だけ。
+  - (a) `CompositionController.CorrectPreviousCommit` (確定し直し): 2 引数版 (expected あり)。`original` は必ず付き、長さも `deleteBefore` と一致する。
+  - (b) `SwitchHeldToJapanese` (英数状態の判定で、判定を待たずにアプリへ送った英字を消して、変換ボックスに入れ直す): 1 引数版で expected が無い。**`original` が nil になる唯一の出どころはこの (b)** で、調査文書の「長さ不一致のときだけ」は不正確だった。
+  - (b) は `DirectMode`・`ClassifyDirect`・`DirectDecided` を配線した Windows (`TrayApplicationContext`) 用。Mac の `MeltypeSession.CreateDefault` はこれらを設定しないので、**Mac では通らない** (Mac の「英数」とコード向けアプリは `session.Direct = true` で全キーを素通しする)。`IMPROVEMENT_PLAN.md` の「Windows 版の `DirectModeAutoDetect` はこの項目では入れない (P11 で検討)」とも合う。
+- **実測** (Mac の本番と同じ配線。コーパス 5,040 行と、2,340 行のテンプレート文を、1 行・2 行連結・`before` あり・文頭大文字などで流した): 確定し直しの edit は 3,600 件超、`original` が nil のものは **0**、長さ不一致も **0**。仮に `DirectMode` を Windows と同じに配線すると、(b) の edit がコーパスで 1,883〜2,586 件出て、そのすべてで `original` が nil。
+- **案の比較**:
+
+  | 案 | 得 | 損 |
+  | --- | --- | --- |
+  | A Swift で `original` が nil なら飛ばす | 将来 nil の経路が増えても fail-closed。今の Mac で壊れる経路は 0 件 | 今の Mac では効果が無い。Swift は自動テストが無く、実機確認が要る |
+  | B (b) にも expected を添えて、すべての edit に `original` を持たせる | 不変条件が完全になる | Mac で使われない経路のために、消す数が 1 つずれる問題 (現在のキーはまだアプリに入っていない) とアプリの自動大文字化への対処まで直す必要があり、検証手段が無い |
+  | C 見送り | 工数ゼロ | 不変条件が文書にしか無い |
+  | D 「照合不要」の印を FFI に足す | (b) を Mac で許可できる | JSON・Swift・Core の 3 か所を変える。(b) が Mac で使われるまで不要 |
+  | **E Core にテストだけ足す (採用)** | Mac の本番経路で不変条件を固定できる。Swift は変えず、実機確認が要らない | Core の新しい経路が nil を作っても、テストの入力に当たらなければ検出できない |
+
+- **採用 (E)**: `SessionFacadeTests.AutoCorrect_EveryDeletingEditCarriesOriginalOfTheSameLength` を追加した。10 文を流し、確定し直しの edit が 5 件以上出ること、`deleteBefore>0` の edit がすべて `original` を持ち、長さが `deleteBefore` と同じであることを確かめる。変異 2 通り (確定し直しを 1 引数版にする・消す数を +1 にする) でどちらも赤。テストは 559 → 560 件。**Swift は変えていない**。
+- **次**: 英数状態の自動判定 (b) を Mac に入れる P11 のときに、(b) の作り直し (`consumed` と、消す数が 1 つ多い問題)、expected の付与 (案 B 相当)、Swift の fail-closed (案 A) を合わせて行う。
+- **文書の食い違い (直していない)**: `docs/SECURITY_REVIEW_2026-10.md` の 225 行目は、Mac でも `DirectModeAutoDetect` (既定 ON) により英字が保持され、学習され得る、と書いている。コード上は Mac でこの設定が効かないので、前提を見直す余地がある (`_heldLetters` に保持される経路が Mac にあるかは、このレビューでは未確認)。
+- **未検証**: 実機 (Swift を変えていないので不要)。(b) が自動大文字化で照合に失敗するかは、(b) が Mac で使われないので確認していない。Windows は対象外。

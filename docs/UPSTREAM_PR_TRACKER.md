@@ -27,7 +27,7 @@
 | P34 | #315 | アーティスト名 (Khalifa・B.o.B・Ke$ha など) を英字のままに | 中 | 完了 (実機確認済み 2026-10-11: Wiz Khalifa・Ed Sheeran・B.o.B・Ke$ha・U.S.A。未確認: 記号が後ろに付く形は限界) | 1778e0a | 辞書の語が入力中だけ英字に見えることの体感 |
 | P35 | #317 | 英文の途中の go・so・do・to を日本語に確定し直さない (P27 と併用する混成版。本家の条件そのままは、従来の確定し直しを 5,144/10,608 件壊すので採らず、「直前が英語の機能語のとき」に絞った) | 中 | 完了 (実機確認済み 2026-10-11: Hermes で `I want to go すし`・`It is so すし`・`I have to do 人間？`。Q5 の修正後は TextEdit・Hermes で `Let's go すし`・`We're here すし` も期待どおり) | aa65978 | `I want to go susi`・`It is so susi`・`I have to do ningen?` が英語のまま残る。`Let It Go no uta`・`New York no tenki` は従来どおり の。冠詞 a・`Let me go susi?`・`’` は限界 |
 | P36 | #332 | ローマ字のまま確定した文を、選んで再変換する | 中 | 完了 (実機確認済み 2026-10-12: TextEdit で項目 1〜8・位置を変えた場合 (行の途中・文書の先頭・Shift+Enter のあと)・候補を出したままのクリックと Cmd+Tab が期待どおり。Hermes のチャット欄 (候補・置き換え・`Thanks, Kenji!` で文字が消えない) と LibreOffice (何も起きず文書が変わらない) も問題なし。未確認: Chrome・Safari・Google ドキュメントなど他のアプリ) | 計画書 P36 | 本家の差分は Mac に当たらず手で移植。日本語だと言える所があるときだけ候補を出す (大文字始まりと単独の敬称語は証拠にしない)。査読 R18b・R19・R20。v3 (実機の TextEdit で見つかった 2 点: 文頭の自動大文字・英文の OS の読みのでたらめ候補) を査読 R21 のうえ追加。549 件。Swift は選択の長さの照合と、再変換できない選択で Shift+Space を飲み込む 2 か所 |
-| P37 | #86 (考え方) | Swift の確定し直しを「`original` が無ければ消さない」にする。Core に「`deleteBefore>0` の edit は必ず `Original` を持つ」テストを足す | 中 | 未着手 | - | 確定し直しが普段どおり効くこと |
+| P37 | #86 (考え方) | Swift の確定し直しを「`original` が無ければ消さない」にする。Core に「`deleteBefore>0` の edit は必ず `Original` を持つ」テストを足す | 中 | 完了 (調査の結果、Core のテストだけ足した。Swift は P11 まで見送り) | 計画書 P37 | Swift は変えていないので実機確認は不要 (確定し直しが普段どおり効くこと) |
 | P38 | #78 #87 (考え方) | 配布前の自動チェックのスクリプト (署名・依存パス・arm64・版の一致・pkg の中身)。検査項目の案 10 個 (pkg 向け。pkg もリポジトリも変更しない) は `docs/PKG_REVIEW_2026-10.md` の §7 | 中 | 未着手 | - | リリース前に 1 回実行 |
 | P39 | #86 (考え方) | 候補ごとの注釈 (英訳・全角・半角) を JSON と候補ウィンドウに出す | 低〜中 | 未着手 | - | `showAnnotation` が既存の注釈と共存できるか |
 | P40 | #314 | anata が入力中に あnata と見えるのを直す | 低〜中 | 保留 | - | 先に実機で、日本語の後ろの固有名詞 (kyouhagoog など) の入力中の見え方を確かめる |
@@ -62,6 +62,7 @@
 | 日付 | 内容 |
 | --- | --- |
 | 2026-10-11 | 調査結果の文書と、この管理表を作成。P30〜P33 を並列で作業開始 |
+| 2026-10-12 | P37 を調査: Core の `deleteBefore>0` の edit は、確定し直し (original あり) と、英数状態の判定 (original なし。Windows 用で、Mac では通らない) の 2 経路だけ。Mac の本番配線で 3,600 件超を流して original が nil のものは 0 件。調査文書の「nil は長さ不一致のときだけ」は不正確だった。**Swift は変えず、Core のテストだけ足した** (560 件)。(b) を Mac に入れる P11 のときに、作り直しと Swift の fail-closed を合わせて行う |
 | 2026-10-12 | P36 の実機確認の残りを記録: TextEdit で、行の途中・文書の先頭・Shift+Enter のあとの行でも `あしたの meeting で review します` が前後の文字を残して置き換わる。候補を出したまま別の行をクリック・Cmd+Tab しても、元の場所に 1 回だけ残り、IME も固まらない。Hermes のチャット欄と LibreOffice も問題なし。**P36 を完了にした** (他のアプリは未確認) |
 | 2026-10-12 | P36 を TextEdit で実機確認 (`main` の 17:20 ビルド): `Asita no meeting de review shimasu` を選んで Shift+Space → `あしたの meeting で review します` (Enter で置き換え、Esc で戻る)、`Kyou wa genki desu. Asita mo ganbarimasu.` が 2 文とも日本語、`Thanks, Kenji!` と `Hello, my name is Ryo.` は候補が出ず文字も消えない (ドラッグ選択・段落 3 回クリック選択のどちらも)、`今日は` は従来どおり。P35 の行も、実機確認済みの記録に合わせて完了にした。**Hermes・LibreOffice などは未確認** |
 | 2026-10-12 | S2 (配布物に残るビルド時の絶対パスを消す) を実装: `mac/build.sh` の署名の前に `strip -S` を足した (`Meltype` 987 件・`MeltypeDictionary` 33 件が 0 件に。署名・辞書アプリの自己テスト 121 件は通過)。査読 R23: P0・P1 なし。引き継ぎ文書 `docs/HANDOFF-strip-build-paths.md` に沿った。**push 前・実機 (strip した Meltype の起動) 未確認。公開済みの 1.1.5 は変わらず、次のリリースから効く** |
