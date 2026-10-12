@@ -2146,3 +2146,20 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **得と損**: 得: X の後ろの日本語が、1 音・2 音以上の助詞のどちらでも区切れる。損: (1) 大文字の `X` に日本語を続けて小書き文字を打つ形は使えなくなる (`Xtumo` が `っも` → `Xつも`、`Xatoukouha` が `ぁとうこうは` → `Xあとうこうは`。小文字の `x` は使える。`Xtu`・`Xa` 単独は変更前から英字のまま)。(2) 実際にはまず打たない形で、`Xmadeline` → `Xまでline`・`Xgurain` → `Xぐらいん` になる。
 - **限界・未確認**: (1) **Mac 実機で確かめていない** (いま入っている IME は 20:28 のビルドで、Q9 より前)。(2) `X` 以外の大文字 1 文字の後ろの 2 音以上の助詞 (`Bkara`・`Akara`) は今までどおり英字のまま (名前を守るため)。(3) `Xmade` 単体は英字のまま (後ろに何も無いと区切らない既存の規則。`Xmadeni` は区切れる)。(4) 変更前からある別の誤り: `Xcode` → `Xcoで`、`xmas` → `xまs`。(5) Windows / Linux は対象外。
 - **Q10 (記録だけ)**: `pushoyobi` → `プ書呼び` (期待は `pushおよび`)。子音で終わる英単語 (push の sh) の後ろに、母音で始まる日本語 (oyobi) を空白なしで続けると、`sho` = しょ と読まれ、全体が日本語のローマ字として読める。v1.1.5-mac のコードでも同じ (`--repro`)。空白を入れる (`push oyobi` → `push および`) と正しい。`pusho` のように日本語としても読める形との区別が要るので、前後比較で損の数を見てから判断する。管理表の Q10。
+
+## 追加項目 Q11 (git のブランチ名 `main` が まいん になる: `mainnima-jisitehosii` → `マイン位マージしてほしい`)
+
+- **経緯**: リョウさんの実機の報告 (2026-10-12): `mainにマージしてほしい` と打ちたくて `mainnima-jisitehosii` と打つと、`マイン位マージしてほしい` になる。リョウさんの希望: **マインドは日本語のまま (名称固定) で、main を英字で出す**。
+- **原因**: `main` はローマ字としても ま・い・ん と読めるので、日本語として扱われる。`mainni` は nn がまとめて ん になり、`まいん` + `い` になる。英単語の最後の n + な行の助詞を分ける既存の規則 (python + no) は、ローマ字として読めない英単語だけが対象 (gomen を守るため)。
+- **修正** (Core + 辞書。打ちながらの変換の経路):
+  1. `dictionaries/english-readable.txt` (ローマ字として読めても英語にする語) に `main`・`domain` を足した。
+  2. `CompositionDetector.ContinuesJapaneseWord`: この一覧の語でも、続く 1 音を足した読みが、よく使う日本語の語 (`readings.txt`)・ブランド名 (`brands.txt`) の頭になるときは英語にしない (`main` + `do` = まいんど = マインド、`main` + `ku` = マインクラフト)。readings.txt に無い まいんち (毎日のくだけた形) も足した。一覧の全語に効くが、査読の前後比較で、英字だったものがかなに戻った行は 0 件。
+  3. `CompositionDetector.NotAfterJapanese` (`main`・`domain`): 同じ入力の中で日本語のすぐ後ろにあるときは英語にしない (`umaindesu` = うまいんです、`amaindayo`、`kumainda`。査読 R33 の 1 回目の P1)。英語にするのは入力の先頭 (`mainni`) と英語の後ろ (`gitmainni`・`origin/main`) だけ。
+  4. `CompositionText.SplitEnglishFinalN`: 一覧の語は、ローマ字として読めても n + な行の助詞を分ける (`main` + `ni` → `mainに`、`lesson` + `ni` → `lessonについて`)。
+- **結果の例** (打ちながら、Enter で確定。テストの変換エンジンはかなを返すだけ): `mainnima-jisitehosii` → `mainにまーじしてほしい`、`maindema-ji` → `mainでまーじ`、`mainnokoudo` → `mainのこうど`、`origin/mainnipush` → `origin/mainにpush`、`lessonnituite` → `lessonについて`。変わらないもの: `maindo`・`maindosetto`・`rimaindo` (マインド)、`mainkurafuto` (マインクラフト)、`mainichi`・`mainasu`・`maina-`・`mainen`、`umaindesu`・`amaindayo`・`kumainda`、`mainchi`、`remaindo`。
+- **テスト**: 578 → **579 件** (全通過)。`CompositionTests.Main_StaysEnglish_ButMindAndMinecraftStayJapanese`。修正前のコードで赤になることを確認した。変換の品質の評価 (`--eval-json`) は変更前と JSON が完全に一致。
+- **査読 R33 (独立。2 回)**:
+  - 1 回目 (`main domain remain` を足し、日本語の後ろの守りが無い版。自作の入力 48,275 件の前後比較、差分 1,970 件): 改善 約 537 件 (n で終わる一覧の語 + な行の助詞、main + 助詞、git の文)。**P1**: `〜まい + ん` の日本語が崩れる回帰 562 件 (実在する語に絞ると 178 件: `umaindesu` → `うmainです`、`amaindayo`、`semainjanai`)。軽い回帰: `remaindo` → `remainど`、`mainchi` → `mainち`。どこにも効いていない処理 (子音だけのときの母音の補い) が変異で生き残った。→ 上の 3 を足し、`remain` を一覧から外し、まいんち を足し、効いていない処理を消した。
+  - 2 回目 (同じ 48,275 件 + 新しい入力 1,153 件): **P0・P1 なし**。変更前が正しく変更後が違う行は 0 件。1 回目の回帰 562 件はすべて変更前と同じに戻った。48,275 件での差分 886 件 = 改善 399・中立 487 (どちらも誤り・意図があいまい)。変異: 日本語の後ろの守りを外す・`remain` を戻す・まいんち を外す・`before < 0` を `<= 0` にする は赤。`domain` を守りから外す変異が生き残った → `korehadomainde` → `これはどまいんで` をテストに足した。
+- **得と損**: 得: 文頭・英語の後ろの `main` + 助詞が英字で残る。同じ一覧の n で終わる語 (lesson・origin・begin・kitchen・region・season …) + な行の助詞も直る。損: (1) 日本語のすぐ後ろの `main` はかなのまま (`kyouhamainnimerge` → `きょうはまいんにmerge`。うまいんです を守るため。日本語を確定してから main を打てば英字)。修正で失った 1 回目の改善は 161 件 (日本語の途中の main/domain 76 件、remain で始まる語 82 件、`push to main` など 3 件)。(2) かな側の記号の後ろ (`` `main` ``・`(main)`・`"main"`) も、かなのまま (変更前と同じ)。(3) `mainmenyu-`・`maintenansu`・`mainsutori-mu` は `main` だけが英字になる (メインは `mein` と打つのがふつうなので影響は小さいと判断)。(4) 標準でない綴りの `nnyi`・`nnye` で、かなが崩れる (`kyouhamainnyidesu` が、査読の検証ドライバでは `きょうはまいんnいです`、`--repro` では `きょうはまinnいです`。変更前は `きょうはまいんいです`。検証ドライバで 8 行。2 つの経路で崩れ方が違う理由は未確認)。
+- **限界・未確認**: (1) **Mac 実機で確かめていない**。(2) 空白で区切った `main ni merge` は、Space が変換のキーなので まいん のまま (変更前と同じ。英数入力で打つか、続けて `mainni` と打つ)。(3) 同じ文の 2 回目の main (`mainnima-jisitekaramainwopushsuru` の後ろの main) はかなのまま。(4) Windows / Linux は対象外。

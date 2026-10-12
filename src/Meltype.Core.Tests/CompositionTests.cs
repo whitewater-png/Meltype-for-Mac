@@ -848,6 +848,30 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Main_StaysEnglish_ButMindAndMinecraftStayJapanese()
+    {
+        // Q11: git のブランチ名 main (ローマ字でも まいん と読める)。mainnima-ji が まいんいまーじ になっていた。
+        // ただし まいんど (マインド)・まいんくらふと (マインクラフト) のように、続く 1 音とで日本語の語の頭になるときは今までどおり日本語。
+        foreach (var (typed, expected) in new[]
+        {
+            ("mainnima-jisitehosii", "mainにまーじしてほしい"), ("mainni", "mainに"), ("maindema-ji", "mainでまーじ"), ("mainwomiru", "mainをみる"),
+            ("mainnokoudo", "mainのこうど"), ("main", "main"), ("mainbranch", "mainbranch"), ("domainni", "domainに"),
+            ("maindo", "まいんど"), ("maindosetto", "まいんどせっと"), ("rimaindo", "りまいんど"), ("mainkurafuto", "まいんくらふと"),
+            ("mainichi", "まいにち"), ("mainasu", "まいなす"), ("maina-", "まいなー"), ("mainen", "まいねん"),
+            // 日本語のすぐ後ろの まいん は日本語 (うまいんです・あまいんだよ・くまいんだ)。まいんち (毎日)、remaindo (リマインド) も日本語
+            ("umaindesu", "うまいんです"), ("amaindayo", "あまいんだよ"), ("semainjanai", "せまいんじゃない"), ("kumainda", "くまいんだ"),
+            ("mainchi", "まいんち"), ("remaindo", "れまいんど"), ("korehadomainde", "これはどまいんで"),
+            // 同じ一覧の、n で終わる語 + n で始まる助詞 (lesson + ni)
+            ("lessonnituite", "lessonについて"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void CommaAfterDigit_IsTouten_UnlessDigitFollows()
     {
         // x64,arm64 の , は読点 (x64、arm64)。1,000 の , は桁区切りのまま。

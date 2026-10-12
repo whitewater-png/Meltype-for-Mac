@@ -20,3 +20,7 @@ peace pension petition poison pole position positive possession regime region re
 revenge revenue rookie rotation safe savage season sensitive sentence separation severe
 situation sole suppose teenage tissue variation venue veteran vintage vision
 vitamin warehouse warren whole whose
+# Q11: git のブランチ名 main (mainnima-ji → まいんいまーじ になっていた) と、同じ綴りで終わる domain。日本語のすぐ後ろ (うまいんです) では英語にしない (CompositionDetector.NotAfterJapanese)。
+# remain は入れない (remaindo = リマインド を re で打つ形が remainど になるため。査読 R33)。
+# まいんど (マインド) の頭なので、main + do・main + ku (マインクラフト) のように、続く 1 音とでよく使う語・ブランド名の読みの頭になるときは英語にしない (CompositionDetector.ContinuesJapaneseWord)。
+main domain
