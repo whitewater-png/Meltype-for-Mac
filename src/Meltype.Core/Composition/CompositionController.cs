@@ -440,7 +440,7 @@ public sealed class CompositionController
         BeginComposition();
         // 選んだ文字の前後の空白・改行・タブは、置き換えても残す
         var converted = lead
-            + JoinRomajiParts(parts, kana => string.Concat(ConvertJapanese(kana).Select(c => c.Text)))
+            + JoinRomajiParts(parts, kana => DigitHyphens(string.Concat(ConvertJapanese(kana).Select(c => c.Text))))
             + trail;
         if (converted.Trim().Length == 0 || converted == text)
         {
@@ -459,6 +459,24 @@ public sealed class CompositionController
         return true;
     }
 
+    /// <summary>
+    /// 数字のすぐ後ろの長音 ー を、打った - に戻す (10-ji → 10-時、03-1234-5678desu → 03-1234-5678です、3-4nin → 3-4人)。
+    /// 長音はかなの母音の後ろにしか意味が無いので、数字の後ろの ー は区切りの - を打ったもの。変換エンジンには今までどおり ー で渡し (読みと変換結果を変えない)、結果だけ直す。
+    /// 全角の数字の後ろは全角の －。かなの後ろの長音 (ko-hi-2hai のこーひー) は変えない。
+    /// </summary>
+    internal static string DigitHyphens(string text)
+    {
+        if (!text.Contains('ー')) return text;
+        var chars = text.ToCharArray();
+        for (var i = 1; i < chars.Length; i++)
+        {
+            if (chars[i] != 'ー') continue;
+            if (char.IsAsciiDigit(chars[i - 1])) chars[i] = '-';
+            else if (chars[i - 1] is >= '０' and <= '９') chars[i] = '－';
+        }
+        return new string(chars);
+    }
+
     /// <summary>日本語の区間の英字が、文全体の英字の <see cref="RomajiMinShare"/> 以上か。英文に紛れた 1 語 (Hello, my name is Ryo.) で日本語にしないための下限。</summary>
     private static bool EnoughJapanese(List<RomajiPart> parts)
     {
@@ -472,7 +490,7 @@ public sealed class CompositionController
     internal const double RomajiMinShare = 0.25;
 
     /// <summary>ローマ字の文の 1 区間。English は英語 (Text は打ったまま)、でなければ日本語 (Text はかな)。NewWord は、空白で区切った語の先頭か。</summary>
-    private readonly record struct RomajiPart(bool English, string Text, bool NewWord, int Letters = 0, bool Lowered = false);
+    private readonly record struct RomajiPart(bool English, string Text, bool NewWord, int Letters = 0, bool Lowered = false, bool Literal = false);
 
     /// <summary>
     /// ローマ字の文を、空白で区切った語ごとに英語 / 日本語に分ける (打ったときと同じ判定。前の語が英語なら、それも手がかりにする)。
@@ -498,6 +516,14 @@ public sealed class CompositionController
                 previousEnglish = true;
                 continue;
             }
+            // 英字を含まず - を含む語 (箇条書きの -、電話番号・日付の 03-1234-5678、空白で区切った -) は、長音 ー にせず前後の空白ごとそのまま残す。
+            // 語の中の長音 (ra-men・su-pa-) は英字を含むので、今までどおり。次の語への手がかりは「英語の後ろ」にしない (英文の後ろの - sushi ga suki も日本語として判定する)
+            if (word.Contains('-') && !word.Any(char.IsAsciiLetter))
+            {
+                parts.Add(new RomajiPart(true, word, true, Literal: true));
+                previousEnglish = false;
+                continue;
+            }
             // 前の語が日本語でも「日本語の続き」とはしない (空白で区切って打った語なので、語の途中ではない)。
             // 前までが英文 (英語 2 語以上) という手がかり (PrecedingEnglishSentence) は使わない: pull request no / Visual Studio Code no の no が英語のまま残るため (docs/IMPROVEMENT_PLAN.md の P36 の前後比較)。
             // 使うのは、直前が感動詞 1 語のとき (爆弾にはなれない oh no! の no を の にしない) だけ。
@@ -511,7 +537,7 @@ public sealed class CompositionController
                 Parentheses = () => _options.Parentheses(),
                 Braces = () => _options.Braces(),
                 PrecedingEnglish = previousEnglish == true ? true : null,
-                PrecedingEnglishSentence = previousEnglish == true && AfterSingleEnglishWord(JoinRomajiParts(parts, kana => kana)) && IsEnglishSentence(JoinRomajiParts(parts, kana => kana) + " "),
+                PrecedingEnglishSentence = previousEnglish == true && AfterSingleEnglishWord(JoinForJudgment(parts)) && IsEnglishSentence(JoinForJudgment(parts) + " "),
             };
             foreach (var c in lowered ? char.ToLowerInvariant(word[0]) + word[1..] : word) typed.Append(c);
             typed.FixTypos();
@@ -577,6 +603,13 @@ public sealed class CompositionController
     private static bool IsParticleAfterEnglish(CompositionSegment? before, CompositionSegment segment) =>
         before is { IsEnglish: true, Raw.Length: >= 2 } && char.IsAsciiLetterLower(before.Value.Raw[0]) && !segment.IsEnglish && RomajiParticles.Contains(segment.Raw);
 
+    /// <summary>
+    /// 前の語までの文を、次の語の判定 (感動詞 1 語の後ろか・英文の後ろか) のためにつなぐ。そのまま残した - の語は、今までどおり長音 ー として数える
+    /// (半角の - のままだと、- oh no の oh の手前で「日本語より後ろ」の走査が止まらず、感動詞の後ろの no が の になる)。
+    /// </summary>
+    private static string JoinForJudgment(List<RomajiPart> parts) =>
+        JoinRomajiParts(parts.Select(p => p.Literal ? p with { English = false, Text = p.Text.Replace('-', 'ー') } : p).ToList(), kana => kana);
+
     /// <summary>文 (ここまでの区間をつないだもの) の最後の日本語より後ろが、英語 1 語だけか (oh、hey)。</summary>
     private static bool AfterSingleEnglishWord(string text)
     {
@@ -621,7 +654,7 @@ public sealed class CompositionController
             if (kana.Length > 0) output.Append(convert(kana.ToString()));
             kana.Clear();
         }
-        foreach (var (english, part, newWord, _, _) in parts)
+        foreach (var (english, part, newWord, _, _, _) in parts)
         {
             if (english)
             {

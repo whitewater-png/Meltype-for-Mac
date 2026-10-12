@@ -928,6 +928,61 @@ internal static class ReconvertRomajiTests
         }
     }
 
+    [Test]
+    public static void Reconvert_StandaloneHyphenWords_StayHyphen()
+    {
+        // 英字を含まない語の - (箇条書きの -、電話番号・日付) は長音 ー にせず、前後の空白ごとそのまま残す。語の中の長音 (ra-men) は今までどおり ー
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            string? Show(string selected) => Create().Reconvert(selected).View?.Text;
+            foreach (var body in new[] { "kyou wa ii tenki desu", "asita no meeting de review shimasu", "PR no review onegai shimasu" })
+            {
+                var expected = Show(body);
+                Assert.True(expected != null && !expected.Contains('ー'), body + ": 本体は候補が出る");
+                Assert.Equal("- " + expected, Show("- " + body), "箇条書き: " + body);
+                Assert.Equal("- " + expected + "\n", Show("- " + body + "\n"), "箇条書き + 3 回クリックの改行: " + body);
+                Assert.Equal("- [ ] " + expected, Show("- [ ] " + body), "チェックボックス: " + body);
+            }
+            Assert.Equal("きょうわ - あしたわ", Show("kyou wa - ashita wa"), "空白で囲んだ -");
+            Assert.Equal("Tel: 03-1234-5678 です", Show("Tel: 03-1234-5678 desu"), "電話番号");
+            Assert.Equal("2026-10-12 にしゅっぱつします", Show("2026-10-12 ni shuppatsu shimasu"), "日付");
+            Assert.Equal("きょうわ -- あしたわ", Show("kyou wa -- ashita wa"), "-- (今までどおり記号の語)");
+            // 語の中の - は今までどおり長音
+            Assert.Equal("らーめんをたべる", Show("ra-men wo taberu"), "語の中の長音");
+            Assert.Equal("きょうわすーぱーにいく", Show("kyou wa su-pa- ni iku"), "語の中・語末の長音");
+            // 数字のすぐ後ろの - は、英字とつながっていても - (長音は数字の後ろに意味が無い)。かなの後ろの長音は数字の手前でも ー
+            Assert.Equal("10-じにかいぎです", Show("10-ji ni kaigi desu"), "数字 + - + ローマ字");
+            Assert.Equal("でんわわ03-1234-5678です", Show("denwa wa 03-1234-5678desu"), "電話番号 + 空白なしのローマ字");
+            Assert.Equal("3-4にんです", Show("3-4nin desu"), "範囲");
+            Assert.Equal("こーひー2はいください", Show("ko-hi-2hai kudasai"), "かなの後ろの長音は数字の手前でも ー");
+            // 残した - の後ろでも、感動詞 1 語の後ろの判定は今までどおり (oh no の no を の にしない)
+            Assert.Equal("きょうわ - oh no!", Show("kyou wa - oh no!"), "- の後ろの感動詞");
+            Assert.Equal("- oh no, わすれた", Show("- oh no, wasureta"), "箇条書きの - の後ろの感動詞");
+            // 残した - は「英語の後ろ」の手がかりにしない: 後ろの日本語は日本語のまま
+            Assert.Equal("- すしがすき", Show("- sushi ga suki"), "- の後ろの日本語");
+            Assert.Equal("03-1234-5678 ばんにでんわして", Show("03-1234-5678 ban ni denwa shite"), "番号の後ろの日本語");
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void DigitHyphens_OnlyAfterDigits()
+    {
+        foreach (var (text, expected) in new[]
+        {
+            ("10ー時", "10-時"), ("03ー1234ー5678です", "03-1234-5678です"), ("0ー", "0-"), ("9ー", "9-"),
+            ("１０ー時", "１０－時"), ("０ー", "０－"), ("９ー", "９－"),
+            // 数字の範囲のすぐ外 (/ : ／ ：) と、かな・先頭・続く長音は変えない
+            ("/ー", "/ー"), (":ー", ":ー"), ("／ー", "／ー"), ("：ー", "：ー"),
+            ("こーひー2はい", "こーひー2はい"), ("ーあ", "ーあ"), ("10ーー", "10-ー"), ("", ""),
+        })
+            Assert.Equal(expected, CompositionController.DigitHyphens(text), text);
+    }
+
     private static void Type(MeltypeSession session, string text)
     {
         foreach (var c in text) session.HandleKey(char.ToUpperInvariant(c), c, false, false, false, false);
