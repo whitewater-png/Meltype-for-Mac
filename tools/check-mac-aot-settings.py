@@ -177,6 +177,7 @@ def child_settings_ops(lib):
     items = settings_items(lib)
     out["keys"] = list(items)
     out["detection"] = items["DetectionLevel"]
+    out["input_style"] = items["InputStyle"]
     out["min_length"] = items["PredictionMinLength"]
     out["live_default"] = items["LiveConversion"]["value"]
     out["set_bool"] = setting(lib, "LiveConversion", False)
@@ -629,7 +630,10 @@ def check_settings_tab(lib_path, failures):
             return
         expect(ops["abi"] == 8, f"FFI の版数が 8 でない: {ops['abi']}")
         expect(len(ops["keys"]) >= 15 and ops["keys"][0] == "LiveConversion" and "DetectionLevel" in ops["keys"], f"設定の一覧が違う: {ops['keys']}")
-        expect(not {"Mode", "InputStyle", "AutoUpdate", "AppRules", "Profiles"} & set(ops["keys"]), "Mac で効かない設定が一覧にある")
+        expect(not {"Mode", "AutoUpdate", "AppRules", "Profiles"} & set(ops["keys"]), "Mac で効かない設定が一覧にある")
+        # 入力方式 (かな入力 JIS) は Mac でも効く設定として一覧に出る。「両方を判定」(Both) は Windows の IME 自動切替用なので選択肢に出さない
+        expect(ops["input_style"]["kind"] == "choice" and [o["value"] for o in ops["input_style"]["options"]] == ["Romaji", "Kana"], f"入力方式の選択肢が違う: {ops['input_style']}")
+        expect(ops["input_style"]["label"] == "入力方式" and ops["input_style"]["group"] == "入力" and ops["input_style"]["description"], "入力方式の名前・グループ・説明が違う")
         expect(ops["detection"]["kind"] == "choice" and [o["value"] for o in ops["detection"]["options"]] == ["Aggressive", "Balanced", "Conservative", "Manual"], f"選択肢が違う: {ops['detection']}")
         expect(ops["detection"]["label"] == "自動判定の強さ" and ops["detection"]["group"] == "入力" and ops["detection"]["description"], "名前・グループ・説明が違う")
         expect(ops["min_length"]["kind"] == "int" and (ops["min_length"]["min"], ops["min_length"]["max"]) == (1, 5) and ops["min_length"]["value"] == 2, f"数の項目が違う: {ops['min_length']}")
