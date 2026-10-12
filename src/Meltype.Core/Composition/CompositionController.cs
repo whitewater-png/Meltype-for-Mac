@@ -437,7 +437,8 @@ public sealed class CompositionController
     private static bool EnoughJapanese(List<RomajiPart> parts)
     {
         var total = parts.Sum(p => p.Letters);
-        var japanese = parts.Where(p => !p.English).Sum(p => p.Letters);
+        // 小文字に直した語 (文頭の語) の字数は、日本語の割合に数えない: 数えると、英文の頭が make・run・you のような曖昧な語のとき、割合の下限を越えて英文に候補が出る
+        var japanese = parts.Where(p => !p.English && !p.Lowered).Sum(p => p.Letters);
         return total > 0 && japanese >= total * RomajiMinShare;
     }
 
@@ -445,7 +446,7 @@ public sealed class CompositionController
     internal const double RomajiMinShare = 0.25;
 
     /// <summary>ローマ字の文の 1 区間。English は英語 (Text は打ったまま)、でなければ日本語 (Text はかな)。NewWord は、空白で区切った語の先頭か。</summary>
-    private readonly record struct RomajiPart(bool English, string Text, bool NewWord, int Letters = 0);
+    private readonly record struct RomajiPart(bool English, string Text, bool NewWord, int Letters = 0, bool Lowered = false);
 
     /// <summary>
     /// ローマ字の文を、空白で区切った語ごとに英語 / 日本語に分ける (打ったときと同じ判定。前の語が英語なら、それも手がかりにする)。
@@ -459,8 +460,12 @@ public sealed class CompositionController
         hasEvidence = false;
         hasParticle = false;
         bool? previousEnglish = null;
+        var sentenceStart = true;
         foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
+            // 文頭 (と . ! ? の後) の語は、アプリが自動で大文字にしたものかもしれない: 先頭の 1 文字だけ大文字なら、小文字にして判定・変換する (この語自体は日本語の証拠にしない)
+            var lowered = sentenceStart && InitialCapitalWord.IsMatch(word);
+            sentenceStart = SentenceEnd.IsMatch(word);
             if (IsCodeLikeWord(word))
             {
                 parts.Add(new RomajiPart(true, word, true, word.Count(char.IsAsciiLetter)));
@@ -480,7 +485,7 @@ public sealed class CompositionController
                 PrecedingEnglish = previousEnglish == true ? true : null,
                 PrecedingEnglishSentence = previousEnglish == true && AfterSingleEnglishWord(JoinRomajiParts(parts, kana => kana)) && IsEnglishSentence(JoinRomajiParts(parts, kana => kana) + " "),
             };
-            foreach (var c in word) typed.Append(c);
+            foreach (var c in lowered ? char.ToLowerInvariant(word[0]) + word[1..] : word) typed.Append(c);
             typed.FixTypos();
             var segments = typed.FinalSegments();
             var first = true;
@@ -490,10 +495,15 @@ public sealed class CompositionController
             {
                 // 日本語と判定されても、かなに読めた所が 1 つも無い (my の m + y のように、読み切れない英字だけ) 区間は英語として扱う
                 var english = segment.IsEnglish || (kana.Any(char.IsAsciiLetter) && kana.All(c => c < 0x80));
-                parts.Add(new RomajiPart(english, english ? segment.Raw : kana, first, segment.Raw.Count(char.IsAsciiLetter)));
+                // 小文字に直した語が英語として残るときは、打ったままの大文字に戻す
+                var raw = lowered && first && english && segment.Raw.Length > 0 && segment.Raw[0] == char.ToLowerInvariant(word[0]) ? word[0] + segment.Raw[1..] : segment.Raw;
+                parts.Add(new RomajiPart(english, english ? raw : kana, first, segment.Raw.Count(char.IsAsciiLetter), lowered));
                 first = false;
-                if (IsRomajiEvidence(before, segment, kana)) hasEvidence = true;
-                if (IsParticleAfterEnglish(before, segment)) hasParticle = true;
+                if (!lowered)
+                {
+                    if (IsRomajiEvidence(before, segment, kana)) hasEvidence = true;
+                    if (IsParticleAfterEnglish(before, segment)) hasParticle = true;
+                }
                 before = segment;
                 lastEnglish = english;
             }
@@ -520,6 +530,12 @@ public sealed class CompositionController
         return core.Length >= RomajiEvidenceLetters && core.All(c => char.IsAsciiLetter(c) || c == '-') && core.Count(char.IsAsciiLetter) >= RomajiEvidenceLetters
             && !_detector.IsKnownEnglishWord(core);
     }
+
+    /// <summary>先頭の 1 文字だけが大文字の語 (Asita・Kenji,・Tanaka-san。全部大文字の PR や 1 文字の I は含めない)。</summary>
+    private static readonly System.Text.RegularExpressions.Regex InitialCapitalWord = new("^[A-Z][a-z]+(-[a-z]+)*[.,!?]*$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>文の終わりの記号で終わる語。次の語は文頭として扱う。</summary>
+    private static readonly System.Text.RegularExpressions.Regex SentenceEnd = new("[.!?]$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     /// <summary>敬称。単独の語 (Takeshi san の san) は、英文の中の人名にも付くので、日本語の証拠にしない (sensei は英単語の表にあるので、元から証拠にならない: 入れても結果が変わらなかった)。</summary>
     private static readonly HashSet<string> RomajiHonorifics = new(StringComparer.Ordinal) { "san", "kun", "chan", "sama" };
@@ -577,7 +593,7 @@ public sealed class CompositionController
             if (kana.Length > 0) output.Append(convert(kana.ToString()));
             kana.Clear();
         }
-        foreach (var (english, part, newWord, _) in parts)
+        foreach (var (english, part, newWord, _, _) in parts)
         {
             if (english)
             {

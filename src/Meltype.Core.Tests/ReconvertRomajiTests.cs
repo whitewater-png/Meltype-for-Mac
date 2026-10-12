@@ -420,6 +420,8 @@ internal static class ReconvertRomajiTests
                     "Good morning, Yoshida!", "Sorry, Ryo.", "Welcome, Rina!", "Kenji, can you send it?", "Kenji! Can you send it?",
                     // 敬称が付いても、英文の中なら同じ (Takeshi san は Take|shi + san に切れ、san だけが証拠に見える)
                     "Thanks, Takeshi san!", "Hi Takeshi san", "Hi Masato san,", "Hi Masato kun", "Hi Masato chan", "Hi Masato sama", "Thanks, Tanaka-san!", "Dear Tanaka-san,",
+                    // 文頭 (と . ! ? の後) の語は小文字にして扱うが、その語自体は日本語の証拠にしない: 名前が文頭の英文・2 文目が名前の英文は、今までどおり
+                    "Tanaka-san, can you send it?", "Kenji, thanks for the report.", "Thanks for the report. Kenji, can you send it?", "I met him yesterday. Thanks, Kenji!", "Hello. Tanaka! Can you hear me?",
                 })
                 {
                     Assert.True(PassesThrough(selected), $"{selected}: 今までどおり ({(checker is null ? "辞書なし" : "同梱の英単語表")})");
@@ -429,6 +431,25 @@ internal static class ReconvertRomajiTests
             {
                 CompositionTests.Detector.SpellChecker = null;
             }
+        }
+    }
+
+    [Test]
+    public static void Reconvert_EnglishStartingWithAmbiguousWord_IsNotPushedOverTheShare()
+    {
+        // 文頭の語 (Make・Run・You) は小文字にすると日本語に読める。その字数を日本語の割合に数えると、辞書に無い語が 1 つある英文 (zipapp) が割合の下限を越えて候補になる。
+        // 小文字に直した語の字数は割合の分子に数えない (分母には数える) ので、今までどおり候補なし。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var selected in new[] { "Run the zipapp command line interface.", "You MUST handle these via tmux send-keys:", "Make a link for an identifier, given name-to-URL mappings." })
+            {
+                Assert.True(PassesThrough(selected), selected + ": 今までどおり (同梱の英単語表)");
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
         }
     }
 
@@ -453,6 +474,139 @@ internal static class ReconvertRomajiTests
             // 敬称だけの語が証拠にならないのは、単独のときだけ。小文字の名前や他の語に証拠があれば日本語にする
             Assert.True(Create().Reconvert("tanaka san ni onegai shimasu").Consumed, "小文字の語に証拠がある");
             Assert.True(Create().Reconvert("kyou san").Consumed, "kyou が証拠");
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void Reconvert_SentenceInitialCapital_IsReadAsJapanese()
+    {
+        // アプリは英数で打つと文頭を自動で大文字にする (Asita no meeting …)。先頭の語だけ英語のまま残らず、小文字で打ったときと同じに日本語にする。
+        // 先頭の 1 文字だけが大文字の語を、判定と変換のために小文字に直して扱う。この語自体は日本語の証拠に数えない (他の語に証拠があるときだけ)。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (selected, expected) in new[]
+            {
+                ("Asita no meeting de review shimasu", "あしたの meeting で review します"),
+                ("Kyou wa genki desu", "きょうわげんきです"),
+                ("Kenji ni onegai shimasu", "けんじにおねがいします"),
+                ("Ohayou gozaimasu", "おはようございます"),
+                ("Watashi wa gakusei desu", "わたしわがくせいです"),
+                // 先頭の語に句読点が付いていても、ハイフンでつながっていても同じ (Tanaka-san の ー は、小文字で打った tanaka-san ni … と同じ従来の答え)
+                ("Hai, wakarimashita", "はい、わかりました"),
+                ("Dorobou, matte kudasai", "どろぼう、まってください"),
+                ("Doukyuu-sei to asobimasu", "どうきゅうーせいとあそびます"),
+                ("Kyou, asita mo ganbarimasu", "きょう、あしたもがんばります"),
+                ("Tanaka-san ni onegai shimasu", "たなかーさんにおねがいします"),
+                // . ! ? のあとの語も文頭として扱う
+                ("Kyou wa genki desu. Asita mo ganbarimasu.", "きょうわげんきです。あしたもがんばります。"),
+                ("Kyou wa ame desu ka? Asita wa hare desu.", "きょうわあめですか？あしたわはれです。"),
+            })
+            {
+                var result = Create().Reconvert(selected);
+                Assert.True(result.Consumed, selected + ": 候補を出す");
+                Assert.Equal(expected, result.View?.Text, selected);
+                Assert.True(result.View!.Candidates.Contains(selected), selected + ": 選んだままの文も候補に");
+            }
+            // 先頭の語が英語の語なら、大文字のまま英語として残す (大文字を小文字にして返さない)
+            Assert.Equal("Hello no meeting でしょう", Create().Reconvert("Hello no meeting deshou").View?.Text);
+            // 全部大文字の語 (略語・地名) は、そのまま扱う (小文字に直さない = AI が あI にならない)
+            Assert.Equal("PR の review おねがいします", Create().Reconvert("PR no review onegai shimasu").View?.Text);
+            Assert.Equal("AI をつかってきょうのかいぎをまとめる", Create().Reconvert("AI wo tsukatte kyou no kaigi wo matomeru").View?.Text);
+            Assert.Equal("TOKYO にいきます", Create().Reconvert("TOKYO ni ikimasu").View?.Text);
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    private static MeltypeSession CreateWithOsReading(CompositionOptions? options = null)
+    {
+        var session = Create(options);
+        // OS の読み (CFStringTokenizer) は、ASCII の英文でもでたらめなかなを返す (実測: this is a pen → てひせぃさぺん、Thanks, Kenji! → てはんくすけんじ)
+        session.ReadingProvider = text => text.All(c => c < 0x80) ? "でたらめ" : text is "今日" ? "きょう" : text is "今日 明日" ? "きょうあした" : null;
+        return session;
+    }
+
+    [Test]
+    public static void Reconvert_EnglishSelection_DoesNotFallBackToTheOsReading()
+    {
+        // ローマ字の再変換が false を返した英文は、従来の再変換 (OS の読み) に落ちて、でたらめなかなの候補が出ていた (実機: Thanks, Kenji! → 手ハンクス感じ)。
+        // ASCII の複数語の選択では OS の読みを使わない = キーはアプリに渡す (Consumed=false)。履歴・意味辞書の読みは残す。
+        foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
+        {
+            CompositionTests.Detector.SpellChecker = checker;
+            try
+            {
+                foreach (var selected in new[]
+                {
+                    "Thanks, Kenji!", "this is a pen", "Hi Tanaka! Can you send me the report?", "Kenji, can you send it?", "I love you", "Hello world",
+                    "Please send me the report by Friday.", "https://example.com/a b",
+                })
+                {
+                    var session = CreateWithOsReading();
+                    var result = session.Reconvert(selected);
+                    Assert.True(!result.Consumed && !session.IsComposing, $"{selected}: 英文は候補を出さない ({(checker is null ? "辞書なし" : "同梱の英単語表")})");
+                    Assert.True(!session.HandleKey(VirtualKeys.Space, null, false, false, false, false).Consumed, selected + ": 関所も閉じていない");
+                }
+            }
+            finally
+            {
+                CompositionTests.Detector.SpellChecker = null;
+            }
+        }
+    }
+
+    [Test]
+    public static void Reconvert_SingleAsciiWord_StillUsesTheOsReading()
+    {
+        // 空白の無い 1 語の選択 (名前 Takeshi → たけし → 武史) は、従来どおり OS の読みを使う (複数語だけ使わない)。前後の空白は語の数に数えない
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var selected in new[] { "Takeshi", "Kenji", " Takeshi ", "proto" })
+            {
+                var session = CreateWithOsReading();
+                session.ReadingProvider = text => text.Trim() is "Takeshi" or "Kenji" or "proto" ? "たけし" : null;
+                var result = session.Reconvert(selected);
+                Assert.True(result.Consumed && result.View is { Converting: true }, $"{selected}: 1 語は OS の読みで再変換する");
+            }
+            // 複数語は、同じ OS の読みを返す提供元でも使わない
+            var many = CreateWithOsReading();
+            many.ReadingProvider = text => "たけし";
+            Assert.True(!many.Reconvert("Takeshi san").Consumed && !many.IsComposing, "複数語は OS の読みを使わない");
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
+    public static void Reconvert_AsciiSelection_StillUsesHistoryMeaningAndKanaReadings()
+    {
+        // OS の読みを使わなくなっても、履歴・意味辞書の読み、かな・漢字の選択の読み (OS を含む) は今までどおり
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            var history = new ConversionHistory(null);
+            history.Remember("ぎっとはぶ", "GitHub");
+            var meanings = MeaningDictionary.Parse("Hello World\tはろーわーるど\tあいさつ。\n");
+            var options = new CompositionOptions { History = history, Meanings = meanings };
+            foreach (var selected in new[] { "GitHub", "Hello World" })
+            {
+                var session = CreateWithOsReading(options);
+                var result = session.Reconvert(selected);
+                Assert.True(result.Consumed && result.View is { Converting: true }, $"{selected}: 履歴・意味辞書の読みで再変換する");
+            }
+            Assert.Equal("今日", CreateWithOsReading().Reconvert("今日").View?.Text);
+            Assert.True(CreateWithOsReading().Reconvert("今日 明日").Consumed, "漢字の複数語は OS の読みを使う (使わないのは ASCII のローマ字の複数語だけ)");
+            Assert.True(CreateWithOsReading().Reconvert("きょう").Consumed, "かなはそのまま読み");
         }
         finally
         {

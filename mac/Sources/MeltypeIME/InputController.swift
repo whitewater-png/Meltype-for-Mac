@@ -175,9 +175,14 @@ final class MeltypeInputController: IMKInputController {
             if selection.location != NSNotFound, selection.length > 0, selection.length <= Self.maxReconvertLength,
                let selected = client.attributedSubstring(from: selection)?.string,
                // 読めた長さが選択の長さと違うホスト (一部しか返さない) では、読んでいない後ろの文字まで置き換えてしまうので、何もしない
-               (selected as NSString).length == selection.length,
-               let result = NativeCore.shared.reconvert(session, text: selected), result.consumed {
-                apply(result, to: client, replacing: selection)
+               (selected as NSString).length == selection.length {
+                if let result = NativeCore.shared.reconvert(session, text: selected), result.consumed {
+                    apply(result, to: client, replacing: selection)
+                    return true
+                }
+                // 選んだ文字を読み直せなかった (英文など)。Shift+Space をそのままアプリへ渡すと、アプリは選択を空白で置き換えて選んだ文字が消えるので、
+                // キーを飲み込んで何もしない (査読 R21 で NSTextView に直接送って確認)。
+                Self.trace("再変換できない選択: Shift+Space を飲み込む (選択の長さ \(selection.length))")
                 return true
             }
         }

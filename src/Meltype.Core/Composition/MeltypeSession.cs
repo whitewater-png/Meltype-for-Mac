@@ -281,7 +281,10 @@ public sealed class MeltypeSession
             _controller.Pump();
             return _host.Result(consumed: true);
         }
-        if (ReadingOf(text) is not { } reading || !_controller.ReconvertKana(reading, text))
+        // ASCII のローマ字の複数語 (英文) の選択では、OS の読みを使わない: 英文がでたらめなかなになる (this is a pen → てひせぃさぺん、Thanks, Kenji! → てはんくすけんじ)。
+        // 履歴・意味辞書の読みは残す。空白の無い 1 語 (Takeshi → たけし) は従来どおり OS の読みも使う。
+        var useOsReading = !(CompositionController.IsRomajiText(text) && text.Trim().Contains(' '));
+        if (ReadingOf(text, useOsReading) is not { } reading || !_controller.ReconvertKana(reading, text))
         {
             return _host.Result(consumed: false);
         }
@@ -289,8 +292,8 @@ public sealed class MeltypeSession
         return _host.Result(consumed: true);
     }
 
-    /// <summary>text の読み (ひらがな)。かなならそのまま、次に変換履歴 (直前の誤変換を直す用途で一番当たる)、意味辞書、OS の順。無ければ null。</summary>
-    private string? ReadingOf(string text)
+    /// <summary>text の読み (ひらがな)。かなならそのまま、次に変換履歴 (直前の誤変換を直す用途で一番当たる)、意味辞書、OS の順 (useOsReading が偽なら OS は尋ねない)。無ければ null。</summary>
+    private string? ReadingOf(string text, bool useOsReading = true)
     {
         if (text.Length == 0) return null;
         var candidates = new[]
@@ -304,6 +307,7 @@ public sealed class MeltypeSession
             if (candidate is not null && ToHiraganaOnly(candidate) is { } kana) return kana;
         }
         // OS への問い合わせは最後 (精度が一番低いので)。例外は握りつぶして「読めない」にする。
+        if (!useOsReading) return null;
         try
         {
             return ReadingProvider?.Invoke(text) is { } read && ToHiraganaOnly(read) is { } hiragana ? hiragana : null;
