@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Yukishiro
 
 using System.Text.Json;
+using Meltype.Config;
 
 namespace Meltype.Composition;
 
@@ -69,35 +70,174 @@ public sealed class LanguageMemory
     public LanguageMemory(string? path)
     {
         _path = path;
-        if (path is null || !File.Exists(path)) return;
+        if (path is null) return;
+        // 版を先に取ってから読む (読んでいる間に書き換わっても、次の確認で版が違うので読み直せる)。
+        _stamp = FileStamp.Of(path);
+        if (Read(path, out _brokenOnDisk) is { } loaded) foreach (var (word, entry) in loaded) _entries[word] = entry;
+    }
+
+    /// <summary>
+    /// ファイルから読む (ファイルが無ければ空)。読めないとき (壊れている・権限・大きすぎる) は null (ログに残す)。
+    /// broken は、ファイルはあるのに読めなかった (大きすぎる以外) とき true。保存の前に「名前.broken」に残す
+    /// (大きすぎるファイルは SafeFile が「名前.oversize」に退避済み)。
+    /// 手で書き換えた・壊れたファイルの null の値や不正なキーは入れない (入れると、その語を打つたびにキー処理の途中で例外になる)。
+    /// キーは Remember と同じ決まり (2 文字以上の英小文字。長さは単語リストの上限まで)。
+    /// </summary>
+    private static Dictionary<string, Entry>? Read(string path, out bool broken)
+    {
+        broken = false;
+        var result = new Dictionary<string, Entry>(StringComparer.Ordinal);
+        if (!File.Exists(path)) return result;
         try
         {
-            if (Config.SafeFile.ReadAllText(path) is not { } json) return;
-            var loaded = JsonSerializer.Deserialize(json, Config.LearningJsonContext.Default.LanguageEntries);
-            // 手で書き換えた・壊れたファイルの null の値や不正なキーは入れない (入れると、その語を打つたびにキー処理の途中で例外になる)。
-            // キーは Remember と同じ決まり (2 文字以上の英小文字。長さは単語リストの上限まで)。
-            if (loaded is not null)
+            // 大きすぎる: 読めなかった扱い (使っている途中なら、空にせず今の内容のまま続ける)。
+            if (SafeFile.ReadAllText(path) is not { } json) return null;
+            var loaded = JsonSerializer.Deserialize(json, LearningJsonContext.Default.LanguageEntries);
+            if (loaded is null) return result;
+            foreach (var (word, entry) in loaded)
             {
-                foreach (var (word, entry) in loaded)
-                {
-                    if (entry is null || word is null || word.Length is < 2 or > Detection.WordList.MaxWordLength || !word.All(char.IsAsciiLetterLower)) continue;
-                    _entries[word] = entry;
-                }
-                if (_entries.Count > MaxEntries)
-                {
-                    foreach (var key in _entries.OrderBy(e => e.Value.Used).Take(_entries.Count - MaxEntries).Select(e => e.Key).ToList()) _entries.Remove(key);
-                }
+                if (entry is null || !IsValidWord(word)) continue;
+                result[word] = entry;
             }
+            if (result.Count > MaxEntries)
+            {
+                foreach (var key in result.OrderBy(e => e.Value.Used).Take(result.Count - MaxEntries).Select(e => e.Key).ToList()) result.Remove(key);
+            }
+            return result;
         }
         catch (Exception ex)
         {
+            broken = File.Exists(path);
             Diagnostics.Log.Warn($"英語 / 日本語の学習データを読めませんでした: {ex.Message}");
+            return null;
         }
     }
 
+    private static bool IsValidWord(string? word) =>
+        word is { Length: >= 2 and <= Detection.WordList.MaxWordLength } && word.All(char.IsAsciiLetterLower);
+
+    // ---- ほかのプロセスの変更の反映 ----
+    // Mac では IME と「Meltype 辞書」の画面が別のプロセスで、それぞれが languages.json をメモリに持つ。保存はファイル全体の書き直しなので、
+    // 読み直さずに保存すると、画面で消した語を IME の次の保存が書き戻してしまい、IME もその語を使い続ける。
+    // そこで、キーごとの Get と一覧 (Entries・Check) は、ファイルの版 (FileStamp) が前に読んだ / 書いたときと違えば読み直す。
+    // 変更する処理は、ロックを取ってから版を比べずに必ず読み直し (版が同じでも中身が変わっていることがある: 時刻が 1 秒単位のファイルシステム)、
+    // 最新のファイルに重ねて保存する。
+
+    /// <summary>Get がファイルを確かめる間隔 (ミリ秒)。Get はキーごとに呼ばれるので毎回は調べない。テストが 0 にする。</summary>
+    internal static int FileCheckIntervalMs { get; set; } = 1000;
+
+    /// <summary>
+    /// IME の学習 (Remember) がロックを待つ時間の上限 (ミリ秒)。確定のたびに呼ばれるので長く待たない
+    /// (取れなければロック無しで保存する)。画面の変更は <see cref="FileLock.TimeoutMs"/> まで待つ。
+    /// </summary>
+    internal static int RememberLockTimeoutMs { get; set; } = 200;
+
+    /// <summary>画面の変更でロックを取れなかったときの理由 (画面にそのまま出す)。</summary>
+    internal const string BusyReason = "ほかの画面が学習データを書き込み中です。少し待ってからもう一度試してください。";
+
+    // 「版が分からない」(ロック無しで保存した後)。どの実際の版とも等しくならないので、次の確認で必ず読み直す。
+    private static readonly FileStamp UnknownStamp = new(true, -1, -1, -1);
+
+    private FileStamp _stamp = FileStamp.Missing;
+    private long _nextFileCheck;
+
+    // 最後に読んだファイルが壊れていて読めなかった (保存の前に .broken に残す)。
+    private bool _brokenOnDisk;
+
+    /// <summary>ファイルが書き換わっていれば今すぐ読み直す (画面が一覧を出す前など)。内容が変わったら true (Version も増える)。</summary>
+    public bool Refresh()
+    {
+        lock (_gate) return RefreshCore();
+    }
+
+    /// <summary>force なら版を比べずに読む (変更の前)。</summary>
+    private bool RefreshCore(bool force = false)
+    {
+        if (_path is null) return false;
+        _nextFileCheck = Environment.TickCount64 + FileCheckIntervalMs;
+        var stamp = FileStamp.Of(_path);
+        if (!force && stamp.Equals(_stamp)) return false;
+        _stamp = stamp;
+        // 読めないファイル (壊れている・大きすぎる・権限) なら今の内容のまま続ける (空にしない)。
+        // 変更したときは、壊れたファイルを .broken に残してから今の内容に書き直す。
+        if (Read(_path, out _brokenOnDisk) is not { } loaded || SameAs(loaded)) return false;
+        _entries.Clear();
+        foreach (var (word, entry) in loaded) _entries[word] = entry;
+        Version++;
+        return true;
+    }
+
+    private bool SameAs(Dictionary<string, Entry> other) =>
+        other.Count == _entries.Count && other.All(e => _entries.TryGetValue(e.Key, out var mine) &&
+            mine.English == e.Value.English && mine.Count == e.Value.Count && mine.Explicit == e.Value.Explicit && mine.Used == e.Value.Used);
+
+    /// <summary>
+    /// 変更 (読み直し → 変更 → 保存) の間、ほかのプロセスが同じファイルを書かないようにするロックを取る。取れたら fileLock に入れて null。
+    /// 画面の変更 (fromApp) は、取れなければ理由を返す (保存しない)。IME の学習は短く待ち、取れなければロック無しで続ける
+    /// (入力を止めないため。その後は版が分からない扱いにして、次の確認で必ず読み直す)。
+    /// 損: ロック無しの保存は、同じ瞬間のほかのプロセスの書き込みと重なりうる。画面がロックを持ち続けると、その間の IME の学習が消えるか、
+    /// まれに画面で消した語が書き戻される。画面の変更がロックを持つのは 1 回の読み直し + 保存 (約 10 ms) だけなので、人の操作では起きにくい。
+    /// 既定の 200 ms で取り合っても失わないことを確かめるテストは無い (LearnedWordsTests の同時書き込みは待ち時間を長くして、ロックが取れる場合だけを見る)。
+    /// </summary>
+    private string? TryLock(bool fromApp, out IDisposable? fileLock)
+    {
+        fileLock = null;
+        if (_path is null) return null;
+        try
+        {
+            fileLock = FileLock.Acquire(_path, fromApp ? FileLock.TimeoutMs : Math.Min(FileLock.TimeoutMs, RememberLockTimeoutMs));
+            return null;
+        }
+        catch (Exception ex)
+        {
+            if (fromApp)
+            {
+                Diagnostics.Log.Warn($"英語 / 日本語の学習データのロックを取れなかったので、変更しませんでした: {ex.Message}");
+                return ex is FileLockTimeoutException ? BusyReason : $"学習データのロックを取れなかったので、変更しませんでした: {ex.Message}";
+            }
+            Diagnostics.Log.Warn($"英語 / 日本語の学習データのロックを取れませんでした (ロック無しで続けます): {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 変更の共通の流れ: ロック → 必ず読み直す → 変更 → 保存。change は (変更しない理由, 変えたか) を返す (理由があるときは何も変えないこと)。
+    /// 保存できなかったら、メモリも変更の前に戻して理由を返す (画面の一覧・IME・ファイルがずれないように。
+    /// 戻さないと、保存できなかった削除が、後の別の保存で黙ってファイルに書かれる)。
+    /// </summary>
+    private string? Edit(bool fromApp, Func<(string? Reason, bool Changed)> change)
+    {
+        lock (_gate)
+        {
+            if (TryLock(fromApp, out var fileLock) is { } busy) return busy;
+            using (fileLock)
+            {
+                RefreshCore(force: true);
+                var before = _entries.Select(e => KeyValuePair.Create(e.Key, Copy(e.Value))).ToList();
+                var (reason, changed) = change();
+                if (reason is not null || !changed) return reason;
+                Trim();
+                Version++;
+                if (Save() is { } failure)
+                {
+                    _entries.Clear();
+                    foreach (var (word, entry) in before) _entries[word] = entry;
+                    // 変えた内容で判定の結果を作ったかもしれないので、戻したときも版を上げる。
+                    Version++;
+                    return failure;
+                }
+                // ロック無しで保存したときは、直後にほかのプロセスが書いても版が同じに見えることがあるので、次は必ず読み直す。
+                if (fileLock is null && _path is not null) _stamp = UnknownStamp;
+                return null;
+            }
+        }
+    }
+
+    private static Entry Copy(Entry entry) => new() { English = entry.English, Used = entry.Used, Count = entry.Count, Explicit = entry.Explicit };
+
     public int Count { get { lock (_gate) return _entries.Count; } }
 
-    /// <summary>覚えている内容が変わるたびに増える (判定の結果を使い回してよいかを見るのに使う)。</summary>
+    /// <summary>覚えている内容が変わるたびに増える (判定の結果を使い回してよいかを見るのに使う。ほかのプロセスの変更を読み直したときも)。</summary>
     public int Version { get; private set; }
 
     private int _maxLengthVersion = -1;
@@ -123,7 +263,12 @@ public sealed class LanguageMemory
     /// <summary>覚えている語なら英語か (true) 日本語か (false)。覚えていなければ null。word は小文字の英字。</summary>
     public bool? Get(string word)
     {
-        lock (_gate) return GetCore(word);
+        lock (_gate)
+        {
+            // キーごとに呼ばれるので、ファイルの確認は間隔をあける (ほかのプロセスで消した・足した語は、遅くともこの間隔の後に効く)。
+            if (_path is not null && Environment.TickCount64 >= _nextFileCheck) RefreshCore();
+            return GetCore(word);
+        }
     }
 
     private bool? GetCore(string word)
@@ -136,17 +281,24 @@ public sealed class LanguageMemory
     /// <summary>
     /// ユーザーが英字 / かなに直した語を覚える (2 文字以上の英字だけ)。
     /// explicitChoice は F10 / F6 / Tab ではっきり直したとき (変換の候補から選んだだけなら false)。
+    /// 保存できなければ覚えない (ログに残す)。ロックは短くしか待たない (取れなければロック無しで保存する)。
     /// </summary>
     public void Remember(string word, bool english, bool explicitChoice = false)
     {
-        lock (_gate) RememberCore(word, english, explicitChoice);
+        word = word.ToLowerInvariant();
+        if (word.Length < 2 || !word.All(char.IsAsciiLetterLower)) return;
+        if (Edit(fromApp: false, () =>
+            {
+                RememberCore(word, english, explicitChoice);
+                return (null, true);
+            }) is { } failure)
+        {
+            Diagnostics.Log.Warn($"英語 / 日本語の学習を保存できなかったので、今回の学習は取り消しました: {failure}");
+        }
     }
 
     private void RememberCore(string word, bool english, bool explicitChoice)
     {
-        word = word.ToLowerInvariant();
-        if (word.Length < 2 || !word.All(char.IsAsciiLetterLower)) return;
-        Version++;
         if (_entries.TryGetValue(word, out var old) && old.English == english)
         {
             old.Used = DateTime.UtcNow;
@@ -163,60 +315,152 @@ public sealed class LanguageMemory
                 ? $"{Diagnostics.Log.Text(word)}はローマ字としても読めるので、もう一度英字にして確定したら英語にします (学習)。"
                 : $"{Diagnostics.Log.Text(word)}は次から{(english ? "英語" : "日本語")}にします (学習)。");
         }
-        if (_entries.Count > MaxEntries)
-        {
-            foreach (var key in _entries.OrderBy(e => e.Value.Used).Take(_entries.Count - MaxEntries * 9 / 10).Select(e => e.Key).ToList())
-            {
-                _entries.Remove(key);
-            }
-        }
-        Save();
     }
 
-    /// <summary>学習した語の一覧 (新しく使ったものから)。</summary>
+    /// <summary>学習した語の一覧 (新しく使ったものから)。ほかのプロセスの変更を読み直してから返す。</summary>
     public IReadOnlyList<Learned> Entries()
     {
         lock (_gate)
         {
+            RefreshCore();
             return _entries.OrderByDescending(e => e.Value.Used)
                 .Select(e => new Learned(e.Key, e.Value.English, Math.Max(1, e.Value.Count), e.Value.Used, !NeedsTwice(e.Key, e.Value)))
                 .ToList();
         }
     }
 
-    /// <summary>学習した語を忘れる (設定の「学習した語」から消したとき)。</summary>
-    public void Remove(IEnumerable<string> words)
+    /// <summary>
+    /// 一覧に足す・直してよいか (保存はしない)。だめなら理由 (画面にそのまま出す)、よければ null。
+    /// except は編集中の元の語 (その語とは重複にしない)。大文字は小文字にして調べる。
+    /// </summary>
+    public string? Check(string word, string? except = null)
     {
         lock (_gate)
+        {
+            RefreshCore();
+            return CheckCore(Normalize(word), except is null ? null : Normalize(except));
+        }
+    }
+
+    private static string Normalize(string word) => word.Trim().ToLowerInvariant();
+
+    /// <summary>理由に入れる語 (画面にそのまま出す)。改行・Tab などの制御文字は空白にし、40 文字を超えたら切る。</summary>
+    private static string Excerpt(string text)
+    {
+        const int max = 40;
+        if (text.Length > max) text = text[..(char.IsHighSurrogate(text[max - 1]) ? max - 1 : max)] + "…";
+        return string.Concat(text.Select(c => char.IsControl(c) ? ' ' : c));
+    }
+
+    private string? CheckCore(string word, string? except)
+    {
+        if (word.Length == 0) return "語を入力してください。";
+        if (!word.All(char.IsAsciiLetterLower)) return "英字 (a〜z) だけで入力してください。";
+        if (word.Length < 2) return "2 文字以上にしてください。";
+        if (word.Length > Detection.WordList.MaxWordLength) return $"{Detection.WordList.MaxWordLength} 文字までにしてください。";
+        if (word != except && _entries.ContainsKey(word)) return $"「{word}」はもう一覧にあります。";
+        return null;
+    }
+
+    /// <summary>
+    /// 一覧に足す (oldWord が null) か、oldWord を直す (綴り・英字 / かな)。すぐ保存する。だめなら理由、できたら null。
+    /// 手で足した・直した語はすぐ効くようにする (はっきり直した扱いで回数を 2 以上にする。1 回では覚えない語 (kyouha) も 2 回目を待たない)。
+    /// ほかのプロセスがロックを持ったままなら、保存せずに理由を返す。
+    /// </summary>
+    public string? Set(string word, bool english, string? oldWord = null)
+    {
+        word = Normalize(word);
+        var old = oldWord is null ? null : Normalize(oldWord);
+        return Edit(fromApp: true, () =>
+        {
+            if (CheckCore(word, old) is { } reason) return (reason, false);
+            Entry? previous = null;
+            if (old is not null && !_entries.TryGetValue(old, out previous)) return ($"「{Excerpt(old)}」は一覧にありません (ほかの画面で消されたかもしれません)。", false);
+            if (old is not null && old != word) _entries.Remove(old);
+            // 同じ語を直すときは、最後に使った日と回数を残す (英字 / かなを変えたら、回数は新しい向きで 2 から数え直す)。
+            // 綴りを変えたら別の語なので、今足した語として扱う。
+            var same = previous is not null && old == word;
+            _entries[word] = new Entry
+            {
+                English = english,
+                Used = same ? previous!.Used : DateTime.UtcNow,
+                Count = same && previous!.English == english ? Math.Max(previous.Count, 2) : 2,
+                Explicit = true,
+            };
+            Diagnostics.Log.Decision(old is null
+                ? $"{Diagnostics.Log.Text(word)}を{(english ? "英語" : "日本語")}として足しました (学習した語の一覧)。"
+                : $"{Diagnostics.Log.Text(old)}を{Diagnostics.Log.Text(word)} ({(english ? "英語" : "日本語")}) に直しました (学習した語の一覧)。");
+            return (null, true);
+        });
+    }
+
+    /// <summary>
+    /// 学習した語を忘れる (「学習した語」の一覧から消したとき)。一覧に無い語は飛ばす。だめなら理由、できたら null。
+    /// ほかのプロセスがロックを持ったままなら、保存せずに理由を返す。
+    /// </summary>
+    public string? Remove(IEnumerable<string> words)
+    {
+        var keys = words.Select(Normalize).ToList();
+        return Edit(fromApp: true, () =>
         {
             var removed = false;
-            foreach (var word in words) removed |= _entries.Remove(word);
-            if (!removed) return;
-            Version++;
-            Save();
-        }
+            foreach (var key in keys) removed |= _entries.Remove(key);
+            return (null, removed);
+        });
     }
 
+    /// <summary>すべて忘れる (「学習データをすべて消去」)。ロックを取れない・保存できないときは、消さずに <see cref="IOException"/> (理由)。</summary>
     public void Clear()
     {
-        lock (_gate)
+        if (Edit(fromApp: true, () =>
+            {
+                _entries.Clear();
+                return (null, true);
+            }) is { } failure)
         {
-            _entries.Clear();
-            Version++;
-            Save();
+            throw new IOException(failure);
         }
     }
 
-    private void Save()
+    private void Trim()
     {
-        if (_path is null) return;
+        if (_entries.Count <= MaxEntries) return;
+        foreach (var key in _entries.OrderBy(e => e.Value.Used).Take(_entries.Count - MaxEntries * 9 / 10).Select(e => e.Key).ToList())
+        {
+            _entries.Remove(key);
+        }
+    }
+
+    /// <summary>
+    /// 保存する。だめなら理由 (ログにも残す)、できたら null。保存した後のファイルの版を覚える (自分の保存で読み直さないため)。
+    /// 読めなかった (壊れた) ファイルは、上書きする前に「名前.broken」に残す (残せなければ保存しない)。
+    /// </summary>
+    private string? Save()
+    {
+        if (_path is null) return null;
         try
         {
-            Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_entries, Config.LearningJsonContext.Default.LanguageEntries));
+            if (SafeFile.IsBlocked(_path))
+            {
+                Diagnostics.Log.Warn("大きすぎる英語 / 日本語の学習データを退避できなかったので、保存しません (元のファイルを守るため)。");
+                return "学習データのファイルが大きすぎて退避もできなかったので、保存しませんでした (元のファイルを守るため)。";
+            }
+            if (_brokenOnDisk && File.Exists(_path))
+            {
+                var backup = _path + ".broken";
+                File.Copy(_path, backup, overwrite: true);
+                SafeFile.Restrict(backup);
+                Diagnostics.Log.Warn($"読めなかった {Path.GetFileName(_path)} を {Path.GetFileName(backup)} に残してから書き直します。");
+            }
+            SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_entries, LearningJsonContext.Default.LanguageEntries));
+            _brokenOnDisk = false;
+            _stamp = FileStamp.Of(_path);
+            return null;
         }
         catch (Exception ex)
         {
             Diagnostics.Log.Warn($"英語 / 日本語の学習データを保存できませんでした: {ex.Message}");
+            return $"保存できませんでした: {ex.Message}";
         }
     }
 }

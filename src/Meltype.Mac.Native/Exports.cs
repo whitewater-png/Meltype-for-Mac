@@ -50,8 +50,9 @@ public static unsafe class Exports
     /// 6: 辞書の管理画面の関数 (meltype_userdict_* / meltype_term_words ほか) を足した。
     /// 7: 設定タブの関数 (meltype_settings_get / meltype_settings_set / meltype_settings_reset) を足した。
     /// 8: 自作の専門用語集の関数 (meltype_term_create ほか) を足し、meltype_term_domains の各行に 5 つ目の欄 (自作なら 1) を足した。
+    /// 9: 学習した語の関数 (meltype_learned_words / _version / _check / _set / _remove) を足した。
     /// </summary>
-    public const int AbiVersion = 8;
+    public const int AbiVersion = 9;
 
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
@@ -624,6 +625,82 @@ public static unsafe class Exports
             return -1;
         }
     }
+
+    // ---- 「Meltype 辞書」の「学習した語」タブ用 (英語 / 日本語の学習 = languages.json。中身は Composition.LanguageMemory) ----
+    // IME のプロセスもメモリに持っているが、どちらも変更の前とファイルが書き換わったときに読み直すので、ここで消した語は IME でも消える。
+
+    /// <summary>
+    /// 学習した語 (新しく使ったものから)。1 行 1 語で、欄は Tab 区切りの「語\tE (英字) か J (かな)\t回数\t最後に使った日時 (UTC、ISO 8601)\t効いていれば 1、2 回目を待っていれば 0」。
+    /// 0 語なら空文字列。取れなければ NULL。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_learned_words")]
+    public static byte* LearnedWords() => Text("学習した語の一覧", () => DictionaryManagement.FormatLearned(DictionaryManagement.Languages.Entries()));
+
+    /// <summary>学習した語の版 (変わるたびに増える。ほかのプロセスがファイルを書き換えたときも)。画面が一覧を読み直すかを決めるのに使う。取れなければ -1。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_learned_version")]
+    public static int LearnedVersion()
+    {
+        try
+        {
+            var languages = DictionaryManagement.Languages;
+            languages.Refresh();
+            return languages.Version;
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"Mac: 学習した語の版を取れませんでした: {ex}");
+            return -1;
+        }
+    }
+
+    /// <summary>学習した語に足す・直してよいか (保存はしない)。exceptWord は編集中の元の語 (NULL なら無し)。だめなら理由、よければ NULL。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_learned_check")]
+    public static byte* LearnedCheck(byte* word, byte* exceptWord)
+    {
+        // 引数の変換も try の中で行う (例外を UnmanagedCallersOnly の外へ出さないため)。
+        try
+        {
+            return ReasonText(DictionaryManagement.Languages.Check(FromUtf8(word) ?? "", FromUtf8(exceptWord)));
+        }
+        catch (Exception ex)
+        {
+            return Failure("学習した語の入力チェック", ex);
+        }
+    }
+
+    /// <summary>
+    /// 学習した語を足す (oldWord が NULL) か、oldWord を直す。english は 1 なら英字のまま、0 ならかなにする語。
+    /// 足した・直した語はすぐ効く (2 回目を待たない)。すぐ保存する。だめなら理由、できたら NULL。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_learned_set")]
+    public static byte* LearnedSet(byte* word, int english, byte* oldWord)
+    {
+        try
+        {
+            return ReasonText(DictionaryManagement.Languages.Set(FromUtf8(word) ?? "", english != 0, FromUtf8(oldWord)));
+        }
+        catch (Exception ex)
+        {
+            return Failure("学習した語の保存", ex);
+        }
+    }
+
+    /// <summary>学習した語を消す (lines は語を改行でつないだもの。一覧に無い語は飛ばす)。元に戻す機能は無い。だめなら理由、できたら NULL。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_learned_remove")]
+    public static byte* LearnedRemove(byte* lines)
+    {
+        try
+        {
+            return ReasonText(DictionaryManagement.Languages.Remove(DictionaryManagement.ParseLearnedWords(FromUtf8(lines))));
+        }
+        catch (Exception ex)
+        {
+            return Failure("学習した語の削除", ex);
+        }
+    }
+
+    /// <summary>理由 (null なら成功) を返り値にする: 成功なら NULL、理由があればその文字列。</summary>
+    private static byte* ReasonText(string? reason) => reason is null ? null : ToUtf8(reason);
 
     // ---- 「Meltype 辞書」の「設定」タブ用 (編集できる設定は Config.MacSettingsCatalog) ----
 

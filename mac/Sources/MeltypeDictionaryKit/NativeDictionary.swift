@@ -23,6 +23,7 @@ private typealias Text2Out3Function = @convention(c) (UnsafePointer<CChar>?, Uns
 private typealias Text2CountFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
 private typealias TextOutIntFunction = @convention(c) (UnsafePointer<CChar>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
 private typealias Text2FlagFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, Int32) -> UnsafeMutablePointer<CChar>?
+private typealias TextFlagTextFunction = @convention(c) (UnsafePointer<CChar>?, Int32, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 private typealias TermEditFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
 
 /// 辞書の管理画面が使う操作 (本物は NativeDictionary。--self-test は偽物でも確かめる)。理由の文字列は、だめなときだけ (画面にそのまま出す)。
@@ -52,9 +53,9 @@ public protocol DictionaryOperations: AnyObject {
 
 /// libMeltypeNative.dylib を読み込んで、ユーザー辞書・専門用語集を操作する (中身は C# の DictionaryManagement / UserDictionary / TermDomains)。
 /// 関数はどれも、C# 側でロックしているので、どのスレッドから呼んでもよい (専門用語の一覧は重いので裏のスレッドで呼ぶ)。
-public final class NativeDictionary: DictionaryOperations {
+public final class NativeDictionary: DictionaryOperations, LearnedWordOperations {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion・IME の NativeCore.expectedAbiVersion と必ず同じにする。
-    public static let expectedAbiVersion: Int32 = 8
+    public static let expectedAbiVersion: Int32 = 9
 
     /// 読み込めなかった理由 (画面に出す)。
     public enum LoadError: Error, CustomStringConvertible {
@@ -118,6 +119,11 @@ public final class NativeDictionary: DictionaryOperations {
     private let settingsGetFunction: TextFunction
     private let settingsSetFunction: Text2Function
     private let settingsResetFunction: TextFunction
+    private let learnedWordsFunction: TextFunction
+    private let learnedVersionFunction: IntFunction
+    private let learnedCheckFunction: Text2Function
+    private let learnedSetFunction: TextFlagTextFunction
+    private let learnedRemoveFunction: Text1Function
 
     public init(libraryPath: String?) throws {
         guard let libraryPath else { throw LoadError.notFound }
@@ -167,6 +173,11 @@ public final class NativeDictionary: DictionaryOperations {
         settingsGetFunction = try symbol("meltype_settings_get", as: TextFunction.self)
         settingsSetFunction = try symbol("meltype_settings_set", as: Text2Function.self)
         settingsResetFunction = try symbol("meltype_settings_reset", as: TextFunction.self)
+        learnedWordsFunction = try symbol("meltype_learned_words", as: TextFunction.self)
+        learnedVersionFunction = try symbol("meltype_learned_version", as: IntFunction.self)
+        learnedCheckFunction = try symbol("meltype_learned_check", as: Text2Function.self)
+        learnedSetFunction = try symbol("meltype_learned_set", as: TextFlagTextFunction.self)
+        learnedRemoveFunction = try symbol("meltype_learned_remove", as: Text1Function.self)
     }
 
     /// 本体が返した文字列を Swift の文字列にして解放する。
@@ -399,6 +410,26 @@ public final class NativeDictionary: DictionaryOperations {
         let summary = take(summaryPointer)
         guard error == nil, let id, let summary else { return (error, nil) }
         return (nil, FfiFormat.parseDomainImportSummary(summary, id: id))
+    }
+
+    // ---- 学習した語 ----
+
+    public func learnedWords() -> [LearnedWord]? {
+        take(learnedWordsFunction()).map(FfiFormat.parseLearnedWords)
+    }
+
+    public func learnedVersion() -> Int32 { learnedVersionFunction() }
+
+    public func checkLearned(_ word: String, except: String?) -> String? {
+        word.withCString { pointer in withOptionalCString(except) { take(learnedCheckFunction(pointer, $0)) } }
+    }
+
+    public func setLearned(_ word: String, english: Bool, oldWord: String?) -> String? {
+        word.withCString { pointer in withOptionalCString(oldWord) { take(learnedSetFunction(pointer, english ? 1 : 0, $0)) } }
+    }
+
+    public func removeLearned(_ words: [String]) -> String? {
+        FfiFormat.formatWords(words).withCString { take(learnedRemoveFunction($0)) }
     }
 
     // ---- 設定 ----

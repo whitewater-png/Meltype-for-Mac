@@ -23,6 +23,36 @@ internal static class DictionaryManagement
     /// <summary>管理画面のプロセスのユーザー辞書。</summary>
     public static UserDictionary UserWords => s_userDictionary.Value;
 
+    // 管理画面のプロセスの「学習した語」(languages.json)。IME のプロセスとは別のインスタンスだが、変更の前とファイルの版が変わったときに
+    // 読み直すので (LanguageMemory.Refresh)、互いの変更は消えない。
+    // 「2 回目を待っている」かの判定 (Active) を IME と同じにするため、よく使う日本語・読み切れるローマ字の判定をここでも付ける
+    // (付けないと、kyouha を 1 回英字にしただけの語が、画面では「有効」と出てしまう)。
+    private static readonly Lazy<LanguageMemory> s_languages = new(() =>
+    {
+        var memory = LanguageMemory.Shared(AppPaths.LanguageMemoryFile);
+        var romaji = new Detection.RomajiDetector();
+        memory.IsCommonJapanese ??= RomajiTypoCorrector.Load(romaji).IsCommonJapanese;
+        memory.IsReadableRomaji ??= word => romaji.AnalyzeFragment(word) is { IsValid: true, Partial: "" };
+        return memory;
+    });
+
+    /// <summary>管理画面のプロセスの「学習した語」(英語 / 日本語の学習)。</summary>
+    public static LanguageMemory Languages => s_languages.Value;
+
+    /// <summary>
+    /// 学習した語を 1 行 1 語で返す (新しく使ったものから)。欄は Tab 区切りで
+    /// 「語 \t E (英字) か J (かな) \t 回数 \t 最後に使った日時 (UTC、ISO 8601 の \"o\") \t 効いていれば 1、2 回目を待っていれば 0」。0 語なら空文字列。
+    /// </summary>
+    public static string FormatLearned(IEnumerable<LanguageMemory.Learned> entries) =>
+        string.Join('\n', entries.Select(e =>
+            $"{e.Word}\t{(e.English ? 'E' : 'J')}\t{e.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)}\t" +
+            $"{(e.Used.Kind == DateTimeKind.Local ? e.Used.ToUniversalTime() : DateTime.SpecifyKind(e.Used, DateTimeKind.Utc)).ToString("o", System.Globalization.CultureInfo.InvariantCulture)}\t" +
+            $"{(e.Active ? 1 : 0)}"));
+
+    /// <summary>改行で区切った語を読む (空の行は飛ばす。Tab があれば最初の欄だけ = FormatLearned の行をそのまま渡してもよい)。</summary>
+    public static List<string> ParseLearnedWords(string? text) =>
+        (text ?? "").Split('\n').Select(line => line.TrimEnd('\r').Split('\t')[0].Trim()).Where(word => word.Length > 0).ToList();
+
     // ---- 文字列の形式 ----
 
     /// <summary>「読み Tab 単語」を改行でつなぐ (ファイルの順)。</summary>

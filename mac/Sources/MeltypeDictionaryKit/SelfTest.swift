@@ -18,6 +18,7 @@ public enum SelfTest {
             if !condition { failures.append(message) }
         }
         checkLogic(check)
+        checkLearnedLogic(check)
         log("ロジック: \(checks) 件")
 
         let before = checks
@@ -25,6 +26,7 @@ public enum SelfTest {
             do {
                 let native = try NativeDictionary(libraryPath: libraryPath)
                 checkNative(native, directory: directory, check)
+                checkNativeLearned(native, directory: directory, check)
                 log("本体を通した操作: \(checks - before) 件 (保存場所 \(directory))")
             } catch {
                 failures.append("本体を読み込めない: \(error)")
@@ -231,6 +233,68 @@ public enum SelfTest {
         check(none.error == nil && none.undo == nil, "1 語も増えなければ、取り消しを積まない")
     }
 
+    /// 学習した語: 行の形式・時刻の読み方・検索と並べ替え・偽の操作での足す/直す/消す。
+    static func checkLearnedLogic(_ check: (Bool, String) -> Void) {
+        let text = "xnotoukouha\tE\t3\t2026-10-12T03:04:05.1234567Z\t1\nkyouha\tJ\t1\t2026-10-11T00:00:00.0000000Z\t0\n"
+            + "bad\tX\t1\t2026-10-11T00:00:00Z\t1\nshort\tE\t1\nnocount\tE\tn\t2026-10-11T00:00:00Z\t1\nwhen\tE\t2\t壊れた時刻\t1\nfuture\tJ\t4\t2026-10-10T00:00:00Z\t1\t余分"
+        let words = FfiFormat.parseLearnedWords(text)
+        check(words.map(\.word) == ["xnotoukouha", "kyouha", "when", "future"], "学習した語の行 (扱いが E/J でない・欄が足りない・回数が数でない行は飛ばす。欄が増えても読める) \(words.map(\.word))")
+        check(words.first.map { $0.english && $0.count == 3 && $0.active } == true && words[1].english == false && words[1].active == false, "英字/かな・回数・有効の欄")
+        check(words.count > 2 && words[2].used == .distantPast, "時刻が読めない行は残す (消せるように)")
+        let expected = Date(timeIntervalSince1970: 1_791_774_245.1234567)   // 2026-10-12T03:04:05.1234567Z
+        check(words.first.map { abs($0.used.timeIntervalSince(expected)) < 0.001 } == true, "C# の \"o\" 形式 (小数 7 桁・Z) を読める")
+        check(FfiFormat.parseIsoDate("2026-10-12T03:04:05") == FfiFormat.parseIsoDate("2026-10-12T03:04:05Z"), "時差が無ければ UTC")
+        check(FfiFormat.parseIsoDate("2026-10-12T12:04:05+09:00") == FfiFormat.parseIsoDate("2026-10-12T03:04:05Z"), "時差つきも読める")
+        check(FfiFormat.parseLearnedWords("").isEmpty, "0 語は空の文字列")
+        // 既定値 (C# の DateTime.MinValue) は「不明」
+        check(FfiFormat.parseIsoDate("0001-01-01T00:00:00.0000000") == nil && FfiFormat.parseIsoDate("0001-01-01T00:00:00.0000000Z") == nil, "0001 年は読めない扱い (不明)")
+        check(FfiFormat.parseLearnedWords("old\tE\t2\t0001-01-01T00:00:00.0000000\t1").first?.used == .distantPast, "0001 年の行は残して「不明」")
+        check(FfiFormat.parseIsoDate("2026-13-01T00:00:00Z") == nil && FfiFormat.parseIsoDate("2026-02-29T00:00:00Z") == nil
+              && FfiFormat.parseIsoDate("2026-10-12T03:04:05.Z") == nil && FfiFormat.parseIsoDate("2026-10-12T03:04:05Zx") == nil
+              && FfiFormat.parseIsoDate("2026-10-12") == nil, "形の違う時刻は読まない")
+        // 手で分けた結果が ISO8601DateFormatter と同じ (閏日・世紀の境・時差つき)
+        let reference = ISO8601DateFormatter()
+        let samples = ["1970-01-01T00:00:00Z", "2000-02-29T23:59:59Z", "2024-02-29T12:00:00Z", "2100-03-01T00:00:00Z", "1999-12-31T23:00:00-05:30", "2026-10-12T12:04:05+09:00"]
+        check(samples.allSatisfy { FfiFormat.parseIsoDate($0) == reference.date(from: $0) }, "手で分けた時刻が ISO8601DateFormatter と同じ")
+        check(FfiFormat.formatWords(["abc", "def"]) == "abc\ndef", "消す語は 1 行 1 語")
+
+        let list = LearnedWordList()
+        list.replace(words)
+        check(list.visible.map(\.word) == ["xnotoukouha", "kyouha", "future", "when"], "既定は新しく使った順")
+        list.query = "KOU"
+        list.apply()
+        check(list.visible.map(\.word) == ["xnotoukouha"], "大文字で探しても見つかる (語の途中でも)")
+        list.query = "ｋｙｏ "
+        list.apply()
+        check(list.visible.map(\.word) == ["kyouha"], "全角・前後の空白はそろえる")
+        list.query = "zzz"
+        list.apply()
+        check(list.visible.isEmpty, "見つからなければ 0 件")
+        list.query = ""
+        list.column = .word
+        list.ascending = true
+        list.apply()
+        check(list.visible.map(\.word) == ["future", "kyouha", "when", "xnotoukouha"], "語の順")
+        list.column = .count
+        list.ascending = false
+        list.apply()
+        check(list.visible.first?.word == "future", "回数の多い順")
+        list.column = .state
+        list.ascending = true
+        list.apply()
+        check(list.visible.last?.word == "kyouha", "状態の列: 有効が先、2 回目を待っている語は後")
+        list.column = .english
+        list.apply()
+        check(list.visible.map(\.english) == [true, true, false, false], "扱いの列: 英字が先")
+
+        let fake = FakeLearnedWords()
+        check(fake.setLearned("xnotoukouha", english: true, oldWord: nil) == nil && fake.words["xnotoukouha"]?.english == true, "偽の操作: 足す")
+        check(fake.checkLearned("xnotoukouha", except: nil) != nil && fake.checkLearned("xnotoukouha", except: "xnotoukouha") == nil, "偽の操作: 重複 (編集中の元の語は除く)")
+        check(fake.setLearned("xnotoukou", english: false, oldWord: "xnotoukouha") == nil && fake.words["xnotoukouha"] == nil && fake.words["xnotoukou"]?.english == false, "偽の操作: 直す (名前と扱い)")
+        check(fake.removeLearned(["xnotoukou"]) == nil && fake.words.isEmpty && fake.learnedVersion() == 3, "偽の操作: 消す・版が進む")
+        check(fake.setLearned("xnotoukouha", english: true, oldWord: "xnotoukou") != nil && fake.words.isEmpty, "偽の操作: 消された語は直せない (理由を返す)")
+    }
+
     // ---- 2. 本体を通した操作 ----
 
     static func checkNative(_ dictionary: NativeDictionary, directory: String, _ check: (Bool, String) -> Void) {
@@ -339,6 +403,69 @@ public enum SelfTest {
         check(dictionary.setSetting(key: "NoSuchKey", value: .bool(true)) != nil, "知らない項目は理由を返す")
         check(dictionary.setSetting(key: "LiveConversion", value: .int(1)) != nil, "型の違う値は理由を返す")
         check(dictionary.resetSettings() == nil && item("LiveConversion")?.value == .bool(true) && item("PredictionMinLength")?.value == .int(2), "既定値に戻せる")
+    }
+
+    /// 学習した語 (languages.json) を本体を通して。保存場所は checkNative と同じ一時フォルダー。
+    static func checkNativeLearned(_ dictionary: NativeDictionary, directory: String, _ check: (Bool, String) -> Void) {
+        let resolved = URL(fileURLWithPath: directory).resolvingSymlinksInPath().path
+        guard dictionary.dataDirectory.map({ URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }) == resolved else { return }   // 実際のデータには書かない
+        check(dictionary.learnedWords() == [], "学習した語は最初は空")
+        let version = dictionary.learnedVersion()
+        check(version >= 0, "学習した語の版を取れる")
+        check(dictionary.checkLearned("", except: nil) != nil, "空は理由を返す")
+        check(dictionary.checkLearned("a", except: nil) != nil, "1 文字は理由を返す")
+        check(dictionary.checkLearned("abc1", except: nil) != nil && dictionary.checkLearned("あいう", except: nil) != nil, "英字以外は理由を返す")
+        check(dictionary.checkLearned("XnoTouKouha", except: nil) == nil, "大文字は小文字にそろえて受ける")
+        check(dictionary.setLearned("xnotoukouha", english: true, oldWord: nil) == nil, "足す")
+        check(dictionary.learnedVersion() != version, "学習した語の版が進む")
+        let added = dictionary.learnedWords()?.first { $0.word == "xnotoukouha" }
+        check(added.map { $0.english && $0.active && $0.count >= 2 } == true, "足した語は英字・すぐ有効 (\(String(describing: added)))")
+        check(added.map { abs($0.used.timeIntervalSinceNow) < 120 } == true, "最後に使った時刻が今")
+        check(dictionary.checkLearned("xnotoukouha", except: nil) != nil, "重複は理由を返す")
+        check(dictionary.checkLearned("xnotoukouha", except: "xnotoukouha") == nil, "編集中の元の語は重複ではない")
+        check(dictionary.setLearned("kyouha", english: true, oldWord: nil) == nil && dictionary.learnedWords()?.first { $0.word == "kyouha" }?.active == true, "よく使う日本語 (kyouha) も、手で足せばすぐ有効")
+        check(dictionary.setLearned("xnotoukou", english: false, oldWord: "xnotoukouha") == nil, "直す (名前と扱い)")
+        let words = dictionary.learnedWords() ?? []
+        check(!words.contains { $0.word == "xnotoukouha" } && words.first { $0.word == "xnotoukou" }.map { !$0.english && $0.active } == true, "直した語だけが残る (かな・有効)")
+        check(dictionary.setLearned("kyouha", english: false, oldWord: "xnotoukou") != nil, "直した先がほかの語と重なると理由を返す")
+        check(FileManager.default.fileExists(atPath: resolved + "/languages.json"), "languages.json に保存される")
+        check(dictionary.removeLearned(["xnotoukou", "kyouha"]) == nil && dictionary.learnedWords() == [], "まとめて消す")
+        // 編集のシートを開いている間に、元の語がほかで (IME・別の画面で) 消されたとき
+        check(dictionary.setLearned("xnotoukouha", english: true, oldWord: "xnotoukou") != nil, "消された語を直そうとすると理由を返す")
+        check(dictionary.learnedWords() == [], "消された語を直そうとしても、新しい語は足されない")
+    }
+}
+
+/// --self-test 用の、学習した語の偽の操作 (メモリの上だけ)。
+final class FakeLearnedWords: LearnedWordOperations {
+    var words: [String: LearnedWord] = [:]
+    private var version: Int32 = 0
+
+    func learnedWords() -> [LearnedWord]? { words.values.sorted { $0.used > $1.used } }
+    func learnedVersion() -> Int32 { version }
+
+    func checkLearned(_ word: String, except: String?) -> String? {
+        let lower = word.lowercased()
+        if lower.count < 2 { return "2 文字以上にしてください" }
+        if !lower.allSatisfy({ ("a"..."z").contains($0) }) { return "英字 (a〜z) だけにしてください" }
+        if lower != except, words[lower] != nil { return "すでにあります" }
+        return nil
+    }
+
+    func setLearned(_ word: String, english: Bool, oldWord: String?) -> String? {
+        if let error = checkLearned(word, except: oldWord) { return error }
+        if let oldWord, words[oldWord] == nil { return "「\(oldWord)」は一覧にありません" }
+        let old = oldWord.flatMap { words.removeValue(forKey: $0) }
+        let lower = word.lowercased()
+        words[lower] = LearnedWord(word: lower, english: english, count: max(old?.count ?? 0, 2), used: old?.used ?? Date(), active: true)
+        version += 1
+        return nil
+    }
+
+    func removeLearned(_ words: [String]) -> String? {
+        for word in words { self.words.removeValue(forKey: word) }
+        version += 1
+        return nil
     }
 }
 

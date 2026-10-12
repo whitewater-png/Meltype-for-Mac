@@ -4,19 +4,25 @@
 import AppKit
 import MeltypeDictionaryKit
 
-/// メインのウインドウ: 「ユーザー辞書」「専門用語集」「設定」のタブ。メニューの独自の項目 (登録・取り込み・書き出し・検索・タブの切り替え) を受ける
-/// (ウインドウの delegate はアクションの responder chain に入る)。取り消す (⌘Z) はウインドウの NSUndoManager を両方のタブで使う。
+/// メインのウインドウ: 「ユーザー辞書」「専門用語集」「学習した語」「設定」のタブ。メニューの独自の項目 (登録・取り込み・書き出し・検索・タブの切り替え) を受ける
+/// (ウインドウの delegate はアクションの responder chain に入る)。取り消す (⌘Z) は、ユーザー辞書・専門用語集・設定のタブで 1 つの NSUndoManager を共有する。
+/// 「学習した語」のタブには取り消しが無いので、そのタブを選んでいる間は別の空の NSUndoManager を返す (⌘Z でほかのタブの変更を取り消さないように)。
 final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     private let dictionary: NativeDictionary
     private let tabs = NSTabViewController()
     private let userController: UserDictionaryViewController
     private let termController: TermDictionaryViewController
+    private let learnedController: LearnedWordsViewController
     private let settingsController: SettingsViewController
+    /// ウインドウの取り消し (windowWillReturnUndoManager で返す)。学習した語のタブは learnedUndoManager。
+    private let sharedUndoManager = UndoManager()
+    private let learnedUndoManager = UndoManager()
 
     init(dictionary: NativeDictionary) {
         self.dictionary = dictionary
         userController = UserDictionaryViewController(dictionary: dictionary)
         termController = TermDictionaryViewController(dictionary: dictionary)
+        learnedController = LearnedWordsViewController(operations: dictionary)
         settingsController = SettingsViewController(dictionary: dictionary)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 620),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -37,6 +43,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         termTab.label = "専門用語集(サンプル)"
         tabs.addTabViewItem(userTab)
         tabs.addTabViewItem(termTab)
+        let learnedTab = NSTabViewItem(viewController: learnedController)
+        learnedTab.label = "学習した語"
+        tabs.addTabViewItem(learnedTab)
         let settingsTab = NSTabViewItem(viewController: settingsController)
         settingsTab.label = "設定"
         tabs.addTabViewItem(settingsTab)
@@ -46,6 +55,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         // 隠れているタブの view は window が nil になるので、シート・取り消しのためにウインドウを渡しておく
         userController.hostWindow = window
         termController.hostWindow = window
+        learnedController.hostWindow = window
         settingsController.hostWindow = window
         // 片方のタブの変更 (専門用語の「直す」でユーザー辞書が変わるなど) を、もう片方にもすぐ反映する
         userController.didChange = { [weak self] in self?.termController.pollChanges() }
@@ -54,20 +64,31 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    /// NSWindow の undo:/redo: と、ほかのタブの registerUndo (window.undoManager) はここで決まる。
+    /// 取り消しを積む操作はどれも、そのタブを選んでいるときのユーザーの操作なので、学習した語のタブを選んでいる間に共有の方へ積まれることはない
+    /// (取り消しの中で積むやり直しは、引数で渡した同じ undoManager に積む)。
+    func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
+        tabs.selectedTabViewItemIndex == Tab.learned.rawValue ? learnedUndoManager : sharedUndoManager
+    }
+
     /// ほかのプロセス (IME) の変更を拾う。
     func pollChanges() {
         guard window?.isVisible == true else { return }
         userController.pollChanges()
         termController.pollChanges()
+        learnedController.pollChanges()
         settingsController.pollChanges()
     }
 
     // ---- メニュー ----
 
+    /// タブの位置 (表示メニューの ⌘1〜⌘4 と同じ順)。
+    private enum Tab: Int { case user = 0, term, learned, settings }
+
     /// 設定のタブには検索が無い。
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(focusSearch(_:)): return tabs.selectedTabViewItemIndex != 2
+        case #selector(focusSearch(_:)): return tabs.selectedTabViewItemIndex != Tab.settings.rawValue
         case #selector(moveToTermDomain(_:)): return tabs.selectedTabViewItemIndex == 0 && userController.hasSelection
         case #selector(exportTermDomain(_:)): return tabs.selectedTabViewItemIndex == 1 && termController.hasUserDomainSelected
         default: return true
@@ -93,6 +114,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         switch tabs.selectedTabViewItemIndex {
         case 0: userController.focusSearch()
         case 1: termController.focusSearch()
+        case Tab.learned.rawValue: learnedController.focusSearch()
         default: break   // 設定のタブに検索は無い
         }
     }
@@ -122,7 +144,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     @objc func showTermDictionary(_ sender: Any?) { tabs.selectedTabViewItemIndex = 1 }
 
-    @objc func showSettings(_ sender: Any?) { tabs.selectedTabViewItemIndex = 2 }
+    @objc func showLearnedWords(_ sender: Any?) { tabs.selectedTabViewItemIndex = Tab.learned.rawValue }
+
+    @objc func showSettings(_ sender: Any?) { tabs.selectedTabViewItemIndex = Tab.settings.rawValue }
 
     @objc func openDataFolder(_ sender: Any?) {
         guard let directory = dictionary.dataDirectory else { return }

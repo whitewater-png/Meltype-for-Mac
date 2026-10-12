@@ -21,6 +21,8 @@
 #      別のプロセスで読み直しても保たれ、IME のつもりのプロセスが動いたまま、別のプロセスが作った専門用語集の語が変換に出る
 #   6. IME のつもりのプロセス (meltype_create のセッション) が動いたまま、別のプロセス (管理画面のつもり) の登録・除外・分野の切り替えが
 #      すぐ反映される (変換の結果に出る・版が進む)。IME の側の登録 (meltype_add_user_word) も、管理画面の登録を消さない
+#   7. 学習した語の関数 (meltype_learned_*): 追加・入力チェック・編集・削除・一覧の形式。IME のつもりのプロセスが動いたまま、
+#      別のプロセスで消した語は IME の判定でも効かなくなり、IME の次の保存で書き戻されない
 # 終了コード: 0 = 通った、1 = 失敗。
 import ctypes
 import json
@@ -82,6 +84,11 @@ def load(lib_path):
         "meltype_create": ([], p),
         "meltype_handle_key": ([p, i, i, i, s, s], p),
         "meltype_add_user_word": ([p, s, s], p),
+        "meltype_learned_words": ([], p),
+        "meltype_learned_version": ([], i),
+        "meltype_learned_check": ([s, s], p),
+        "meltype_learned_set": ([s, i, s], p),
+        "meltype_learned_remove": ([s], p),
     }
     for name, (args, result) in signatures.items():
         function = getattr(lib, name)
@@ -521,6 +528,79 @@ def child_broken(lib):
     return out
 
 
+def learned_words(lib):
+    """学習した語の一覧 (行ごとに 5 つの欄)。取れなければ None。"""
+    raw = text(lib, lib.meltype_learned_words())
+    if raw is None:
+        return None
+    return [line.split("\t") for line in raw.split("\n") if line]
+
+
+def child_learned_ops(lib):
+    """「学習した語」タブがする操作を一通り行う。"""
+    out = {}
+    out["data_directory"], out["safe"] = data_directory(lib)
+    if not out["safe"]:
+        return out
+    out["abi"] = lib.meltype_abi_version()
+    out["empty"] = learned_words(lib)
+    v0 = lib.meltype_learned_version()
+    out["add_api"] = text(lib, lib.meltype_learned_set(u("API"), 1, None))
+    out["add_sushi"] = text(lib, lib.meltype_learned_set(u("sushi"), 0, None))
+    out["add_kyouha"] = text(lib, lib.meltype_learned_set(u("kyouha"), 1, None))
+    out["version_moved"] = lib.meltype_learned_version() != v0
+    out["dup"] = text(lib, lib.meltype_learned_set(u("api"), 1, None))
+    out["check_ok"] = text(lib, lib.meltype_learned_check(u("github"), None))
+    out["check_dup"] = text(lib, lib.meltype_learned_check(u("api"), None))
+    out["check_except"] = text(lib, lib.meltype_learned_check(u("api"), u("api")))
+    out["check_short"] = text(lib, lib.meltype_learned_check(u("a"), None))
+    out["check_kana"] = text(lib, lib.meltype_learned_check(u("すし"), None))
+    out["words"] = learned_words(lib)
+    out["edit"] = text(lib, lib.meltype_learned_set(u("apii"), 0, u("api")))
+    out["edit_missing"] = text(lib, lib.meltype_learned_set(u("abc"), 1, u("nosuchword")))
+    out["remove"] = text(lib, lib.meltype_learned_remove(u("sushi\nnosuchword\n")))
+    out["after"] = learned_words(lib)
+    return out
+
+
+def child_learned_read(lib):
+    out = {}
+    _, safe = data_directory(lib)
+    if safe:
+        out["words"] = learned_words(lib)
+    return out
+
+
+def child_learned_watch(lib):
+    """IME のつもり: kyouha を英語と覚えた状態で打つ。親の合図のあと、もう一度打って、別のプロセスで消した学習が効かなくなったかを返す。"""
+    out = {}
+    out["data_directory"], out["safe"] = data_directory(lib)
+    if not out["safe"]:
+        print(json.dumps(out), flush=True)
+        return None
+    session = lib.meltype_create()
+    out["session"] = bool(session)
+    out["learn"] = text(lib, lib.meltype_learned_set(u("kyouha"), 1, None))  # 間違えて英語と覚えた語のつもり
+    out["before"] = type_keys(lib, session, "kyouha")
+    type_keys(lib, session, "\x1b\x1b\x1b")
+    print(json.dumps({"ready": True}), flush=True)
+    sys.stdin.readline()            # 親が、別のプロセスで消し終えるまで待つ
+    time.sleep(1.3)                 # 判定がファイルを確かめる間隔 (1 秒) より長く待つ
+    out["after"] = type_keys(lib, session, "kyouha")
+    type_keys(lib, session, "\x1b\x1b\x1b")
+    # IME の側の保存 (別の語を覚える) で、消した語を書き戻さない
+    out["learn_other"] = text(lib, lib.meltype_learned_set(u("kubernetes"), 1, None))
+    return out
+
+
+def child_learned_remove(lib):
+    out = {}
+    _, safe = data_directory(lib)
+    if safe:
+        out["remove"] = text(lib, lib.meltype_learned_remove(u("kyouha")))
+    return out
+
+
 def child(lib_path, step, args):
     lib = load(lib_path)
     if step in ("write", "read"):
@@ -561,6 +641,16 @@ def child(lib_path, step, args):
         out = child_register(lib)
     elif step == "dict-broken":
         out = child_broken(lib)
+    elif step == "learned-ops":
+        out = child_learned_ops(lib)
+    elif step == "learned-read":
+        out = child_learned_read(lib)
+    elif step == "learned-remove":
+        out = child_learned_remove(lib)
+    elif step == "learned-watch":
+        out = child_learned_watch(lib)
+        if out is None:
+            return
     else:
         raise SystemExit(f"unknown step {step}")
     print(json.dumps(out, ensure_ascii=False), flush=True)
@@ -628,7 +718,7 @@ def check_settings_tab(lib_path, failures):
         if not ops["safe"]:
             failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
             return
-        expect(ops["abi"] == 8, f"FFI の版数が 8 でない: {ops['abi']}")
+        expect(ops["abi"] == 9, f"FFI の版数が 9 でない: {ops['abi']}")
         expect(len(ops["keys"]) >= 15 and ops["keys"][0] == "LiveConversion" and "DetectionLevel" in ops["keys"], f"設定の一覧が違う: {ops['keys']}")
         expect(not {"Mode", "AutoUpdate", "AppRules", "Profiles"} & set(ops["keys"]), "Mac で効かない設定が一覧にある")
         # 入力方式 (かな入力 JIS) は Mac でも効く設定として一覧に出る。「両方を判定」(Both) は Windows の IME 自動切替用なので選択肢に出さない
@@ -715,7 +805,7 @@ def check_user_terms(lib_path, failures):
             failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
             return
         data = ops["data_directory"]
-        expect(ops["abi"] == 8, f"FFI の版数が 8 でない: {ops['abi']}")
+        expect(ops["abi"] == 9, f"FFI の版数が 9 でない: {ops['abi']}")
         expect(len(ops["user_before"]) == 4, f"前提: ユーザー辞書に 4 語: {ops['user_before']}")
         expect(ops["create_bad"], "空の名前を断らない")
         expect(ops["create"] is None and ops["id"] and ops["id"].startswith("user-") and len(ops["id"]) == 13, f"自作の専門用語集を作れない: {ops['create']} / {ops['id']}")
@@ -880,6 +970,62 @@ def check_dictionary(lib_path, failures):
         expect(["きごうとう", "記号等"] in live["words"] and ["いめのとうろく", "IMEの登録"] in live["words"], f"IME と管理画面の登録の片方が消えた: {live['words']}")
 
 
+def check_learned(lib_path, failures):
+    def expect(condition, message):
+        if not condition:
+            failures.append(message)
+
+    with tempfile.TemporaryDirectory(prefix="meltype-aot-learned-") as home:
+        ops = run(lib_path, home, "learned-ops")
+        if not ops["safe"]:
+            failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
+            return
+        data = ops["data_directory"]
+        expect(ops["empty"] == [], f"最初の学習した語が空でない: {ops['empty']}")
+        expect(ops["add_api"] is None and ops["add_sushi"] is None and ops["add_kyouha"] is None, f"足せない: {ops['add_api']} / {ops['add_sushi']} / {ops['add_kyouha']}")
+        expect(ops["version_moved"], "足しても学習した語の版が進まない")
+        expect(ops["dup"] is not None and ops["check_dup"] is not None, "重複の理由が返らない")
+        expect(ops["check_ok"] is None and ops["check_except"] is None, f"よい語・編集中の元の語を断る: {ops['check_ok']} / {ops['check_except']}")
+        expect(ops["check_short"] is not None and ops["check_kana"] is not None, "短い語・英字以外を断らない")
+        words = {row[0]: row for row in ops["words"] or []}
+        expect(set(words) == {"api", "sushi", "kyouha"}, f"一覧の語が違う: {ops['words']}")
+        expect(all(len(row) == 5 for row in ops["words"] or []), f"一覧の欄が 5 つでない: {ops['words']}")
+        expect(words.get("api", [None])[1:3] == ["E", "2"] and words.get("sushi", [None])[1] == "J", f"英字 / かな・回数が違う: {ops['words']}")
+        expect(words.get("kyouha", [""] * 5)[4] == "1", f"手で足した kyouha が有効でない (2 回目を待っている): {words.get('kyouha')}")
+        expect(all(row[3].endswith("Z") or row[3].endswith("+00:00") for row in ops["words"] or []), f"日時が UTC でない: {ops['words']}")
+        expect(ops["edit"] is None and ops["edit_missing"] is not None, f"編集が違う: {ops['edit']} / {ops['edit_missing']}")
+        expect(ops["remove"] is None, f"消せない: {ops['remove']}")
+        after = {row[0]: row[1] for row in ops["after"] or []}
+        expect(after == {"apii": "J", "kyouha": "E"}, f"編集・削除の後の一覧が違う: {ops['after']}")
+        path = os.path.join(data, "languages.json")
+        expect(os.path.exists(path) and mode(path) == 0o600, "languages.json が 0600 でない")
+        again = run(lib_path, home, "learned-read")
+        expect({row[0] for row in again.get("words") or []} == {"apii", "kyouha"}, f"別のプロセスで読み直すと、学習した語が違う: {again}")
+
+    # IME のつもりのプロセスが動いたまま、別のプロセス (画面) で学習した語を消す
+    with tempfile.TemporaryDirectory(prefix="meltype-aot-learned-live-") as home:
+        watcher = subprocess.Popen(command(lib_path, "learned-watch"), env=env_for(home), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        ready = json.loads(watcher.stdout.readline())
+        if not ready.get("ready"):
+            failures.append(f"IME のつもりのプロセスが始まらない (学習した語): {ready}")
+            watcher.kill()
+            return
+        removed = run(lib_path, home, "learned-remove")
+        expect(removed.get("remove") is None, f"画面のつもりのプロセスで消せない: {removed}")
+        stdout, stderr = watcher.communicate("go\n", timeout=120)
+        if watcher.returncode != 0:
+            failures.append(f"IME のつもりのプロセスが異常終了 (学習した語): {stderr.strip()[-500:]}")
+            return
+        live = json.loads(stdout.strip().splitlines()[-1])
+        expect(live["session"] and live["learn"] is None, f"セッション・学習の準備ができない: {live}")
+        expect(live["before"] == "kyouha", f"前提: 英語と覚えた kyouha が英字のまま: {live['before']}")
+        expect(live["after"] not in (None, "kyouha"), f"別のプロセスで消した学習が、動いている IME で効いたまま: {live['after']}")
+        final = run(lib_path, home, "learned-read")
+        names = {row[0] for row in final.get("words") or []}
+        expect("kyouha" not in names, f"IME の次の保存で、消した語が書き戻された: {final}")
+        expect("kubernetes" in names, f"IME の保存が残っていない: {final}")
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--child":
         child(sys.argv[3], sys.argv[2], sys.argv[4:])
@@ -895,6 +1041,7 @@ def main():
     check_user_terms(lib_path, failures)
     settings_failures = len(failures)
     check_dictionary(lib_path, failures)
+    check_learned(lib_path, failures)
     for message in failures:
         print("FAIL:", message)
     if not failures:
@@ -902,6 +1049,7 @@ def main():
         print("PASS: AOT 版で設定タブの操作・不正な値の拒否・別プロセスへの反映ができた")
         print("PASS: AOT 版で自作の専門用語集の作成・移動・取り消し・書き出し・取り込み・別プロセスへの反映ができた")
         print("PASS: AOT 版で辞書の管理画面の操作・別プロセスへの反映・同時の登録ができた")
+        print("PASS: AOT 版で学習した語の追加・編集・削除・別プロセスへの反映 (動いている IME の判定・保存) ができた")
     else:
         print(f"FAIL (設定 {settings_failures} 件・辞書 {len(failures) - settings_failures} 件)")
     return 1 if failures else 0

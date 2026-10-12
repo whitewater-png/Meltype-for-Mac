@@ -28,13 +28,16 @@ internal static class FileLock
     /// ロックを取る。取れたら、閉じると外れる FileStream を返す。待っても取れなければ <see cref="FileLockTimeoutException"/>。
     /// 権限が無いなど、待っても変わらない失敗はそのまま例外にする。
     /// </summary>
-    public static FileStream Acquire(string target)
+    public static FileStream Acquire(string target) => Acquire(target, TimeoutMs);
+
+    /// <summary><see cref="Acquire(string)"/> と同じだが、待つ時間の上限を指定する (入力中の処理など、長く待てないとき)。</summary>
+    public static FileStream Acquire(string target, int timeoutMs)
     {
         var path = LockPath(target);
         SafeFile.EnsureDirectory(Path.GetDirectoryName(path)!);
         var options = new FileStreamOptions { Mode = FileMode.OpenOrCreate, Access = FileAccess.ReadWrite, Share = FileShare.None };
         if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        var deadline = Environment.TickCount64 + Math.Max(0, TimeoutMs);
+        var deadline = Environment.TickCount64 + Math.Max(0, timeoutMs);
         while (true)
         {
             try
