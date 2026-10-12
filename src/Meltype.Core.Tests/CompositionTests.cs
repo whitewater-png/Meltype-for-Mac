@@ -894,6 +894,50 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Main_AfterJapaneseLine_AndLearnedMain()
+    {
+        // Q11 の実機確認: 前の行が日本語のとき、行の先頭の mainnima-ji が まいんに (→ mine に) になっていた。
+        // main を英字で覚えている (F10 など) と、maindo が mainど になっていた (覚えた英字がマインドの守りより先に効く)。
+        foreach (var learned in new[] { false, true })
+        {
+            var memory = new LanguageMemory(null);
+            if (learned) memory.Remember("main", english: true, explicitChoice: true);
+            Detector.Memory = memory;
+            try
+            {
+                foreach (var (typed, expected) in new[]
+                {
+                    ("mainnima-jisitehosii", "mainにまーじしてほしい"), ("maindo", "まいんど"), ("mainkurafuto", "まいんくらふと"),
+                })
+                {
+                    foreach (var before in new[] { "", "kyouhaXnitoukousita\n" })
+                    {
+                        var k = new Keyboard(languages: memory);
+                        k.Type(before + typed + "\n");
+                        Assert.Equal(before.Length > 0 ? "きょうはXにとうこうした" + expected : expected, k.Host.Document, $"learned={learned} before={before.Length > 0} {typed}");
+                    }
+                }
+                // 同じ入力の中の日本語の後ろ: 覚えていなければ今までどおりかな (うまいんです を守る)。覚えていれば、記号の後ろと同じく覚えた英字
+                foreach (var (typed, plain, withLearned) in new[]
+                {
+                    ("kyouhamainnimerge", "きょうはまいんにmerge", "きょうはmainにmerge"),
+                    ("umaindesu", "うまいんです", "うmainです"),
+                    ("`main`ni", "｀まいん｀に", "`main`に"),
+                })
+                {
+                    var k = new Keyboard(languages: memory);
+                    k.Type(typed + "\n");
+                    Assert.Equal(learned ? withLearned : plain, k.Host.Document, $"learned={learned} {typed}");
+                }
+            }
+            finally
+            {
+                Detector.Memory = null;
+            }
+        }
+    }
+
+    [Test]
     public static void CommaAfterDigit_IsTouten_UnlessDigitFollows()
     {
         // x64,arm64 の , は読点 (x64、arm64)。1,000 の , は桁区切りのまま。

@@ -91,7 +91,8 @@ public sealed class CompositionDetector
     /// <summary>
     /// english-readable.txt の語のうち、日本語のすぐ後ろでは英語にしない語。読みの頭 (まい) が、日本語の語の終わり (うまい・あまい・せまい) と
     /// つながってしまう (umaindesu = うまいんです、kumainda = くまいんだ)。英語にするのは、入力の先頭 (mainni)・英語の後ろ (gitmainni・origin/main) だけ。
-    /// 日本語や、かな側の記号 (`main`・(main)・。) の後ろでは今までどおりかな。
+    /// 同じ入力の中の日本語や、かな側の記号 (`main`・(main)・。) の後ろでは今までどおりかな。入力の先頭は、前に確定した文 (前の行) が日本語でも英語にする
+    /// (前の行が日本語の TextEdit で mainnima-ji が まいんに → mine に になっていた。Q11 の実機確認)。
     /// </summary>
     private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain" };
 
@@ -663,7 +664,10 @@ public sealed class CompositionDetector
         if (level == DetectionLevel.Manual) return false;
         // ユーザーが英字 / かなに直して覚えた語。ただし短くてローマ字として読める語 (go、no) は、日本語のすぐ後ろ
         // (nihon|go) では使わない (一度 go を英字で確定しただけで、日本語 が にほんgo になっていた)。
-        if (Memory?.Get(lower) is { } learned && !(learned && before < 0 && lower.Length <= 3 && _romaji.AnalyzeFragment(lower) is { IsValid: true, Partial: "" })) return learned;
+        // english-readable.txt の語 (main) を英字で覚えていても、続く 1 音とでよく使う語・ブランド名の頭になる (main + do = マインド) ときは、覚えた英字を使わない (Q11 の実機確認)。
+        // 日本語の後ろでは覚えた英字を今までどおり使う (記号の後ろの `main`・(main) は、覚えた英字でしか英字にならないため。査読 R33 の 3 回目)。
+        if (Memory?.Get(lower) is { } learned && !(learned && before < 0 && lower.Length <= 3 && _romaji.AnalyzeFragment(lower) is { IsValid: true, Partial: "" }) &&
+            !(learned && ReadableEnglish.Value.ContainsWord(lower) && ContinuesJapaneseWord(lower, next))) return learned;
         // 5 文字以上の英単語で、ローマ字としても読めるもの:
         // - c 行の綴り (camera、coffee、class) は英語。日本語を打つときは k を使う (カメラ は kamera)。
         // - ローマ字として読むと ぢ・づ になる綴り (radio = らぢお、studio、audio) で、ふつうの日本語の語にならないなら英語。
@@ -682,7 +686,7 @@ public sealed class CompositionDetector
         // ただし、続く 1 音と合わせて日本語の語の頭になるなら日本語 (main + do = マインド・マインドセット。main + de = main で は英語。Q11)。
         // main・domain は、日本語のすぐ後ろでは使わない (う + まいんです = うまいんです、あまいんだよ、せまいんじゃない。査読 R33)。
         if (lower.Length >= 4 && ReadableEnglish.Value.ContainsWord(lower) && !ContinuesJapaneseWord(lower, next) &&
-            !(before < 0 && NotAfterJapanese.Contains(lower))) return true;
+            !(!startOfInput && before < 0 && NotAfterJapanese.Contains(lower))) return true;
         // c 行の綴りで読める語 (care = かれ、can = かん) が日本語の途中にあるなら、日本語を打っている (fucarete → ふかれて、shoucanshi → しょうかんし)。
         // 入力全体がその語だけのときは英語。
         if (!(startOfInput && atEnd))
