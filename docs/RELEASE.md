@@ -4,6 +4,13 @@
 > このリポジトリには `.github/workflows` が無く、CI は動いていません。Mac 版は作者の Mac で `mac/build.sh` → `make-zip.sh` / `make-pkg.sh` を実行し、
 > ad-hoc 署名 (公証なし) の zip と pkg を `gh release create` で添付しています。Developer ID 署名・公証・CI は運用コストのため行っていません (限界は `SECURITY.md` を参照)。
 
+## Mac 版: 公開前の検査 (読み取り専用・Mac 専用)
+
+`mac/build.sh --no-install` → `make-zip.sh` → `make-pkg.sh` のあと、`gh release create` の前に `python3 tools/check-release.py mac/dist/Meltype-mac-<版>.zip mac/dist/Meltype-mac-<版>.pkg --expect-version <版>` を実行する (署名・ビルド時の絶対パス・arch・版の一致・zip と pkg の中身。何も書き換えず、ネットワークも使わない)。FAIL が 1 つでもあれば公開しない。
+公開したあとは、`gh release view v<版>-mac --json assets` の digest を `--zip-digest`・`--pkg-digest` に渡して、配った zip と pkg が手元と同じか確かめる。通っても実機での確認の代わりにはならない。項目は `docs/PKG_REVIEW_2026-10.md` の §7、`--help` で選択肢が見られる。
+リポジトリ側の検査 (postinstall・pkg の Resources・Distribution・版・案内文) は、作業ツリーではなく `--ref` (既定は HEAD) の**コミットの内容**と比べる。**コミットしてから実行する** (未コミットの変更は見ない)。公開済みの版と比べるときは `--ref v<版>-mac`。`--ref` に存在しない名前を渡すと、検査を始めずに終了コード 2 で止まる。
+pkg は、Scripts が postinstall の 1 つだけであること (root で走る)、Resources が `mac/pkg/resources` とバイト一致であること、Payload の生のモード (setuid など) も見る。Payload を読む `bsdtar` などが無い環境では、その 1 項目だけ SKIP になる。
+
 ## 版を出す (テスト版・公開版共通)
 
 1. 版を上げる: `src/Meltype/Meltype.csproj`・`src/Meltype.Core/Meltype.Core.csproj` の `<Version>`、

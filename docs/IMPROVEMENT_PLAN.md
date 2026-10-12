@@ -2017,3 +2017,74 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
   6. **マウス**: 候補をクリックで選んだとき注釈が前の候補のまま残らないか (`candidateSelectionChanged` は番号だけ覚える)。
   7. **退行の確認**: `kyou` Space → 「今日」を Enter、意味が 1.5 秒後に出る語、↓ ↑ の往復、Esc、予測変換 (Tab) の候補ウィンドウに注釈が出ないこと。コード向けアプリ (Terminal・VS Code) では「あ (コード) ・ 英訳」。
   8. **失敗の型**: 注釈が空になる・「あ」が消えて戻らない・注釈が前の候補のまま残る・候補ウィンドウがちらつく/動く・Enter で確定される文字が変わる・入力が止まる。出たらすぐ取り下げる。
+
+## 追加項目 P38 (配布前の自動チェックのスクリプト: 本家 #78 (配布前の Defender 検査)・#87 の考え方の Mac 版)
+
+- **経緯**: pkg の査読 (`docs/PKG_REVIEW_2026-10.md`) で、配布物の問題 (ビルド時の絶対パス 1,020 件・タグ時点の postinstall と HEAD の差など) を、公開のあとに手作業で見つけた。§7 に検査項目の案 10 個を残してあった。本家は配布前にウイルス対策ソフトで検査して誤検知を先に見つける (#78)。Mac 版では「公開する前に、署名・ビルド時のパス・arch・版の一致・pkg の中身を機械で見る」に置き換えた。
+- **実装**: `tools/check-release.py` (新規、Python 3.9 互換。既存の `tools/check-mac-aot-settings.py` と同じ書き方で、Core・Swift・`mac/build.sh` は変えていない)。`docs/RELEASE.md` に使い方を 5 行足した。
+  - 既定で `mac/build/Meltype.app` を検査。引数に `.zip`・`.pkg`・`.app` を渡すとそれも検査。`--no-app` (既定の app を外す)、`--zip-digest`・`--pkg-digest`・`--digest` (公開済みの Release の digest。**スクリプト自身はネットワークを使わない**)、`--ref` (リポジトリ側の基準。既定 HEAD。公開済みの版は `v<版>-mac`)、`--expect-version`、`--signed` (Developer ID の配布物を想定)、`--compare-installed` (参考表示)、`--help`。
+  - **完全に読み取り専用**: zip と pkg は `$TMPDIR` の下の `mktemp` した一時フォルダーへ展開し、終わると (SIGINT・SIGTERM の中断でも) 消す。インストール・postinstall の実行・配布物の実行をしない。`installer` は `-dominfo` だけ (`-target` は渡さない)。`xattr -l`・`mdls` は使わない。リポジトリ側は `git show <ref>:<path>` で読むだけ。
+  - 出力は項目ごとの `[PASS]` `[FAIL]` `[SKIP]` `[INFO]` と件数だけ。絶対パス・署名つき URL は出さない (`codesign -dv` の `Executable=` 行は捨て、RPATH も分類の件数だけ。1 行ずつマスクもかける)。FAIL が 1 つでもあれば終了コード 1、使い方の誤りは 2。**SKIP と INFO は失敗にしない**。
+- **§7 の 10 項目の取捨**:
+
+  | § | 項目 | 扱い | 理由・やり方 |
+  | --- | --- | --- | --- |
+  | 1 | digest の突き合わせ | 実装 (任意) | `--zip-digest`・`--pkg-digest` で比べる。渡さなければ SKIP。SHA-256 は INFO で出す。`mac/dist` の同名ファイルとの比較は見送り (検査する対象そのものと比べても何も分からない)。`gh` を呼ぶとネットワークを使うので、digest はユーザーが渡す |
+  | 2 | 署名の状態 | 実装 | `pkgutil --check-signature` (署名なしが期待値。`--signed` で逆)、`installer -dominfo` (ホームフォルダー限定)。`spctl` は INFO (拒否が普通)。`installer -pkginfo` は見送り (タイトルを出すだけで判定に使えない) |
+  | 3 | 展開 | 実装 | 存在しない一時パスへ `pkgutil --expand-full` が rc 0 |
+  | 4 | 構造 | 実装 | Distribution (hostArchitectures・os-version min が Info.plist の `LSMinimumSystemVersion` と同じ・domains)、PackageInfo (install-location・relocatable・auth・identifier・upgrade-bundle・strict-identifier・postinstall の timeout)。期待値はスクリプト冒頭の定数 |
+  | 5 | 出所の整合 | 実装 | postinstall を `--ref` のものとバイト比較。Distribution は XML として比べ、productbuild の書き換え (`installKBytes`・`updateKBytes`・`#`・`bundle-version` の塊) を戻してから比べる (`VERSION` の置換は make-pkg.sh の sed と同じ、1 行に 1 回) |
+  | 6 | ペイロード | 実装 | symlink (外へ出ないか)・setuid/setgid/sticky/他者書き込み・`.DS_Store`・`._*`、Mach-O の arm64・minos (platform 1 の行だけ)・RPATH (OS 標準と `@` 始まり以外の絶対パスが無い)・依存 (`otool -L`。dylib 自身の install name は除く)・`libMeltypeNative.dylib` の存在・ビルド時の `/Users/<名前>/` が 0 件 (数え方は `grep -a -o -E` と同じ正規表現)。pkg の `._*` は `pkgutil --payload-files` で数えて INFO (1.1.5 は 3,470 件で、無害と見ている)。xattr の名前は見ない (署名つき URL を避ける)。RPATH・依存の「想定どおり」は個別の値の一致ではなく分類にした (値を固定すると、依存の追加のたびに壊れるため) |
+  | 7 | 署名 | 実装 | `codesign --verify --deep --strict`、app・管理画面・Frameworks の各部品が ad-hoc で TeamIdentifier なし、エンタイトルメントなし |
+  | 8 | 版の一致 | 実装 | app と管理画面の Info.plist、リポジトリの Info.plist・Core の csproj・Converter.swift の versionString・`1-bug.yml` の例、zip・pkg のファイル名、Distribution・PackageInfo の版、`CFBundleVersion`、`--expect-version`。Windows 側の `src/Meltype/Meltype.csproj` は対象外 |
+  | 9 | 案内文の整合 | 実装 | `git grep` で「右クリック → 開く」の行を探し、前後 3 行に「このまま開く」があるか (HEAD で 8 行すべて)。これはリポジトリ側の検査で、`--ref` を古いタグにすると正当に FAIL する (併記はタグより後) |
+  | 10 | 導入済みとの比較 | 実装 (参考) | `--compare-installed` で版と実行ファイルの SHA-256 を INFO に出すだけ。開発用の Mac では同じ版番号で中身が違うのが普通で、リリースの可否に関係しないため、失敗にしない |
+
+  追加した項目 (§7 に無い): zip の中身 (最上位が `Meltype-mac/` だけ・直下の構成が `make-zip.sh` と同じ・`__MACOSX`/`._*`/`.DS_Store` が 0・名前に `..` や絶対パスが無い・シェルスクリプトの実行権限・`bash -n`・INSTALL.txt に「このまま開く」)、postinstall の `bash -n` と、通信・難読化・再帰削除のコマンドが無いこと (コメント行を除く目安)、zip・pkg・app を同時に渡したときの Mach-O の同一性。
+- **実測** (macOS 26.6.2、作業コピーは HEAD `4011e23` と同じ内容。スクリプトの実行時間は app だけで 1.5 秒、zip と pkg で 15.6 秒):
+  - **(a) 手元の `mac/build/Meltype.app`** (更新時刻 16:52。`strip -S` 済み): **PASS 22 / FAIL 0 / INFO 1**。ビルド時のパスは `Meltype`・`MeltypeDictionary`・2 本の dylib とも 0 件。codesign 通過、4 部品とも ad-hoc・TeamIdentifier なし・エンタイトルメントなし、arm64、minos 最大 13.0、RPATH は `@` 始まり 4 本・OS 標準 2 本・その他 0、版は 5 か所とも 1.1.5・ビルド番号 21、案内文 8 行すべて併記あり。mac/build に置いた複製への引数なし実行も同じ結果。
+  - **(b) `mac/dist` の 1.1.5 の zip と pkg** (読み取り専用で渡した):
+    - `--ref v1.1.5-mac`: PASS 68 / FAIL 3 / INFO 9。FAIL は、zip と pkg の中の `Meltype`・`MeltypeDictionary` に**ビルド時のパス 1,020 件** (987 + 33。PKG_REVIEW §2 の数と一致) の 2 か所と、案内文 (タグ時点では併記が無い: 8 行中 6 行) の 1 か所。digest・署名なし・構造・postinstall と Distribution のタグとの一致・版 (13 か所とも 1.1.5、ビルド番号は 5 か所とも 21)・zip と pkg の Mach-O 4 本が同一、は PASS。
+    - `--ref HEAD`: 上に加えて、**postinstall が HEAD と違う** (S1 の署名検査がタグに入っていない、PKG_REVIEW §2 のとおり) が FAIL。わざと違う digest を渡すと digest の項目も FAIL。
+  - **(c) 変異 20 件** (複製だけを壊す。`mutate.py`。無傷の複製は FAIL 0): すべて、対応する項目が FAIL になった。app: ①署名を壊す (封印された資源を 1 バイト変更) ②実行ファイルの中の文字列をビルド時のパスに見える文字列で上書き ③Info.plist の版 ④Mach-O ヘッダーの cputype を x86_64 に ⑤RPATH にビルド機のパスを足す ⑥minos を 15.0 に ⑦署名を外す ⑧エンタイトルメント付きで署名し直す ⑨`.DS_Store`・bundle の外を指す symlink・他者書き込み権限 ⑩`libMeltypeNative.dylib` を消す ⑪同梱されていない `@rpath` の依存 ⑫`CFBundleVersion` だけ変更。zip: ⑬実行権限を外す ⑭余分なファイルと欠けたスクリプト ⑮構文エラー。pkg (`pkgutil --expand` → 編集 → `--flatten` を scratch で): ⑯hostArchitectures ⑰domains ⑱postinstall に `curl` ⑲install-location ⑳PackageInfo の版。1 つの壊れ方が複数の項目に出るもの (署名を外すと verify も FAIL、など) は、関連する項目の FAIL として記録した。⑫は自分で選んだ文字列が実行ファイルの依存名に当たり、依存の項目も FAIL になった (正当な連鎖)。
+  - **読み取り専用の確認**: 検査の前後で `mac/build/Meltype.app` (3,469 ファイル) と `mac/dist` (3,510 項目) の全ファイルの内容・大きさ・更新時刻・権限のハッシュが変わらない (`snap.py`)。`$TMPDIR` に `check-release-*` が残らない (SIGTERM で中断した場合も、子プロセスを止めてから消すように直して 0 件を確認)。全ログに `/Users`・`/private`・`/var/folders` の文字列が 0 件。引数の誤り 4 通りは終了コード 2、存在しない pkg は FAIL、存在しない `--ref` は SKIP。
+  - 検査の途中で直した不具合 2 件: dylib 自身の install name (`@rpath/MeltypeNative.dylib`。NativeAOT の出力名のまま) を「同梱されていない依存」と誤って FAIL にしていた、pkg のペイロードの `./._Meltype.app` (AppleDouble) を「Meltype.app の外の項目」と誤って FAIL にしていた。
+- **得と損**:
+  - 得: 公開のあとに査読で見つけていた種類の問題 (ビルド時のパス・postinstall の差・版の食い違い・arch・署名の状態) を、公開の前に 1 コマンドで見つけられる。手元の 1.1.5 の実物で、既知の問題 (1,020 件・S1 が入っていない) を同じ数字で出し、壊した複製 20 件を検出した。読み取り専用で、何も入れない。
+  - 損: (1) 期待値 (`auth=root`・timeout 600・zip の構成・署名方針など) をスクリプトの定数に持つので、方針を変えたときにスクリプトも直さないと偽の FAIL が出る (`--signed` は署名方針の切り替え用)。(2) PASS は「配れる」の保証ではない: ad-hoc 署名なので署名し直した改ざんは見つけられず、postinstall の禁止コマンド検査は目安で回避できる。実インストール・Gatekeeper の許可・実機の動作は見ない。(3) 約 890 行のスクリプトの保守が増える。(4) `otool`・`lipo`・`codesign` など Command Line Tools と、システムの Python 3.9 が要る。(5) 案内文の検査 (§7-9) はリポジトリの文面を見るだけで、配布物の `conclusion.html` などは見ない。
+- **未確認・見送り**: `--signed` (Developer ID) の経路は、証明書が無いので実行していない。`llama.framework` などの `.framework` を同梱するビルドは、今回のビルドに無いので試していない (署名の対象には含めてあるが、symlink の扱いも実物では未確認)。Intel Mac・macOS 13/14/15 での実行は未確認 (26.6.2 のみ)。`--compare-installed` は実行して INFO が出ることだけ確認した。CI には組み込んでいない (リョウさんの方針で CI は行わない)。公開済みの Release の digest との突き合わせは、digest を手で渡す形で、実際の `gh release view` の値では今回試していない (手元の `mac/dist` のファイルのハッシュで試した)。次のリリースの zip・pkg で件数が 0 になること (S2) は、このスクリプトで確かめられる。独立した査読は未実施。Windows/Linux は対象外 (Mac 専用のスクリプト)。
+
+## 査読 R25 の結果と対応 (P38 修正版。`P38v2.patch` = HEAD 基準で `tools/check-release.py` と `docs/RELEASE.md` の 2 ファイル)
+
+R25 の結論は P0 なし。読み取り専用・ネットワーク不使用・シェルインジェクションなしは実測で確認済み。P1 が 6 件あり、すべて「先に変異や再現で旧スクリプトが PASS・Traceback・誤 FAIL になるのを確かめ (赤)、直して期待どおりになる (緑)」の順で直した。
+
+| # | R25 の指摘 | 赤 (旧) | 直し方 | 緑 (新) |
+| --- | --- | --- | --- | --- |
+| P1-1 | preinstall の追加を見逃す | Scripts と PackageInfo に preinstall を足しても PASS (43/0/1) | `Scripts/` のファイル一覧 (`._*` を除く) を `postinstall` の 1 つだけ、PackageInfo の `<scripts>` も `postinstall(./postinstall)` の 1 つだけに固定。pkg の最上位 (Distribution・Resources・Meltype-component.pkg) と component の構成 (Bom・PackageInfo・Payload・Scripts) も固定 | preinstall 追加は FAIL 2 件、Scripts の余分なファイルだけでも FAIL、最上位に余分なファイルでも FAIL |
+| P1-2 | Resources を比べない | welcome.html・conclusion.html の改変、余分な `extra.js` が PASS | `git ls-tree -r <ref> mac/pkg/resources` の一覧と、pkg の `Resources/` をファイル名・バイトで突き合わせ (make-pkg.sh の `--resources pkg/resources` がそのまま入る) | 3 変異とも FAIL。1.1.5 の実物は `--ref v1.1.5-mac` で 2 個とも一致 |
+| P1-3 | setuid 検査が無効 (`--expand-full` は 04755 → 0755) | Payload の setuid・setgid ディレクトリ・fifo が PASS | `pkgutil --expand` した生の Payload を `bsdtar -tvf` で読み (失敗したら `gzip -dc \| cpio -it -v`)、setuid/setgid/sticky/他者書き込み・デバイス/fifo/ソケット・外へ出る symlink を検査。読めない環境は SKIP (理由を出す) | 3 変異とも FAIL。1.1.5 実物は 6,941 項目で 0 件。bsdtar・gzip・cpio が PATH に無い環境では SKIP と理由 |
+| P1-4 | 読めない zip・pkg で Traceback と絶対パス | rc=1、Traceback にパスが出る | `main()` を `guarded_main()` で包み、例外は型名と `strerror` だけの 1 行 `[FAIL]` (パスなし) と終了コード 2。SystemExit・KeyboardInterrupt は握らない | 読めない zip・pkg とも rc=2、1 行、漏れ 0 |
+| P1-5 | `--ref typo` が全部 SKIP で rc=0 | rc=0 | `--ref` を明示したときは、最初に `rev-parse` で確かめ、読めなければ stderr に一文を出して終了コード 2 (先頭が `-` の値も拒否)。コミットは読めるがファイルが無いときは FAIL (既定の HEAD のときだけ SKIP) | rc=2 |
+| P1-6 | `len(machos) >= 4` が脆い | Swift の互換 dylib が無い app で偽 FAIL | 件数条件を外し、必須 3 本 (Meltype・MeltypeDictionary・libMeltypeNative.dylib) を名前で確認 | 偽 FAIL が消え、`libMeltypeNative.dylib` を消した変異は FAIL |
+
+P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に直した。`vtuple` は末尾の 0 を無視する ("13" = "13.0" = "13.0.0"。単体テストで旧 NG 2 → 新 OK)。`docs/RELEASE.md` に「リポジトリ側の検査は HEAD (`--ref`) のコミットの内容と比べる。コミットしてから実行する」と、pkg の追加検査・`--ref` の誤りが rc 2 になることを追記。timeout=600・auth=root は「pkgbuild の既定値で make-pkg.sh に明示は無い」とコメント。追加で見つけて直したもの: エラー文に出た `$HOME` 配下のパスの**後ろの部分** (`/.hermes/...` など) が残る漏れ (マスクを長い順にし、続きも伏せる)。
+
+追加した検査項目は 6 つ (pkg 最上位・component の構成・Scripts・PackageInfo の scripts・Resources・Payload の生のモード)、置き換えた項目は 1 つ (Mach-O の件数 → 必須 3 本)。正常な pkg の件数は 43/0/1 → 49/0/1。
+
+### 実測 (macOS 26.6.2・Python 3.9.6)
+- 変異 (新規 13 件 + 既存の検出の確認 2 件 + 制御 2 件。単体テスト 23 件は別): pkg の preinstall 追加・Scripts の余分なファイル・welcome 改変・conclusion 改変・Resources の余分なファイル・最上位の余分なファイル・Payload の setuid・setgid ディレクトリ・fifo (以上 9 件は旧 PASS → 新 FAIL)、読めない zip・読めない pkg・`--ref` の誤り (旧 Traceback / rc=0 → 新 rc=2)、互換 dylib なし (旧 偽 FAIL → 新 FAIL なし)。制御 (無改変の pkg と、Payload を詰め直しただけの pkg) は旧新とも FAIL 0。
+- 誤検知の確認 (旧と新で FAIL の項目名が同じ): ① 手元の `mac/build/Meltype.app` は PASS 22 / FAIL 0 のまま。② HEAD の app から make-pkg 相当の手順で scratch に作った zip と pkg、app の 3 点同時は FAIL 0 (旧 89 → 新 95 PASS)。③ `mac/dist` の 1.1.5 の zip と pkg を `--ref v1.1.5-mac`: FAIL 3 (パス 1,020 件 = 987 + 33 を 2 か所、案内文 8 行中 6 行) で旧と同じ。④ 同 `--ref HEAD` は、旧の FAIL (postinstall 不一致) に加えて、HEAD で変わった conclusion.html のため Resources が FAIL (正当)。
+- 読み取り専用: app と `mac/dist` の 6,979 項目の内容・大きさ・更新時刻・権限が実行の前後で同一。`$TMPDIR` に `check-release-*` が残らない。ログに `/Users`・`/private`・`/var/folders` 0 件、Traceback 0 件。
+- 未確認: Intel Mac・macOS 13〜15。`bsdtar` が無い環境の SKIP は PATH を絞った実行で確認 (実際に無い Mac では未確認)。`--signed` は証明書が無く未実行。R25 の指摘 6 件の再査読は未実施 (**独立した再査読が要る**)。
+
+## 査読 R29 (P38 v2 の再査読) の結果と対応
+
+- **結論**: P0 なし。R25 の P1 6 件は全部直っていることを、R25 の変異を再実行して確認した (preinstall の追加・welcome.html / conclusion.html の改変と削除・setuid の仕込み (cpio を自作)・読めない zip / pkg・`--ref` の誤り・互換 dylib を消した app)。約 50 の新しい変異 (PackageInfo の identifier・install-location・version、Distribution の改変、Payload の絶対パス symlink・余分なトップレベルのファイル、zip の絶対パス・`..`、app 内の外向き symlink、Frameworks の余分な dylib など) のほとんどを検出した。読み取り専用 (app と `mac/dist` の 6,979 項目の内容・大きさ・更新時刻・権限が実行の前後で同一)、一時フォルダーと孤児プロセスなし、ログに Traceback・絶対パス・URL なし、外部コマンドはすべてリスト引数 (`shell=True` なし)、悪意のある cpio は `pkgutil` が拒否。
+- **新しい P1 (直した)**: Payload の `./Meltype.app2`・`./Meltype.appEVIL` が、`startswith("./Meltype.app")` の前方一致で PASS になっていた (`/Library/Input Methods` に余分なものが入るのを通す)。`l == "./Meltype.app" or l.startswith("./Meltype.app/")` に直した。**赤→緑**: 直す前は 2 つとも PASS、直したあとは FAIL (対照の無改変の pkg は PASS のまま)。
+- **P2 (直した)**: `unzip` に標準入力を渡していなかったので、tty で同名のエントリーが 2 つある zip の上書き確認で止まった → 標準入力を切った。`git ls-tree` が非 ASCII の名前を C クオートして、中身が一致していても偽の FAIL になった → `core.quotePath=false`。
+- **確認 (直したあと)**: 手元の `mac/build/Meltype.app` は PASS 22 / FAIL 0 のまま。`mac/dist` の 1.1.5 を `--ref v1.1.5-mac` で検査して PASS 73 / FAIL 3 / SKIP 2 (FAIL は既知のビルド時のパス 1,020 件と、案内文 6 行)。
+- **P2 (直していない)**:
+  - PackageInfo の `postinstall-action`・`overwrite-permissions`・`<relocate>`・`<atomic-update-bundle>`・`numberOfFiles` を検査していない。`LSMinimumSystemVersion` を app 単体・zip 単体では固定していない (pkg のときだけ Distribution 経由)。helper の実行権限・dylib のモードを見ない (main の実行ファイルだけ)。
+  - 既定の `HEAD` が読めないとき (リポジトリの外・git が読めない) は、リポジトリ側の検査が SKIP になり終了コード 0 になる。welcome.html を改変した pkg でも「FAIL なし」と出る (リポジトリの中で実行する前提)。明示した `--ref` に `mac/pkg/resources` が無いときのメッセージが紛らわしい。`--ref ""` は黙って HEAD 扱い。
+  - 700MB の非 Mach-O ファイルで最大メモリが約 775MB (ファイルを丸ごと読む。既存)。
+- **未確認**: Intel Mac・macOS 13〜15・`--signed`・公証 (stapler)。
