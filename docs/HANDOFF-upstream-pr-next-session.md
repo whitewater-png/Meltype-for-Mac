@@ -1,11 +1,11 @@
 # 引き継ぎ: 本家 PR の取り込み (P30〜P36) と実機の不具合 (Q1〜Q5) の続き
 
-> 2026-10-12 夕の時点 (かな入力・US 配列のマージのあと)。**基準コミット: `a5e1ab6`** (このファイルをコミットすると HEAD は 1 つ進む。必ず `git log --oneline -5` と `git status --short` で現状を確かめてから始める)。
+> 2026-10-12 夕の時点 (かな入力・US 配列のマージのあと)。**基準コミット: `8355f47`** (このファイルをコミットすると HEAD は 1 つ進む。必ず `git log --oneline -5` と `git status --short` で現状を確かめてから始める)。
 > 別セッションが同じ作業ツリーを使っている。**このファイルを `git add -A` で巻き込まない・他の `docs/HANDOFF-*.md` (exception-recovery、strip-build-paths) には触らない。**
 > 状態の正本は `docs/UPSTREAM_PR_TRACKER.md` (項目ごとの状態) と `docs/IMPROVEMENT_PLAN.md` (設計・数字・限界)。この文書はそれを読むための道案内。
 
 ## 0. 先にやること
-1. `cd /Users/ryo/Meltype && git status --short && git log --oneline -5 && git log origin/main..HEAD --oneline | wc -l` (未 push は 44 件のはず。**push していない**。`/Users/ryo/Meltype` の作業ツリーは、別セッションが `exp/zenzai-eval` などに切り替えていることがある。`git branch --show-current` を見て、`main` でなければそこへコミットしない。`main` へは一時の `git worktree add` で入れ、`git update-ref refs/heads/main <新> <旧>` で更新するとよい)。
+1. `cd /Users/ryo/Meltype && git status --short && git log --oneline -5 && git log origin/main..HEAD --oneline | wc -l` (未 push は 45 件のはず。**push していない**。`/Users/ryo/Meltype` の作業ツリーは、別セッションが `exp/zenzai-eval` などに切り替えていることがある。`git branch --show-current` を見て、`main` でなければそこへコミットしない。`main` へは一時の `git worktree add` で入れ、`git update-ref refs/heads/main <新> <旧>` で更新するとよい)。
 2. 入っているアプリ: `~/Library/Input Methods/Meltype.app` は 1.1.5 (build 21)、**2026-10-12 17:20 ビルド** (`main` の `f5de00a` を、切り離した一時の作業ツリーでビルドして入れ替えたもの。P36・S2・かな入力・US 配列を含み、`exp/zenzai-eval` の変更は含まない)。`defaults read io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK` は「存在しない」になっていること (トレースログは切ってある)。
 3. テスト: `bash --noprofile --norc -c 'export PATH=$HOME/.dotnet:$PATH; cd src/Meltype.Core.Tests && dotnet run -c Release'` → **559/559** (かな入力・US 配列のマージ後)。
 4. かな入力 (JIS) と US 配列対応は、別セッションが `main` に取り込んだ (`afe2ccd`・`11c135f`)。マージ後のテストは 559 件通り、`tools/check-mac-aot-settings.py` は期待値が古くなって失敗していたので直した (`b33e571`。`InputStyle` は Mac の設定に出る)。**実機の確認 (2026-10-12、JIS キーボード、`main` の 17:20 ビルド、TextEdit): 設定の「入力方式」の表示と切り替え、かな入力 (`Shift+E` = ぃ など・英単語のときの英字表示)、ローマ字入力 (`kyouha,.` → `きょうは、。`、`` kono`config`wo `` → `` この`config`を ``。バッククォートは JIS の Shift+@)、`¥` キーは `¥`、Option + `¥` は `\` (半角) で、問題なし。US 配列そのもの (`docs/US_LAYOUT_CHECKLIST.md` の U1〜U13) は US キーボードが無いので未確認。**
@@ -30,7 +30,7 @@
 | Q4 | 確定し直しで古い英語が残る (`setMarkedText("")` で取り除く) | TextEdit で確認済み。LibreOffice は限界 (入力欄の中身を返さない)。Hermes・Chrome・Safari などは未確認 |
 | Q5 | 2 行目以降の英文 (`Let's go`・`We're here`)。素通しした Enter・Tab・**Shift+Enter** を確定の記録に入れる | TextEdit・Hermes で確認済み |
 | P35 | 英文の途中の `go`・`so`・`do`・`to` を確定し直さない | 完了 (実機確認済み。管理表も更新した) |
-| **P36** | **選んだローマ字の文を Shift+Space で再変換 (本家 #332 の改良導入)** | **コミット済み。TextEdit で実機確認済み (2026-10-12)。Hermes・LibreOffice などは未 (下の §3)** |
+| **P36** | **選んだローマ字の文を Shift+Space で再変換 (本家 #332 の改良導入)** | **完了 (TextEdit・Hermes・LibreOffice で実機確認済み 2026-10-12。他のアプリは未確認)** |
 | P37 | Swift の確定し直しを「`original` が無ければ消さない」に (本家 #86 の考え方) | 未着手 |
 | P38 | 配布前の自動チェック (検査項目の案は `docs/PKG_REVIEW_2026-10.md` §7) | 未着手 |
 | P39 | 候補ごとの注釈 (英訳・全角・半角) | 未着手 |
@@ -44,7 +44,7 @@
 - Swift (`InputController.handle`、Shift+Space の入口) に 2 つの守りを足した: 読めた長さと選択の長さが違うホストでは何もしない。選んだ文字を読めたのに再変換できなかったときは、キーを飲み込む (アプリに渡すと選択が空白で置き換わって消えるため)。
 - 査読: R18b・R19・R20・R21・R22。いずれも P0 なし。
 
-**実機の確認: TextEdit は 2026-10-12 に下の項目 1〜8 が期待どおり (リョウさんの報告)。残りは Hermes → LibreOffice と、行の途中・文書の先頭・候補表示中のクリック / Cmd+Tab。日本語入力 (「あ」) で、最初に捨てキーを 1 回打ってから。**
+**実機の確認 (2026-10-12、リョウさんの報告): 下の項目 1〜8、位置を変えた場合 (行の途中・文書の先頭・Shift+Enter のあと)、候補を出したままのクリックと Cmd+Tab (TextEdit)、Hermes のチャット欄での候補・置き換え・`Thanks, Kenji!`、LibreOffice (何も起きない) が、すべて期待どおり。残りは Chrome・Safari・Google ドキュメントなど他のアプリだけ (任意)。以下は確認に使った手順 (再確認用)。日本語入力 (「あ」) で、最初に捨てキーを 1 回打ってから。**
 | # | 操作 | 期待 |
 |---|---|---|
 | 1 | `asita no meeting de review shimasu` を確定 (文頭は自動で大文字になる) → 選んで Shift+Space | `あしたの meeting で review します` が候補に出る。Enter で 1 回だけ置き換わる |
@@ -70,13 +70,13 @@
 - 他: Hermes の `We'うぇへれすし` (原因未調査。Q5 の Shift+Enter で説明できる可能性)、TextEdit の `Let  It Go` (空白が二重)、`HI there` (再現せず。Shift を離すのが遅れた打ち方の影響と見ている)、`gemma4-27b`→`gemma4ー27b`、`ollama run` の `run` が `るん`、`gpt-oss`→`gpt-おっs`。
 
 ## 5. リョウさんの判断を待っていること
-1. **push・版の更新・リリース** (未 push 44 件)。
+1. **push・版の更新・リリース** (未 push 45 件)。
 2. 空白の無い 1 語の英単語で OS の読みを切るか (でたらめ約 724 件が消える一方、`Suzuki`・`Sakura` など正しい読み約 40 件も消える)。今は「残す」。
 3. `docs/HANDOFF-exception-recovery.md` (別セッションのもの。実装済みなのに「未着手」と書いている古い文書) の扱い。
 4. `change` を英字にする回避策 (大文字 `Change`・末尾の空白・ユーザー辞書) を試すか。
 
 ## 6. 次の作業の候補 (おすすめ順)
-1. §3 の P36 の残りの実機確認 (Hermes・LibreOffice・行の途中・候補表示中のクリック)。TextEdit の分は完了で、管理表・計画書に記録済み。
+1. P36 は実機確認まで完了 (§3)。残りは他のアプリ (Chrome・Safari・Google ドキュメント・Slack) での確認だけで、任意。
 2. **P37** (Swift の確定し直しを fail-closed に)。P36 で触った入口の近くで、LibreOffice の件 (照合できないとき) と関係する。Core に「`deleteBefore>0` の edit は必ず `Original` を持つ」テストを足す。
 3. 小さな改善: `IsRomajiText` の前に前後の改行・空白を除く (末尾の改行付きローマ字文を日本語にできる)。複数語でも英語の語が 1 つも無いときだけ Meltype 自前のローマ字→かなを読みに使う案。
 4. P38 (配布前チェックのスクリプト)、P39。
