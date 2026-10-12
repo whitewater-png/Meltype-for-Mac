@@ -826,6 +826,28 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void LoneCapitalX_IsNotSmallKanaPrefix()
+    {
+        // Q9: SNS の X。語の頭の大文字の X 1 文字は、次の n と合わせて xn = ん にしない (Xnotoukouha が んおとうこうは になっていた)。
+        // 小文字の x (xtu = っ・xn = ん) と、英字の後ろの X は今までどおり。
+        foreach (var (typed, expected) in new[]
+        {
+            ("Xnotoukouha", "Xのとうこうは"), ("Xno", "Xの"), ("Xni", "Xに"), ("Xnitoukousita", "Xにとうこうした"),
+            ("kyouhaXnitoukousita", "きょうはXにとうこうした"), ("Xnoakaunto", "Xのあかうんと"), ("Xgawakaru", "Xがわかる"),
+            ("xtu", "っ"), ("xnotoukou", "んおとうこう"), ("Xbox", "Xbox"), ("Xboxnogemu", "Xboxのげむ"),
+            // X の後ろだけは 2 音以上の助詞でも区切る。ほかの大文字 1 文字 (名前の頭) には広げない。や は助詞にしない
+            ("Xnado", "Xなど"), ("Xkara", "Xから"), ("Xnadodehappyousuru", "Xなどではっぴょうする"), ("Xshika", "Xしか"), ("Xsika", "Xしか"),
+            ("Xgurai", "Xぐらい"), ("Xkurai", "Xくらい"), ("Xnara", "Xなら"), ("Xnante", "Xなんて"), ("Xyori", "Xより"), ("Xdake", "Xだけ"), ("Xbakari", "Xばかり"), ("Xmadeni", "Xまでに"), ("Xmadedesu", "Xまでです"), ("Xyatte", "Xyatte"),
+            ("Ishikawa", "Ishikawa"), ("Imadegawa", "Imadegawa"), ("Ashikaga", "Ashikaga"), ("Bkara", "Bkara"), ("Okara", "Okara"), ("Ayaka", "Ayaka"), ("Xya", "Xya"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void CommaAfterDigit_IsTouten_UnlessDigitFollows()
     {
         // x64,arm64 の , は読点 (x64、arm64)。1,000 の , は桁区切りのまま。

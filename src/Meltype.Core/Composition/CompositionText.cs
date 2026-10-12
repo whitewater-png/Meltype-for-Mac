@@ -132,6 +132,8 @@ public sealed class CompositionText
                    !(char.IsAsciiLetterUpper(last.Raw[0]) && _units.Count >= 2 && _units[^2].Raw is { Length: > 0 } before && char.IsAsciiLetterUpper(before[^1])) &&
                    // 英単語の最後の l / x (hotel の l) は、次の文字と合わせて小書き文字 (lya = ゃ) にしない。
                    !(last.Raw is "l" or "x" or "L" or "X" && EndsWithEnglishWordFromUnit(_units.Count)) &&
+                   // 語の頭の大文字の X 1 文字 (SNS の X) も、次の文字と合わせて小書き文字 (xn = ん・xa = ぁ) にしない。
+                   !(last.Raw is "X" && IsLoneCapitalX(_units.Count - 1, last.Raw)) &&
                    // 英単語の最後の t (commit の t) も、続けて打った s と合わせて ts (つ) にしない。
                    !(last.Raw is "t" or "T" && _pending.Length > 0 && _pending[0] is 's' or 'S' && EndsWithEnglishWordFromUnit(_units.Count)))
             {
@@ -140,7 +142,7 @@ public sealed class CompositionText
             }
             _pending.Insert(0, pulled.ToString());
             // 英単語 (hotel) の最後の l / x の次に打った文字は、l / x と合わせて小書き文字 (hotel + ya → ほてゃ) にしない。
-            if (_pending.Length == 1 && _pending[0] is 'l' or 'x' or 'L' or 'X' && EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString()))
+            if (_pending.Length == 1 && _pending[0] is 'l' or 'x' or 'L' or 'X' && (EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString()) || IsLoneCapitalX(_units.Count, _pending.ToString())))
             {
                 _units.Add(new CompositionUnit(_pending.ToString(), _pending.ToString()));
                 _pending.Clear();
@@ -234,6 +236,13 @@ public sealed class CompositionText
         }
         return false;
     }
+
+    /// <summary>
+    /// 語の頭で Shift を押して打った X 1 文字 (SNS の X) か: extra が大文字の X で、その前 (最初の count 個の単位の最後) が英字の単位ではない (入力の先頭・日本語・記号・数字の後ろ)。
+    /// 次の文字と合わせて小書き文字 (xn = ん・xa = ぁ・xtu = っ) にすると、Xnotoukou が んおとうこう になる。小文字の x (xtu = っ) は今までどおり。
+    /// </summary>
+    private bool IsLoneCapitalX(int count, string extra) =>
+        extra == "X" && !(count > 0 && _units[count - 1] is { Raw: [.., var previous] } unit && char.IsAsciiLetter(previous) && unit.Kana == unit.Raw);
 
     /// <summary>
     /// 最後の count 個の単位 (の英字の並び) + extra が、4 文字以上の知っている英単語で終わっているか (ほ|て|l = hotel)。

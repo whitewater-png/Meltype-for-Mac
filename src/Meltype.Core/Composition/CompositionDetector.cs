@@ -731,6 +731,11 @@ public sealed class CompositionDetector
     // (本家 yksr-melt/Meltype の 1640142 / issue #266 と同じ変更)
     private const int MinCamelAcronymLength = 4;
 
+    // SNS の X の後ろでだけ助詞として見る、2 音以上の助詞 (Xnado → Xなど、Xkara → Xから)。
+    // ほかの大文字 1 文字には広げない: 名前 (Ishikawa → Iしかわ、Imadegawa → Iまでがわ、Okara → Oから) を区切ってしまうため (査読 R32)。
+    // や (Xya) は入れない。全体の助詞の表 (DictionaryDetector) は変えない。
+    private static readonly string[] ParticlesAfterX = ["kara", "made", "nado", "nara", "nante", "yori", "dake", "shika", "sika", "bakari", "kurai", "gurai"];
+
     /// <summary>
     /// 大文字で終わる略語 (OCR、AutoIME、PlanB) か。McA・LeB のように、短い頭 (Mc・Le) の後ろの大文字で終わるものは、
     /// 略語ではなく名前 (McAfee・LeBron) の途中と見る (本家 issue #266)。
@@ -774,6 +779,8 @@ public sealed class CompositionDetector
             // 大文字 1 文字 + 助詞で始まるローマ字 (A|nisiyouka → Aにしようか、B|noan → Bの案)。
             // 名前 (Tanaka、Hanako) を区切らないよう、後ろが助詞で始まるときだけ。
             if (head.Length == 1 && char.IsAsciiLetterUpper(head[0]) && Detection.DictionaryDetector.StartsWithParticle(rest.Replace("-", "")) is not null) return k;
+            // SNS の X の後ろだけは、2 音以上の助詞 (Xnado → Xなど、Xkara → Xから) でも区切る。
+            if (head == "X" && ParticlesAfterX.FirstOrDefault(rest.Replace("-", "").StartsWith) is not null) return k;
         }
         // 後ろに大文字で始まる語が続く (Japanese|to|English…) と、後ろが小文字だけにならず上では区切れない。
         // 次の大文字の前までを見て、知っている語 + 助詞で始まるローマ字 (Japanese|to) なら区切る。
