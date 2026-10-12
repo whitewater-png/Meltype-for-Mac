@@ -45,6 +45,20 @@ Mac の標準的な IME の仕組み (Input Method Kit) で動く Meltype です
 
 ## インストール
 
+### 配布版 (dmg・ダブルクリックのインストーラー)
+1. [Releases](https://github.com/whitewater-png/Meltype-for-Mac/releases) から `Meltype-mac-<version>.dmg` をダウンロードして、ダブルクリックで開く (開いたウインドウの背景に、開き方の図が出ます)
+2. 中の `Meltype-mac-<version>.pkg` をダブルクリックする
+   - 「開発元が未確認のため開けません」「開いていません」などと出たら、表示を閉じてから (「ゴミ箱に入れる」は押さない) 次のようにします
+   - macOS 15 以降: システム設定 → プライバシーとセキュリティ → 下のほうの「このまま開く」を押す (ログインパスワードを聞かれることがあります。「このまま開く」は、開こうとしてから約 1 時間だけ押せます。確認の表示が出たら、開くほうを選びます)
+   - macOS 14 以前: pkg を右クリック (control + クリック) →「開く」→「開く」
+   - 心配なときは、リリースページの SHA-256 と `shasum -a 256 <ダウンロードしたファイル>` の結果を比べてから開いてください
+3. インストーラーの案内に従って進める (「このユーザーのみ」に入るので、管理者パスワードは不要です)
+4. メニューバーの入力メニューで Meltype を選ぶ。出ていないときは、下の「配布版 (zip)」の 3. と同じようにします
+
+![dmg を開いたときのウインドウ](docs/images/mac-dmg-window.png)
+
+同じ案内は、dmg の中の「開けないときは.txt」にも書いてあります。**dmg と pkg は動作確認中です** (うまくいかないときは zip を使うか、Issue で教えてください)。
+
 ### 配布版 (zip)
 1. [Releases](https://github.com/whitewater-png/Meltype-for-Mac/releases) から `Meltype-mac-<version>.zip` をダウンロードして展開する
 2. 「Install Meltype.command」をダブルクリックする
