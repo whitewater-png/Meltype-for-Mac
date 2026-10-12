@@ -150,6 +150,8 @@ public sealed class MeltypeSession
             ShiftEnterNewline = () => ShiftEnterNewlineSetting.IsOn,
             AutoCorrect = () => shared.Current is { AutoCorrectAfterCommit: true, DetectionLevel: not DetectionLevel.Manual },
             Level = () => shared.Current.DetectionLevel,
+            // かな入力 (JIS)。設定の「入力方式」。既定はローマ字入力なので、変えなければ今までどおり。
+            KanaInput = () => shared.Current.InputStyle == InputStyle.Kana,
             Candidates = CandidateDictionary.Load(userDirectory),
             ContextRules = ContextRules.Load(userDirectory),
             History = ConversionHistory.Shared(AppPaths.ConversionHistoryFile),
@@ -358,7 +360,8 @@ public sealed class MeltypeSession
         if (shift && _controller.IsComposing) Feed(new KeyEvent(VirtualKeys.LShift, 0, false, false, false, down.TimeMs));
         if (modifier && _controller.IsComposing) Feed(new KeyEvent(control ? VirtualKeys.LControl : VirtualKeys.LMenu, 0, false, false, false, down.TimeMs));
 
-        var swallowed = Feed(down, e => !modifier && StartsComposition(e, ch, shift));
+        var kanaInput = _options.KanaInput();
+        var swallowed = Feed(down, e => !modifier && StartsComposition(e, ch, shift, kanaInput));
         // このキーをアプリに送り直した (= 使わなかった) なら、アプリに渡す。
         var consumed = swallowed && !_host.ReplayedCurrent;
         // アプリに渡したキーでキャレットが動くかもしれないので、確定し直しの記録は捨てる (Windows の MeltypeEngine と同じ)。
@@ -450,8 +453,10 @@ public sealed class MeltypeSession
     }
 
     /// <summary>変換ボックスを開くキーか (Windows 版の MeltypeEngine.StartsComposition と同じ考え方)。</summary>
-    private static bool StartsComposition(KeyEvent e, char? ch, bool shift)
+    private static bool StartsComposition(KeyEvent e, char? ch, bool shift, bool kanaInput)
     {
+        // かな入力では、かなのキー (数字キー・記号キーも) なら入力を始める。入力する文字は仮想キーから決まる。
+        if (kanaInput && Detection.KanaDetector.IsKanaKey(e.Vk)) return true;
         if (ch is not { } c) return false;
         if (VirtualKeys.IsLetter(e.Vk) && char.IsAsciiLetter(c)) return true;
         // 句読点・かぎかっこ・長音・数字・記号 (Shift で打つものも)

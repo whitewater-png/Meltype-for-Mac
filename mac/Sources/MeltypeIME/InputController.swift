@@ -156,7 +156,10 @@ final class MeltypeInputController: IMKInputController {
             break
         }
 
-        guard let vk = KeyMapping.virtualKey(for: event) else { return false }
+        // 設定が「かな入力 (JIS)」で、物理キーボードが JIS のときだけ、かなのキーを物理キーで本体に渡す (ローマ字入力・US 配列では今までどおり)。
+        // 設定の確認は軽いので先に見て、OFF のとき (ふつう) は配列を調べない。
+        let kana = NativeCore.shared.kanaInput && KeyMapping.isJISKeyboard
+        guard let vk = KeyMapping.virtualKey(for: event, kana: kana) else { return false }
         let utf16 = Array((event.characters ?? "").utf16)
         // 矢印・Home などの機能キーの characters は Unicode 私用領域の文字 (U+F700〜U+F8FF。右矢印は U+F703) なので、文字としては渡さない。
         // 渡すと英数字だけの変換ボックス (「2」など) で矢印がその文字を変換ボックスに足し、Google ドキュメントが変換中の範囲を広げて後ろの文字を消す。

@@ -880,4 +880,71 @@ internal static class SessionFacadeTests
         var result = Type(session, "a")[0];
         Assert.Equal("今日", string.Concat(result.Commits.Select(c => c.Text)));
     }
+
+    // ---- かな入力 (JIS)。Mac では Swift が物理キーを JIS かな配列の仮想キーにして渡す ----
+
+    /// <summary>本番 (MeltypeSession.CreateDefault) と同じく、かな入力かは設定の「入力方式」から決める。</summary>
+    private static MeltypeSession CreateKana(InputStyle style)
+    {
+        var settings = new Settings { InputStyle = style };
+        return new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(),
+            new CompositionOptions { KanaInput = () => settings.InputStyle == InputStyle.Kana }, () => settings);
+    }
+
+    /// <summary>仮想キーを順に打つ (shift: その打鍵で Shift を押す。文字は Mac と同じく Shift 付きの文字を渡す)。</summary>
+    private static List<SessionResult> TypeVk(MeltypeSession session, params (int Vk, char Ch, bool Shift)[] keys) =>
+        keys.Select(k => session.HandleKey(k.Vk, k.Ch, k.Shift, false, false, false)).ToList();
+
+    [Test]
+    public static void KanaInput_Setting_Off_NumberKeyIsStillASymbol()
+    {
+        // 既定 (ローマ字入力) では、かなのキーの扱いは変わらない。数字キーは今までどおり記号・数字として始まる。
+        var session = CreateKana(InputStyle.Romaji);
+        var results = TypeVk(session, (0x34, '4', false));
+        Assert.Equal("4", results[0].View?.Text, "ローマ字入力では数字のまま");
+    }
+
+    [Test]
+    public static void KanaInput_TypesJisKanaFromVirtualKeys()
+    {
+        var session = CreateKana(InputStyle.Kana);
+        // か (T) な (U) → 「かな」。文字 (ch) は英字のまま渡されるが、かなのキーなので仮想キーから決まる。
+        var results = TypeVk(session, (0x54, 't', false), (0x55, 'u', false));
+        Assert.True(results.All(r => r.Consumed), "かなのキーはアプリに渡さない");
+        Assert.Equal("かな", results[^1].View?.Text);
+        var enter = Type(session, "\n")[0];
+        Assert.Equal("かな", enter.Commits.Single().Text);
+    }
+
+    [Test]
+    public static void KanaInput_NumberKeyStartsComposition_AndDakutenCombines()
+    {
+        var session = CreateKana(InputStyle.Kana);
+        // 数字キー (4 = う) でも入力を始める。か + ゛ (@ のキー = 0xC0) → が。
+        var first = TypeVk(session, (0x34, '4', false));
+        Assert.True(first[0].Consumed, "数字キーもかなのキーなので入力を始める");
+        Assert.Equal("う", first[0].View?.Text);
+        session.CommitPending();
+        var results = TypeVk(session, (0x54, 't', false), (0xC0, '@', false));
+        Assert.Equal("が", results[^1].View?.Text, "濁点は直前のかなに付く");
+    }
+
+    [Test]
+    public static void KanaInput_ShiftGivesSmallKana()
+    {
+        var session = CreateKana(InputStyle.Kana);
+        // き (G)・Shift + Z = っ・と (S) → きっと。辞書に無いかな列は英字として見せる判定なので、辞書にある語で確かめる。
+        var results = TypeVk(session, (0x47, 'g', false), (0x5A, 'Z', true), (0x53, 's', false));
+        Assert.Equal("きっと", results[^1].View?.Text);
+    }
+
+    [Test]
+    public static void KanaInput_ControlKeysAreNotKana()
+    {
+        // Cmd+C などはアプリの操作。かな入力でも、変換ボックスが空なら触らない。
+        var session = CreateKana(InputStyle.Kana);
+        var result = session.HandleKey(0x43, 'c', false, false, false, true);
+        Assert.True(!result.Consumed, "Command と一緒のキーは素通し");
+        Assert.True(!session.IsComposing, "変換ボックスは開かない");
+    }
 }

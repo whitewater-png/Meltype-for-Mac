@@ -73,6 +73,23 @@ public static unsafe class Exports
     public static int SetShiftEnterNewline(int on) => Config.ShiftEnterNewlineSetting.Set(on != 0) ? 1 : 0;
 
     /// <summary>
+    /// 入力方式が「かな入力 (JIS)」なら 1、そうでなければ (ローマ字入力・読めないとき) 0。Swift 側が、キーを JIS かな配列の仮想キーにするかを決めるのに使う。
+    /// ABI 版数は上げていない (古い本体には無く、その場合 Swift 側は 0 として扱う)。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_get_kana_input")]
+    public static int GetKanaInput()
+    {
+        try
+        {
+            return Config.SharedSettings.Shared.Current.InputStyle == Config.InputStyle.Kana ? 1 : 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
     /// 専門用語集の分野の一覧。1 行 1 分野で「ID\t名称\t語数\t有効なら 1・そうでなければ 0」を改行でつないだ文字列 (meltype_free で解放する)。
     /// 分野が無い・取れないときは NULL。
     /// </summary>

@@ -77,7 +77,9 @@ internal static class MacSettingsTests
             if (item.Kind == MacSettingKind.Choice)
             {
                 Assert.True(property.PropertyType.IsEnum, $"{item.Key} は列挙型");
-                var fields = property.PropertyType.GetFields(BindingFlags.Public | BindingFlags.Static);
+                // 入力方式の「両方を判定」(Both) は Windows の IME 自動切替用で、Mac ではローマ字入力と同じ動きなので、意図して選択肢に出さない。
+                var fields = property.PropertyType.GetFields(BindingFlags.Public | BindingFlags.Static)
+                    .Where(f => !(item.Key == nameof(Settings.InputStyle) && f.Name == nameof(InputStyle.Both))).ToArray();
                 Assert.Equal(fields.Length, item.Options.Count, $"{item.Key} の選択肢の数");
                 foreach (var field in fields)
                 {
@@ -88,7 +90,7 @@ internal static class MacSettingsTests
             }
         }
         // Mac で効かない設定・プロファイルや更新の項目は入れない
-        foreach (var excluded in new[] { nameof(Settings.Mode), nameof(Settings.InputStyle), nameof(Settings.AutoUpdate), nameof(Settings.AppRules), nameof(Settings.Profiles), nameof(Settings.LearningEnabled) })
+        foreach (var excluded in new[] { nameof(Settings.Mode), nameof(Settings.AutoUpdate), nameof(Settings.AppRules), nameof(Settings.Profiles), nameof(Settings.LearningEnabled) })
             Assert.True(!keys.Contains(excluded), $"{excluded} は入れない");
     }
 

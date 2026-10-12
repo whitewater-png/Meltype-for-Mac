@@ -73,6 +73,7 @@ internal static class MacSettingsCatalog
     {
         [nameof(Settings.LiveConversion)] = "Space を押さなくても、打ったそばから漢字に変換して表示します。",
         [nameof(Settings.DetectionLevel)] = "英語か日本語かを自動で見分ける強さ。積極的 = 英語らしければすぐ英字 / 標準 = 短い語 (no, to, ga) は前後が英語のときだけ英字 / 慎重 = 確信度が高いときだけ英字 / 手動 = 自動では切り替えず提案だけ (変換ボックスで Tab を押すと提案どおり英字に)。",
+        [nameof(Settings.InputStyle)] = "ローマ字入力 / かな入力 (JIS)。かな入力は JIS キーボード専用の実験的な機能です (US 配列では使えません)。JIS かな配列で入力し (Shift+E = ぃ, Shift+Z = っ, Shift+ね = 、、濁点・半濁点は直前のかなに付く)、打ったキーの英字が英単語なら英字で見せます。JIS キーボード以外 (US 配列など) では、かな入力にしてもローマ字入力のまま動きます。変えると、次に打つ文字から効きます。",
         [nameof(Settings.CorrectTypos)] = "Space・Enter で変換・確定するときに打ち間違いを直します。ローマ字: 読めない子音が残ったとき、隣のキーの押し間違い・入れ替わり・抜けを 1 文字だけ直します (onegaishimsu → お願いします、sumimasne → すみません。よく使う語の読みになるときだけ)。英語: 同梱のよくある打ち間違いの一覧にある語を直します (teh → the、recieve → receive)。",
         [nameof(Settings.FileLog)] = "~/Library/Application Support/Meltype/meltype.log にログを書きます (OFF のときは書きません)。判定した語の先頭の数文字・アプリ名・入力欄の名前が含まれます。確定した文字列などは「ログに入力した文字を残す」が ON のときだけ残ります。",
     };
@@ -103,6 +104,12 @@ internal static class MacSettingsCatalog
             (DetectionLevel.Balanced, "Balanced", "標準 (Balanced)"),
             (DetectionLevel.Conservative, "Conservative", "慎重 (Conservative)"),
             (DetectionLevel.Manual, "Manual", "手動 (提案のみ)")),
+        Choice(nameof(Settings.InputStyle), "入力方式",
+            "ローマ字入力 / かな入力 (JIS) / 両方を判定。Meltype キーボードでは、かな入力を選ぶと JIS かな配列で入力し (Shift+E = ぃ, Shift+Z = っ, Shift+ね = 、)、打ったキーの英字が英単語なら英字で見せます。「両方を判定」は IME 自動切替のみ (Meltype キーボードではローマ字入力)。",
+            InputGroup, s => s.InputStyle, (s, v) => s.InputStyle = v,
+            (InputStyle.Romaji, "Romaji", "ローマ字入力"),
+            // 「両方を判定」(InputStyle.Both) は IME 自動切替 (Windows) 用で、Mac ではローマ字入力と同じ動きなので、選択肢に出さない。
+            (InputStyle.Kana, "Kana", "かな入力 (JIS)")),
         Bool(nameof(Settings.AutoCorrectAfterCommit), "確定後も文脈に合わせて直す",
             "英語とも日本語とも読める語 (i, sushi など) を確定した後、次の語で英語か日本語かがはっきりしたら自動で確定し直します (i → 胃 と確定した後に want と打つと I want)。",
             InputGroup, s => s.AutoCorrectAfterCommit, (s, v) => s.AutoCorrectAfterCommit = v),

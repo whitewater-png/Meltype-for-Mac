@@ -851,6 +851,10 @@ public sealed class CompositionController
         var shift = _swallowedShift.Count > 0 || _host.IsShiftDown();
         if (Detection.KanaDetector.KanaForKey(e.Vk, shift) is not { } kana) return null;
         var raw = _host.CharFromKey(e, _swallowedShift.Count > 0) ?? kana;
+        // Shift が小書き文字・句読点を打つのに使われたとき (Shift + Z = っ) は、大文字で打った英語ではない。
+        // 大文字の英字のまま持つと「大文字で始まる区間は英語」の規則に当たり、きっと が きZと のように英字になってしまう。
+        // Shift を押しても同じかな (Shift + G = き) なら、これまでどおり大文字の英語の手がかりとして残す。
+        if (shift && char.IsAsciiLetterUpper(raw) && Detection.KanaDetector.KanaForKey(e.Vk, false) != kana) raw = char.ToLowerInvariant(raw);
         return (raw, kana);
     }
 
