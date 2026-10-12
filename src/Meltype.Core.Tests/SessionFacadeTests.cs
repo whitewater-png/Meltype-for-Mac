@@ -887,4 +887,57 @@ internal static class SessionFacadeTests
         var result = Type(session, "a")[0];
         Assert.Equal("今日", string.Concat(result.Commits.Select(c => c.Text)));
     }
+
+    // ---- US 配列 (docs/US_LAYOUT_PLAN.md)。Swift (KeyMapping) は、打った文字をそのまま渡し、US 配列の記号キーは仮想キー 0x07 (文字を入力するキー) になる ----
+
+    /// <summary>Mac の IME が、US 配列の記号キーを本体に渡す形で 1 文字打つ (Shift の有無は文字から決める)。</summary>
+    private static SessionResult TypeUsSymbol(MeltypeSession session, char c) =>
+        session.HandleKey(0x07, c, shift: c is '~' or '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')' or '_' or '+' or '{' or '}' or '|' or ':' or '"' or '<' or '>' or '?',
+            control: false, alt: false, command: false);
+
+    [Test]
+    public static void UsLayout_Backslash_StaysHalfWidthInJapanese()
+    {
+        // US 配列の \ キー。日本語の途中でも、全角の ￥ にせず半角の \ のまま入る (パス・エスケープ・正規表現)。
+        var session = Create();
+        Type(session, "kyouha");
+        var result = TypeUsSymbol(session, '\\');
+        Assert.True(result.Consumed, "\\ は変換ボックスに入れる (アプリには渡さない)");
+        Assert.Equal("きょうは\\", result.View?.Text);
+        var enter = Type(session, "\n")[0];
+        Assert.Equal("きょうは\\", enter.Commits.Single().Text);
+    }
+
+    [Test]
+    public static void UsLayout_Backslash_StartsComposition_AndStaysHalfWidthWithFullWidthSymbolsOn()
+    {
+        // 変換ボックスが空のときの \ でも入力を始める。「記号を全角にする」が ON (既定) でも \ は全角にならない。
+        var session = CreateWith(new Settings { FullWidthSymbols = true });
+        var first = TypeUsSymbol(session, '\\');
+        Assert.True(first.Consumed, "変換ボックスが空でも \\ で入力を始める");
+        Assert.Equal("\\", first.View?.Text);
+        Assert.Equal("\\", Type(session, "\n")[0].Commits.Single().Text);
+    }
+
+    [Test]
+    public static void UsLayout_SymbolKeys_BecomeTheExpectedCharacters()
+    {
+        // US 配列で打つ記号 (Shift を押すものを含む)。日本語の中での表記は JIS と同じ (括弧・: ; | @ # は半角、! ? ~ ` は全角)。
+        // ` は後ろが英語になれば半角に戻る。既存の Backtick_BeforeEnglish_StaysHalfWidth を参照。
+        // _ と + は、英字の識別子 (snake_case・C++) の一部と見て、全体を英字のままにする設計 (CompositionDetector の IsNameUnit・IsPart) なので、ここには入れない。
+        // これは JIS でも US でも同じ。
+        var cases = new (char Typed, string Expected)[]
+        {
+            ('`', "｀"), ('~', "～"), ('!', "！"), ('@', "@"), ('#', "#"), ('$', "＄"), ('%', "％"), ('^', "＾"), ('&', "＆"), ('*', "＊"),
+            ('(', "("), (')', ")"), ('=', "＝"), ('{', "｛"), ('}', "｝"), ('|', "|"), (':', ":"), (';', ";"),
+            ('"', "”"), ('\'', "’"), ('<', "＜"), ('>', "＞"), ('?', "？"), ('\\', "\\"),
+        };
+        foreach (var (typed, expected) in cases)
+        {
+            var session = Create();
+            Type(session, "kyouha");
+            var result = TypeUsSymbol(session, typed);
+            Assert.Equal("きょうは" + expected, result.View?.Text, $"US 配列の「{typed}」");
+        }
+    }
 }
