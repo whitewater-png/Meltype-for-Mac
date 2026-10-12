@@ -1961,3 +1961,59 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
 - **次**: 英数状態の自動判定 (b) を Mac に入れる P11 のときに、(b) の作り直し (`consumed` と、消す数が 1 つ多い問題)、expected の付与 (案 B 相当)、Swift の fail-closed (案 A) を合わせて行う。
 - **文書の食い違い (直していない)**: `docs/SECURITY_REVIEW_2026-10.md` の 225 行目は、Mac でも `DirectModeAutoDetect` (既定 ON) により英字が保持され、学習され得る、と書いている。コード上は Mac でこの設定が効かないので、前提を見直す余地がある (`_heldLetters` に保持される経路が Mac にあるかは、このレビューでは未確認)。
 - **未検証**: 実機 (Swift を変えていないので不要)。(b) が自動大文字化で照合に失敗するかは、(b) が Mac で使われないので確認していない。Windows は対象外。
+
+## 追加項目 P39 (候補ごとの注釈: 本家 #86 の考え方。Core の JSON に `notes` を足すだけ。Swift は保留)
+
+
+- **経緯**: 調査文書 (`UPSTREAM_PR_SURVEY.md` の #86) は「Core に `Notes` があるが JSON に出していない。Swift も使っていない」とした。本家 #86 (Windows の TSF IME。`gh pr diff 86` を読んだだけ) は、`SessionResult.ToJson` に `"notes":[…]` (候補と同じ長さ。注釈の無い候補は `null`) を足し、C++ の候補ウィンドウが候補の右に小さく描く。Mac 版の Core には `CompositionView.Notes` と `CandidateNotes` がすでにあり (Windows の `CompositionWindow` が描いている)、Mac だけが JSON に出していなかった。
+- **Notes に入るもの** (`CompositionController.CandidateNotes`、変えていない): 「英訳」(英訳の辞書から足した候補)、「全角」「半角」(同じ記号・英数字の半角と全角が両方とも候補にあるとき)。注釈が 1 つも無ければ `Notes` は null。
+- **変えたもの (これだけ)**: `src/Meltype.Core/Composition/MeltypeSession.cs` の `AppendNotes` (+20 行) と、テスト `src/Meltype.Core.Tests/CandidateNotesJsonTests.cs` (新規、8 件)。**Swift は変えていない** (`NativeCore.swift`・`InputController.swift` は HEAD と同じ)。
+  - `view.notes` を、`view.candidates` と同じ長さ・同じ順で書く。注釈の無い候補は `null`。**候補の範囲に注釈が 1 つも無いとき (Notes が null・空・全部 null、候補が 0 個のとき) は `notes` のキーごと出さない**。キーは view の最後 (`selectedPrediction` の後ろ)。Notes が候補より短ければ null で埋め、長ければ候補の数で切る。
+  - **FFI の版数は上げない (8 のまま)**: JSON にキーを足しただけで、関数の引数・戻り値の形は変わらない。`tools/check-mac-aot-settings.py` の期待値も 8 のまま、PASS。
+  - **今の Swift への影響は無い**: HEAD の `NativeCore.swift` の `SessionResult` / `TextEdit` / `CompositionView` (`Decodable`) をそのまま写した `swiftc` の投げ捨てスクリプトで、`notes` の入った JSON が読めることを実測した (下の「確認」)。`JSONDecoder` は未知のキーを無視する。
+- **Mac の候補ウィンドウ側 (保留)**: `IMKCandidates` の注釈は `showAnnotation` で出す 1 つだけ (候補ごとの欄は無い)。すでに 2 か所が使っている (変換のたびに入力モードの「あ」= `showModeAnnotation`、意味があれば 1.5 秒後に意味 = `scheduleMeaning`)。v1 は `showModeAnnotation` に「選んでいる候補の注釈を `あ ・ 英訳` とつなぐ」数行を足していた。**R26 の指摘で保留にした**:
+  1. `showModeAnnotation` は `view.meaning != nil` のとき何も書かない。注釈付きの候補 (学習で 2 番目に来た英訳、末尾の全角) から意味付きの候補 (先頭候補は 3,000 読みの 25% に意味がある) へ動くと、「あ ・ 英訳」が最大 1.5 秒残るおそれがある (IMK が選択の変更で注釈を消すかは未確認)。学習後・折り返しで起きる。
+  2. そもそも今の「あ」の注釈が実機で見えるか自体が未検証 (`IMPROVEMENT_PLAN` にも「注釈の表示が出るか」は未検証と記載)。見えなければ Swift の数行は効果が無い。
+  3. マウスで候補を選んだときは `candidateSelectionChanged` が番号だけ覚えて注釈を更新しない。
+  - 保留した Swift 案は **`scratch/p39v2/P39-swift-held.patch`** (HEAD 基準、41 行、当てていない。将来の再開用)。再開するときは、先に下の「再開手順」の 1 を実機で確かめる。
+- **案の比較** (採用は B):
+
+  | 案 | 得 | 損 |
+  | --- | --- | --- |
+  | A 見送る | リスク 0 | 記号の `#` と `＃` を見分ける手がかりが Mac に無い。調査文書の改良が残る |
+  | **B Core の JSON だけ (採用)** | 版数を上げず、Swift の挙動が変わらない。Linux の ibus も同じ JSON から読める見込み。将来の Swift の変更の足場 | 画面には何も出ない (価値は足場だけ) |
+  | C Core の JSON + Swift が既存の注釈につなぐ (v1。保留) | 一覧のうち選んでいる候補の注釈が見える | 上の 3 点。実機で確かめるまで画面にどう出るか不明。意味付きの候補へ動いたとき「あ ・ 英訳」が残るおそれ |
+  | D 候補の文字列に注釈を足す (`river　英訳`) | 一覧の全行に出る | `candidateSelected` が文字列で番号を逆引きする作りが壊れる。不採用 |
+  | E `NSAttributedString` の候補で行ごとに注釈を描く | 全行に出る | IMKCandidates がどこまで描くか未調査・変更が大きい。不採用 |
+
+- **実測** (v1 の調査。Mac の本番に近い配線。変換エンジンは偽物 = 「読み → 1 文節」で、azooKey ではない。3,000 組、候補の枠は合計 25,158 個): 英訳が付いた候補は 6,723 個 (26.7%)、全角 3,006 個 (11.9%)、半角 2,987 個 (11.9%)。「全角」「半角」はほぼすべての変換で出る (変換の候補の末尾に、打った英字 `kawa` とその全角が必ず足されるため)。この割合は英訳のある語に偏った上限の目安で、実際の azooKey は漢字の候補をもっと並べるので英訳の割合は下がる。
+- **独立査読 R26 の結果** (別の査読者が実行。`scratch/review18/p39-notes.md`): **P0 なし**。
+  - JSON と候補の対応: 5,040 行 × 4 設定 (通常 / MoreCandidates 46 個 / 英訳 OFF / 両方)、各約 11 万キーで、notes の長さが候補と合わない 0、全部 null なのにキーがある 0、対があるのに null の欠け 0、意味と注釈の同居 0。再変換 (かな・漢字・複数文節)・学習 4 周・記号も長さ一致。追加キー (Shift+←→ で区切り変更、F6–F10、BackSpace、`SelectCandidate`(マウス)、Esc) 約 8 万キーでも 長さ不一致 0 / 欠け 0 / 余計 0。実データ (3,000 組 × 3 周、学習で順が変わる 3,019 回) も長さ不一致 0。
+  - 互換性: 変更前後で同じ入力 43.6 万 JSON を比べ、`notes` を除くと完全一致 (差 0)。Swift のデコード (査読者が `swiftc` で): notes 無し / null 混じり / 全部 null / `[]` / `null` / 未知キーの 6 形がすべて読めた。
+  - 性能: 1 キーあたり 通常 5.1 → 5.1 µs、MoreCandidates 46 個 6.5 → 6.5 µs (5 回の中央値、変更前後)。**差なし**。`CandidateNotes` 自体は変更前から毎 `UpdateView` で計算していた。
+  - 変異 5 本 (N1 エスケープ無し / N2 長さを 8 で頭打ち / N3 無い所を空文字 / N4 文節番号ぶんずらす / N5 全角判定の参照先): **N1・N3・N5 は赤、N2・N4 は生き残り** (全 569 件でも緑) → テスト不足 (P1)。この修正でテストを 2 本足して、2 本とも赤になった (下)。
+  - Swift の読解で、上の保留の理由 1–3 を指摘 → 推奨は「Core の JSON だけ。Swift は実機で『あ』が見えると確認できるまで保留」。
+- **テスト**: 560 → **568 件、すべて通る** (`CandidateNotesJsonTests` 新規 8 件。v1 の 6 件 + R26 の P1 で足した 2 件)。
+  - v1 の 6 件: JSON の形 (候補と同じ長さ・順、`null` で位置を保つ、短い/長い Notes、エスケープ)、注釈が無いときはキーを出さない (4 通り + 今までの JSON と同じ末尾)、`kawa ` の `river`・`stream` に「英訳」、`@ ` の `@`=半角・`＠`=全角、変換前と英訳の辞書が無いときは出ない。
+  - **足した 2 件** (どちらも注釈を位置ではなく候補の文字から決める `Expected` で比べる。位置のずれを検出するため):
+    - `Session_NotesStayAlignedWhenThereAreMoreThanEightCandidates`: `MoreCandidates` で候補が 46 個になるとき、notes の長さが候補と一致し、9 個目より後ろの `river`・`stream` が「英訳」、`kawa` が「半角」、`ｋａｗａ` が「全角」で、日本語の候補は null。
+    - `Session_NotesFollowTheSelectedClauseNotTheFirstOne`: 4 文節 (川|橋|雨|雲。英訳が 2 個・1 個・3 個・0 個) を → で 1 つずつ選び (`selectedClause` = 0–3、偶数・奇数)、各文節で notes が「この文節の」候補の位置と合う。
+  - **変異 13 通りすべて赤** (`scratch/p39v2/mutate.log`、作業コピーで 1 つずつ): 実装者の M1–M8 (`Take(count)` を外す / 長さを notes に合わせる / 全部 null でも出す / null の項目を飛ばす / 呼び出しを消す / 位置を 1 つずらす / Core の「英訳」判定を外す / 「全角」「半角」の入れ替え) と、R26 の N1–N5。**生き残っていた N2 は新しい 2 件が、N4 は文節のテストだけが赤にする**。変異を戻すたびに `touch` し、最後に全体を 1 回通した (568/568)。
+- **確認** (作業コピー内。インストールはしていない):
+  - `./build.sh --no-install` 成功、`MeltypeNative.dylib` の更新時刻は `MeltypeSession.cs` より後、`codesign --verify --deep --strict` 成功、`python3 tools/check-mac-aot-settings.py` は PASS 4 件。Swift は HEAD のまま (`git diff HEAD -- mac` は空)。
+  - **AOT の dylib を直接叩いた確認** (ctypes。IME としての動作ではない): `meltype_abi_version` = 8。`kawa` Space → 候補 `川 かわ カワ ｶﾜ river stream River kawa ｋａｗａ` (9 個)、`notes` = `[null,null,null,null,"英訳","英訳","英訳","半角","全角"]`。`@` Space → 候補 5 個、`notes` = `["半角","全角",null,null,null]`。変換前の `kyou` → `notes` のキーが無い。
+  - **HEAD の Swift の型でデコード** (`scratch/p39v2/headdecode.swift`・`headdecode2.swift`。HEAD の `NativeCore.swift` から `SessionResult`・`TextEdit`・`CompositionView` を機械的に抜き出して `swiftc` したもの。v1 の確認は新しい型だった): (1) notes 無し、(2) 候補と同じ長さ・null 混じり、(3) 全部 null、(4) `[]`、(5) `null`、(6) 引用符・改行のエスケープ入り、の 6 形が読めた。さらに上の dylib が実際に返した JSON 3 本 (`kawa `・`@ `・`kyou`) も読めた。
+- **得と損**:
+  - 得: Core の JSON が #86 と同じ形になる (注釈が無いときは今までと完全に同じ形)。FFI の版数を上げずに済む。Swift は何も変わらないので、実機でのリスクは増えない。将来 Swift が使う足場ができる。
+  - 損: 画面には何も出ない (価値は足場だけ)。`notes` が全部 null のときはキーごと出さないので、Swift 側は「無い」と「全部 null」を区別できない (区別が要るものは無い)。
+  - 価値の評価: 低。Swift を足すかどうかは実機次第 (下)。
+- **未確認 / 対象外**: Mac 実機で注釈が見えるか・今の「あ」の注釈が見えるか (Swift を変えていないので、この変更では確認不要)。変換エンジンは偽物 (azooKey を通していない)。英訳の候補が実際の変換で何割に付くか。**Linux の ibus** は JSON を `dict.get(読み)` で読むので未知のキーは無視されるはずだが (R26 が読んだのみ)、**私は実行していない**。**Windows / Linux は対象外**。
+- **再開手順** (将来、Swift の数行を再開するとき。実機: TextEdit。入れ替えは別途承認のうえ。日本語入力は「かな」キー、JIS):
+  1. **土台 (先に)**: 今の入れ替え済みの版で、`kawa` を打って Space。候補ウィンドウの横か下に小さく「あ」が出るか。**出なければ**、`showAnnotation` はこの環境で見えない。以降の確認はすべて意味が無いので、Swift 案は取り下げたままにする。
+  2. **意味付きの候補へ戻ったとき注釈が残らないか (R26 の指摘。先にここを確かめる)**: 注釈付きの候補 (英訳 `river` や末尾の全角) から、意味が付く候補 (川・橋・箸など。`hashi` Space で 橋・箸) へ ↑↓ で動かす。`あ ・ 英訳` が最大 1.5 秒残らず、「あ」か意味に替わること。学習のあと (英訳を 2 回選んで 2 番目に上がった状態) と、候補の折り返し (一番下から一番上へ) でも試す。**漢字候補だけの確認では足りない**: 漢字候補の `あ` 表示は意味の有無で変わらないので、「あ に戻る」と書いてもあてはまらない (川・橋のような意味付きの候補では `showModeAnnotation` が何も書かない)。残るなら、意味があるときも注釈を書き直す案に直してから再開する。
+  3. **英訳**: `kawa` Space のあと ↓ で、`river`・`stream` に着いたとき「あ ・ 英訳」になる。漢字・かなの候補では「あ」のまま。
+  4. **全角・半角**: `kawa` Space のあと一番下まで進む → `kawa` で「あ ・ 半角」、`ｋａｗａ` で「あ ・ 全角」。
+  5. **記号**: JIS キーボードで `@` のあと Space。`@` は「あ ・ 半角」、`＠` は「あ ・ 全角」。`#`・`!` も同じ。選んで Enter で確定した文字が、注釈の付かない今までと同じ。
+  6. **マウス**: 候補をクリックで選んだとき注釈が前の候補のまま残らないか (`candidateSelectionChanged` は番号だけ覚える)。
+  7. **退行の確認**: `kyou` Space → 「今日」を Enter、意味が 1.5 秒後に出る語、↓ ↑ の往復、Esc、予測変換 (Tab) の候補ウィンドウに注釈が出ないこと。コード向けアプリ (Terminal・VS Code) では「あ (コード) ・ 英訳」。
+  8. **失敗の型**: 注釈が空になる・「あ」が消えて戻らない・注釈が前の候補のまま残る・候補ウィンドウがちらつく/動く・Enter で確定される文字が変わる・入力が止まる。出たらすぐ取り下げる。

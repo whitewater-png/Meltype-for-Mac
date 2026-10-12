@@ -61,8 +61,28 @@ public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commit
         builder.Append(",\"predictions\":");
         AppendArray(builder, view.Predictions ?? []);
         builder.Append(",\"selectedPrediction\":").AppendInt(view.SelectedPrediction);
+        AppendNotes(builder, view);
         builder.Append("}}");
         return builder.ToString();
+    }
+
+    /// <summary>
+    /// 候補ごとの注釈 (英訳・全角・半角。本家 #86 の考え方)。候補 (view.candidates) と同じ長さ・同じ順で、注釈の無い候補は null。
+    /// 候補の範囲に注釈が 1 つも無ければ notes のキーごと出さない: Swift は無いキーを nil として読み (未知のキーも無視できる)、
+    /// FFI の版数 (meltype_abi_version) を上げずに済み、注釈の無い今までの JSON と同じ形のままになる。
+    /// </summary>
+    private static void AppendNotes(StringBuilder builder, CompositionView view)
+    {
+        var count = view.Candidates.Count;
+        if (view.Notes is not { } notes || !notes.Take(count).Any(n => n is not null)) return;
+        builder.Append(",\"notes\":[");
+        for (var i = 0; i < count; i++)
+        {
+            if (i > 0) builder.Append(',');
+            if (notes.ElementAtOrDefault(i) is { } note) AppendString(builder, note);
+            else builder.Append("null");
+        }
+        builder.Append(']');
     }
 
     private static void AppendArray(StringBuilder builder, IReadOnlyList<string> items)
