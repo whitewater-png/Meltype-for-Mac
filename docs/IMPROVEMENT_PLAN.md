@@ -2088,3 +2088,16 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
   - 既定の `HEAD` が読めないとき (リポジトリの外・git が読めない) は、リポジトリ側の検査が SKIP になり終了コード 0 になる。welcome.html を改変した pkg でも「FAIL なし」と出る (リポジトリの中で実行する前提)。明示した `--ref` に `mac/pkg/resources` が無いときのメッセージが紛らわしい。`--ref ""` は黙って HEAD 扱い。
   - 700MB の非 Mach-O ファイルで最大メモリが約 775MB (ファイルを丸ごと読む。既存)。
 - **未確認**: Intel Mac・macOS 13〜15・`--signed`・公証 (stapler)。
+
+## 追加項目 S3 (セキュリティレビュー 2026-10 の M5 の見直し: 「Mac でも DirectModeAutoDetect で英字が保持・学習され得る」は成り立たない。文書だけを訂正)
+
+- **経緯**: P37 の調査で、Mac では `MeltypeSession.CreateDefault` が `DirectMode`・`ClassifyDirect`・`DirectDecided` を設定せず、Direct のキーは Core に渡る前に素通しされると分かった。`docs/SECURITY_REVIEW_2026-10.md` の M-1 (225 行目) は「秘匿フラグを立てないアプリでも英数モードで `DirectModeAutoDetect` により英字が `_heldLetters` に保持され、学習され得る」と書いていた。調査員が根拠をコードと実測で確かめ、文書の訂正案を作り、独立査読 R28・R30 で文言を詰めた。**コードは変えていない**。
+- **確かめたこと** (作業コピー、`MeltypeSession.CreateDefault` (Mac 本番と同じ配線)・FakeConverter・一時フォルダー・ダミーの語):
+  - `DirectModeAutoDetect` を読むのは Windows の `MeltypeEngine.cs:357` だけ。`DirectMode` を設定するのは Windows の `TrayApplicationContext.cs:50` だけで、`Hold` (`_heldLetters`) は `DirectMode()` が true のときだけ通る。**Mac では通らない**。
+  - Direct (英数・コード向けアプリ。`SetApp` を直接呼んで Terminal・iTerm2 でも確認) は、全キーが素通しで、一時フォルダーに増えたファイルは 0 個。`FileLog` と `LogTypedText` を ON にしても、meltype.log は作られない。
+  - **ただし、日本語入力のまま (Direct でない状態で) 学習ファイルに残る経路は、別にある** (M5 の「中」は変えない): (a) 英字のみ 2 文字以上の語を、自動判定と逆の表示モード (F6〜F10) にして確定したとき languages.json に残る (判定の強さが標準 (Balanced) のとき。Manual では基準が変わり、Tab も残る)。(e) 変換で候補を選び直して確定すると、conversions.json・suggest.json・languages.json に書かれる (FakeConverter での実測。数字を含む語でも残る)。(d) `FileLog` と `LogTypedText` が両方 ON のときだけ、meltype.log に語全体が残る (どちらも既定 OFF)。F6〜F10・Tab・候補の選び直しをしない Enter・Space だけの確定では増えない。
+- **査読の経緯 (誤りを直した記録)**: 調査員の初版の訂正案は、「F6/F10 をしなければ、Enter・Space で確定しても学習ファイルは増えない」と書いていた。R28 (P0) が、候補の選び直しで 3 つのファイルに書かれることを実測して指摘し、「FakeConverter では候補を選び直せない (未確認)」という記述も誤りだった。v2 で直し、R30 が再実測した。R30 の P1 4 件 (`DetectionLevel` に `Auto` は無い、F6〜F8 のあとの Space だけでは残らない、表 M5 の「問題」「影響」欄と本文の食い違い) を直した。
+- **文書の変更** (`docs/SECURITY_REVIEW_2026-10.md` だけ。取り消し線 `<del>` と `[見直し 2026-10-12: …]` の形は、既存の `[訂正]` の前例に沿った): M-1 の 225 行目の主張を取り消し線にして見直しを足した。本文の「影響」の条件を実測に合わせて書き直した。修正案 2 に補足を足した。総括を本文と揃えた。表 M5 の旧行番号に注記を足した。重大度の数字 (中 10 件) は変えていない。
+- **見送り (適用していない)**: 調査員が作った任意の M3 の訂正パッチ (M3 は S1 (`9084282`) で対応済み。M-3 の経路は Windows 専用で、HEAD では `DescribeKind` の分類だけをログに出している)。R30 が、同じコミットが M8 (postinstall に `codesign --verify` を足し、失敗なら `exit 1`)・M7・M2(b) も直していることを指摘した。M3 だけ「対応済み」にすると、冒頭の「今すぐ…M8」と表 M8 の「常に `exit 0`」が現状と食い違ったまま残るので、まとめて直すときに一緒に扱う (`scratch/sec225v2/SECURITY_REVIEW-m3.patch` は 24 時間で消える)。
+- **未確認**: azooKey を通した学習 (`learnCallback`)。Swift・IMK の実機での動作。Windows 実機。2 文字の語で languages.json に残る条件。F7・F8・F9 のすべての組み合わせ (代表だけ測った)。F6〜F8 のあとの Space だけでは残らず、F6 → Space → Esc では残る違いの経路。
+- **前提の変化**: Mac で Direct が学習しない・`Hold` が通らないという前提は、英数状態の自動判定を Mac に入れる (P11) と変わる。そのときは、`SwitchHeldToJapanese` の作り直し (P37 の節) と、この M5 の見直しを合わせて見直す。
