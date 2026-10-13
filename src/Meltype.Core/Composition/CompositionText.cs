@@ -135,7 +135,7 @@ public sealed class CompositionText
                    // 語の頭の大文字の X 1 文字 (SNS の X) も、次の文字と合わせて小書き文字 (xn = ん・xa = ぁ) にしない。
                    !(last.Raw is "X" && IsLoneCapitalX(_units.Count - 1, last.Raw)) &&
                    // 英単語の最後の t (commit の t) も、続けて打った s と合わせて ts (つ) にしない。
-                   !(last.Raw is "t" or "T" && _pending.Length > 0 && _pending[0] is 's' or 'S' && EndsWithEnglishWordFromUnit(_units.Count)))
+                   !(last.Raw is "t" or "T" && _pending.Length > 0 && _pending[0] is 's' or 'S' && EndsWithEnglishWordFromUnit(_units.Count, tsuFollows: true)))
             {
                 pulled.Insert(0, last.Raw);
                 _units.RemoveAt(_units.Count - 1);
@@ -151,10 +151,17 @@ public sealed class CompositionText
             // (commit + suru・site → こっみつる・こっみつぃて ではなく commitする・commitして)。
             // 読めない子音がいくつか残っていても同じ (reflect + sareta の ct + s → reflectされた。refェcつァれた になっていた。本家 #77、P45-3)。
             if (_pending.Length >= 1 && _pending[^1] is 't' or 'T' && c is 's' or 'S' && _pending.ToString().All(char.IsAsciiLetter) &&
-                EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString()))
+                EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString(), tsuFollows: true))
             {
                 foreach (var letter in _pending.ToString()) _units.Add(new CompositionUnit(letter.ToString(), letter.ToString()));
                 _pending.Clear();
+            }
+            // つ にまとめた t + s (shut + s) の後ろが u 以外の母音なら つぁ・つぃ ではないので、英単語の t と s に分け直す (shutした。本家 35beb60、P45-11)。
+            if (_pending.Length >= 2 && _pending[^2] is 't' or 'T' && _pending[^1] is 's' or 'S' && c is 'a' or 'i' or 'e' or 'o' or 'A' or 'I' or 'E' or 'O' &&
+                _pending.ToString().All(char.IsAsciiLetter) && EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString()[..^1]))
+            {
+                foreach (var letter in _pending.ToString()[..^1]) _units.Add(new CompositionUnit(letter.ToString(), letter.ToString()));
+                _pending.Remove(0, _pending.Length - 1);
             }
             _pending.Append(c);
             SplitUnitAfterNumber(final: false);
@@ -327,7 +334,26 @@ public sealed class CompositionText
     /// 英単語は単位の区切りから始まるものだけを見る。音の途中から始まる語 (から|な|l の anal、だ|め|x の amex) は、
     /// ローマ字で打っている日本語 (からなぁ・だめぇ) の一部なので英単語とみなさない。
     /// </summary>
-    private bool EndsWithEnglishWordFromUnit(int count, string extra = "")
+    /// <summary>
+    /// 単位 start から最後の t までを、t + s の つ まで含めて読むと日本語の語かその頭になるか
+    /// (shitsumon の しつ、teishutsu の しゅつ)。前の かな から読んでもよい (ochitsuku の おちつ)。本家 35beb60 (P45-11)。
+    /// </summary>
+    private bool ReadsAsJapaneseWithTsu(int start, int count, string extra)
+    {
+        var last = count;
+        if (extra.Length == 0 && count > start && _units[count - 1].Raw is "t" or "T") last = count - 1;
+        else if (extra is not ("t" or "T")) return false;
+        var kana = "";
+        for (var i = last - 1; i >= 0; i--)
+        {
+            if (!_units[i].Kana.All(c => c is >= 'ぁ' and <= 'ゖ' or 'ー') || _units[i].Raw.Length == 0 || !_units[i].Raw.All(char.IsAsciiLetter)) return false;
+            kana = _units[i].Kana + kana;
+            if (i <= start && kana.Length + 1 >= (i == start ? 2 : 3) && _detector.IsJapaneseWordOrPrefix(kana + "つ")) return true;
+        }
+        return false;
+    }
+
+    private bool EndsWithEnglishWordFromUnit(int count, string extra = "", bool tsuFollows = false)
     {
         var letters = extra;
         for (var i = count - 1; i >= 0 && _units[i].Raw.Length > 0 && _units[i].Raw.All(char.IsAsciiLetter); i--)
@@ -335,6 +361,8 @@ public sealed class CompositionText
             letters = _units[i].Raw + letters;
             // 大文字の略語の途中 (AI の I) から始まる語 (Init) は見ない (AInitsuite の t と s を つ にまとめるように。本家 #129、P45-10)
             if (i > 0 && char.IsAsciiLetterUpper(_units[i].Raw[0]) && _units[i - 1].Raw is [.., var before] && char.IsAsciiLetterUpper(before)) continue;
+            // 続けて打った s と合わせた つ まで読むと日本語の語 (shitsumon の shit) なら、英単語として見ない (本家 35beb60、P45-11)
+            if (tsuFollows && ReadsAsJapaneseWithTsu(i, count, extra)) continue;
             if (letters.Length >= 4 && _detector.IsKnownEnglishWord(letters)) return true;
         }
         return false;

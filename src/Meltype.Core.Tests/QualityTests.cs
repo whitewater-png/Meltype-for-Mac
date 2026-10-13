@@ -107,6 +107,11 @@ internal static class Quality
         new("混在", "selectshita", "selectした"),
         new("混在", "tanaka@gmail.com", "tanaka@gmail.com"),
         new("混在", "yamada.taro@example.co.jp", "yamada.taro@example.co.jp"),
+        // 英単語の最後の t + s は つ にしないが、つ まで読むと日本語の語になるなら つ (しゅつ・おちつ。本家 35beb60、P45-11)
+        new("日本語", "teishutsushita", "ていしゅつした"),
+        new("日本語", "ochitsuite", "おちついて"),
+        new("混在", "kyoucommitsuru", "きょうcommitする"),
+        new("混在", "shutsita", "shutした"),
         new("混在", "githubnipushshita", "githubにpushした"),
         new("混在", "pythondekaita", "pythonでかいた"),
         new("混在", "zoomdekaigi", "zoomでかいぎ"),
