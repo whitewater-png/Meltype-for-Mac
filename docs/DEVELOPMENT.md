@@ -144,3 +144,24 @@ tools/eval-compare.sh /tmp/meltype-upstream . eval/cases /tmp/eval-out
 - `/tmp` のようにシンボリックリンクを通る絶対パスで `dotnet run --project` を呼ぶとビルドが失敗することがあったので、スクリプトは作業ツリーに入って相対パスで呼びます。
 
 この比較は Core のテスト用キーボードの結果で、**実機の確認の代わりにはなりません**。Windows・Linux は対象外です。
+
+### 本家追従 (`tools/upstream_watch.py`)
+
+本家 Meltype の新しいコミットを PR 単位で拾い、Mac 版に取り込み済みか・そのまま当たるか・新しい正解ケースがあるかを [docs/UPSTREAM_WATCH.md](UPSTREAM_WATCH.md) の候補表にまとめます。
+
+```bash
+git clone https://github.com/yksr-melt/Meltype.git ~/meltype-upstream   # 初回だけ。完全な履歴が要ります (--depth 1 は不可)
+export MELTYPE_UPSTREAM=~/meltype-upstream
+python3 tools/upstream_watch.py --since <hash>   # 初回だけ --since。2 回目からは UPSTREAM_WATCH.md 先頭の seen から
+python3 tools/upstream_watch.py                  # 以降
+```
+
+- 引数: `--upstream <clone>` (既定: `MELTYPE_UPSTREAM`)、`--mac <tree>` (既定: このスクリプトのあるリポジトリ)、`--since <hash>`、`--no-fetch` (fetch しない)、`--dry-run` (文書も候補ファイルも書かず、標準出力だけ)、`--no-eval` (dotnet を回さない)。通信は本家の clone への `git fetch` だけです。終了コードは 0 = 正常 (新コミット 0 件も 0)、2 = 引数・環境の誤り (dotnet の失敗も 2。文書は更新しません)。標準出力に 3〜6 行の要約が出ます (Hermes の定期実行はこれを読みます。定期実行はこのリポジトリの外です)。
+- 出力: `docs/UPSTREAM_WATCH.md` の先頭に、新しい順で節が増えます。本家の `QualityTests.cs` に足された `new("カテゴリ", "打鍵", "期待")` の行は `eval/candidates/upstream-<日付>.tsv` に書き (4 列。同じ日の再実行は上書き)、Mac 版で何件当たるかを表と節の末尾に出します。
+- **候補ファイルは正解表に自動では足されません。** 正解表に移すのは人です:
+  1. 候補ファイルの行を見て、期待が本家の意図どおりか、私的な文が入っていないかを確かめる (当たる行も、外れる行も。外れる行は Mac 版にまだ無い修正を示します)。
+  2. 入れる行を `eval/cases/upstream-quality.tsv` の**末尾**に移す (出典の列は `本家 <hash> #NNN` のまま)。
+  3. 上の「1 つの作業ツリーで流す」で回し、数字が期待どおりか見る。
+  4. push すれば表は公開されます。`git add` した時点で履歴にも残るので、迷う行は入れません。
+- `Before:` などの名前付き引数がある行、かなで打つ行、複数行の行は 4 列で表せないので、候補ファイルには出さず、表の「新ケース」の列に件数だけ出ます。必要なら本家のテストを見て手で足します。
+- 自己テスト: `python3 tools/test_upstream_watch.py` (git・dotnet は使いません)。Windows・Linux の変更は一覧に出すだけで、取り込み・評価はしません。
