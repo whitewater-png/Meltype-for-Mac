@@ -1167,6 +1167,8 @@ internal static class RomajiTypoTests
         foreach (var word in words)
         {
             Assert.True(word.Length >= 4 && word.All(char.IsAsciiLetterLower), "4 文字以上の小文字の英字: " + word);
+            // overcute (本家 #406、P45-1) は全体ではローマ字として読めないが、over|cute と 2 語に割れて overくて になるので入れる (割れる語だけ例外)
+            if (word == "overcute") continue;
             Assert.True(CompositionTests.Detector.Romaji.AnalyzeFragment(word).IsValid, "ローマ字として読める語 (features の s のような最後の子音は残ってよい): " + word);
         }
         Assert.Equal(words.Count, words.Distinct().Count(), "重複が無い");

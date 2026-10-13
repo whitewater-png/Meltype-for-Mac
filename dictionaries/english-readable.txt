@@ -24,3 +24,5 @@ vitamin warehouse warren whole whose
 # remain は入れない (remaindo = リマインド を re で打つ形が remainど になるため。査読 R33)。
 # まいんど (マインド) の頭なので、main + do・main + ku (マインクラフト) のように、続く 1 音とでよく使う語・ブランド名の読みの頭になるときは英語にしない (CompositionDetector.ContinuesJapaneseWord)。
 main domain
+# overcute: over|cute に割れるが全体は日本語の語ではない (本家 #406、P45-1)
+overcute
