@@ -10,7 +10,7 @@
 #   - Meltype.app の署名が壊れていないか確かめる (壊れていたら何も入れずに中止)
 #   - ~/Library/Input Methods/Meltype.app に入れる (cp / 入れ直しのときは、今のものを一時の場所に退避してから rsync --delete で中身だけ入れ替え、署名の検査に失敗したら退避から戻す)
 #   - 入れ直しのとき、動いている Meltype と、開いている辞書の管理画面「Meltype 辞書」を止める
-#     (pkill -x Meltype、pkill -f …/Meltype.app/Contents/Helpers/MeltypeDictionary.app/。辞書の変更はその都度保存済み)
+#     (killall Meltype、pkill -f …/Meltype.app/Contents/Helpers/MeltypeDictionary.app/。辞書の変更はその都度保存済み)
 #   - 隔離属性 (com.apple.quarantine) を外す (確認してから。下を読むこと)
 #   - 入力ソースとして登録し (Meltype --register)、入力メニューと IME の起動役を起動し直す (killall imklaunchagent TextInputMenuAgent)
 #   - 登録できなかったときだけ、入力ソースの一覧に書き込む (defaults write com.apple.HIToolbox AppleEnabledInputSources)
@@ -128,7 +128,12 @@ if [[ -d "$TARGET/Meltype.app" ]]; then
     rm -rf "$BACKUP_DIR"
     # 入れ替えてから、動いていた Meltype を止める (次にキーを打ったときに macOS が新しい Meltype を起動する)。
     # 先に止めると、入れ替えの途中でキーを打ったときに、新旧が混ざった Meltype が起動されてしまう。
-    pkill -x Meltype 2>/dev/null || true
+    # pkill ではなく killall を使う: pkill は既定で「自分の祖先」を対象から外す。入力メニューの「更新する」は IME が
+    # 切り離した bash -c を起動し、その中でこの install.sh を実行するので、IME は祖先にあたり、pkill -x Meltype では止められない
+    # (古い版が動き続ける。1.1.3 以降では、入れ替えたあとも「新しい版があります」が出る)。ターミナルから手で実行したときは問題にならないので、
+    # 手で試しただけでは気づけない。確かめ方: python3 tools/check-install-stop-ime.py
+    # (build.sh・uninstall.sh・pkg の postinstall の pkill は、IME から起動されない前提で、そのままにしてある)
+    killall Meltype 2>/dev/null || true
     # 開いていた辞書の管理画面も閉じる (古い版のまま残さない。変更はその都度保存済み)。
     # 実行ファイル名が 16 文字を超え pkill -x では合わないので、入れ替えた Meltype.app の中のパスで探す。
     pkill -f "$TARGET/Meltype.app/Contents/Helpers/MeltypeDictionary.app/" 2>/dev/null || true

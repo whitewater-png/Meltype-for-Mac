@@ -8,6 +8,7 @@
 ## Mac 版: 公開前の検査 (読み取り専用・Mac 専用)
 
 `mac/build.sh --no-install` → `make-zip.sh` → `make-pkg.sh` のあと、`gh release create` の前に `python3 tools/check-release.py mac/dist/Meltype-mac-<版>.zip mac/dist/Meltype-mac-<版>.pkg --expect-version <版>` を実行する (署名・ビルド時の絶対パス・arch・版の一致・zip と pkg の中身。何も書き換えず、ネットワークも使わない)。FAIL が 1 つでもあれば公開しない。
+`mac/install.sh` を触ったときと公開の前には `python3 tools/check-install-stop-ime.py` も実行する (この 1 つだけは読み取り専用ではない: 更新機能から起動された `install.sh` が、動いている IME を止められるかを、一時フォルダーに作る身代わりのプロセスで確かめる。C のコンパイラ (Command Line Tools) が要る。本物の Meltype・リポジトリ・成果物には触らない。終了コードが 0 以外 (FAIL=1、確かめられなかった=2) なら公開しない。zip を作ったあとで `install.sh` を直したときは、展開した zip の `Meltype-mac/install.sh` を引数に渡す。経緯は計画書の Q13)。
 公開したあとは、`gh release view v<版>-mac --json assets` の digest を `--zip-digest`・`--pkg-digest` に渡して、配った zip と pkg が手元と同じか確かめる。通っても実機での確認の代わりにはならない。項目は `docs/PKG_REVIEW_2026-10.md` の §7、`--help` で選択肢が見られる。
 リポジトリ側の検査 (postinstall・pkg の Resources・Distribution・版・案内文) は、作業ツリーではなく `--ref` (既定は HEAD) の**コミットの内容**と比べる。**コミットしてから実行する** (未コミットの変更は見ない)。公開済みの版と比べるときは `--ref v<版>-mac`。`--ref` に存在しない名前を渡すと、検査を始めずに終了コード 2 で止まる。
 pkg は、Scripts が postinstall の 1 つだけであること (root で走る)、Resources が `mac/pkg/resources` とバイト一致であること、Payload の生のモード (setuid など) も見る。Payload を読む `bsdtar` などが無い環境では、その 1 項目だけ SKIP になる。

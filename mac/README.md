@@ -58,7 +58,7 @@ cd mac
 - 判定は Core の `UpdateCheck.Evaluate` (`src/Meltype.Core/Update/UpdateCheck.cs`)。draft / prerelease を無視し、タグ (`v1.0.4-mac` など) の版を数で比べ、資産 `Meltype-mac-<版>.zip` の URL (`github.com/whitewater-png/Meltype-for-Mac/releases/download/`)・サイズ (100 MB 以下)・`digest` (`sha256:` + 64 桁) が全部そろったときだけ有効にする。
 - 新しい版が見つかると、入力メニューの先頭に「新しい版があります (v…)…」を出し、通知センターにも 1 度だけ通知する (`notifiedVersion`。許可を断られていれば通知しない)。
 - 「更新する」を押したときだけ、zip をダウンロード (リダイレクトは github.com / githubusercontent.com だけ) → SHA-256 を照合 → `ditto -x -k` で展開 → `codesign --verify --deep --strict`・版・バンドル ID の確認 → (展開の前に zip の中身を検査) → 展開したフォルダーの `install.sh --yes` を新しいセッションで切り離して起動する。
-  `install.sh` は rsync で入れ替えてから `pkill -x Meltype` で IME を止めるが、切り離した bash は続き、終わると結果のダイアログを出して一時フォルダーを消す (ログは `Application Support/Meltype/update.log`)。ダウンロード・SHA-256・展開前の zip の検査 (エントリ 5000 個以下・展開後 300MB 以下・`..` や絶対パスの名前なし)・展開・署名の検査のどれかで失敗したら、入れてある Meltype には触れずに中止する。
+  `install.sh` は rsync で入れ替えてから `killall Meltype` で IME を止めるが、切り離した bash は続き、終わると結果のダイアログを出して一時フォルダーを消す (ログは `Application Support/Meltype/update.log`)。ダウンロード・SHA-256・展開前の zip の検査 (エントリ 5000 個以下・展開後 300MB 以下・`..` や絶対パスの名前なし)・展開・署名の検査のどれかで失敗したら、入れてある Meltype には触れずに中止する。
   `install.sh` は入れ替える前に今の Meltype.app を一時フォルダーへ `cp -Rp` で退避し、rsync か入れ替え後の `codesign --verify` が失敗したら退避から書き戻す (成功したら退避を消す。`Meltype.app` フォルダーそのものは消さない)。
 - 1.0.4〜1.0.9 をお使いの場合は、入力メニューの更新が失敗するので、リリースページから zip をダウンロードして、「Install Meltype.command」で手で入れ替えてください (設定と辞書はそのまま残ります。1.0.10 以降は更新が使えます)。
 - 「更新する」が出るのは、実行中の Meltype が `~/Library/Input Methods/Meltype.app` のときだけ (それ以外 (ビルドの途中の場所など) は「詳細」でリリースページを開くだけ)。
@@ -78,7 +78,7 @@ shasum -a 256 ~/Downloads/Meltype-mac.zip   # ファイル名は実際のもの�
 
 1. `codesign --verify --deep --strict` で Meltype.app が壊れていないか確かめる (壊れていたら何も入れずに中止)。入れ直しのときは、入れ替える前に今のものを退避し、入れ替えか入れ替え後の署名の検査に失敗したら元に戻す
 2. 実行ファイル (IME と辞書の管理画面) と `libMeltypeNative.dylib` の SHA-256 を表示する (リリースページの値と見比べる)
-3. `~/Library/Input Methods/Meltype.app` に入れる (入れ直しのときは `rsync -a --delete` で中身だけ入れ替え、動いている Meltype を `pkill -x Meltype` で止める。
+3. `~/Library/Input Methods/Meltype.app` に入れる (入れ直しのときは `rsync -a --delete` で中身だけ入れ替え、動いている Meltype を `killall Meltype` で止める。
    開いている辞書の管理画面も `pkill -f …/Meltype.app/Contents/Helpers/MeltypeDictionary.app/` で閉じる。辞書の変更はその都度保存済みなので失われない)
 4. 隔離属性 `com.apple.quarantine` を外す。**macOS の Gatekeeper の検査をこの Meltype.app について回避する**操作なので、端末では `[y/N]` を聞きます (`--yes` で省略。端末でなく `--yes` も無いときは外さない)
 5. 入力ソースとして登録し、`killall imklaunchagent TextInputMenuAgent` で入力メニューと IME の起動役を起動し直す

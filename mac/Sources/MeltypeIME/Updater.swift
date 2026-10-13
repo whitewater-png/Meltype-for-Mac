@@ -600,7 +600,8 @@ enum Updater {
     }
 
     /// install.sh を --yes で、新しいセッション (POSIX_SPAWN_SETSID) で起動する。
-    /// install.sh は rsync で入れ替えてから pkill -x Meltype でこの IME を止めるが、止められるのは IME だけで、
+    /// install.sh は rsync で入れ替えてから killall Meltype でこの IME を止めるが (この IME は install.sh の祖先にあたり、
+    /// pkill は祖先を対象から外すので使えない。tools/check-install-stop-ime.py)、止められるのは IME だけで、
     /// 切り離した bash は続く (SIGHUP も来ない)。終わったら、結果のダイアログを出して一時フォルダーを消す。
     /// 標準出力・標準エラーは update.log に書く (0600、毎回上書き)。
     private static func launchDetachedInstall(folder: URL, work: URL, version: String, logFile: URL, dataDirectory: URL) -> Bool {
