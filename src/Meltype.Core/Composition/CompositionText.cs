@@ -159,6 +159,7 @@ public sealed class CompositionText
             _pending.Append(c);
             SplitUnitAfterNumber(final: false);
             Normalize(final: false);
+            RereadSmallTsuAfterEnglishL();
             return;
         }
         if (_pending.Length > 0 && char.ToLowerInvariant(_pending[^1]) == 'z' && ZSymbol(c) is { } z)
@@ -245,6 +246,54 @@ public sealed class CompositionText
             _units[^1] = new CompositionUnit("ん", last.Raw[..1]);
             _pending.Append(last.Raw[1]);
             return;
+        }
+    }
+
+    /// <summary>
+    /// 英単語の最後の l + tu / tsu を、英単語 + つ ではなく、英単語 + 小書きの っ で読み直す (moral|ltu|te = もらって)。
+    /// 英単語の最後の l は、次の文字を打った時点で英字として固定される (moral|tu = moralつ) ので、ここで読み直す。
+    /// 後ろの tute が日本語として不自然で、英単語 + つ の方が自然なとき (mail|tukau = つかう) は、今までどおり英単語 + つ に戻す。
+    /// 大文字を含むとき (Moraltute) と「っっ」になるとき (sukilltute) は読み直さない。本家 #104 (P45-5)。
+    /// </summary>
+    private void RereadSmallTsuAfterEnglishL()
+    {
+        var common = _detector.IsCommonJapanese;
+        if (common is null) return;
+        var start = _units.Count;
+        while (start > 0 && _units[start - 1].Raw is { Length: > 0 } raw && raw.All(char.IsAsciiLetter)) start--;
+        // 末尾に近い方から、英字として固定された l (次が tu/tsu) か、ltu/ltsu を っ として読んだ単位を探す
+        var li = -1;
+        for (var i = _units.Count - 1; i >= start && li < 0; i--)
+        {
+            var fixedL = _units[i] is { Raw: "l", Kana: "l" } && i + 1 < _units.Count && _units[i + 1] is { Raw: "tu" or "tsu", Kana: "つ" };
+            if (fixedL || _units[i] is { Raw: "ltu" or "ltsu", Kana: "っ" }) li = i;
+        }
+        if (li < 0) return;
+        // 英単語の始まり: li - 1 から前へ、stem + l が 4 文字以上の知っている英単語になる位置
+        var w = -1;
+        var stem = "";
+        for (var i = li - 1; i >= start && w < 0; i--)
+        {
+            stem = _units[i].Raw + stem;
+            if (stem.Length + 1 >= 4 && (stem + "l") is var word && word.All(char.IsAsciiLetterLower) && _detector.IsKnownEnglishWord(word)) w = i;
+        }
+        if (w < 0) return;
+        var isFixedL = _units[li].Kana == "l";
+        var restAfterL = _units[li].Raw[1..] + string.Concat(_units.Skip(li + 1).Select(u => u.Raw));
+        var whole = stem + "l" + restAfterL;
+        if (whole.Any(char.IsAsciiLetterUpper)) return;
+        var useTsu = common(whole) && !common(restAfterL) && !_detector.Romaji.AnalyzeFragment(whole).Kana.Contains("っっ");
+        if (isFixedL && useTsu)
+        {
+            var tsu = _units[li + 1];
+            _units.RemoveRange(li, 2);
+            _units.Insert(li, new CompositionUnit("っ", "l" + tsu.Raw));
+        }
+        else if (!isFixedL && !useTsu)
+        {
+            var raw = _units[li].Raw;
+            _units[li] = new CompositionUnit("l", "l");
+            _units.Insert(li + 1, new CompositionUnit("つ", raw[1..]));
         }
     }
 
