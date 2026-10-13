@@ -25,6 +25,7 @@ internal static class Quality
     [
         // --- 日本語の文 (テスト用の変換エンジンはかなのまま返す) ---
         new("日本語", "kyouhaiitenkidesune", "きょうはいいてんきですね"),
+        new("日本語", "hosuthingu", "ほすてぃんぐ"),
         new("日本語", "watashihagakuseidesu", "わたしはがくせいです"),
         new("日本語", "arigatougozaimasu", "ありがとうございます"),
         new("日本語", "yoroshikuonegaishimasu", "よろしくおねがいします"),

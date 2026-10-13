@@ -764,6 +764,14 @@ public sealed class CompositionDetector
         if (!analysis.IsValid)
         {
             if (!exact && !prefix) return false;
+            // 日本語のすぐ後ろの短い英単語 (thin) が、変換ボックスの綴り (thi = てぃ) では最後まで読めて、続き (gu) とも読めるなら、
+            // 外来語のカタカナ (hosu|thin|gu = ホスティング) を打っている途中。英単語にしない (ほすthinぐ になっていた。本家 #153、P45-2)。
+            if (before < 0 && !atEnd && lower.Length <= 4 && next is { Length: > 0 } && char.IsAsciiLetter(next[0]) &&
+                _romaji.AnalyzeFragment(lower) is { IsValid: true, Partial: "" or "n" } &&
+                _romaji.AnalyzeFragment(lower + next.ToLowerInvariant()).IsValid)
+            {
+                return false;
+            }
             if (!exact && smallKanaSpelling) return false;
             // 日本語のすぐ後ろの 2 文字の語で、変換ボックスでは読める綴り (こ + we = こうぇ、wi = うぃ) は日本語。
             if (smallKanaSpelling && lower.Length <= 2 && before < 0) return false;
