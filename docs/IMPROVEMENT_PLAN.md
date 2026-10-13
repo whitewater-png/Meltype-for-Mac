@@ -2289,6 +2289,7 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
   11. `teishutsushita` → `ていしゅつした`。`kyoucommitsuru` → `きょうcommitする`
   - R35 の形: `kyouhawikipediadeshirabeta` → `きょうはwikipediaでしらべた` (前の日本語が英字にならない)、`ato@hitori` → `ato@hitori` (トレードオフの確認)
 - **限界**: Mac 版 Core のテスト用キーボードの結果で、変換エンジン・Mac の入力欄は通っていない。同梱の英単語表と `NSSpellChecker` の差は未確認 (上の「実機で確かめること」)。取り込んだ修正は eval の 264 件と Core のテスト 618 件では broken 0 だが、取り込み前後の大規模な比較 (P29 のような数万件) は行っていない (R35 の 576 行の比較が唯一の広い比較)。見送りの判断は「eval か既存テストが 1 件でも壊れたら撤退」で機械的に行い、壊れない条件を探すことはしていない。`-pedia` のように eval にも既存テストにも無い形の悪化は、この方針では見つからず、査読で見つかった。
+- **実機確認 (2026-10-14、macOS 26.6.2、JIS、TextEdit、ビルド 08:08 = main 6b0dca9)**: 上の 1〜11・R35 の全項目が期待どおり (`overcute`、`ホスティング`、`reflectされた`、`今日はもらって` / `hotelつかう`、`yamada.taro@example.co.jp` / `あと@3nin`、`AIできる` / `Xの投稿は`、`提出した` / `きょうcommitする`、`今日はwikipediaで調べた` / `ato@hitori`)。`umaindesu` だけ `うmainです` になったが、これはリョウさんの Mac で `main` が英語として学習されているため (Q11 に記録済みの既知のコスト。学習した語から `main` を消せば `うまいんです` に戻る)。P45 の変更とは無関係。→ **完了**。
 - **Windows・Linux は対象外** (Mac 版の Core の変更だが、確かめたのは Mac 版の Core だけ)。
 
 ## 追加項目 0-2 (本家追従の半自動化: `tools/upstream_watch.py`)
