@@ -704,6 +704,23 @@ internal static class LanguageLearningTests
     }
 
     [Test]
+    public static void AcronymThenRomaji_IsJapanese()
+    {
+        // 大文字の略語の後ろのローマ字 (AInituite → AIについて: 本家 #129、P45-10)。
+        // AIde を英単語 aide、AInit を init と読んで、後ろまで英字にしていた
+        foreach (var (typed, expected) in new[]
+        {
+            ("AInituite", "AIについて"), ("AInitsuite", "AIについて"), ("AIdekiru", "AIできる"), ("GPTnituite", "GPTについて"),
+            ("AIde", "AIで"), ("iOSdekiru", "iOSできる"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void UnitsAfterNumbers_StayLetters()
     {
         // 単位 (mm、min) が打ちにくく、日本語になることがあった (10mmで → 10っまで、5min → 5みん)。

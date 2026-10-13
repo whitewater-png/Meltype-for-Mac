@@ -333,6 +333,8 @@ public sealed class CompositionText
         for (var i = count - 1; i >= 0 && _units[i].Raw.Length > 0 && _units[i].Raw.All(char.IsAsciiLetter); i--)
         {
             letters = _units[i].Raw + letters;
+            // 大文字の略語の途中 (AI の I) から始まる語 (Init) は見ない (AInitsuite の t と s を つ にまとめるように。本家 #129、P45-10)
+            if (i > 0 && char.IsAsciiLetterUpper(_units[i].Raw[0]) && _units[i - 1].Raw is [.., var before] && char.IsAsciiLetterUpper(before)) continue;
             if (letters.Length >= 4 && _detector.IsKnownEnglishWord(letters)) return true;
         }
         return false;

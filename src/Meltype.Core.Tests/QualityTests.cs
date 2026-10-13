@@ -199,6 +199,8 @@ internal static class Quality
         new("大文字", "W", "W"),
         new("大文字", "kaW", "かW"),
         new("大文字", "McAfeeto", "McAfeeと"),
+        new("大文字", "AInituite", "AIについて"),
+        new("大文字", "AIdekiru", "AIできる"),
 
         // --- 本家 #406 (P45-1) ---
         new("英語", "overcute", "overcute"),

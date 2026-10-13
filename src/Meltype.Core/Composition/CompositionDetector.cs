@@ -851,6 +851,8 @@ public sealed class CompositionDetector
             var head = Raw(units, start, k);
             if (!head.All(char.IsAsciiLetter)) continue;
             if (lowerStart && !(head.Length >= 3 && IsKnownCapitalizedWord(head))) continue;
+            // 大文字の略語に小文字が続いた形 (AIde、AIni) は語ではない。略語 (AI) の後ろがローマ字 (dekiru) と見る (本家 #129、P45-10)
+            if (IsAcronymWithLowerTail(head)) continue;
             // 後ろは小文字のローマ字 (長音の - を含んでもよい: TSyu-za- の yu-za-)。
             var rest = Raw(units, k, n) + pending;
             // 後ろが助詞 1 つだけ (OCR|wo、English|ga) なら 2 文字でもよい
@@ -880,6 +882,17 @@ public sealed class CompositionDetector
             if (head.Length >= 3 && IsKnownCapitalizedWord(head) || head.Length >= 4 && IsSpellWord(head.ToLowerInvariant())) return k;
         }
         return -1;
+    }
+
+    /// <summary>
+    /// 大文字 2 文字以上の後ろに小文字が続く (AIde・GPTni)。iOS・IDEs のような知っている書き方でなければ、
+    /// 1 つの語ではなく、略語 + ローマ字の打ち始め。(本家 #129、P45-10)
+    /// </summary>
+    private bool IsAcronymWithLowerTail(string head)
+    {
+        var upper = 0;
+        while (upper < head.Length && char.IsAsciiLetterUpper(head[upper])) upper++;
+        return upper >= 2 && upper < head.Length && head[upper..].All(char.IsAsciiLetterLower) && !IsKnownCapitalizedWord(head);
     }
 
     // - を付けて使う英語の接頭辞 (e-mail、re-do、co-op、x-ray)。接頭辞 + - + 3 文字以上の英単語なら英語。
