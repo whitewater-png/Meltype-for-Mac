@@ -153,6 +153,9 @@ internal static class CompositionTests
         /// <summary>変換中の Shift+Enter で確定してキーをアプリに渡すか (CompositionOptions.ShiftEnterNewline)。既定は ON。</summary>
         public bool ShiftEnterNewline { get; set; } = true;
 
+        /// <summary>ATOK スタイルのキー操作か (CompositionOptions.TokMode)。既定は OFF (今までの動作)。</summary>
+        public bool TokMode { get; set; }
+
         /// <summary>変換後も続けて入力できるか (CompositionOptions.ContinueAfterConversion)。既定は OFF (今までの動作)。</summary>
         public bool Continue { get; set; }
 
@@ -202,6 +205,7 @@ internal static class CompositionTests
                 LiveConversion = () => live,
                 ContinueAfterConversion = () => Continue,
                 ShiftEnterNewline = () => ShiftEnterNewline,
+                TokMode = () => TokMode,
                 TypeDigitsAfterConversion = () => TypeDigits,
                 DirectMode = () => Direct,
                 ClassifyDirect = (letters, final) => DirectEngine.Evaluate(new Detection.DetectionInput(letters, letters.Select(c => (int)char.ToUpperInvariant(c)).ToArray(), final)).Verdict,

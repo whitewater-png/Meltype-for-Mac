@@ -348,6 +348,29 @@ public sealed class CompositionText
         _units.InsertRange(0, kana.Select(c => new CompositionUnit(c.ToString(), c.ToString())));
     }
 
+    /// <summary>
+    /// 先頭から、文節の並び (日本語の文節は読み、英語の文節は打った英字) に当たる単位を取り除く (部分確定で、確定した分を除く)。
+    /// 文節の区切りが 1 音の途中にある・中身が合わないときは false で、何も変えない。
+    /// </summary>
+    public bool RemoveLeading(IEnumerable<(string Text, bool English)> parts)
+    {
+        var index = 0;
+        foreach (var (text, english) in parts)
+        {
+            var position = 0;
+            while (position < text.Length)
+            {
+                if (index >= _units.Count) return false;
+                var piece = english ? _units[index].Raw : _units[index].Kana;
+                if (piece.Length == 0 || position + piece.Length > text.Length || string.CompareOrdinal(text, position, piece, 0, piece.Length) != 0) return false;
+                position += piece.Length;
+                index++;
+            }
+        }
+        _units.RemoveRange(0, index);
+        return true;
+    }
+
     /// <summary>単位 (読みと打った英字) を、今の内容の前に付ける。固定していた文節を、打ったままの状態に戻すのに使う。</summary>
     public void PrependUnits(IEnumerable<CompositionUnit> units) => _units.InsertRange(0, units.ToList());
 
