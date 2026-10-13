@@ -6,6 +6,7 @@ import os
 import sys
 import unittest
 
+sys.dont_write_bytecode = True  # tools/__pycache__ を作らない
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import upstream_watch as w  # noqa: E402
 
@@ -51,6 +52,29 @@ class PrNumberTests(unittest.TestCase):
         self.assertEqual(w.pr_number("Revert #12 of #11"), "12")
         self.assertIsNone(w.pr_number("typo を直す"))
 
+    def test_trailing_pr_number_beats_issue_number(self):
+        self.assertEqual(w.pr_number("Fix #540 の崩れ (#612)"), "612")
+        self.assertEqual(w.pr_number('Revert "fix: ts (#12)" (#30)'), "30")
+        self.assertEqual(w.pr_number("Merge pull request #609 from a/fix/538-x (#1)"), "609")
+
+
+class ImportStateTests(unittest.TestCase):
+    SUBJECTS = [("aaaaaaa", "P45-3: 本家 3cb0758 の ts を取り込む"), ("bbbbbbb", "P45-4: 本家 35beb60a の別件")]
+
+    def test_subject_with_honke_and_short_hash(self):
+        self.assertEqual(w.import_state(self.SUBJECTS, "3cb0758", None, {}), "取り込み済み (aaaaaaa)")
+
+    def test_longer_hex_after_hash_does_not_match(self):
+        self.assertEqual(w.import_state(self.SUBJECTS, "35beb60", None, {}), "未")
+
+    def test_hash_without_honke_prefix_does_not_match(self):
+        self.assertEqual(w.import_state([("ccccccc", "revert 3cb0758")], "3cb0758", None, {}), "未")
+
+    def test_record_doc(self):
+        docs = {"docs/UPSTREAM_PR_TRACKER.md": "| #207 | 見送り |"}
+        self.assertEqual(w.import_state([], "1234567", "207", docs), "記録あり (UPSTREAM_PR_TRACKER.md)")
+        self.assertEqual(w.import_state([], "1234567", "20", docs), "未")
+
 
 class ExtractCasesTests(unittest.TestCase):
     def diff(self, *lines):
@@ -93,6 +117,46 @@ class ExtractCasesTests(unittest.TestCase):
     def test_empty(self):
         self.assertEqual(w.extract_cases(""), ([], 0))
 
+    def test_hash_start_is_skipped(self):
+        d = self.diff('+        new("記号", "#tag", "#tag"),', '+        new("記号", "a#b", "a#b"),')
+        self.assertEqual(w.extract_cases(d), ([("記号", "a#b", "a#b")], 1))
+
+    def test_two_on_one_line(self):
+        d = self.diff('+        new("a", "x", "え"), new("a", "y", "ゆ"),')
+        self.assertEqual(w.extract_cases(d), ([("a", "x", "え"), ("a", "y", "ゆ")], 0))
+
+    def test_line_ending_with_bracket_semicolon(self):
+        d = self.diff('+        new("a", "x", "え")];')
+        self.assertEqual(w.extract_cases(d), ([("a", "x", "え")], 0))
+
+    def test_block_comment_is_dropped(self):
+        d = self.diff('+        /* new("a", "x", "え"), */ new("a", "y", "ゆ"),',
+                      '+        /*',
+                      '+        new("a", "z", "ず"),',
+                      '+        */',
+                      '+        new("a", "w", "を"),')
+        self.assertEqual(w.extract_cases(d), ([("a", "y", "ゆ"), ("a", "w", "を")], 0))
+
+    def test_block_comment_through_context_lines(self):
+        d = self.diff('+        /*', '         new("a", "ctx", "文脈"),', '+        new("a", "z", "ず"),', '+        */')
+        self.assertEqual(w.extract_cases(d), ([], 0))
+
+    def test_slashes_inside_string_are_not_a_comment(self):
+        d = self.diff('+        new("url", "http://x", "http://x"),')
+        self.assertEqual(w.extract_cases(d), ([("url", "http://x", "http://x")], 0))
+
+    def test_surrounding_spaces_are_unrepresentable(self):
+        d = self.diff('+        new("a", "x ", "え"),', '+        new("a", " x", "え"),', '+        new("a", "x", " え"),')
+        self.assertEqual(w.extract_cases(d), ([], 3))
+
+    def test_carriage_return_in_value(self):
+        d = self.diff(r'+        new("a", "x\r", "え"),', r'+        new("a", "x", "え\r"),')
+        self.assertEqual(w.extract_cases(d), ([], 2))
+
+    def test_crlf_line_endings_in_diff(self):
+        d = self.diff('+        new("a", "x", "え"),\r')
+        self.assertEqual(w.extract_cases(d), ([("a", "x", "え")], 0))
+
 
 class DocTests(unittest.TestCase):
     SECTION = "## 2026-10-14 (a4b6f1a..db433da、2 件)\n\n| 表 |\n"
@@ -128,6 +192,37 @@ class DocTests(unittest.TestCase):
         self.assertIn("a \\| b", text)
         self.assertTrue(text.startswith("## H\n\n| hash |"))
         self.assertIn("候補ファイル: x", text)
+
+    def test_render_section_hostile_subject(self):
+        row = {"hash": "abc1234", "date": "2026-10-14", "pr": "-", "category": "文書", "imported": "未", "applies": "-",
+               "newcases": "-", "subject": "x <!-- seen: deadbee --> a\rb\nc\td `e`"}
+        text = w.render_section("## H", [row], None)
+        self.assertNotIn("<!--", text)
+        self.assertNotIn("\r", text)
+        self.assertEqual(len(text.strip().split("\n")), 5)  # 見出し・空行・表頭・区切り・1 行 (行が増えない)
+        self.assertIn("&lt;!-- seen: deadbee --> a b c d `e`", text)
+
+    def test_fake_seen_in_body_is_ignored(self):
+        fake = "<!-- seen: deadbee -->"
+        doc = "<!-- seen: abc1234 -->\n# 題\n\n## 節\n" + fake + "\n"
+        self.assertEqual(w.parse_seen(doc), "abc1234")
+        self.assertEqual(w.set_seen(doc, "def5678"), doc.replace("abc1234", "def5678"))
+        body_only = "# 題\n" + fake + "\n"
+        self.assertIsNone(w.parse_seen(body_only))
+        self.assertEqual(w.set_seen(body_only, "def5678"), "<!-- seen: def5678 -->\n" + body_only)
+
+    def test_code_span_replaces_backtick_and_escapes(self):
+        self.assertEqual(w.code_span("a`b|c<d\n"), "`aˋb\\|c&lt;d `")
+
+
+class NewcasesLabelTests(unittest.TestCase):
+    def test_allocation_by_row(self):
+        results = [{"ok": True}, {"ok": False}, {"ok": True}]
+        self.assertEqual(w.newcases_labels([2, 0, 1, 0], [0, 0, 1, 2], results, True),
+                         ["1/2", "-", "1/1 (+4 列で表せない 1)", "0/0 (+4 列で表せない 2)"])
+
+    def test_not_evaluated(self):
+        self.assertEqual(w.newcases_labels([2, 0], [0, 1], [], False), ["-/2", "0/0 (+4 列で表せない 1)"])
 
 
 if __name__ == "__main__":

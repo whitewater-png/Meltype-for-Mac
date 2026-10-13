@@ -1,6 +1,7 @@
 # ビルド成果物・配布物 (ソースから作り直せるもの)
 bin/
 obj/
+__pycache__/
 .build/
 mac/build/
 mac/dist/

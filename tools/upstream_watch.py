@@ -7,9 +7,9 @@
 やること (docs/UPSTREAM_WATCH.md の先頭の `<!-- seen: <hash> -->` から origin/main までを見る):
   1. 本家の clone を fetch する (--no-fetch で省く。通信はこれだけ)
   2. first-parent の PR 単位でコミットを並べ、変更ファイルから分類する (判定・変換 / Windows / 本家 Mac / Linux / 文書)
-  3. Mac 版に取り込み済みか (hash が Mac 版のコミットにあるか、追跡文書に記録があるか) を調べる
+  3. Mac 版に取り込み済みか (Mac 版のコミットの件名に `本家 <7桁>` があるか、追跡文書に記録があるか) を調べる
   4. 判定・変換のコミットは、Mac 版にそのまま当たるか (git apply --check) を調べる
-  5. 本家の QualityTests.cs に足された new("カテゴリ", "打鍵", "期待") を eval/candidates/upstream-<日付>.tsv に書き、
+  5. 本家の QualityTests.cs に足された new("カテゴリ", "打鍵", "期待") を eval/candidates/upstream-<日付>-<since 短hash>.tsv に書き、
      Mac 版で当たるか数える (--no-eval で省く)
   6. docs/UPSTREAM_WATCH.md の先頭に節を足す (--dry-run なら書かず、標準出力だけ)
 
@@ -21,18 +21,19 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 from datetime import date
 
 WATCH_DOC = "docs/UPSTREAM_WATCH.md"
-RECORD_DOCS = ["docs/UPSTREAM_PR_TRACKER.md", "docs/UPSTREAM_PR_SURVEY.md", "docs/IMPROVEMENT_PLAN.md"]
+RECORD_DOCS = ["docs/UPSTREAM_PR_TRACKER.md", "docs/UPSTREAM_PR_SURVEY.md"]
 QUALITY_TESTS = "src/Meltype.Core.Tests/QualityTests.cs"
 CORE_PATHS = ["src/Meltype.Core", "dictionaries", "src/Meltype.Core.Tests"]
 MAX_MISSES = 20
 
-SEEN_RE = re.compile(r"<!--\s*seen:\s*([0-9a-fA-F]+)\s*-->")
+SEEN_RE = re.compile(r"\A<!--\s*seen:\s*([0-9a-fA-F]+)\s*-->")
 
 # 分類。上から順に見て、当たったものを名前の順 (判定・変換 → Windows → 本家 Mac → Linux → 文書) で並べる。
 CATEGORY_ORDER = ["判定・変換", "Windows", "本家 Mac", "Linux", "文書"]
@@ -73,9 +74,12 @@ def label_of(primary, others):
 
 
 def pr_number(subject):
-    """subject の最初の #NNN を返す (無ければ None)。"""
-    m = re.search(r"#(\d+)", subject)
-    return m.group(1) if m else None
+    """PR 番号を返す (無ければ None)。Merge pull request #N → 末尾の (#N) → 最初の #N の順に探す。"""
+    for pattern in (r"^Merge pull request #(\d+)", r"\(#(\d+)\)\s*$", r"#(\d+)"):
+        m = re.search(pattern, subject)
+        if m:
+            return m.group(1)
+    return None
 
 
 def csharp_unescape(body):
@@ -104,39 +108,73 @@ def csharp_unescape(body):
 
 
 _STR = r'"((?:[^"\\]|\\.)*)"'
-CASE_RE = re.compile(r"^\s*new\(\s*" + _STR + r"\s*,\s*" + _STR + r"\s*,\s*" + _STR + r"\s*\)\s*,?\s*(?://.*)?$")
-CASE_START_RE = re.compile(r"^\s*new\(")
+CASE_RE = re.compile(r"(?<![\w.])new\(\s*" + _STR + r"\s*,\s*" + _STR + r"\s*,\s*" + _STR + r"\s*\)")
+NEW_RE = re.compile(r"(?<![\w.])new\(")
+CASE_LINE_RE = re.compile(r"^\s*[\[{(]?\s*new\(")
+
+
+def strip_comments(text, in_block):
+    """1 行から // と /* */ のコメントを除く (文字列の中は触らない)。(コメントを除いた行, 行末で /* の中か)。"""
+    out = []
+    i = 0
+    while i < len(text):
+        if in_block:
+            j = text.find("*/", i)
+            if j < 0:
+                return "".join(out), True
+            i, in_block = j + 2, False
+        elif text[i] == '"':
+            j = i + 1
+            while j < len(text) and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+            out.append(text[i:j + 1])
+            i = j + 1
+        elif text.startswith("//", i):
+            break
+        elif text.startswith("/*", i):
+            i, in_block = i + 2, True
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out), in_block
+
+
+def representable(cat, typed, expected):
+    """4 列 (TSV) で表せ、評価表で比べられる値か。"""
+    if not typed or not expected or typed != typed.strip() or expected != expected.strip():
+        return False
+    if any(c < " " or c == "\x7f" for c in cat + typed + expected):
+        return False
+    if typed.startswith("#"):
+        return False  # TSV の # 始まりはコメント行になる
+    return all(" " <= c <= "~" for c in typed)  # かなで打つ行は評価表で比べ方を付けられない
 
 
 def extract_cases(diff_text):
     """diff の追加行から new("カテゴリ", "打鍵", "期待") を取り出す。(cases, skipped)。
 
-    cases = [(カテゴリ, 打鍵, 期待)]。削除行・コメント行は無視する。
-    skipped = 4 列で表せない行の数 (Before: などの名前付き引数、扱えないエスケープ、Tab・改行・非 ASCII を含む打鍵、空の打鍵・期待)。
+    cases = [(カテゴリ, 打鍵, 期待)]。削除行・コメントは無視する。1 行に複数あれば全部拾う。
+    skipped = 4 列で表せない new(...) の数 (Before: などの名前付き引数、扱えないエスケープ、
+    # 始まり・非 ASCII・Tab・改行を含む打鍵、前後に空白がある値、空の打鍵・期待)。
     """
     cases, skipped = [], 0
+    in_block = False
     for line in diff_text.splitlines():
-        if not line.startswith("+") or line.startswith("+++"):
+        if line.startswith(("@@", "diff ", "+++", "---", "-")) or line[:1] not in ("+", " "):
+            in_block = in_block and not line.startswith(("@@", "diff "))
             continue
-        text = line[1:]
-        if not CASE_START_RE.match(text):
+        code, in_block = strip_comments(line[1:], in_block)  # 文脈行も通して /* の状態を追う
+        if not line.startswith("+") or not CASE_LINE_RE.match(code):
             continue
-        m = CASE_RE.match(text)
-        if not m:
-            skipped += 1
-            continue
-        cat, typed, expected = (csharp_unescape(g) for g in m.groups())
-        if None in (cat, typed, expected):
-            skipped += 1
-            continue
-        typed, expected = typed.strip(), expected.strip()
-        if not typed or not expected or any(c in "\t\r\n" for c in typed + expected + cat):
-            skipped += 1
-            continue
-        if any(c > "~" or c < " " for c in typed):
-            skipped += 1  # かなで打つ行は評価表で比べ方を付けられない
-            continue
-        cases.append((cat, typed, expected))
+        found = 0
+        for m in CASE_RE.finditer(code):
+            found += 1
+            cat, typed, expected = (csharp_unescape(g) for g in m.groups())
+            if None in (cat, typed, expected) or not representable(cat, typed, expected):
+                skipped += 1
+            else:
+                cases.append((cat, typed, expected))
+        skipped += len(NEW_RE.findall(code)) - found
     return cases, skipped
 
 
@@ -149,7 +187,7 @@ def set_seen(doc, new_hash):
     """先頭の seen 印を書き換える (無ければ先頭に足す)。"""
     mark = f"<!-- seen: {new_hash} -->"
     if SEEN_RE.search(doc):
-        return SEEN_RE.sub(mark, doc, count=1)
+        return SEEN_RE.sub(lambda _: mark, doc, count=1)
     return mark + "\n" + doc
 
 
@@ -165,7 +203,28 @@ def insert_section(doc, section):
 
 
 def cell(text):
-    return str(text).replace("|", "\\|").replace("\n", " ")
+    """表の 1 セルに入れられる形にする (本家由来の文字列用)。"""
+    text = re.sub(r"[\r\n\t]", " ", str(text))
+    return text.replace("|", "\\|").replace("<", "&lt;")
+
+
+def code_span(text):
+    return "`" + cell(text).replace("`", "ˋ") + "`"
+
+
+def newcases_labels(counts, skips, results, evaluated):
+    """行ごとの「当たり/件数」。counts[i] 件の候補が results に順に並んでいる。"""
+    labels, pos = [], 0
+    for n, skipped in zip(counts, skips):
+        label = "-"
+        if n or skipped:
+            hit = str(sum(1 for x in results[pos:pos + n] if x["ok"])) if evaluated else "-"
+            label = f"{hit}/{n}" if n else "0/0"
+            if skipped:
+                label += f" (+4 列で表せない {skipped})"
+        labels.append(label)
+        pos += n
+    return labels
 
 
 def render_section(heading, rows, candidate_note):
@@ -183,7 +242,7 @@ def render_section(heading, rows, candidate_note):
 # ---------------------------------------------------------------- git・dotnet
 
 def run(cmd, cwd=None, input_text=None, check=True):
-    p = subprocess.run(cmd, cwd=cwd, input=input_text, capture_output=True, text=True, encoding="utf-8")
+    p = subprocess.run(cmd, cwd=cwd, input=input_text, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if check and p.returncode != 0:
         raise WatchError(f"失敗しました: {' '.join(cmd)}\n{p.stderr.strip()}")
     return p
@@ -193,10 +252,10 @@ def git(tree, *args, input_text=None, check=True):
     return run(["git", "-C", tree, *args], input_text=input_text, check=check)
 
 
-def list_commits(upstream, since):
+def list_commits(upstream, since, until):
     """first-parent の PR 単位で、古い順に [{hash, short, date, subject, parents}]。"""
     sep = "\x1f"
-    out = git(upstream, "log", "--first-parent", "--reverse", f"--format=%H{sep}%cs{sep}%P{sep}%s", f"{since}..origin/main").stdout
+    out = git(upstream, "log", "--first-parent", "--reverse", f"--format=%H{sep}%cs{sep}%P{sep}%s", f"{since}..{until}").stdout
     commits = []
     for line in out.splitlines():
         h, d, parents, subject = line.split(sep, 3)
@@ -209,11 +268,18 @@ def changed_files(upstream, h):
     return [p for p in out.splitlines() if p]
 
 
-def import_state(mac, short, pr, doc_texts):
-    """Mac 版のコミットに hash があれば 取り込み済み、追跡文書に hash か #NNN があれば 記録あり、どちらも無ければ 未。"""
-    hits = git(mac, "log", "--all", "--abbrev=7", "--format=%h", f"--grep={short}", check=False).stdout.split()
-    if hits:
-        return f"取り込み済み ({hits[0]})"
+def mac_subjects(mac):
+    """Mac 版 (HEAD) のコミットの [(7 桁 hash, 件名)]。"""
+    out = git(mac, "log", "HEAD", "--abbrev=7", "--format=%h\x1f%s").stdout
+    return [tuple(line.split("\x1f", 1)) for line in out.splitlines() if "\x1f" in line]
+
+
+def import_state(subjects, short, pr, doc_texts):
+    """Mac 版の件名に `本家 <7桁>` があれば 取り込み済み、追跡文書に hash か #NNN があれば 記録あり、どちらも無ければ 未。"""
+    pattern = re.compile(r"本家 " + re.escape(short) + r"(?![0-9a-fA-F])")
+    for h, subject in subjects:
+        if pattern.search(subject):
+            return f"取り込み済み ({h})"
     for name, text in doc_texts.items():
         if short in text or (pr and re.search(r"#" + pr + r"(?!\d)", text)):
             return f"記録あり ({os.path.basename(name)})"
@@ -223,10 +289,14 @@ def import_state(mac, short, pr, doc_texts):
 def fits_as_is(upstream, mac, h):
     """判定・変換の差分が Mac 版にそのまま当たるか。そのまま / 手移植 / 対象ファイルなし。"""
     # merge コミットは format-patch だと空になるので、first-parent との差分を取る。
-    patch = git(upstream, "diff", "--binary", f"{h}^1", h, "--", *CORE_PATHS).stdout
-    if not patch.strip():
+    # パッチはバイトのまま Mac 版に渡す (UTF-8 でない行を置き換えて壊さない)。
+    d = subprocess.run(["git", "-C", upstream, "diff", "--binary", f"{h}^1", h, "--", *CORE_PATHS], capture_output=True)
+    if d.returncode != 0:
+        raise WatchError(f"失敗しました: git diff {h}\n{d.stderr.decode('utf-8', 'replace').strip()}")
+    if not d.stdout.strip():
         return "対象ファイルなし"
-    return "そのまま" if git(mac, "apply", "--check", "-", input_text=patch, check=False).returncode == 0 else "手移植"
+    ok = subprocess.run(["git", "-C", mac, "apply", "--check", "-"], input=d.stdout, capture_output=True).returncode == 0
+    return "そのまま" if ok else "手移植"
 
 
 def quality_cases(upstream, h):
@@ -281,13 +351,16 @@ def watch(a):
 
     if not a.no_fetch:
         git(upstream, "fetch", "-q", "origin", "main")
-    if git(upstream, "rev-parse", "--verify", "-q", f"{since}^{{commit}}", check=False).returncode != 0:
+    p = git(upstream, "rev-parse", "--verify", "-q", "--end-of-options", f"{since}^{{commit}}", check=False)
+    if p.returncode != 0 or not p.stdout.strip():
         raise WatchError(f"--since {since} が本家の clone にありません")
-    new_hash = git(upstream, "rev-parse", "origin/main").stdout.strip()
-    since_short = git(upstream, "rev-parse", "--short=7", f"{since}^{{commit}}").stdout.strip()
+    since = p.stdout.strip()  # 以降は完全な hash だけを使う
+    new_hash = git(upstream, "rev-parse", "origin/main").stdout.strip()  # fetch の直後に 1 回だけ取る
+    since_short = since[:7]
 
     today = date.today().isoformat()
-    commits = list_commits(upstream, since)
+    commits = list_commits(upstream, since, new_hash)
+    subjects = mac_subjects(mac)
     doc_texts = {}
     for name in RECORD_DOCS:
         path = os.path.join(mac, name)
@@ -298,7 +371,7 @@ def watch(a):
     for c in commits:
         pr = pr_number(c["subject"])
         primary, others = classify(changed_files(upstream, c["hash"]))
-        imported = import_state(mac, c["short"], pr, doc_texts)
+        imported = import_state(subjects, c["short"], pr, doc_texts)
         row = {"hash": c["short"], "date": c["date"], "pr": f"#{pr}" if pr else "-", "subject": c["subject"],
                "category": label_of(primary, others), "imported": imported, "applies": "-", "newcases": "-", "_cases": []}
         if imported == "未":
@@ -312,46 +385,35 @@ def watch(a):
             all_cases += row["_cases"]
         rows.append(row)
 
-    # 候補ファイルと評価
-    rel_candidate = f"eval/candidates/upstream-{today}.tsv"
+    # 候補ファイルと評価 (一時フォルダーで評価し、成功してから作業ツリーに置く)
+    rel_candidate = f"eval/candidates/upstream-{today}-{since_short}.tsv"
     results, evaluated = [], False
-    tmp = None
-    if all_cases:
-        tsv_lines = [f"# 本家 {since_short}..{new_hash[:7]} の QualityTests.cs に足された正解ケース (tools/upstream_watch.py が {today} に書いた)。",
-                     "# 正解表 (eval/cases) には自動で足さない。人が確かめてから upstream-quality.tsv の末尾に移す。",
-                     ] + [f"{t}\t{e}\tfull\t{s}" for t, e, s in all_cases]
-        tsv_text = "\n".join(tsv_lines) + "\n"
-        if a.dry_run:
-            tmp = tempfile.TemporaryDirectory()
-            tsv_path = os.path.join(tmp.name, os.path.basename(rel_candidate))
-        else:
-            tsv_path = os.path.join(mac, rel_candidate)
-            os.makedirs(os.path.dirname(tsv_path), exist_ok=True)
-        with open(tsv_path, "w", encoding="utf-8") as f:
-            f.write(tsv_text)
-        if not a.no_eval:
-            work = tmp or tempfile.TemporaryDirectory()
-            try:
-                results = run_eval(mac, os.path.abspath(tsv_path), os.path.join(work.name, "result.json"))
-            finally:
-                if work is not tmp:
-                    work.cleanup()
-            if len(results) != len(all_cases):
-                raise WatchError(f"評価の件数が合いません ({len(results)} 件 / 候補 {len(all_cases)} 件)")
-            evaluated = True
+    candidate_src = None
+    work = tempfile.TemporaryDirectory()
+    try:
+        if all_cases:
+            tsv_lines = [f"# 本家 {since_short}..{new_hash[:7]} の QualityTests.cs に足された正解ケース (tools/upstream_watch.py が {today} に書いた)。",
+                         "# 正解表 (eval/cases) には自動で足さない。人が確かめてから upstream-quality.tsv の末尾に移す。",
+                         ] + [f"{t}\t{e}\tfull\t{s}" for t, e, s in all_cases]
+            candidate_src = os.path.join(work.name, os.path.basename(rel_candidate))
+            with open(candidate_src, "w", encoding="utf-8") as f:
+                f.write("\n".join(tsv_lines) + "\n")
+            if not a.no_eval:
+                results = run_eval(mac, candidate_src, os.path.join(work.name, "result.json"))
+                if len(results) != len(all_cases):
+                    raise WatchError(f"評価の件数が合いません ({len(results)} 件 / 候補 {len(all_cases)} 件)")
+                evaluated = True
+            if not a.dry_run:
+                dest = os.path.join(mac, rel_candidate)
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                shutil.copy(candidate_src, dest)
+    finally:
+        work.cleanup()
 
     # 行ごとの当たり/件数
-    pos = 0
-    for r in rows:
-        n = len(r["_cases"])
-        skipped = r.get("_skipped", 0)
-        if n or skipped:
-            hit = str(sum(1 for x in results[pos:pos + n] if x["ok"])) if evaluated else "-"
-            text = f"{hit}/{n}" if n else "0/0"
-            if skipped:
-                text += f" (+4 列で表せない {skipped})"
-            r["newcases"] = text
-        pos += n
+    labels = newcases_labels([len(r["_cases"]) for r in rows], [r.get("_skipped", 0) for r in rows], results, evaluated)
+    for r, label in zip(rows, labels):
+        r["newcases"] = label
     total_hit = sum(1 for x in results if x["ok"])
     misses = [x for x in results if not x["ok"]]
 
@@ -360,7 +422,7 @@ def watch(a):
         if evaluated:
             note = f"候補ファイル: `{rel_candidate}` (Mac 版で {total_hit}/{len(all_cases)} 当たり)"
             if misses:
-                note += "。外れ:\n\n" + "\n".join(f"- `{x['typed']}` → `{x['expected']}` (Mac 版の実際: `{x['actual']}`)" for x in misses[:MAX_MISSES])
+                note += "。外れ:\n\n" + "\n".join(f"- {code_span(x['typed'])} → {code_span(x['expected'])} (Mac 版の実際: {code_span(x['actual'])})" for x in misses[:MAX_MISSES])
                 if len(misses) > MAX_MISSES:
                     note += f"\n- …ほか {len(misses) - MAX_MISSES} 件"
         else:
@@ -383,8 +445,6 @@ def watch(a):
     if not a.dry_run:
         with open(doc_path, "w", encoding="utf-8") as f:
             f.write(new_doc)
-    if tmp:
-        tmp.cleanup()
 
     # 標準出力の要約
     lines = [f"本家の新コミット {len(commits)} 件 ({since_short}..{new_hash[:7]})" + (" [dry-run: 何も書いていません]" if a.dry_run else ""),
@@ -406,6 +466,9 @@ def main(argv):
         watch(a)
     except WatchError as e:
         print(f"エラー: {e}", file=sys.stderr)
+        return 2
+    except Exception as e:  # 想定外の失敗も文書は書かずに終わる
+        print(f"エラー: 想定外の失敗です ({type(e).__name__}: {e})", file=sys.stderr)
         return 2
     return 0
 
