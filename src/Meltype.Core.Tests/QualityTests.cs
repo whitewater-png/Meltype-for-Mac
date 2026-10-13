@@ -105,6 +105,8 @@ internal static class Quality
         new("混在", "kyouhagoogledekensaku", "きょうはgoogleでけんさく"),
         new("混在", "reflectsareta", "reflectされた"),
         new("混在", "selectshita", "selectした"),
+        new("混在", "tanaka@gmail.com", "tanaka@gmail.com"),
+        new("混在", "yamada.taro@example.co.jp", "yamada.taro@example.co.jp"),
         new("混在", "githubnipushshita", "githubにpushした"),
         new("混在", "pythondekaita", "pythonでかいた"),
         new("混在", "zoomdekaigi", "zoomでかいぎ"),

@@ -925,7 +925,22 @@ public sealed class CompositionDetector
         }
         var name = Raw(units, start, end) + (end == n ? pending : "");
         if (!name.Any(char.IsAsciiLetter)) return -1;
-        return mention || name.Contains('_') ? end : -1;
+        if (mention || name.Contains('_')) return end;
+        // メールアドレスの @ より前 (tanaka@、yamada.taro@): @ を打ったら、その前も英字のまま。
+        // @ の後ろのドメインは、上の @ の後ろの決まりで英字になる (たなか@gmail.com になっていた。本家 #59、P45-7)。
+        if (start == 0 || units[start - 1].Raw is " " or "<" or "(" or "\"" or "'" or ":" or ",")
+        {
+            var local = end;
+            while (local + 1 < n && units[local].Raw is "." or "-" or "+" && IsNameUnit(units[local + 1]))
+            {
+                local++;
+                while (local < n && IsNameUnit(units[local])) local++;
+            }
+            // @ の後ろに英字が続いたとき (ドメインを打ち始めた) だけ。あと@3人 (ato@3nin) のような @ は日本語のまま
+            var domainStarts = local + 1 < n ? units[local + 1].Raw is [var first, ..] && char.IsAsciiLetter(first) : local + 1 == n && pending is [var p, ..] && char.IsAsciiLetter(p);
+            if (local < n && units[local].Raw == "@" && domainStarts) return local + 1;
+        }
+        return -1;
     }
 
     /// <summary>
