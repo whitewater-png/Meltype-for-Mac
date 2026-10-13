@@ -103,6 +103,8 @@ internal static class Quality
 
         // --- 日本語の中の英単語 ---
         new("混在", "kyouhagoogledekensaku", "きょうはgoogleでけんさく"),
+        new("混在", "reflectsareta", "reflectされた"),
+        new("混在", "selectshita", "selectした"),
         new("混在", "githubnipushshita", "githubにpushした"),
         new("混在", "pythondekaita", "pythonでかいた"),
         new("混在", "zoomdekaigi", "zoomでかいぎ"),

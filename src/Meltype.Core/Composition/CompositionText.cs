@@ -149,9 +149,11 @@ public sealed class CompositionText
             }
             // 英単語の最後の t の次に打った s は、t と合わせて ts (つ・つぃ) にしない
             // (commit + suru・site → こっみつる・こっみつぃて ではなく commitする・commitして)。
-            if (_pending.Length == 1 && _pending[0] is 't' or 'T' && c is 's' or 'S' && EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString()))
+            // 読めない子音がいくつか残っていても同じ (reflect + sareta の ct + s → reflectされた。refェcつァれた になっていた。本家 #77、P45-3)。
+            if (_pending.Length >= 1 && _pending[^1] is 't' or 'T' && c is 's' or 'S' && _pending.ToString().All(char.IsAsciiLetter) &&
+                EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString()))
             {
-                _units.Add(new CompositionUnit(_pending.ToString(), _pending.ToString()));
+                foreach (var letter in _pending.ToString()) _units.Add(new CompositionUnit(letter.ToString(), letter.ToString()));
                 _pending.Clear();
             }
             _pending.Append(c);
