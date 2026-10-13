@@ -105,6 +105,17 @@ internal static class Quality
         new("混在", "kyouhagoogledekensaku", "きょうはgoogleでけんさく"),
         new("混在", "reflectsareta", "reflectされた"),
         new("混在", "selectshita", "selectした"),
+        new("混在", "kyouhawikipediadeshirabeta", "きょうはwikipediaでしらべた"),
+        // 全体で 1 語の英単語は、助詞 + 英単語に分けない (de|light、mo|rally)。本家 35beb60 の「英語」行
+        new("英語", "delight", "delight"),
+        new("英語", "devote", "devote"),
+        new("英語", "morally", "morally"),
+        // P45-2 (てぃ の続き) の巻き添えで、日本語の後ろの think が てぃ にならない守り (査読 R35)
+        new("混在", "kyouhathinkdesu", "きょうはthinkです"),
+        new("混在", "kyouhathinkpad", "きょうはthinkpad"),
+        new("混在", "chottodehijacked", "ちょっとでhijacked"),
+        new("混在", "korekarastories", "これからstories"),
+        new("混在", "mottopython", "もっとpython"),
         new("混在", "tanaka@gmail.com", "tanaka@gmail.com"),
         new("混在", "yamada.taro@example.co.jp", "yamada.taro@example.co.jp"),
         // 英単語の最後の t + s は つ にしないが、つ まで読むと日本語の語になるなら つ (しゅつ・おちつ。本家 35beb60、P45-11)
