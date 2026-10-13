@@ -2228,3 +2228,65 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **旧 `--expect` の挙動**: `#` で始まらない空でない行に 4 列の行が 1 つも無い表 (Pull Request のチェックが使う) は、変更前の `Expect` と同じです: `#` の行も読み、2 列でない行 (見出し・3 列の行) は黙って捨てる (変更前と同じ)、期待に漢字があれば英字の語の並び、無ければ完全一致 (カタカナの正規化・大小無視なし)。4 列の行が 1 つでもある表は新しい読み方 (`#` と空行を無視、列数・比べ方・かな打鍵行の比べ方を検査) です。`--expect-all` は常に 4 列として読みます。出力 JSON には、これまでの `kind` も残しています。
 - **`nojp` と `full`**: `nojp` の「日本語」は U+3000〜30FF・U+3400〜9FFF・U+FF00〜FFEF (全角記号・半角カナを含む)。期待が打鍵そのものの行 (`mac-terminal.tsv` の 12 行、`mac-device.tsv` の P34 の 7 行) は `full` にしました (`nojp` は `ー` 以外の綴りの崩れを見逃すため)。`ascii` の語は印字可能 ASCII の連続 (`[!-~]+`) で、`gemma4-27b` が `gemma4ー27b` になる崩れも見つけます。`ollama run`→`るん`・`gemma4ー27b` は実機で既知の外れで、Mac 版 Core のテスト用キーボードでは再現しません (`ollama run` は本家の Core でも再現せず、`gemma4ー27b` は本家の Core では再現します)。
 - **未検証・限界**: 実機は関係しません (Core のテスト用キーボードの結果。変換エンジンも Mac の入力欄も通っていません)。`mac-device.tsv` の期待は文書の記録から写したもので、打鍵が書かれていない行は期待から復元しました (出典に明記)。`mac-terminal.tsv` の期待は「望ましい出力」で、実機で確かめたものではありません。`/tmp` のようにシンボリックリンクを通る絶対パスで `dotnet run --project` を呼ぶとビルドが失敗することがあり、スクリプトは相対パスで呼びます。Windows / Linux は対象外です。
+
+## 追加項目 P45 (本家の判定修正の取り込み: broken 40 件)
+
+- **目的**: 計画書 [STRATEGY_2026-10.md](STRATEGY_2026-10.md) の柱 A・E。`eval/cases/upstream-quality.tsv` のうち、本家 Core で当たり、Mac 版で外れる 40 件を、本家の該当コミットを**手で移植**して直す。1 本家コミット = Mac 版の 1 コミット。Mac 版の `CompositionDetector.cs`・`CompositionText.cs` は独自の改変が入っているので、`git apply` は使わず、本家の差分 (`git show <hash>`) を読んで、意図を Mac 版のコードに合わせて書いた (旧ブランチ batch/p45 から取り直す段階で `cherry-pick` した)。本家にあって Mac 版に無い `ScoredSegmentation.cs` への変更は対象外。
+- **進め方 (毎コミット)**: (1) Core のテスト全通過、(2) `--expect-all eval/cases` を回す、(3) 取り込み前の Mac 版の結果 (216/261) と `tools/eval_compare.py` で比べて **broken 0** (取り込み前に当たっていた例を 1 つも壊さない)、(4) 本家の結果との差 (broken の残り) を見る。**broken が 1 件でも出たら、そのコミットは取り消して見送る。条件を足して通そうとしない** (同じ種類の回帰が繰り返し出る修正は撤退する、が方針)。eval に無い既存テストが落ちたときも同じ扱い。
+- **査読 R35 (Opus、敵対的) での差し戻し**: 最初の版は本家 9 コミットを Mac 版 9 コミットで入れていた (直った例 20 件)。R35 が 576 行の前後比較をして、**悪化 7 系統**を見つけた。そのうち `-pedia` (n=8・9) は、`kyouhawikipediadeshirabeta` が `きょうはwikipediaでしらべた` でなく `kyouhawikipediaでしらべた` と、**前の日本語ごと英字になる**悪化だった (eval の 261 件には無い形)。**本家の a4b6f1a も同じ出力になる**。本家への報告は判断待ち。そこで n=8・9 の 2 コミット (2a1ccb9・40bcad9) を外し、3dbc7e9 から新ブランチ batch/p45b を作って 7 コミットを取り直し、守りのコミット 1 つ (P45-12) を足した。
+- **取り込んだもの** (本家 7 コミット → Mac 版 7 コミット、直った例 12 件):
+
+| n | 本家 hash | 内容 | 直った例 | Mac 版のコミット |
+| --- | --- | --- | --- | --- |
+| 1 | ac36ced (#406) | `english-readable.txt` に `overcute` (本家の差分は 1 語。仕様の「3 語」とは違う) | 1 (overcute) | fde8902 (P45-1) |
+| 2 | b2e33ca (#153) | `thin` などが `てぃ` の綴りで続きと読めるなら、カタカナ語の途中にする | 1 (hosuthingu) | 29872b5 (P45-2) |
+| 3 | 82094f0 (#77) | 英単語の最後の t と次の s を、読めない子音が残っていても つ にしない | 1 (reflectsareta) | af19636 (P45-3) |
+| 5 | 9dc873d (#104) | 英単語の最後の l + tu/tsu を っ として読み直す (`RereadSmallTsuAfterEnglishL`) | 3 (moraltute・moraltsute・kyouhamoraltute) | f61cae3 (P45-5) |
+| 7 | d0dca04 (#59) | メールアドレスの @ より前も英字のままにする (`UserNameEnd`) | 4 (tanaka@・yamada.taro@・taro+news@・yamada-taro@) | 1ba9488 (P45-7) |
+| 10 | fb24a53 (#129) | 大文字の略語の後ろのローマ字を日本語に (`IsAcronymWithLowerTail`) | 1 (AIdekiru) | f09e8fb (P45-10) |
+| 11 | 35beb60 の ts の部分だけ | 日本語の途中の英単語で `つ` が崩れるのを直す (`ReadsAsJapaneseWithTsu`) | 1 (teishutsushita) | d507d90 (P45-11) |
+
+  - 守りのコミット: 4534aab (P45-12。回帰の守り。下の「テスト」)。
+  - n=11 は一部だけ取り込んだ (ts の部分)。取り込んだ部分と残した部分を、コミットメッセージにも書いた。
+- **見送ったもの**:
+
+| n | 本家 hash | 見送った理由 (壊れた例) |
+| --- | --- | --- |
+| 4 | c6b281e (#69) | 直る例は `inviteshimashita`・`invitewookutta` の 2 件だが、`githubdevote` (期待 `githubでvote`) が壊れた (eval の broken 1 件) |
+| 6 | b4484c4 | eval は broken 0・3 件直る (`i18n`・`l10n`・`h2o`) が、既存テスト 2 件が落ちた: `video.mp4woMP3ni` が `MP3に` でなく `MP3ni` のまま、`今日は3かける4を` が `今日は3×4を` でなく `きょうは3かけru4wo`。`NumeronymEnd` (英字 1〜2 + 数字 1〜2 + 英字 1〜3) が `MP3|ni`・`3|kakeru|4` に当たる。本家は `ScoredSegmentation.cs` 側にも手を入れていて別の守りがある |
+| 8・9 (`-pedia`) | 3cb0758 の pedia の部分・fd66db0 + f1a190e (#207)。Mac 版は 2a1ccb9・40bcad9 | **一度入れたが、査読 R35 で外した**。直る例 8 件 (pedia・protopedia・conservapedia・worldpedia・wikipedias・protopedias・Protopedia・Protopedias) は直らないまま。`kyouhawikipediadeshirabeta` が `きょうはwikipediaでしらべた` でなく `kyouhawikipediaでしらべた` と、前の日本語ごと英字になる悪化があるため。本家の a4b6f1a も同じ。本家への報告は判断待ち。**`-pedia` を入れ直すなら、前の日本語を巻き込まない条件を先に決める** |
+| 8 の残り | 3cb0758 の `や` の部分 + ffd7e6a | 直るはずだった `githubya`・`yapython`・`yacursor`・`yaslack`・`yastack`・`yaplay`・`yasync` (7 件) は直らないまま。全部入れると eval の broken 3 件 (`delight`・`devote`・`morally`) と既存テスト 4 件 (`Today I go susi` が `とday`、`Xyatte` が `Xやって`、`kaibunsyorta2026kotosimo`、`Please use TanakaMakoto today` が `とday`) が壊れた。ffd7e6a を外して `や` の部分だけ残しても `Xyatte`・`kaibunsyorta2026kotosimo` が壊れた |
+| 11 の残り | 35beb60 の `と` の部分 | `devtoprod`・`edittopub`・`dottonet`・`rdstoredshift`・`uikittoswiftui` (5 件) は、本家 74ca494 (英字のあいだの「と」を助詞にする、#154) が前提。Mac 版にその機能が無い。別項目として 74ca494 から取り込む候補。`delight`・`devote`・`morally` の部分は見送った ffd7e6a の修正 |
+| 12 | 8dfec9d | `sitePR`・`site PR` が直る (eval で 2 件) が、既存の英文 `make sure you have time` が `まけ すれ よう have time` に壊れた (eval の broken 1 件)。`sure` が `すれ` (する活用) と読めるため |
+| 13 | (未特定) | メール 3 件 (`tanaka@example.com` ほか) は n=7 で直った。`my name is taro`・`apinoerror` は、本家で `git log -S taro`・`-S apinoerror` (Core) を調べたが、直した修正は見つからなかった (当たるのは最初の公開コミット・テスターの報告・n=7 の d0dca04 など)。`taro` は辞書にも無い。**未特定** |
+
+- **計測** (`eval/cases`、Mac 版 Core のテスト用キーボード。実機は通っていない):
+
+| ファイル | 取り込み前 | 取り込み後 |
+| --- | --- | --- |
+| upstream-quality.tsv | 163/203 | 175/203 |
+| mac-device.tsv | 37/38 | 40/41 (R35 の 3 件を追加) |
+| mac-terminal.tsv | 16/20 | 16/20 |
+| **合計** | **216/261** | **231/264** |
+
+  - 合計の母数が 261 → 264 なのは、P45-12 で足した新規 3 件 (`mac-device.tsv` の R35 のブロック) の分。3 件とも当たっている (`mac-device.tsv`・`mac-terminal.tsv` は、新規 3 件のほかは変わらない)。
+  - 取り込み前の Mac 版に対する比較: **broken 0 / fixed 12 / added 3**。
+  - 本家に対する比較 (`upstream.json` で当たり、今 Mac 版で外れる): **broken 40 → 28**。残りの 28 件は、見送りの表の例 (`-pedia` 8 件・`i18n`・`l10n`・`h2o`・`inviteshimashita`・`invitewookutta`・`や` 7 件 (`githubya` など)・`と` 5 件・`site PR`) と、`my name is taro`・`apinoerror`。
+  - 途中の版の結果は `scratch/p45-<n>.json` に残してある (見送りの n=4・6・12 は壊れた版の結果)。
+- **テスト**: Core のテストは 617 → **618 件** (`AcronymThenRomaji_IsJapanese` を追加)、全件通過。品質テスト (`Quality`) の行は、各 n で本家のテストの行をそのまま足した。`FeedbackTests` の辞書の語の形の検査 (`Q3_EnglishReadable_Dictionary_EntriesAreWellFormed`) は、`overcute` だけを例外にした (全体ではローマ字として読めないが、`over|cute` と 2 語に割れて `overくて` になるため)。`FeedbackTests` の `taro@gmail.com` の期待は、本家と同じく `たろ@gmail.com` から `taro@gmail.com` に直した。P45-12 で足した**回帰の守り**:
+  - `mac-device.tsv` に R35 のブロック: `kyouhawikipediadeshirabeta` → `きょうはwikipediaでしらべた`、`anowikipedia` → `あのwikipedia`、`ato@hitori` → `ato@hitori` (トレードオフ。本家と同じ)。
+  - `QualityTests.cs` に `kyouhawikipediadeshirabeta` (混在) と、本家 35beb60 の「英語」行 6 件 (`delight`・`devote`・`morally`・`chottodehijacked`・`korekarastories`・`mottopython`。6 件とも通る)。
+  - `FeedbackTests.cs` に `ato@3nin` → `あと@3nin` (P45-7 の `domainStarts` の条件を `IsAsciiLetterOrDigit` に変えると赤になることを確かめて戻した)。
+  - P45-2 の守り: `kyouhathinkdesu` → `きょうはthinkです`、`kyouhathinkpad` → `きょうはthinkpad`。ただし P45-2 の条件 (`AnalyzeFragment(lower + next).IsValid`) を `true` にしても赤にならなかった (`thinly`・`thinner`・`things` も同じ)。**この条件だけで結果が決まる例は見つかっておらず、テストの穴として残る**。なお `kyouhathinkpaddesu` は `きょうはthinkぱっです` になり (本家も同じ)、`thinkpad` は残らない。
+- **ほかの項目との干渉の確認**: n=1 は Q11 の `NotAfterJapanese`・`ContinuesJapaneseWord` に当たらない語 (`umaindesu` → `うまいんです` のまま、`korehaovercutedayo`・`overcutenanda` は英字のまま)。n=7 は P29 の `DotSuffixEnd` と別の関数 (`UserNameEnd`) で、`ato@3nin` は `あと@3nin` のまま。**`ato@hitori` は `ato@hitori` になる**: 日本語の語の後ろの `@` は、メールアドレスの一部と読むトレードオフ (本家と同じ)。数字で始まる `ato@3nin` は `あと@3nin` で守っている (上の守りのテスト)。n=10 は Q9 (`X` の後ろ)・P34 (記号入りの名前) の `Xnotoukouha` → `Xのとうこうは`・`Anisiyouka` → `Aにしようか` が `--repro` で変わらない。
+- **実機で確かめること** (TextEdit で打って Enter。かなは漢字に変換されてよい。**実機は `NSSpellChecker`、eval と `--repro` は同梱の英単語表なので、`IsKnownEnglishWord` を使う n=3・5・10・11 は答えが違うことがある**):
+  1. `overcute` → `overcute` (`overくて` にならない)。あわせて `umaindesu` → `うまいんです` が変わらないこと
+  2. `hosuthingu` → `ほすてぃんぐ` (`ほすthinぐ` にならない)
+  3. `reflectsareta` → `reflectされた`
+  5. `moraltute` → `もらって`、`kyouhamoraltute` → `きょうはもらって`。`hoteltukau` → `hotelつかう` のまま
+  7. `tanaka@gmail.com` → `tanaka@gmail.com`、`yamada.taro@example.co.jp` → **そのまま** (`たなか@…` 系にならない)。`ato@3nin` → `あと@3nin` のまま
+  10. `AIdekiru` → `AIできる`、`AInituite` → `AIについて`。`Xnotoukouha` → `Xのとうこうは` のまま
+  11. `teishutsushita` → `ていしゅつした`。`kyoucommitsuru` → `きょうcommitする`
+  - R35 の形: `kyouhawikipediadeshirabeta` → `きょうはwikipediaでしらべた` (前の日本語が英字にならない)、`ato@hitori` → `ato@hitori` (トレードオフの確認)
+- **限界**: Mac 版 Core のテスト用キーボードの結果で、変換エンジン・Mac の入力欄は通っていない。同梱の英単語表と `NSSpellChecker` の差は未確認 (上の「実機で確かめること」)。取り込んだ修正は eval の 264 件と Core のテスト 618 件では broken 0 だが、取り込み前後の大規模な比較 (P29 のような数万件) は行っていない (R35 の 576 行の比較が唯一の広い比較)。見送りの判断は「eval か既存テストが 1 件でも壊れたら撤退」で機械的に行い、壊れない条件を探すことはしていない。`-pedia` のように eval にも既存テストにも無い形の悪化は、この方針では見つからず、査読で見つかった。
+- **Windows・Linux は対象外** (Mac 版の Core の変更だが、確かめたのは Mac 版の Core だけ)。
