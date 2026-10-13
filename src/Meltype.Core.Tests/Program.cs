@@ -8,6 +8,7 @@ namespace Meltype.Tests;
 ///   dotnet run --project src/Meltype.Core.Tests                 … すべてのテスト
 ///   dotnet run --project src/Meltype.Core.Tests -- Composition  … 名前に一致するテストだけ
 ///   dotnet run --project src/Meltype.Core.Tests -- --eval       … 品質テストの正解率と外れた例
+///   dotnet run --project src/Meltype.Core.Tests -- --expect-all eval/cases out.json … 正解表 (eval/cases/*.tsv) の判定結果
 ///   dotnet run --project src/Meltype.Core.Tests -- --explain konnichiwa hello … 1 文字ずつの判定理由
 /// Windows では src/Meltype.Tests から実行すると、Windows のスペルチェッカーを使い、Windows 専用のテストもまとめて流す。
 /// </summary>
@@ -47,6 +48,10 @@ internal static class Program
             case "--expect":
                 // --expect 入力ファイル 出力ファイル (Pull Request のチェック用)
                 Checks.Expect(args[1], args[2]);
+                return 0;
+            case "--expect-all":
+                // --expect-all 正解表のフォルダー 出力ファイル (eval/cases/*.tsv をすべて確かめ、file つきの 1 つの JSON にする)
+                Checks.ExpectAll(args[1], args[2]);
                 return 0;
             case "--henkan":
                 Henkan.Run(string.Join(" ", args.Skip(1)));

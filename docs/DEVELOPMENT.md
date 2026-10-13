@@ -109,3 +109,38 @@ dotnet run --project src/Meltype.Core.Tests -- --eval       # 品質テスト (�
 - `src/Meltype.Core.Tests/` — 共通部分のテスト (判定・入力セッション・変換ボックス・学習・品質テスト)。Mac・Linux でも動く
 - `src/Meltype.Tests/` — Windows 版のテストと調査用の道具 (共通部分のテストもまとめて流す)
 - `dictionaries/` — 組み込み辞書
+
+## 評価基盤 (`eval/`)
+
+同じ「正解表」で、本家 Meltype の Core と Mac 版の Core の判定結果を並べ、回帰 (本家や前回で当たっていたのに今は外れる例) を 0 件にするための仕組みです。表の形式・比べ方・実機の結果の足し方は [eval/README.md](../eval/README.md) にあります。
+
+### 正解表
+
+`eval/cases/*.tsv`。1 行 = `打鍵<Tab>期待<Tab>比べ方<Tab>出典` の 4 列です。比べ方は `full` (完全一致。期待にカタカナがあるときだけ、カタカナ→ひらがなと英字の大小を吸収。本家の `Expect` と同じ)・`ascii` (印字可能 ASCII の連続の並びだけ)・`nojp` (日本語・全角記号・半角カナが 1 文字も無い。英文が崩れないことだけ見たい行用)。`upstream-quality.tsv` (本家の品質テストの写し)・`mac-device.tsv` (実機の記録と計画書の期待)・`mac-terminal.tsv` (ターミナル・AI ツール名) の 3 つがあります。
+
+### 1 つの作業ツリーで流す (`--expect-all`)
+
+```bash
+cd src/Meltype.Core.Tests
+dotnet run -c Release -- --expect-all ../../eval/cases /tmp/eval.json
+```
+
+`eval/cases/*.tsv` をすべて確かめ、`{file, typed, expected, mode, source, actual, ok}` の配列を JSON で出します (`file` は表のファイル名)。1 つの表だけなら、これまでどおり `--expect <表> <出力>` です (2 列だけの古い表も動きます)。変換エンジンはテスト用の偽物なので、漢字の変換は測りません。
+
+### 本家との比較と回帰ゲート
+
+```bash
+git clone --depth 1 https://github.com/yksr-melt/Meltype.git /tmp/meltype-upstream
+tools/eval-compare.sh /tmp/meltype-upstream . eval/cases /tmp/eval-out
+```
+
+`tools/eval-compare.sh <base-tree> <new-tree> <cases-dir> <out-dir>` は、2 つの作業ツリーで同じ表を回し、`tools/eval_compare.py` で比べます。`out-dir` に `base.json`・`new.json`・`compare.md` (ファイルごとの `ok/total` の表と、`broken`・`fixed` の一覧) ができます。
+
+- `broken` … base で当たり、new で外れた例 (回帰)。**1 件でもあれば終了コード 1** です (dotnet や入力の失敗は 2、問題なしは 0。本家のゲートは broken + addedFailing、こちらは broken のみ)。これが回帰ゲートで、`broken` が 0 件になるまで取り込んだ変更を「回帰なし」と言いません。
+- `fixed` … base で外れ、new で当たった例。`added` / `removed` … 片方にしかない例 (表の増減)。
+- base には Mac 版の前回のコミットの作業ツリー (`git worktree add /tmp/prev <コミット>`) も使えます。
+- 本家の `Meltype.Core.Tests` には `--expect-all` と 3 つの比べ方が無いので、本家側は `tools/eval_legacy_base.py` が `--expect` を表ごとに回し、返ってきた `actual` を同じ規則で判定し直します。この判定は C# の `Checks.Judge` と同じで、`python3 tools/eval_legacy_base.py --rejudge <--expect-all の JSON>` で食い違いが無いことを確かめられます。
+- `dotnet` は作業ツリーの中に `bin/` `obj/` を作ります。本家の clone を汚したくないときは、コピーを渡します。
+- `/tmp` のようにシンボリックリンクを通る絶対パスで `dotnet run --project` を呼ぶとビルドが失敗することがあったので、スクリプトは作業ツリーに入って相対パスで呼びます。
+
+この比較は Core のテスト用キーボードの結果で、**実機の確認の代わりにはなりません**。Windows・Linux は対象外です。
