@@ -156,16 +156,43 @@ final class MeltypeConverter {
     private func requestCandidates(_ composing: ComposingText, reading: String, context: String?, prediction: Bool = false) -> ConversionResult {
         var request = options
         if prediction { request.requireJapanesePrediction = .manualMix }
+        lastRequestAt = Date()
         guard zenzaiActive, let zenzai else {
             return inSession(for: reading) { converter.requestCandidates(composing, options: request) }
         }
-        // personalizationMode は既定値が無いので明記する。profile も空 (個人の情報は渡さない)
-        request.zenzaiMode = .on(weight: zenzai.weightURL, inferenceLimit: Self.zenzaiInferenceLimit, requestRichCandidates: false,
-                                 personalizationMode: nil, versionDependentMode: .v3(.init(profile: "", leftSideContext: context ?? "")))
+        request.zenzaiMode = zenzaiMode(weight: zenzai.weightURL, context: context)
         let start = Date()
         let result = inSession(for: reading) { converter.requestCandidates(composing, options: request) }
         noteZenzaiRequest(from: start)
         return result
+    }
+
+    /// Zenzai の設定。personalizationMode は既定値が無いので明記する。profile も空 (個人の情報は渡さない)。
+    private func zenzaiMode(weight: URL, context: String?) -> ConvertRequestOptions.ZenzaiMode {
+        .on(weight: weight, inferenceLimit: Self.zenzaiInferenceLimit, requestRichCandidates: false,
+            personalizationMode: nil, versionDependentMode: .v3(.init(profile: "", leftSideContext: context ?? "")))
+    }
+
+    /// 直近の変換要求の時刻 (Zenzai の先読みが、入力中を避けるのに使う)。
+    private var lastRequestAt = Date.distantPast
+    /// 先読みは、最後の変換要求からこの時間 (秒) 以上たっているときだけ (入力の無いとき)。
+    private static let zenzaiIdleSeconds = 1.5
+
+    /// Zenzai の準備ができたあと、モデルの読み込み (数百 ms〜数秒、最初の 1 回) を、入力の無いときに先に済ませる。
+    /// 読み込みはメインスレッドで起きる (KanaKanjiConverter はスレッドセーフではない) ので、最初のキーの変換で起きると、そのキーが待たされる。
+    /// 1 回だけ、最後の変換から zenzaiIdleSeconds 以上あいているときに、ほかのセッションに触れない既定のセッションで 1 語を要求する。
+    /// 先読みの要求も noteZenzaiRequest を通るので、読み込めなかったときは同じ安全弁 (このプロセスでは使わない) が働く。
+    func warmUpZenzaiIfIdle() {
+        guard !zenzaiWarmedUp, zenzaiActive, let zenzai,
+              Date().timeIntervalSince(lastRequestAt) >= Self.zenzaiIdleSeconds else { return }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition("あ", inputStyle: .direct)
+        var request = options
+        request.zenzaiMode = zenzaiMode(weight: zenzai.weightURL, context: nil)
+        let start = Date()
+        _ = converter.requestCandidates(composing, options: request)
+        converter.stopComposition()
+        noteZenzaiRequest(from: start)
     }
 
     /// Zenzai を使った 1 回の要求の安全弁。モデルを読み込めなかった (azooKey は黙って Zenzai なしの変換に落ちる) か、
@@ -173,9 +200,11 @@ final class MeltypeConverter {
     private func noteZenzaiRequest(from start: Date) {
         guard let zenzai else { return }
         let end = Date()
-        // 読み込みに失敗すると、azooKey は zenzStatus に理由を足す ("load <URL>    <理由>")。成功のときは足さない
+        // 読み込みに失敗すると、azooKey は zenzStatus に理由を足す ("load <URL>    <理由>")。成功のときは足さない。
+        // これは azooKey の内部の文字列 (空白 4 つ) に頼った判定で、公開された API ではない。
+        // azooKey の版 (Package.swift の revision) を上げたときは、azooKey の KanaKanjiConverter.swift の zenzStatus の組み立て ("load <URL>    <理由>" の行) を見て、今も合うか確かめること。
         if converter.zenzStatus.contains("    ") {
-            zenzai.suspend(reason: "モデルを読み込めなかったため一時的に OFF")
+            zenzai.suspend(reason: "モデルを読み込めなかったため一時的に OFF", loadFailed: true)
             return
         }
         // 最初の 1 回はモデルの読み込み (数百 ms〜数秒、1 回だけ) を含むので、遅さの数には入れない

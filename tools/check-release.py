@@ -82,6 +82,8 @@ ZIP_EXPECTED = {  # zip の中の Meltype-mac/ の直下 (mac/make-zip.sh が置
 POSTINSTALL_DENY = [r"\bcurl\b", r"\bwget\b", r"\bnc\b", r"\bssh\b", r"\bscp\b", r"\bosascript\b", r"\bbase64\b", r"\beval\b", r"\brm\s+-[a-zA-Z]*r"]
 MACHO_MAGICS = {bytes.fromhex(h) for h in ("cffaedfe", "feedfacf", "cafebabe", "bebafeca", "cafebabf")}
 USERS_RE = re.compile(rb"/Users/[A-Za-z0-9._-]+/")  # 数え方は grep -a -o -E '/Users/[A-Za-z0-9._-]+/' | wc -l と同じ
+LLAMA_FRAMEWORK_PREFIX = "Contents/Frameworks/llama.framework/"
+THIRD_PARTY_BUILD_USER = b"/Users/miwa/"
 OPEN_RE = r"右クリック[^→]*→ *「開く」"
 
 
@@ -489,10 +491,18 @@ def check_app(app, label, signed):
     arch_bad, minos_bad, rpath_bad, dep_bad, paths = [], [], [], [], {}
     rpath_stat = {"@": 0, "OS 標準": 0, "その他": 0}
     n_deps = 0
+    third_party_paths = 0
     for rel in machos:
         path = os.path.join(app, rel)
         with open(path, "rb") as f:
-            paths[rel] = len(USERS_RE.findall(f.read()))
+            found_paths = USERS_RE.findall(f.read())
+        # 例外: azooKey の出来合いの llama.framework の中の /Users/miwa/ だけは、第三者の作者のビルド機のパスで、利用者 (自分) の情報ではない。
+        # SwiftPM が checksum で中身を固定している。FAIL にせず件数だけ INFO に出す (件数が変わったら気づけるように)。
+        # 自前の Mach-O (Meltype・MeltypeDictionary・libMeltypeNative.dylib) と、llama.framework の中でも /Users/miwa/ 以外は、0 件のまま FAIL で守る。
+        if rel.startswith(LLAMA_FRAMEWORK_PREFIX):
+            third_party_paths += sum(1 for p in found_paths if p == THIRD_PARTY_BUILD_USER)
+            found_paths = [p for p in found_paths if p != THIRD_PARTY_BUILD_USER]
+        paths[rel] = len(found_paths)
         result["exe"][rel] = sha256(path)
         archs = archs_of(path)
         if archs is None or "arm64" not in archs:
@@ -556,6 +566,7 @@ def check_app(app, label, signed):
     total = sum(paths.values())
     detail = ", ".join("%s %d" % (os.path.basename(k), v) for k, v in sorted(paths.items()))
     check(total == 0, "実行ファイルに残るビルド時の絶対パス (ホームフォルダー配下) が 0 件 (§7-6)", "Mach-O %d 本で 0 件" % len(paths), "合計 %d 件 (%s)。mac/build.sh の strip -S (S2) が入る前のビルド、または効いていない" % (total, detail))
+    info("llama.framework (azooKey の出来合い) に残る第三者のビルド機のパス %s (参考。自分のパスではない)" % THIRD_PARTY_BUILD_USER.decode(), "%d 件" % third_party_paths)
     others = 0
     for rel in non_macho:
         try:

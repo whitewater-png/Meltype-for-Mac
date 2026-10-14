@@ -5,7 +5,7 @@
 # Meltype の Mac 版をビルドして ~/Library/Input Methods にインストールする。
 #   ./build.sh            ビルドしてインストール
 #   ./build.sh --no-install  ビルドだけ (build/Meltype.app)
-# 必要なもの: macOS 13 以降、Xcode (またはコマンドライン ツール: xcode-select --install)、.NET 10 SDK
+# 必要なもの: macOS 13.3 以降、Xcode (またはコマンドライン ツール: xcode-select --install)、.NET 10 SDK
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -95,7 +95,8 @@ while read -r name; do
     # 署名は後ろの codesign が付け直す (薄くすると、元の署名は無効になる)。
     framework_binary="$APP/Contents/Frameworks/$name.framework/Versions/A/$name"
     if [[ -f "$framework_binary" && "$(lipo -archs "$framework_binary")" == *" "* ]]; then
-        lipo -thin "$(uname -m)" "$framework_binary" -output "$framework_binary.thin"
+        # ビルドする CPU ($RID。別の CPU 向けにビルドしても、その CPU の分を残す) に合わせて薄くする
+        lipo -thin "$([[ "$RID" == osx-arm64 ]] && echo arm64 || echo x86_64)" "$framework_binary" -output "$framework_binary.thin"
         mv "$framework_binary.thin" "$framework_binary"
     fi
 done < <( (otool -L "$BIN/MeltypeIME"; otool -L "$BIN/MeltypeDictionary") | sed -n 's|^[[:space:]]*@rpath/\([^/]*\)\.framework/.*|\1|p' | sort -u)
@@ -137,9 +138,10 @@ LICENSES="$APP/Contents/Resources/Licenses"
 mkdir -p "$LICENSES"
 cp ../LICENSE "$LICENSES/LICENSE-Meltype-GPL-3.0.txt"
 cp ../THIRD-PARTY-NOTICES.md "$LICENSES/THIRD-PARTY-NOTICES.md"
-for dep in AzooKeyKanaKanjiConverter Jinja swift-algorithms swift-collections swift-numerics swift-tokenizers; do
+for dep in AzooKeyKanaKanjiConverter Jinja swift-algorithms swift-collections swift-numerics swift-tokenizers SwiftyMarisa; do
     found=
-    for name in LICENSE LICENSE.txt NOTICE NOTICE.txt; do
+    # SwiftyMarisa (と、その中の marisa-trie) のライセンスは LICENSE.md (BSD 2-clause と LGPL のデュアル。Meltype は BSD 2-clause で使う)
+    for name in LICENSE LICENSE.txt LICENSE.md NOTICE NOTICE.txt; do
         if [[ -f ".build/checkouts/$dep/$name" ]]; then cp ".build/checkouts/$dep/$name" "$LICENSES/$dep-$name"; found=1; fi
     done
     [[ -n "$found" ]] || { echo "$dep のライセンスファイルが見つかりません (.build/checkouts/$dep)。ライセンス表示なしでは配布できません。" >&2; exit 1; }
@@ -152,6 +154,10 @@ cp "$AZ_DICT_LICENSE" "$LICENSES/azooKey_dictionary_storage-LICENSE"
 # (native/mozc/MOZC_COMMIT の版から取ったもの) を mac/Resources/Licenses に置いてある
 [[ -f Resources/Licenses/Mozc-LICENSE.txt ]] || { echo "Mozc のライセンスファイル (mac/Resources/Licenses/Mozc-LICENSE.txt) が見つかりません。" >&2; exit 1; }
 cp Resources/Licenses/Mozc-LICENSE.txt "$LICENSES/Mozc-LICENSE.txt"
+# llama.cpp (MIT)。azooKey が配る出来合いの llama.framework (Contents/Frameworks) をそのまま同梱するので、MIT の条件どおり著作権表示と許諾文の全文を一緒に渡す
+# (xcframework には LICENSE が入っていないので、mac/Resources/Licenses に置いてある)
+[[ -f Resources/Licenses/llama.cpp-LICENSE.txt ]] || { echo "llama.cpp のライセンスファイル (mac/Resources/Licenses/llama.cpp-LICENSE.txt) が見つかりません。" >&2; exit 1; }
+cp Resources/Licenses/llama.cpp-LICENSE.txt "$LICENSES/llama.cpp-LICENSE.txt"
 # 実行ファイルの RPATH に、ビルドしたマシンの絶対パス (/Library/Developer/CommandLineTools/... など) が残っていると、
 # 配布先の Mac でそのパスを探しに行く (ビルドした人の環境が漏れ、同じパスに置かれたライブラリを読み込まされる余地も残る)。
 # 署名すると中身を変えられなくなるので、署名の前に外す。無いときに失敗しないよう || true。

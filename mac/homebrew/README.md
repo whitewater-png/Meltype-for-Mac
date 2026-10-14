@@ -3,7 +3,7 @@
 `Casks/meltype-for-mac.rb` が cask の正本です。tap リポジトリ (`whitewater-png/homebrew-meltype-for-mac`) へは、ここからコピーして使います。
 **公開 tap はまだありません** (GitHub にリポジトリは作っていません)。以下のうち「公開」の節は、許可を取ってから実行します。
 
-配布物は zip (`Meltype-mac-<version>.zip`) です。dmg の中身は pkg で、Homebrew の `pkg` stanza は `sudo installer -target /` になり、「このユーザーのみ」の pkg と合わないため使いません。Apple シリコン・macOS 13 以降だけが対象です。
+配布物は zip (`Meltype-mac-<version>.zip`) です。dmg の中身は pkg で、Homebrew の `pkg` stanza は `sudo installer -target /` になり、「このユーザーのみ」の pkg と合わないため使いません。Apple シリコン・macOS 13.3 以降だけが対象です (cask の `depends_on macos:` は Ventura = 13 までしか書けないので、13.0〜13.2 の人には caveats で案内します)。
 
 ## ローカル tap で確かめる
 

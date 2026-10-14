@@ -179,6 +179,90 @@ enum ZenzaiSelfTest {
             check(model.isReady && !model.isUsable && status(model)?.state == .slow, "止めると使わず、状態は『遅いため一時的に OFF』")
         }
 
+        // 6b. 読み込みの失敗は、遅いのとは別の状態で出す
+        do {
+            let dir = root.appendingPathComponent("load-failed", isDirectory: true)
+            let model = makeModel(dir, source: local(size: Int64(payload.count), sha256: hex(payload)), offCalls: offCalls)
+            model.poll(enabled: true)
+            _ = wait(model, seconds: 20)
+            model.suspend(reason: "モデルを読み込めなかったため一時的に OFF", loadFailed: true)
+            check(!model.isUsable && status(model)?.state == .loadFailed, "読み込めなかったときは、遅いときと別の状態 (loadFailed)")
+        }
+
+        // 8a. OFF にしたら取得を中止する (一時ファイルを消し、状態は OFF。失敗とは扱わず、設定も触らない)。
+        //     poll のあと、メインのループを回す前に OFF にするので、検査・取得の結果が届く前に中止される (どの順でも、届いた結果は捨てる)
+        do {
+            let dir = root.appendingPathComponent("cancel", isDirectory: true)
+            let before = offCalls.count
+            let model = makeModel(dir, source: local(size: Int64(payload.count), sha256: hex(payload)), offCalls: offCalls)
+            model.poll(enabled: true)
+            check(model.isBusy && status(model)?.state == .downloading, "(中止) ON にすると取得が始まる")
+            model.poll(enabled: false)
+            check(!model.isBusy && status(model)?.state == .off, "(中止) OFF にすると取得をやめ、状態は『OFF』")
+            let limit = Date().addingTimeInterval(1.5)
+            while Date() < limit { RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05)) }
+            check(!model.isReady && status(model)?.state == .off && !FileManager.default.fileExists(atPath: model.weightURL.path), "(中止) 遅れて届く結果で、準備完了にならない・ファイルを置かない")
+            check(((try? FileManager.default.contentsOfDirectory(atPath: model.modelsDirectory.path)) ?? []).filter { $0.hasSuffix(".part") }.isEmpty, "(中止) 一時ファイルが残らない")
+            check(offCalls.count == before, "(中止) 失敗とは扱わず、設定を触らない")
+            model.poll(enabled: true)
+            check(model.isBusy, "(中止) ON にし直すと取り直す")
+            _ = wait(model, seconds: 20)
+            check(model.isReady && status(model)?.state == .ready, "(中止) 取り直して準備完了になる")
+            // 準備完了のあと OFF → ON: 状態は OFF → 準備できましたに戻る (取り直さない)
+            model.poll(enabled: false)
+            check(status(model)?.state == .off && model.isReady, "(OFF) 準備完了のあと OFF にすると状態は『OFF』 (読み込み済みのモデルはそのまま)")
+            model.poll(enabled: true)
+            check(!model.isBusy && status(model)?.state == .ready, "(OFF) ON に戻すと『準備できました』に戻る (取り直さない)")
+        }
+
+        // 8b. 取得の失敗の記録は、設定を OFF に戻した後も残る (理由を読めるように)
+        do {
+            let dir = root.appendingPathComponent("failed-stays", isDirectory: true)
+            let model = makeModel(dir, source: local(size: Int64(payload.count), sha256: String(repeating: "0", count: 64)), offCalls: offCalls)
+            model.poll(enabled: true)
+            _ = wait(model, seconds: 20)
+            model.poll(enabled: false)
+            check(status(model)?.state == .failed, "(失敗) 設定が OFF に戻っても、失敗の記録は残る")
+        }
+
+        // 8c. 前の起動が残した一時ファイルは、取得の始めに消す。既にあるファイルの検査 (通信しない) は『確認中』
+        do {
+            let dir = root.appendingPathComponent("leftovers", isDirectory: true)
+            let models = dir.appendingPathComponent("models", isDirectory: true)
+            try? FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
+            let staleParts = [models.appendingPathComponent("download.OLD.part"), dir.appendingPathComponent("zenzai.OLD.tmp")]
+            for url in staleParts { try? Data("x".utf8).write(to: url) }
+            try? Data("keep".utf8).write(to: models.appendingPathComponent("other.txt"))
+            let model = makeModel(dir, source: local(size: Int64(payload.count), sha256: hex(payload)), offCalls: offCalls)
+            model.poll(enabled: true)
+            _ = wait(model, seconds: 20)
+            check(staleParts.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) }, "残っていた download.*.part と zenzai.*.tmp を消す")
+            check(FileManager.default.fileExists(atPath: models.appendingPathComponent("other.txt").path), "関係のないファイルは消さない")
+            let again = makeModel(dir, source: local(size: Int64(payload.count), sha256: hex(payload)), offCalls: offCalls)
+            again.poll(enabled: true)
+            check(again.isBusy && status(again)?.state == .checking, "既にあるファイルの検査中は『確認中』")
+            _ = wait(again, seconds: 20)
+            check(again.isReady && status(again)?.state == .ready, "検査を通ると『準備できました』")
+        }
+
+        // 8d. 転送先の許可 (本番): huggingface.co と *.hf.co だけ
+        do {
+            let allowed = ZenzaiModel.Source.production.allowedHost
+            check(["huggingface.co", "us.aws.cdn.hf.co", "cas-bridge.xethub.hf.co"].allSatisfy(allowed), "転送先: huggingface.co と *.hf.co は許す")
+            check(["evilhf.co", "hf.co.evil.example", "huggingface.co.evil.example", "example.com", "hf.co"].allSatisfy { !allowed($0) }, "転送先: 似た名前・関係ないホストは許さない")
+        }
+
+        // 8e. 更新の最低 OS: 新しい版の LSMinimumSystemVersion が今の OS より新しければ断る
+        do {
+            func version(_ major: Int, _ minor: Int, _ patch: Int) -> OperatingSystemVersion { OperatingSystemVersion(majorVersion: major, minorVersion: minor, patchVersion: patch) }
+            func blocked(_ required: String?, on current: OperatingSystemVersion) -> Bool {
+                Updater.checkMinimumSystemVersion((required.map { ["LSMinimumSystemVersion": $0] } ?? [:]) as NSDictionary, current: current) != nil
+            }
+            check(blocked("13.3", on: version(13, 2, 1)) && blocked("14.0", on: version(13, 6, 0)) && blocked("13.3.1", on: version(13, 3, 0)), "最低 OS より古い Mac には更新を出さない")
+            check(!blocked("13.3", on: version(13, 3, 0)) && !blocked("13.3", on: version(26, 0, 0)) && !blocked("13", on: version(13, 0, 0)), "最低 OS と同じ・新しい Mac は更新できる")
+            check(!blocked(nil, on: version(13, 0, 0)) && !blocked("x.y", on: version(13, 0, 0)), "最低 OS が無い・読めないときは止めない")
+        }
+
         // 7. 本物の URL (1 回だけ。サイズと SHA-256 が固定した値と合う)
         if network {
             let dir = root.appendingPathComponent("network", isDirectory: true)

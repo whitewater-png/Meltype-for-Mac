@@ -10,7 +10,9 @@ import PackageDescription
 
 let package = Package(
     name: "MeltypeIME",
-    platforms: [.macOS(.v13)],
+    // 最低 OS は 13.3。azooKey の出来合いの llama.framework (Zenzai 用) の minos が 13.3 で、起動時にリンクされるので、
+    // Zenzai を OFF にしている人も 13.0〜13.2 では起動できない。Info.plist (2 つ)・pkg の Distribution・README と揃えること。
+    platforms: [.macOS("13.3")],
     dependencies: [
         // main は API がよく変わるので、確かめたコミットに固定する (更新するときは Converter.swift も合わせて直す)。
         // trait は CPU 版 (ZenzaiCPU) だけを使う。GPU 版 (Zenzai) は llama.cpp b4846 の Metal 初期化 (bf16 カーネルの読み込み) で落ちる

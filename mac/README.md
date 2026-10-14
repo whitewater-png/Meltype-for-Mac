@@ -18,7 +18,7 @@ Mac の正式な IME の仕組み (Input Method Kit) で動く Meltype です。
 
 ## 必要なもの
 
-- macOS 13 以降。配布している zip は Apple シリコン (M1 以降) 用です。ソースからのビルドは、ビルドした Mac の CPU 用になります (Apple シリコンの Mac なら Apple シリコン用、Intel の Mac なら Intel 用。Intel 用のビルドは配布していません)
+- macOS 13.3 以降 (azooKey の `llama.framework` が 13.3 以降を要求し、Zenzai を OFF にしていても起動時にリンクされるため。古い版の Mac には更新も出さない)。配布している zip は Apple シリコン (M1 以降) 用です。ソースからのビルドは、ビルドした Mac の CPU 用になります (Apple シリコンの Mac なら Apple シリコン用、Intel の Mac なら Intel 用。Intel 用のビルドは配布していません)
 - Xcode、またはコマンドライン ツール (`xcode-select --install`)
 - .NET 10 SDK（10.0.401 以上。`global.json` の指定どおり。<https://dotnet.microsoft.com/download>。または `curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0`）
 
@@ -53,10 +53,13 @@ cd mac
 ## Zenzai (ニューラル変換、実験的) とモデルの取得 (通信)
 
 - 設定タブの「Zenzai (ニューラル変換、実験的)」(`Settings.Zenzai`、既定 OFF)。ON にすると、文脈に合う漢字が先頭に来やすくなる (実験: 212 文で第一候補の一致 +17〜22 ポイント、1 キーの p95 61 ms、メモリ +30〜100 MB。CPU 版。`docs/ZENZAI_EXPERIMENT_2026-10.md`)。
-- **通信**: ON にしたときだけ、IME が変換モデル (zenz-v3.1-small の Q5_K_M、73,871,968 バイト) を `https://huggingface.co/Miwa-Keita/zenz-v3.1-small-gguf/resolve/main/ggml-model-Q5_K_M.gguf` から 1 回取得する (GET。転送先は `huggingface.co` と `*.cdn.hf.co` (実測 `us.aws.cdn.hf.co`) の https だけ。認証・Cookie・キャッシュなし、使い捨てセッション)。打った内容は送らない。OFF のあいだは通信しない。ダウンロードが終わるまで (と、失敗したとき) は、今までどおりの変換。
+- **通信**: ON にしたときだけ、IME が変換モデル (zenz-v3.1-small の Q5_K_M、73,871,968 バイト) を `https://huggingface.co/Miwa-Keita/zenz-v3.1-small-gguf/resolve/main/ggml-model-Q5_K_M.gguf` から 1 回取得する (GET。転送先は `huggingface.co` と `*.hf.co` (実測 `us.aws.cdn.hf.co`。Xet ストレージの `cas-bridge.xethub.hf.co` に移っても通る) の https だけ。サイズと SHA-256 を固定しているので、許すホストを広げても安全さは変わらない。認証・Cookie・キャッシュなし、使い捨てセッション)。転送先が許可と違ったときは、通信の失敗と分けた文を出す。打った内容は送らない。OFF のあいだは通信しない。取得の途中で OFF にしたら、ダウンロードを中止して一時ファイルを消す (状態は「OFF」)。ダウンロードが終わるまで (と、失敗したとき) は、今までどおりの変換。
+- **左文脈**: 変換のとき、他のアプリのカーソル前の文字 (UTF-16 で 20 単位。`surroundingText` はカーソルの後ろの 20 単位も読む) を読み、日英判定と、ON のときは Zenzai の入力 (`leftSideContext`) に使う。保存も送信もしない。
+- **最初の読み込み**: 準備ができて数秒たち、入力の無いとき (最後の変換から 1.5 秒以上) に、モデルを 1 回だけ先に読み込む (メインスレッドで数百 ms〜数秒止まるが、入力が無いときに済ませる)。その前に打ち始めたときは、最初の 1 キーがモデルの読み込みを待つ。
+- **OFF にしたあと**: 変換には使わなくなるが、読み込み済みのモデルのメモリ (+30〜100 MB) は IME を起動し直す (`pkill -x Meltype`) まで残る。
 - **検査**: サイズと SHA-256 (`4de930c0…14f6c`) をアプリに固定していて、一時ファイルに書いて検査してから所定の場所に移す。一致しなければ捨てて、設定を OFF に戻す。重い native コード (llama.cpp) に読ませるのは、この検査を通った 1 ファイルだけ。
-- **保存場所**: `~/Library/Application Support/Meltype/models/zenz-v3.1-small-Q5_K_M.gguf` (フォルダー 0700、ファイル 0600)。**消し方**: `models/` を消せばよい (次に ON のとき取り直す)。`uninstall.sh --remove-data` でデータごと消える。
-- **状態の表示**: IME が `~/Library/Application Support/Meltype/zenzai.json` (`state` = downloading / ready / failed / slow、`progress`、`error`、`updatedAt`。0600) に書き、「Meltype 辞書」の設定タブの Zenzai の下に「ダウンロード中 (xx%)」「失敗: …」「準備できました」「遅いため一時的に OFF」を出す。壊れていれば何も出さない。
+- **保存場所**: `~/Library/Application Support/Meltype/models/zenz-v3.1-small-Q5_K_M.gguf` (フォルダー 0700、ファイル 0600)。**消し方**: 設定を **OFF にしてから** `models/` を消す (ON のままだと、次に IME が起動したとき自動で取り直す)。`uninstall.sh --remove-data` でデータごと消える。
+- **状態の表示**: IME が `~/Library/Application Support/Meltype/zenzai.json` (`state` = checking / downloading / ready / failed / slow / loadFailed / off、`progress`、`error`、`updatedAt`。0600) に書き、「Meltype 辞書」の設定タブの Zenzai の下に「確認中」(起動時に既にあるファイルを検査しているとき。通信しない)「ダウンロード中 (xx%)」「失敗: …」「準備できました」「変換が遅いため一時的に OFF」「モデルを読み込めなかったため一時的に OFF」「OFF」を出す。壊れていれば何も出さない。取得に失敗して設定を OFF に戻したときは、理由が読めるよう「失敗」を残す (次に ON にするまで)。
 - **安全弁**: モデルを読み込めなかった、または 1 キーの変換 (予測・ライブ変換・文節候補の合計) が 300 ms を超えることが 3 キー続いたら、その IME のプロセスでは Zenzai を使わない (設定はそのまま。IME を起動し直すと戻る)。
 - **確かめ方** (開発者向け): `.build/release/MeltypeIME --zenzai-self-test` (一時フォルダーとローカルのファイルで、ダウンロード中・失敗・準備完了を確かめる。通信しない)。`--network` を付けると本物の URL から 1 回だけ取得して、サイズと SHA-256 を確かめる。`--weights <gguf> --cases eval/kanji/kanji-cases.tsv` を付けると、製品の変換の経路で OFF と ON の一致数を比べる。
 - ビルド: `Package.swift` は swift-tools-version 6.1、azooKey に trait `ZenzaiCPU` (CPU 版。GPU 版は llama.cpp b4846 の Metal 初期化で落ちるので使わない) と `.interoperabilityMode(.Cxx)`。`llama.framework` は `build.sh` が `otool -L` に出るものだけ同梱し (B1)、自分の CPU の分だけに薄くする (`lipo -thin`)。

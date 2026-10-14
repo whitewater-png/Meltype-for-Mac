@@ -8,20 +8,26 @@ import Foundation
 /// Foundation だけに依存させ、IME と辞書アプリの両方から使い、読み方の規則を単体で確かめられるようにしてある。
 public struct ZenzaiStatus: Equatable {
     public enum State: String {
+        /// 起動時に、既にあるモデルのファイルを検査している (通信はしない)。
+        case checking
         /// モデルを取得している。progress に百分率。
         case downloading
         /// モデルがあり、検査 (サイズと SHA-256) も通った。
         case ready
         /// 取得できなかった・検査に通らなかった。error に理由。設定は OFF に戻してある。
         case failed
-        /// 動いたが、モデルの読み込みに失敗した・1 キーの変換が遅いので、この IME のプロセスだけ OFF にしている (IME を起動し直すまで)。
+        /// 動いたが、1 キーの変換が遅いので、この IME のプロセスだけ OFF にしている (IME を起動し直すまで)。
         case slow
+        /// 検査は通ったが、モデルを読み込めなかったので、この IME のプロセスだけ OFF にしている (IME を起動し直すまで)。
+        case loadFailed
+        /// 設定を OFF にした (取得は中止し、使わない)。
+        case off
     }
 
     public var state: State
     /// downloading のときの百分率 (0〜100)。
     public var progress: Int?
-    /// failed・slow のときの理由 (画面にそのまま出す。打った内容は入れない)。
+    /// failed・slow・loadFailed のときの理由 (画面にそのまま出す。打った内容は入れない)。
     public var error: String?
     public var updatedAt: Date
 
@@ -61,6 +67,11 @@ public struct ZenzaiStatus: Equatable {
     /// 設定タブに出す 1 行 (Zenzai の項目の下)。出すものが無ければ nil。
     public func displayText(now: Date = Date()) -> String? {
         switch state {
+        case .checking:
+            // 検査は数秒で終わる。長く更新が無ければ IME が止まったあとの古い記録なので、何も出さない
+            return now.timeIntervalSince(updatedAt) > Self.staleAfter ? nil : "確認中"
+        case .off:
+            return "OFF"
         case .downloading:
             if now.timeIntervalSince(updatedAt) > Self.staleAfter { return "ダウンロードが止まっています (Meltype を使い始めると、設定が ON のあいだ再開します)" }
             return "ダウンロード中 (\(progress ?? 0)%)"
@@ -69,7 +80,9 @@ public struct ZenzaiStatus: Equatable {
         case .failed:
             return "失敗: \(error ?? "理由は分かりません")"
         case .slow:
-            return "遅いため一時的に OFF (Meltype を起動し直すと戻ります)"
+            return "変換が遅いため一時的に OFF (Meltype を起動し直すと戻ります)"
+        case .loadFailed:
+            return "モデルを読み込めなかったため一時的に OFF (Meltype を起動し直すと戻ります)"
         }
     }
 

@@ -27,8 +27,10 @@ final class ZenzaiModel {
             url: URL(string: "https://huggingface.co/Miwa-Keita/zenz-v3.1-small-gguf/resolve/main/ggml-model-Q5_K_M.gguf")!,
             size: 73_871_968,
             sha256: "4de930c06bef8c263aa1aa40684af206db4ce1b96375b3b8ed0ea508e0b14f6c",
-            // huggingface.co は重みを CDN (実測は us.aws.cdn.hf.co) に転送する
-            allowedHost: { $0 == "huggingface.co" || $0.hasSuffix(".cdn.hf.co") },
+            // huggingface.co は重みを CDN に転送する (実測は us.aws.cdn.hf.co。Xet ストレージの cas-bridge.xethub.hf.co へ移行中)。
+            // 転送先の名前は変わりやすいので、hf.co の下 (*.hf.co) まで許す。サイズと SHA-256 を固定して、合わないファイルは使わないので、
+            // 許すホストを広げても、変なファイルを読ませない安全さは変わらない (許可の役目は、関係ないホストへ要求を送らないこと)。
+            allowedHost: { $0 == "huggingface.co" || $0.hasSuffix(".hf.co") },
             fileName: "zenz-v3.1-small-Q5_K_M.gguf"
         )
     }
@@ -56,6 +58,15 @@ final class ZenzaiModel {
     private var timer: Timer?
     /// 状態が変わったとき (メインスレッド)。テストが待つのに使う。
     var onChange: (() -> Void)?
+    /// 取得・検査の世代。設定を OFF にして中止するたびに進め、古い世代の結果 (遅れて届く完了) は捨てる。メインスレッドだけ。
+    private var generation = 0
+    private var downloadTask: URLSessionDownloadTask?
+    private var currentPart: URL?
+    /// このプロセスで止めたときの状態 (suspend)。OFF → ON にし直したとき、状態ファイルに書き戻すのに使う。
+    private var suspendedStatus: ZenzaiStatus?
+    /// 状態ファイルの今の state (書いたもの。まだ書いていなければ、最初に 1 回だけファイルから読む)。メインスレッドだけ。
+    private var knownState: ZenzaiStatus.State?
+    private var knownStateLoaded = false
 
     init(source: Source, dataDirectory: @escaping () -> URL, turnOffSetting: (() -> Bool)? = nil) {
         self.source = source
@@ -65,9 +76,11 @@ final class ZenzaiModel {
 
     // ---- 保存場所 ----
 
-    var modelsDirectory: URL { dataDirectory().appendingPathComponent("models", isDirectory: true) }
+    /// データフォルダー。場所は FFI で本体に尋ねるので、1 度だけ求めて覚える (変換のたびに尋ねない)。メインスレッドだけで触る。
+    private lazy var dataDirectoryURL: URL = dataDirectory()
+    var modelsDirectory: URL { dataDirectoryURL.appendingPathComponent("models", isDirectory: true) }
     var weightURL: URL { modelsDirectory.appendingPathComponent(source.fileName) }
-    var statusFile: URL { dataDirectory().appendingPathComponent("zenzai.json") }
+    var statusFile: URL { dataDirectoryURL.appendingPathComponent("zenzai.json") }
 
     /// 変換に使ってよいか (モデルが準備でき、このプロセスで止められていない)。
     var isUsable: Bool { isReady && !isSuspended }
@@ -80,33 +93,85 @@ final class ZenzaiModel {
         poll(enabled: NativeCore.shared.zenzaiEnabled)
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
             ZenzaiModel.shared.poll(enabled: NativeCore.shared.zenzaiEnabled)
+            // 準備ができたら、入力の無いときにモデルを先に読み込む (最初のキーで止まらないように)。OFF のあいだは変換エンジンを作らない
+            if ZenzaiModel.shared.isUsable { MeltypeConverter.shared.warmUpZenzaiIfIdle() }
         }
     }
 
-    /// 設定の ON/OFF を渡す (メインスレッド)。ON で、まだ用意できていなければ取得を始める。OFF なら何もせず (通信しない)、次に ON になったとき取り直せるようにする。
+    /// 設定の ON/OFF を渡す (メインスレッド)。ON で、まだ用意できていなければ取得を始める。
+    /// OFF なら、取得の途中なら中止して (一時ファイルも消す)、状態を OFF にする。通信はしない。次に ON になったとき取り直せるようにする。
+    /// OFF にしても、読み込み済みのモデルのメモリは、IME を起動し直すまで残る (azooKey が持っている)。
     func poll(enabled: Bool) {
-        guard enabled else { attempted = false; return }
-        guard !isReady, !isBusy, !attempted else { return }
+        guard enabled else {
+            attempted = false
+            cancelDownload()
+            markOff()
+            return
+        }
+        if isReady {
+            // OFF にしていたあとに ON へ戻した。準備はできているので、状態の表示だけ戻す
+            if currentState() == .off { writeStatus(suspendedStatus ?? ZenzaiStatus(state: .ready)) }
+            return
+        }
+        guard !isBusy, !attempted else { return }
         attempted = true
         isBusy = true
-        writeStatus(ZenzaiStatus(state: .downloading, progress: 0))
+        generation += 1
+        let mine = generation
+        let weight = weightURL
+        // 既にファイルがあれば検査だけ (通信しない)。無ければ取得
+        let existing = FileManager.default.fileExists(atPath: weight.path)
+        writeStatus(existing ? ZenzaiStatus(state: .checking) : ZenzaiStatus(state: .downloading, progress: 0))
         DispatchQueue.global(qos: .utility).async { [self] in
             // 既にあるファイルが合っていれば、通信しない (IME を起動し直すたびに取り直さない)
-            if verify(weightURL) == nil {
-                DispatchQueue.main.async { self.finish(error: nil) }
+            if verify(weight) == nil {
+                DispatchQueue.main.async { if self.generation == mine { self.finish(error: nil) } }
                 return
             }
-            DispatchQueue.main.async { self.download() }
+            DispatchQueue.main.async { if self.generation == mine { self.download() } }
         }
+    }
+
+    /// 取得・検査の途中なら中止する (メインスレッド)。通信を打ち切り、一時ファイルを消す。失敗とは扱わない (設定は利用者が OFF にしたもの)。
+    private func cancelDownload() {
+        guard isBusy else { return }
+        generation += 1   // 動いている取得・検査の結果は、これ以降捨てる
+        isBusy = false
+        downloadTask?.cancel()
+        downloadTask = nil
+        if let part = currentPart { try? FileManager.default.removeItem(at: part) }
+        currentPart = nil
+        lastReported = (percent: -1, at: Date.distantPast)
+        Self.logger.info("Zenzai が OFF になったので、モデルの取得を中止しました")
+        onChange?()
     }
 
     // ---- 取得 ----
 
+    /// 前の IME が途中で終わって残した一時ファイル (モデルの download.*.part と、状態の zenzai.*.tmp) を消す。
+    private func removeLeftovers() {
+        let manager = FileManager.default
+        let leftovers: [(directory: URL, matches: (String) -> Bool)] = [
+            (modelsDirectory, { $0.hasPrefix("download.") && $0.hasSuffix(".part") }),
+            (dataDirectoryURL, { $0.hasPrefix("zenzai.") && $0.hasSuffix(".tmp") }),
+        ]
+        for (directory, matches) in leftovers {
+            for name in (try? manager.contentsOfDirectory(atPath: directory.path)) ?? [] where matches(name) {
+                try? manager.removeItem(at: directory.appendingPathComponent(name))
+            }
+        }
+    }
+
     private func download() {
+        removeLeftovers()
         guard let scheme = source.url.scheme?.lowercased(), source.allowedSchemes.contains(scheme) else {
             finish(error: "モデルの取得先が https ではありません。")
             return
         }
+        // ファイルがあったが検査に通らなかったとき (確認中) も、ここから取得の状態にする
+        writeStatus(ZenzaiStatus(state: .downloading, progress: 0))
+        let mine = generation
+        let destinationURL = weightURL
         let directory = modelsDirectory
         do {
             // モデルのフォルダーは本人だけが読める権限 (0700)。前の版が別の権限で作ったものも直す
@@ -117,18 +182,25 @@ final class ZenzaiModel {
             return
         }
         let part = directory.appendingPathComponent("download.\(UUID().uuidString).part")
+        currentPart = part
         let delegate = ZenzaiDownloadDelegate(destination: part, limit: source.size, source: source) { [weak self] percent in
-            DispatchQueue.main.async { self?.reportProgress(percent) }
+            DispatchQueue.main.async { if let self, self.generation == mine { self.reportProgress(percent) } }
         } completion: { [weak self] failure in
             guard let self else { return }
             DispatchQueue.global(qos: .utility).async {
                 var error = failure
                 if error == nil {
                     // 検査 → 権限 → 置き換え。途中で止まっても、検査前のファイルは weightURL に置かない
-                    error = self.verify(part) ?? self.install(part)
+                    error = self.verify(part) ?? self.install(part, to: destinationURL)
                 }
                 if error != nil { try? FileManager.default.removeItem(at: part) }
-                DispatchQueue.main.async { self.finish(error: error) }
+                DispatchQueue.main.async {
+                    // OFF にして中止したあとの完了 (中止の知らせ・遅れて届いた成功) は、状態に反映しない
+                    guard self.generation == mine else { try? FileManager.default.removeItem(at: part); return }
+                    self.currentPart = nil
+                    self.downloadTask = nil
+                    self.finish(error: error)
+                }
             }
         }
         let configuration = URLSessionConfiguration.ephemeral
@@ -140,7 +212,9 @@ final class ZenzaiModel {
         let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
         var request = URLRequest(url: source.url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
         request.setValue("Meltype/\(UpdateManager.shared.currentVersion)", forHTTPHeaderField: "User-Agent")
-        session.downloadTask(with: request).resume()
+        let task = session.downloadTask(with: request)
+        downloadTask = task
+        task.resume()
         session.finishTasksAndInvalidate()
     }
 
@@ -156,14 +230,14 @@ final class ZenzaiModel {
     }
 
     /// 検査を通した一時ファイルを、本人だけが読める権限 (0600) にして、本来の場所に置き換える。
-    private func install(_ part: URL) -> String? {
+    private func install(_ part: URL, to destination: URL) -> String? {
         let manager = FileManager.default
         do {
             try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: part.path)
         } catch {
             return "モデルの権限を設定できませんでした。"
         }
-        if rename(part.path, weightURL.path) != 0 { return "モデルを所定の場所に置けませんでした。" }
+        if rename(part.path, destination.path) != 0 { return "モデルを所定の場所に置けませんでした。" }
         return nil
     }
 
@@ -195,26 +269,47 @@ final class ZenzaiModel {
     // ---- このプロセスだけ止める ----
 
     /// モデルの読み込みに失敗した・遅いので、この IME のプロセスでは使わない (設定は変えない。IME を起動し直すと戻る)。メインスレッド。
-    func suspend(reason: String) {
+    /// loadFailed は「読み込めなかった」、slow は「遅い」。設定タブの文が変わる。
+    func suspend(reason: String, loadFailed: Bool = false) {
         guard !isSuspended else { return }
         isSuspended = true
         Self.logger.error("Zenzai をこのプロセスでは使いません: \(reason, privacy: .public)")
-        writeStatus(ZenzaiStatus(state: .slow, error: reason))
+        let status = ZenzaiStatus(state: loadFailed ? .loadFailed : .slow, error: reason)
+        suspendedStatus = status
+        writeStatus(status)
         onChange?()
     }
 
     // ---- 状態ファイル (zenzai.json) ----
 
+    /// 状態ファイルの今の state。書いたものを覚えていて、まだ書いていなければ、最初に 1 回だけファイルから読む (IME の前の起動が残したもの)。
+    private func currentState() -> ZenzaiStatus.State? {
+        if !knownStateLoaded {
+            knownStateLoaded = true
+            knownState = ZenzaiStatus.read(dataDirectory: dataDirectoryURL.path)?.state
+        }
+        return knownState
+    }
+
+    /// 設定が OFF のあいだの表示を「OFF」にする。状態ファイルがまだ無ければ作らない (使っていない人にファイルを増やさない)。
+    /// 失敗 (failed) の記録は、設定を OFF に戻したこと自体が失敗の結果なので、理由を読めるよう、次に ON にするまで残す。
+    private func markOff() {
+        guard let state = currentState(), state != .off, state != .failed else { return }
+        writeStatus(ZenzaiStatus(state: .off))
+    }
+
     /// 一時ファイルに書いてから置き換える (途中で止まっても元のファイルを壊さない)。フォルダーは 0700、ファイルは 0600。
     private func writeStatus(_ status: ZenzaiStatus) {
         guard let data = status.encoded() else { return }
         let manager = FileManager.default
-        let directory = dataDirectory()
+        let directory = dataDirectoryURL
         do {
             try manager.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             let temp = directory.appendingPathComponent("zenzai.\(UUID().uuidString).tmp")
             guard manager.createFile(atPath: temp.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return }
-            if rename(temp.path, statusFile.path) != 0 { try? manager.removeItem(at: temp) }
+            if rename(temp.path, statusFile.path) != 0 { try? manager.removeItem(at: temp); return }
+            knownState = status.state
+            knownStateLoaded = true
         } catch {
             Self.logger.error("Zenzai の状態を保存できませんでした")
         }
@@ -262,6 +357,10 @@ private final class ZenzaiDownloadDelegate: HostRestrictedDelegate, URLSessionDo
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         // file: は応答コードが無い (テスト用)。https は 200 だけ
         if let http = downloadTask.response as? HTTPURLResponse, http.statusCode != 200 {
+            if rejectedRedirect {
+                complete("ダウンロードの転送先が、許可したホスト (huggingface.co と *.hf.co) ではなかったので中止しました (通信の失敗ではありません)。")
+                return
+            }
             complete("ダウンロードできませんでした (サーバーの応答: HTTP \(http.statusCode))。")
             return
         }
@@ -275,6 +374,11 @@ private final class ZenzaiDownloadDelegate: HostRestrictedDelegate, URLSessionDo
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if error != nil { complete("ダウンロードできませんでした (ネットワークに接続できないか、転送先が許可されていません)。") }
+        guard error != nil else { return }
+        if rejectedRedirect {
+            complete("ダウンロードの転送先が、許可したホスト (huggingface.co と *.hf.co) ではなかったので中止しました (通信の失敗ではありません)。")
+        } else {
+            complete("ダウンロードできませんでした (ネットワークに接続できなかった可能性があります)。")
+        }
     }
 }

@@ -455,6 +455,9 @@ enum Updater {
             return fail("ダウンロードした Meltype.app の版が、Release の版 (v\(offer.version)) と一致しませんでした。")
         }
         guard info["CFBundleIdentifier"] as? String == Bundle.main.bundleIdentifier else { return fail("ダウンロードした Meltype.app が、今の Meltype と別のアプリでした。") }
+        // (4a) 新しい版の最低 OS (LSMinimumSystemVersion) が、この Mac の OS より新しければ入れ替えない。
+        //      入れ替えると IME が起動しなくなり、日本語入力が使えなくなる (最低 OS を上げた版は、古い OS の人には届けない)
+        if let reason = checkMinimumSystemVersion(info) { return fail(reason) }
         // (4b) この Mac の CPU で動くか。配布の zip は Apple シリコン用だけなので、Intel Mac でソースから入れた Meltype を
         //      入れ替えると、起動できなくなって日本語入力が使えなくなる (codesign の検査は CPU を見ない)
         if let reason = checkArchitectures(app) { return fail(reason) }
@@ -464,6 +467,23 @@ enum Updater {
             return fail("インストールを開始できませんでした。")
         }
         return .success(())
+    }
+
+    /// 新しい版の Info.plist の LSMinimumSystemVersion ("13.3" など) が、今の OS より新しければ理由を返す。無い・読めないときは確かめられないので nil。
+    static func checkMinimumSystemVersion(_ info: NSDictionary, current: OperatingSystemVersion = ProcessInfo.processInfo.operatingSystemVersion) -> String? {
+        guard let text = info["LSMinimumSystemVersion"] as? String else { return nil }
+        let parts = text.split(separator: ".").map { Int($0) }
+        guard !parts.isEmpty, !parts.contains(where: { $0 == nil }) else { return nil }
+        let required = parts.compactMap { $0 }
+        let now = [current.majorVersion, current.minorVersion, current.patchVersion]
+        for index in 0..<max(required.count, now.count) {
+            let need = index < required.count ? required[index] : 0
+            let have = index < now.count ? now[index] : 0
+            if need != have {
+                return have < need ? "この版は macOS \(text) 以降が必要です (この Mac は macOS \(now[0]).\(now[1]).\(now[2]))。今の Meltype は、この OS で動く最後の版のままにしてあります。" : nil
+            }
+        }
+        return nil
     }
 
     /// Meltype.app の中の実行ファイル (IME 本体・辞書の管理画面・C# のライブラリ) が、この Mac の CPU 向けを含むか。だめなら理由。
@@ -665,6 +685,9 @@ enum Updater {
 /// リダイレクト先のホストを制限する (https だけ、許可したホストだけ)。外れたら要求を打ち切る。
 class HostRestrictedDelegate: NSObject, URLSessionTaskDelegate {
     private let allowed: (String) -> Bool
+    /// 許可していない転送先への転送を断ったか (断ると、転送の応答 (3xx) がそのまま最終の応答として届く。通信の失敗と区別するのに使う)。
+    /// 書くのも読むのも、同じセッションの delegate queue (直列) の上。
+    private(set) var rejectedRedirect = false
 
     init(allowed: @escaping (String) -> Bool) {
         self.allowed = allowed
@@ -675,6 +698,7 @@ class HostRestrictedDelegate: NSObject, URLSessionTaskDelegate {
         if let url = request.url, url.scheme == "https", let host = url.host?.lowercased(), allowed(host) {
             completionHandler(request)
         } else {
+            rejectedRedirect = true
             completionHandler(nil)
         }
     }
