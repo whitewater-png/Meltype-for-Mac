@@ -567,7 +567,16 @@ final class MeltypeInputController: IMKInputController {
                     client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
                     Self.trace("apply: 変換中の文字を取り除いた後 \(Self.ranges(client))")
                 } else if marked.location != NSNotFound, marked.length > 0 {
-                    Self.trace("apply: 変換中の文字を取り除かない (中身が違う・読めない) marked=\(NSStringFromRange(marked))")
+                    // 変換中の文字を取り除けないまま範囲つきで置き換えると、アプリは範囲を無視して変換中の範囲に入れ、元の文字が消えずに二重になる
+                    // (実機: 「今日はsushi」の後ろの「です」の確定で、`sushi` の確定し直し `すし` が `sushi` の後ろに入り「今日はsushiすしです」)。なので、この確定を丸ごと飛ばす
+                    // (消す・入れるの両方をしない。確定済みの文字は元のまま残る)。確定し直し (自動) は、これまでの飛ばす経路 (キャレット不明・中身が違う) と同じく Core には伝えない
+                    // (Core の記録は _correctable を空にした直後で、ずれても次の確定し直しの対象にならない)。トグル由来なら取消へ。
+                    // self-test が無いのは、`apply` の確認に IMKTextInput の偽物 (変換中の範囲・置き換え範囲を無視する本物のアプリの動き) が要るため。確かめるのは実機のトレース。
+                    let actual = client.attributedSubstring(from: marked)?.string
+                    Self.trace("apply: 確定し直しを飛ばす (変換中の文字を取り除けない) marked=\(NSStringFromRange(marked)) actual=\(Self.cut(actual)) expected=\(Self.cut(lastView?.text))")
+                    NSLog("Meltype: 確定し直しを飛ばしました (変換中の文字を取り除けない。消す予定 %d 文字)", edit.deleteBefore)
+                    if result.toggle == true { skippedToggle = true }
+                    continue
                 }
             }
             Self.trace("apply: insertText text=\(Self.cut(edit.text)) replacementRange=\(NSStringFromRange(range)) 直前 \(Self.ranges(client))")
