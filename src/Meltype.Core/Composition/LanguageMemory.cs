@@ -29,7 +29,19 @@ public sealed class LanguageMemory
 
         /// <summary>F10 / F6 などで、はっきり英字 / かなに直したか (変換の候補から選んだだけなら false)。</summary>
         public bool Explicit { get; set; }
+
+        /// <summary>
+        /// 覚えている向きと逆の向きに、候補から選んだだけ (はっきり直していない) で続けて確定した回数 (1-6)。
+        /// 一度の例外で向きが反転しないよう、<see cref="ReverseToFlip"/> 回続いたときだけ反転する。前の版で保存したものは 0。
+        /// </summary>
+        public int Reverse { get; set; }
     }
+
+    /// <summary>はっきり直したわけではない逆向きの確定が、この回数続いたら向きを反転する (R41-7)。</summary>
+    internal const int ReverseToFlip = 2;
+
+    /// <summary><see cref="RememberUndoable"/> の取り消し用 (覚える前の項目。無かったら Previous は null)。</summary>
+    internal sealed record RememberUndo(string Word, Entry? Previous);
 
     /// <summary>学習した語 (設定の「学習した語」の一覧に出す)。Active は今効いているか (2 回目を待っている語は false)。</summary>
     public sealed record Learned(string Word, bool English, int Count, DateTime Used, bool Active);
@@ -169,7 +181,7 @@ public sealed class LanguageMemory
 
     private bool SameAs(Dictionary<string, Entry> other) =>
         other.Count == _entries.Count && other.All(e => _entries.TryGetValue(e.Key, out var mine) &&
-            mine.English == e.Value.English && mine.Count == e.Value.Count && mine.Explicit == e.Value.Explicit && mine.Used == e.Value.Used);
+            mine.English == e.Value.English && mine.Count == e.Value.Count && mine.Explicit == e.Value.Explicit && mine.Reverse == e.Value.Reverse && mine.Used == e.Value.Used);
 
     /// <summary>
     /// 変更 (読み直し → 変更 → 保存) の間、ほかのプロセスが同じファイルを書かないようにするロックを取る。取れたら fileLock に入れて null。
@@ -233,7 +245,7 @@ public sealed class LanguageMemory
         }
     }
 
-    private static Entry Copy(Entry entry) => new() { English = entry.English, Used = entry.Used, Count = entry.Count, Explicit = entry.Explicit };
+    private static Entry Copy(Entry entry) => new() { English = entry.English, Used = entry.Used, Count = entry.Count, Explicit = entry.Explicit, Reverse = entry.Reverse };
 
     public int Count { get { lock (_gate) return _entries.Count; } }
 
@@ -283,38 +295,79 @@ public sealed class LanguageMemory
     /// explicitChoice は F10 / F6 / Tab ではっきり直したとき (変換の候補から選んだだけなら false)。
     /// 保存できなければ覚えない (ログに残す)。ロックは短くしか待たない (取れなければロック無しで保存する)。
     /// </summary>
-    public void Remember(string word, bool english, bool explicitChoice = false)
+    public void Remember(string word, bool english, bool explicitChoice = false) => RememberUndoable(word, english, explicitChoice);
+
+    /// <summary>
+    /// <see cref="Remember"/> と同じ。あとで <see cref="Undo"/> で覚える前に戻せるよう、覚える前の項目を返す
+    /// (確定後の F10 / F6 で、Swift が入力欄の書き換えを確かめられず飛ばしたとき、学習も取り消すのに使う)。覚えなかった (語が不正・保存できない) ときは null。
+    /// </summary>
+    internal RememberUndo? RememberUndoable(string word, bool english, bool explicitChoice = false)
     {
         word = word.ToLowerInvariant();
-        if (word.Length < 2 || !word.All(char.IsAsciiLetterLower)) return;
+        if (word.Length < 2 || !word.All(char.IsAsciiLetterLower)) return null;
+        Entry? previous = null;
         if (Edit(fromApp: false, () =>
             {
+                previous = _entries.TryGetValue(word, out var existing) ? Copy(existing) : null;
                 RememberCore(word, english, explicitChoice);
                 return (null, true);
             }) is { } failure)
         {
             Diagnostics.Log.Warn($"英語 / 日本語の学習を保存できなかったので、今回の学習は取り消しました: {failure}");
+            return null;
+        }
+        return new RememberUndo(word, previous);
+    }
+
+    /// <summary><see cref="RememberUndoable"/> で覚えたことを、覚える前の項目に戻す。保存できなければログに残すだけ。</summary>
+    internal void Undo(RememberUndo undo)
+    {
+        if (Edit(fromApp: false, () =>
+            {
+                if (undo.Previous is null) _entries.Remove(undo.Word);
+                else _entries[undo.Word] = Copy(undo.Previous);
+                return (null, true);
+            }) is { } failure)
+        {
+            Diagnostics.Log.Warn($"英語 / 日本語の学習を取り消せませんでした: {failure}");
         }
     }
 
     private void RememberCore(string word, bool english, bool explicitChoice)
     {
-        if (_entries.TryGetValue(word, out var old) && old.English == english)
+        if (!_entries.TryGetValue(word, out var old))
+        {
+            AddEntry(word, english, explicitChoice);
+            return;
+        }
+        if (old.English == english)
         {
             old.Used = DateTime.UtcNow;
             var waiting = NeedsTwice(word, old);
             old.Count = Math.Max(1, old.Count) + 1;
             old.Explicit |= explicitChoice;
+            old.Reverse = 0;
             if (waiting) Diagnostics.Log.Decision($"{Diagnostics.Log.Text(word)}は次から英語にします (2 回目の学習)。");
+            return;
         }
-        else
+        // 逆向き。F10 / F6 ではっきり直したなら、すぐ反転する。候補から選んだだけなら、続けて ReverseToFlip 回になるまで向きを変えない
+        // (一度の例外で、覚えた向きが逆転しないように。1-6)。反転は Count = 2 で作る: 2 回ルールが重なって、反転後にもう 1 回要らないように (R41-7)。
+        if (explicitChoice || old.Reverse + 1 >= ReverseToFlip)
         {
-            var entry = new Entry { English = english, Used = DateTime.UtcNow, Count = 1, Explicit = explicitChoice };
-            _entries[word] = entry;
-            Diagnostics.Log.Decision(NeedsTwice(word, entry)
-                ? $"{Diagnostics.Log.Text(word)}はローマ字としても読めるので、もう一度英字にして確定したら英語にします (学習)。"
-                : $"{Diagnostics.Log.Text(word)}は次から{(english ? "英語" : "日本語")}にします (学習)。");
+            AddEntry(word, english, explicitChoice, count: 2);
+            return;
         }
+        old.Reverse++;
+        Diagnostics.Log.Decision($"{Diagnostics.Log.Text(word)}は逆向きの選択を {old.Reverse} 回見ましたが、向きは変えません (あと {ReverseToFlip - old.Reverse} 回続いたら変えます)。");
+    }
+
+    private void AddEntry(string word, bool english, bool explicitChoice, int count = 1)
+    {
+        var entry = new Entry { English = english, Used = DateTime.UtcNow, Count = count, Explicit = explicitChoice };
+        _entries[word] = entry;
+        Diagnostics.Log.Decision(NeedsTwice(word, entry)
+            ? $"{Diagnostics.Log.Text(word)}はローマ字としても読めるので、もう一度英字にして確定したら英語にします (学習)。"
+            : $"{Diagnostics.Log.Text(word)}は次から{(english ? "英語" : "日本語")}にします (学習)。");
     }
 
     /// <summary>学習した語の一覧 (新しく使ったものから)。ほかのプロセスの変更を読み直してから返す。</summary>
