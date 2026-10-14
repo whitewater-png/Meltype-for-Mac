@@ -165,3 +165,13 @@ python3 tools/upstream_watch.py                  # 以降
   4. push すれば表は公開されます。`git add` した時点で履歴にも残るので、迷う行は入れません。
 - `Before:` などの名前付き引数がある行、かなで打つ行、複数行の行は 4 列で表せないので、候補ファイルには出さず、表の「新ケース」の列に件数だけ出ます。必要なら本家のテストを見て手で足します。
 - 自己テスト: `python3 tools/test_upstream_watch.py` (git・dotnet は使いません)。Windows・Linux の変更は一覧に出すだけで、取り込み・評価はしません。
+
+## Homebrew cask (自前 tap)
+
+`mac/homebrew/Casks/meltype-for-mac.rb` が cask の正本です (配布物は zip。Apple シリコン・macOS 13 以降)。使い方・ローカル tap での確かめ方・版の上げ方は [mac/homebrew/README.md](../mac/homebrew/README.md) にあります。
+
+- 版を上げるとき: `python3 tools/update-cask.py <version> <sha256>` で version と sha256 の 2 行だけを書き換える (`python3 tools/test_update_cask.py` が自己テスト)。`scripts/release_build.sh` にはまだ結線していません。
+- **quarantine は postflight で外す**: cask で入れると Meltype.app に `com.apple.quarantine` が付き、ad-hoc 署名の実行ファイルは Gatekeeper に `Killed: 9` で止められる (IME は裏で起動するので表示も出ず、入力メニューに出ないだけ。`--register` も失敗)。pkg と同じ結果にするため `xattr -dr` で外している (得: 確実に起きる / 損: Gatekeeper の確認を飛ばし、Release の SHA-256 を信頼する形になる)。
+- **既に `~/Library/Input Methods/Meltype.app` があると入らない** (zip の install.sh・build.sh で入れた場合。Homebrew の仕様)。先に `uninstall.sh` か Finder で外す。
+- 確かめ: ローカル tap (`brew tap-new whitewater-png/meltype-for-mac`) にコピーして `brew audit --cask --strict --online` と `brew style`。
+- **公開 tap (`whitewater-png/homebrew-meltype-for-mac`) はまだありません。** 作るのは公開行為なので、許可を取ってからです。README の入れ方の節への追記も、公開してからにします。
