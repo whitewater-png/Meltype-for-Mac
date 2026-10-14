@@ -330,6 +330,54 @@ public sealed class CompositionText
     }
 
     /// <summary>
+    /// 先頭の 1 音を取り出して、見えている形 (カタカナにしていればカタカナ) で返す (ATOK の 1 音確定、Shift+↓)。残りは入力のまま残す。
+    /// 英字として見せている部分は 1 文字だけ取り出す (google の g)。英語の判定は残りの文字で改めて行う。
+    /// 取り出せる音が無い (入力途中の子音だけ) なら null。
+    /// </summary>
+    public (string Text, bool English)? TakeFirst()
+    {
+        if (_units.Count == 0) return null;
+        var first = _units[0];
+        var english = Mode is DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric ||
+                      (Mode == DisplayMode.Auto && (IsNumeric || Segments() is { Count: > 0 } segments && segments[0].IsEnglish));
+        if (!english)
+        {
+            _units.RemoveAt(0);
+            var kana = Mode switch
+            {
+                DisplayMode.Katakana => ToKatakana(first.Kana),
+                DisplayMode.HalfWidthKatakana => ToHalfWidthKatakana(first.Kana),
+                _ => first.Kana,
+            };
+            ResetIfEmpty();
+            return (kana, false);
+        }
+        // かな入力は 1 キー 1 単位 (濁点を付けたものは 2 キー) なので、単位ごと取り出す。
+        var letter = KanaInput ? first.Raw : first.Raw[..1];
+        // 最後の 1 文字を取り出すと表示モードが戻るので、先に見えている形にしておく。
+        var shown = Mode == DisplayMode.FullWidthAlphanumeric ? ToFullWidth(letter) : letter;
+        if (first.Raw.Length > 1 && !KanaInput)
+        {
+            // 1 音にまとまった英字 (go) の残り (o) は、打ち直して単位に分け直す (英字の後ろが日本語の音になることもあるため)。
+            var rest = first.Raw[1..] + string.Concat(_units.Skip(1).Select(u => u.Raw)) + _pending;
+            var (mode, levelOverride) = (Mode, LevelOverride);
+            Clear();
+            foreach (var c in rest) Append(c);
+            (Mode, LevelOverride) = (mode, levelOverride);
+        }
+        else _units.RemoveAt(0);
+        ResetIfEmpty();
+        return (shown, true);
+    }
+
+    private void ResetIfEmpty()
+    {
+        if (!IsEmpty) return;
+        Mode = DisplayMode.Auto;
+        LevelOverride = null;
+    }
+
+    /// <summary>
     /// 読み (ひらがな) をそのまま入れる。確定後の再変換用で、打鍵を経ないので Raw も読みと同じにする
     /// (英字として判定されない)。それまでの内容は捨てる。
     /// </summary>

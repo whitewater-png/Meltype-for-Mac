@@ -207,6 +207,7 @@ public sealed class CompositionOptions
 ///   Space   → 文節に区切って漢字変換 (英単語で終わっているときは確定して空白)
 ///   Shift+Space → 英単語と判定した語も、ローマ字として読んで変換 (go → 語)
 ///   ←→      → 文節を選ぶ (変換前に押しても文節の選択に入る) / Space・↓↑ でその文節の候補 / Shift+←→ で区切りを変える
+///   Shift+↓   → 入力中: 先頭の 1 音だけ確定 (ATOK の 1 音確定)
 ///   Enter   → 確定してテキストボックスへ入力
 ///   BackSpace / Esc → 1 音削除 / 変換取り消し・入力取り消し
 ///   F6 / F7 / F8 / F9 / F10, 半角/全角 → ひらがな / カタカナ / 全角英数 / 半角英数 / 日本語⇔英字
@@ -928,6 +929,10 @@ public sealed class CompositionController
             case VirtualKeys.F8: SetMode(DisplayMode.HalfWidthKatakana); return;
             case VirtualKeys.F9: SetMode(DisplayMode.FullWidthAlphanumeric); return;
             case VirtualKeys.F10: SetMode(DisplayMode.HalfWidthAlphanumeric); return;
+            case VirtualKeys.Down when _headCount == 0 && (_swallowedShift.Count > 0 || _host.IsShiftDown()):
+                // Shift+↓: 先頭の 1 音だけ確定し、残りは入力のまま (ATOK の 1 音確定)。変換中・固定した文節があるときは今までどおり。
+                CommitFirstSound();
+                return;
             case VirtualKeys.Left or VirtualKeys.Right or VirtualKeys.Up or VirtualKeys.Down when !_text.IsAlphanumeric:
                 // 変換前でも矢印キーで文節の選択に入る (Mac のライブ変換と同じ)。
                 EnterClauseSelection(vk);
@@ -2162,6 +2167,34 @@ public sealed class CompositionController
             LearnLanguage();
         }
         CommitText(text + suffix, english, _text.Raw, chosen);
+    }
+
+    /// <summary>
+    /// 1 音確定 (Shift+↓): 先頭の 1 音 (英字は 1 文字) だけを、見えている形で確定する。残りは入力のまま続ける。
+    /// 1 音だけでは語にならないので、変換・英語/日本語の学習はせず、前の確定の確定し直しの対象にもしない。
+    /// </summary>
+    private void CommitFirstSound()
+    {
+        if (_text.TakeFirst() is not { } first)
+        {
+            // 入力途中の子音だけ (語末の n など) が残っているなら、それを確定する (n → ん)。
+            Commit();
+            return;
+        }
+        // 最後の 1 音なら入力を終える (表示は閉じる)。
+        if (_text.IsEmpty) CommitText("", first.English);
+        var text = first.Text;
+        if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, null);
+        _correctable.Clear();
+        _lastCommitEnglish = first.English;
+        var joined = (_lastCommitText ?? "") + text;
+        _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
+        _lastCommitTime = Environment.TickCount64;
+        // 残りの入力の文脈 (変換・英語の判定) は、確定した 1 音の後ろとして続ける。
+        _precedingText = (_precedingText ?? "") + text;
+        _text.PrecedingEnglish = first.English;
+        _host.CommitText(text);
+        Committed?.Invoke(text);
     }
 
     /// <summary>
