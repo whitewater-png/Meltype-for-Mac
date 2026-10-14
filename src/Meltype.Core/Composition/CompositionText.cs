@@ -308,11 +308,12 @@ public sealed class CompositionText
     /// <summary>1 音 (または 1 文字) 消す。入力途中の子音があればそれを 1 文字消す。</summary>
     public void RemoveLast()
     {
-        // 1 音確定で固定した見え方は、消した所から後ろを捨てる (消したあとに打った文字は、固定した英字と綴りが同じでも判定し直す)。
-        _frozenPending = null;
+        // 1 音確定で固定した見え方は、消した単位から後ろを捨てる (消したあとに打った文字は、固定した英字と綴りが同じでも判定し直す)。
+        // 入力途中の子音だけを消したときは、子音の固定は残す (Japan の n を消して n を打ち直しても n。別の文字なら子音が違うので使われない)。
         if (_pending.Length > 0) _pending.Length--;
         else if (_units.Count > 0)
         {
+            _frozenPending = null;
             // 末尾が英字に見えているか (1 文字ずつ消すか) は、固定した見え方のままで決める。
             var englishTail = Mode is DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric ||
                               (Mode == DisplayMode.Auto && Segments() is { Count: > 0 } segments && segments[^1].IsEnglish);

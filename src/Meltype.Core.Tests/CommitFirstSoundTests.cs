@@ -297,6 +297,9 @@ internal static class CommitFirstSoundTests
                      ("Google", 5, "oyogu", "Gおよぐ"),
                      ("Japan", 4, "apa", "Jあぱ"),
                      ("Japan", 4, "n", "Jん"),
+                     ("Japan", 1, "n", "Japan"),
+                     ("Kotlin", 1, "n", "Kotlin"),
+                     ("kyouhaJapan", 1, "n", "きょうはJapan"),
                  })
         {
             var k = new CompositionTests.Keyboard();
