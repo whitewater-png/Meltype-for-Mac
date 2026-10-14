@@ -64,7 +64,9 @@ cask "meltype-for-mac" do
   ]
 
   caveats <<~EOS
-    入力メニューに Meltype が出ないときは、いったんログアウトしてログインし直してください。
+    インストール後は、いったんログアウトしてログインし直してください (Homebrew の処理はサンドボックスの中で動くため、
+    入力ソースの登録を済ませられません。ログアウトせずに使うには、次を実行してから入力メニューで Meltype を選びます)。
+      "$HOME/Library/Input Methods/Meltype.app/Contents/MacOS/Meltype" --register
 
     署名は ad-hoc で、Apple の公証は受けていません。そのまま起動できるよう、入れるときに quarantine 属性を外しています
     (pkg で入れたときと同じ結果です。Release の SHA-256 は Homebrew が検証します)。
