@@ -641,7 +641,7 @@ def child_toggle_ops(lib):
     cancel = text(lib, lib.meltype_cancel_toggle(session))
     out["cancel"] = json.loads(cancel) if cancel else None
     out["learned_after_cancel"] = [row[:2] for row in learned_words(lib) or []]
-    out["f10_again"] = key_result(lib, session, 0x79, before="にほんご")["consumed"]    # 取り消したので、もう一度直せる
+    out["f10_again"] = key_result(lib, session, 0x79, before="にほんご")["consumed"]    # 取り消したあとは記録を捨てるので、もう一度押しても直さない (R43-7)
     # 逆向きの回数 (Reverse) を languages.json に保存・読み直しできる (ソース生成の JSON)
     out["set_api"] = text(lib, lib.meltype_learned_set(u("apix"), 1, None))
     path = os.path.join(out["data_directory"], "languages.json")
@@ -1096,7 +1096,7 @@ def check_toggle(lib_path, failures):
         expect(["nihongo", "E"] in ops["learned_after_f10"], f"F10 で直した語を学習していない: {ops['learned_after_f10']}")
         expect(ops["cancel"] is not None and ops["cancel"]["consumed"] is False, f"取消の結果が違う: {ops['cancel']}")
         expect(not any(row[0] == "nihongo" for row in ops["learned_after_cancel"]), f"取り消したのに学習が残っている: {ops['learned_after_cancel']}")
-        expect(ops["f10_again"] is True, "取り消した後に、もう一度直せない")
+        expect(ops["f10_again"] is False, "取り消した後は記録を捨てるのに、もう一度直した")
         expect(ops["set_api"] is None and ops["languages_json"] and '"Reverse"' in ops["languages_json"], f"languages.json に Reverse を保存できない: {ops['languages_json']}")
 
 

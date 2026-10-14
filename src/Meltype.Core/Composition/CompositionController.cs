@@ -473,6 +473,8 @@ public sealed class CompositionController
     internal bool ReconvertKana(string kana, string original)
     {
         if (kana.Length == 0 || IsComposing) return false;
+        // 選んだことでキャレットは動いている。直前の語は、あとの F10 / F6 の対象にしない (ReconvertRomaji と同じ)
+        _lastWord = null;
         BeginComposition();
         _reconvertOriginal = original;
         _text.SetKana(kana);
@@ -978,8 +980,8 @@ public sealed class CompositionController
                 {
                     Commit(suffix: " ", fixEnglish: true);
                 }
-                else if (EndsWithEnglish(final: true)) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + " ", english: true, _text.Raw);
-                else if (_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level())) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.Raw) + " ", english: true, _text.Raw);
+                else if (EndsWithEnglish(final: true)) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + " ", english: true, _text.Raw, hasEnglish: true, hasJapanese: _text.Segments(final: true).Any(s => !s.IsEnglish));
+                else if (_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level())) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.Raw) + " ", english: true, _text.Raw, hasEnglish: true);
                 else
                 {
                     // Space で変換した = 語の後に空白を打とうとした、とも取れる (確定し直して英語にするときに空白を足す)。
@@ -1045,7 +1047,7 @@ public sealed class CompositionController
         if (_text.KanaInput && KanaOf(e) is { } key)
         {
             if (_converting) EndConversionForNewInput();
-            _toggleBox = null; // 続けて打った: 直した語だけの変換ボックスではなくなる
+            DropToggleBoxUnlessContinued();
             _text.AppendKana(key.Raw, key.Kana);
             return;
         }
@@ -1055,14 +1057,24 @@ public sealed class CompositionController
             // 変換中に次の文字を打ったら、今の候補で確定して新しい入力を始める (IME と同じ)。
             // ContinueAfterConversion が ON なら、確定せずに、今の候補のまま固定して続きを未変換の文節にする。
             if (_converting) EndConversionForNewInput();
-            _toggleBox = null;
+            DropToggleBoxUnlessContinued();
             _text.Append(ch);
             return;
         }
 
-        // 矢印 (英字だけのとき)・Tab・Delete などは確定してから通す。
-        Commit();
+        // 矢印 (英字だけのとき)・Tab・Delete などは確定してから通す (暗黙の確定)。
+        Commit(implicitly: true);
         ReplayDown(e);
+    }
+
+    /// <summary>
+    /// 確定後の F6 で開いた変換ボックスに続けて打った。直した語だけの変換ボックスではなくなるので控えは捨てるが、
+    /// ContinueAfterConversion で文節を固定して続けたとき (_headCount > 0) は、確定のときに末尾の空白を戻し、日本語として学習するので残す (R43-4)。
+    /// 空白は続けて打った文字の後ろ (確定する文字列の末尾) に付く。
+    /// </summary>
+    private void DropToggleBoxUnlessContinued()
+    {
+        if (_headCount == 0) _toggleBox = null;
     }
 
     /// <summary>変換ボックスを開く記号・数字 (フック側の MeltypeEngine.StartsComposition と合わせる)。</summary>
@@ -1382,6 +1394,10 @@ public sealed class CompositionController
                 FixMisspelling(typo);
                 StartConversion();
                 return true;
+            case VirtualKeys.Escape when _toggleBox is { } toggleBox && _headCount == 0:
+                // 確定後の F6 で開いた変換ボックス: Esc 1 回で元の語を書き戻す
+                CancelToggleBoxToOriginal(toggleBox);
+                return true;
             case VirtualKeys.Back:
             case VirtualKeys.Escape:
                 if (_headCount > 0)
@@ -1457,7 +1473,7 @@ public sealed class CompositionController
     {
         if (!_options.ContinueAfterConversion())
         {
-            Commit();
+            Commit(implicitly: true);
             BeginComposition();
             return;
         }
@@ -2254,12 +2270,14 @@ public sealed class CompositionController
 
     // ---- 確定 ----
 
+    /// <summary>暗黙の確定 (フォーカス移動・クリック・英数キー・Ctrl ショートカット): 文字は確定するが、F6 の変換ボックスの学習はしない。</summary>
     private void CommitIfAny()
     {
-        if (!_text.IsEmpty || _headCount > 0) Commit();
+        if (!_text.IsEmpty || _headCount > 0) Commit(implicitly: true);
     }
 
-    private void Commit(string suffix = "", bool fixEnglish = false)
+    /// <param name="implicitly">暗黙の確定か。F6 で開いた変換ボックスは、Enter・Space など自分で確定したときだけ日本語として学習する (R43-3)。</param>
+    private void Commit(string suffix = "", bool fixEnglish = false, bool implicitly = false)
     {
         var converting = _converting && _clauses.Count > 0;
         // 変換後も続けて入力: 固定した文節 + 未変換の文節 (変換していなければ、表示のまま)。
@@ -2268,9 +2286,13 @@ public sealed class CompositionController
         var text = converting ? string.Concat(_clauses.Select(c => c.Text)) : fixedOnly ? FixedText + CurrentDisplay(final: true) : CurrentDisplay(final: true);
         if (fixEnglish && !converting && _text.Mode == DisplayMode.Auto) text = FixEnglishTypo(text);
         var english = converting ? _clauses.All(c => c.IsEnglish) : _text.IsAlphanumericAt(final: true);
+        // 確定後の F10 / F6 の対象: 英語の区間・日本語の区間があるか (確定 1 回分まるごと)
+        var hasEnglish = english || (converting ? _clauses.Any(c => c.IsEnglish) : _text.Mode == DisplayMode.Auto && _text.Segments(final: true).Any(s => s.IsEnglish));
+        var hasJapanese = !english && (converting ? _clauses.Any(c => !c.IsEnglish) : _text.Mode != DisplayMode.Auto || _text.Segments(final: true).Any(s => !s.IsEnglish));
         var chosen = (converting || fixedOnly) && _clauses.Any(c => c.Changed);
-        // 確定後の F6 で開いた変換ボックス (読みは打った英字から作ったかな。Raw は変換ボックスの中身ではなく、元の英字を使う)
-        var toggle = _headCount == 0 ? _toggleBox : null;
+        // 確定後の F6 で開いた変換ボックス (読みは打った英字から作ったかな。Raw は変換ボックスの中身ではなく、元の英字を使う)。
+        // 続けて打って文節を固定していても (ContinueAfterConversion)、控えがあれば末尾の空白を戻す
+        var toggle = _toggleBox;
         // ローマ字の再変換は、打ち直した文ではないので学習しない (日本語にした文を読みとして覚えない)
         if (converting && !_reconvertRomaji) Learn();
         else
@@ -2279,8 +2301,9 @@ public sealed class CompositionController
             if (toggle is null) LearnLanguage();
         }
         // 日英の学習は、ここで 1 回だけ (Learn・LearnLanguage は、打った英字が無い変換ボックスでは日英を書かないので、二重にならない。R41-6)
-        if (toggle is not null) _options.Languages?.Remember(toggle.Raw, english: false, explicitChoice: true);
-        CommitText(text + (suffix.Length > 0 ? suffix : toggle?.Tail ?? ""), english, toggle?.Raw ?? _text.Raw, chosen);
+        // 暗黙の確定 (フォーカス移動・クリックなど) は、文字は確定するが学習しない
+        if (toggle is not null && !implicitly) _options.Languages?.Remember(toggle.Raw, english: false, explicitChoice: true);
+        CommitText(text + (suffix.Length > 0 ? suffix : toggle?.Tail ?? ""), english, toggle?.Raw ?? _text.Raw, chosen, hasEnglish, hasJapanese);
     }
 
     /// <summary>
@@ -2329,18 +2352,20 @@ public sealed class CompositionController
     private sealed record CommitRecord(string Text, string Raw, bool English, bool SpaceIntended);
 
     /// <summary>
-    /// 確定後の F10 / F6 (<see cref="TryToggleLastWord"/>) で直せる、直前に確定した 1 語。表示した文字・打った英字・向き・確定した時刻。
+    /// 確定後の F10 / F6 (<see cref="TryToggleLastWord"/>) で直せる、直前に確定した 1 回分。表示した文字・打った英字・英語の区間があるか・日本語の区間があるか・確定した時刻。
+    /// 単位は語ではなく「確定 1 回分」まるごと (変換中の F10 / F6 と同じ): 「きょうはsushiです」は英語も日本語も含むので、F6 でも F10 でも直せる (R43-1)。
     /// 自動の確定し直し用の <see cref="_correctable"/> とは別に持つ: そちらに全部の確定を入れると、曖昧でない語まで自動で書き換わる (R41-1)。
     /// </summary>
-    private sealed record LastWord(string Text, string Raw, bool English, long Time);
+    private sealed record LastWord(string Text, string Raw, bool HasEnglish, bool HasJapanese, long Time);
 
     private LastWord? _lastWord;
 
     /// <summary>
-    /// 直前の語を直せる時間。マウス押下が届かないアプリで、キャレットが動いたのに記録が残り続けないよう、確定し直しが自分の確定を信じる時間
-    /// (<see cref="OwnCommitTrustMs"/>) に揃えた短い時間にする (R41-5)。
+    /// 直前の 1 回分を直せる時間 (ミリ秒)。目で確かめて F 段へ手を伸ばすまでに 1〜2.5 秒かかるので、自分の確定を信じる時間 (<see cref="OwnCommitTrustMs"/> = 1.5 秒) とは分けて 3 秒にした (R43-2)。
+    /// 主な安全装置は、末尾一致と、Swift が書き換え前に中身を確かめること。時間は、マウス押下が届かないアプリで、キャレットが動いたのに記録が残り続けないための保険。
+    /// 実機で 3〜5 秒の間で決める (押したときの経過ミリ秒を診断ログに出す)。
     /// </summary>
-    private const long LastWordTrustMs = OwnCommitTrustMs;
+    private const long LastWordTrustMs = 3000;
 
     /// <summary>
     /// F6 で英字からかなに直して開いた変換ボックスの元。Raw = 打った英字、Lead / Tail = 記録した文字の前後の空白 (直さずに残す)、
@@ -2394,12 +2419,16 @@ public sealed class CompositionController
         _toggleUndo = null;
         _toggleNotice = null;
         if (IsComposing || _lastWord is not { } word) return false;
-        if (Environment.TickCount64 - word.Time >= LastWordTrustMs)
+        var elapsed = Environment.TickCount64 - word.Time;
+        // 有効時間を実機で決めるための記録 (3〜5 秒の間で決める)
+        Diagnostics.Log.Info($"確定後の {(toEnglish ? "F10" : "F6")}: 確定から {elapsed} ミリ秒");
+        if (elapsed >= LastWordTrustMs)
         {
             _lastWord = null;
             return false;
         }
-        if (word.English == toEnglish || precedingText is null) return false;
+        // 確定 1 回分まるごとが対象: F10 は日本語の区間があるとき、F6 は英語の区間があるときだけ効かせる
+        if (!(toEnglish ? word.HasJapanese : word.HasEnglish) || precedingText is null) return false;
         var preceding = NoBreakToSpace(precedingText);
         var recorded = NoBreakToSpace(word.Text);
         if (!preceding.EndsWith(recorded, StringComparison.Ordinal))
@@ -2431,7 +2460,7 @@ public sealed class CompositionController
             _host.CommitText(replacement);
             // 手で直した語を、自動の確定し直しが元に戻さない (R41-2)
             _correctable.Clear();
-            _lastWord = new LastWord(replacement, word.Raw, English: true, Environment.TickCount64);
+            _lastWord = new LastWord(replacement, word.Raw, HasEnglish: true, HasJapanese: false, Environment.TickCount64);
             SetOwnContext(beforeBody + replacement, english: true);
             Committed?.Invoke(replacement);
             _toggleUndo = new ToggleUndo(word, previousCorrectable, ownText, ownEnglish, ownTime, OpenedBox: false, learning);
@@ -2493,7 +2522,8 @@ public sealed class CompositionController
         _lastCommitText = undo.OwnText;
         _lastCommitEnglish = undo.OwnEnglish;
         _lastCommitTime = undo.OwnTime;
-        _lastWord = undo.Previous;
+        // 確かめられないアプリでもう一度押しても、また飛ばして取り消すだけなので、記録は捨てる (R43-7)
+        _lastWord = null;
         Diagnostics.Log.Decision("入力欄の書き換えを確かめられなかったので、確定後の F10 / F6 を取り消しました");
     }
 
@@ -2529,7 +2559,7 @@ public sealed class CompositionController
         ResetPrediction();
         var restored = box.Raw + box.Tail;
         _host.CommitText(restored);
-        _lastWord = new LastWord(restored, box.Raw, English: true, Environment.TickCount64);
+        _lastWord = new LastWord(restored, box.Raw, HasEnglish: true, HasJapanese: false, Environment.TickCount64);
         SetOwnContext((_precedingText ?? "") + restored, english: true);
         Committed?.Invoke(restored);
     }
@@ -2539,7 +2569,23 @@ public sealed class CompositionController
     {
         _toggleBox = null;
         _lastWord = box.Previous with { Time = Environment.TickCount64 };
-        SetOwnContext((_precedingText ?? "") + box.Body, box.Previous.English);
+        SetOwnContext((_precedingText ?? "") + box.Body, box.Previous.HasEnglish && !box.Previous.HasJapanese);
+    }
+
+    /// <summary>F6 で開いた変換ボックスを、変換中のまま Esc 1 回で取り消す: 元の語を書き戻して閉じる (ローマ字の再変換と同じ。R43-8)。</summary>
+    private void CancelToggleBoxToOriginal(ToggleBox box)
+    {
+        _text.Clear();
+        _converting = false;
+        _clauses = [];
+        _selectedClause = 0;
+        ResetPrediction();
+        if (_reconvertOriginal is { } original)
+        {
+            _reconvertOriginal = null;
+            _host.CommitText(original);
+        }
+        RestoreToggleBox(box);
     }
 
     /// <summary>
@@ -2787,14 +2833,14 @@ public sealed class CompositionController
     }
 
     /// <summary>確定して入力する。英語だったか日本語だったか・確定した文字列を、次の入力の文脈として覚えておく。</summary>
-    private void CommitText(string text, bool english, string raw = "", bool chosen = false)
+    private void CommitText(string text, bool english, string raw = "", bool chosen = false, bool hasEnglish = false, bool hasJapanese = false)
     {
         var spaceIntended = _spaceStartedConversion;
         _spaceStartedConversion = false;
         // 固定した文節を含む確定は、語の単位の判定 (英語とも日本語とも読める語の確定し直し) の対象にしない。
         var hadFixed = _headCount > 0;
         // 確定後の F6 で開いた変換ボックスの確定は、手で直した語。自動の確定し直しの対象にも、確定し直しの元にもしない (R41-2)。
-        var fromToggle = _toggleBox is not null && !hadFixed;
+        var fromToggle = _toggleBox is not null;
         // 再変換 (選択 + Shift+Space) で入れ替えた文字は、打った英字ではないので、確定後の F10 / F6 の対象にしない。
         var reconverted = (_reconvertOriginal is not null && !fromToggle) || _reconvertRomaji;
         _toggleBox = null;
@@ -2829,7 +2875,7 @@ public sealed class CompositionController
         _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
         _lastCommitTime = Environment.TickCount64;
         // 確定後の F10 / F6 で直せる直前の 1 語 (打った英字が分かる確定だけ。固定した文節を含む・再変換の確定は記録しない)。
-        _lastWord = !hadFixed && !reconverted && raw.Any(char.IsAsciiLetter) ? new LastWord(text, raw, english, _lastCommitTime) : null;
+        _lastWord = !hadFixed && !reconverted && raw.Any(char.IsAsciiLetter) && (hasEnglish || hasJapanese) ? new LastWord(text, raw, hasEnglish, hasJapanese, _lastCommitTime) : null;
         _host.CommitText(text);
         Committed?.Invoke(text);
     }
@@ -3042,7 +3088,7 @@ public sealed class CompositionController
     private void CommitPrediction(string text)
     {
         var reading = _text.AllKana(final: false);
-        CommitText(text, english: false, _text.Raw);
+        CommitText(text, english: false, _text.Raw, hasJapanese: true);
         _options.History?.Remember(reading, text);
     }
 

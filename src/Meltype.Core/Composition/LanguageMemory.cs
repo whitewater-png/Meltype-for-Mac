@@ -35,10 +35,19 @@ public sealed class LanguageMemory
         /// 一度の例外で向きが反転しないよう、<see cref="ReverseToFlip"/> 回続いたときだけ反転する。前の版で保存したものは 0。
         /// </summary>
         public int Reverse { get; set; }
+
+        /// <summary>直近の逆向き (<see cref="Reverse"/> を増やした) の時刻 (UTC)。<see cref="ReverseWindow"/> を超えたら数え直す。前の版で保存したものは既定値 (= 古い)。</summary>
+        public DateTime ReverseAt { get; set; }
     }
 
     /// <summary>はっきり直したわけではない逆向きの確定が、この回数続いたら向きを反転する (R41-7)。</summary>
     internal const int ReverseToFlip = 2;
+
+    /// <summary>「続けて」の長さ: 前の逆向きからこの時間を超えたら、逆向きの回数は 1 から数え直す (R43-6)。</summary>
+    internal static readonly TimeSpan ReverseWindow = TimeSpan.FromHours(24);
+
+    /// <summary>今の時刻 (UTC)。テストが差し替える。</summary>
+    internal Func<DateTime> UtcNow { get; set; } = () => DateTime.UtcNow;
 
     /// <summary><see cref="RememberUndoable"/> の取り消し用 (覚える前の項目。無かったら Previous は null)。</summary>
     internal sealed record RememberUndo(string Word, Entry? Previous);
@@ -181,7 +190,7 @@ public sealed class LanguageMemory
 
     private bool SameAs(Dictionary<string, Entry> other) =>
         other.Count == _entries.Count && other.All(e => _entries.TryGetValue(e.Key, out var mine) &&
-            mine.English == e.Value.English && mine.Count == e.Value.Count && mine.Explicit == e.Value.Explicit && mine.Reverse == e.Value.Reverse && mine.Used == e.Value.Used);
+            mine.English == e.Value.English && mine.Count == e.Value.Count && mine.Explicit == e.Value.Explicit && mine.Reverse == e.Value.Reverse && mine.ReverseAt == e.Value.ReverseAt && mine.Used == e.Value.Used);
 
     /// <summary>
     /// 変更 (読み直し → 変更 → 保存) の間、ほかのプロセスが同じファイルを書かないようにするロックを取る。取れたら fileLock に入れて null。
@@ -245,7 +254,7 @@ public sealed class LanguageMemory
         }
     }
 
-    private static Entry Copy(Entry entry) => new() { English = entry.English, Used = entry.Used, Count = entry.Count, Explicit = entry.Explicit, Reverse = entry.Reverse };
+    private static Entry Copy(Entry entry) => new() { English = entry.English, Used = entry.Used, Count = entry.Count, Explicit = entry.Explicit, Reverse = entry.Reverse, ReverseAt = entry.ReverseAt };
 
     public int Count { get { lock (_gate) return _entries.Count; } }
 
@@ -347,17 +356,23 @@ public sealed class LanguageMemory
             old.Count = Math.Max(1, old.Count) + 1;
             old.Explicit |= explicitChoice;
             old.Reverse = 0;
+            old.ReverseAt = default;
             if (waiting) Diagnostics.Log.Decision($"{Diagnostics.Log.Text(word)}は次から英語にします (2 回目の学習)。");
             return;
         }
         // 逆向き。F10 / F6 ではっきり直したなら、すぐ反転する。候補から選んだだけなら、続けて ReverseToFlip 回になるまで向きを変えない
-        // (一度の例外で、覚えた向きが逆転しないように。1-6)。反転は Count = 2 で作る: 2 回ルールが重なって、反転後にもう 1 回要らないように (R41-7)。
-        if (explicitChoice || old.Reverse + 1 >= ReverseToFlip)
+        // (一度の例外で、覚えた向きが逆転しないように。1-6)。「続けて」は前の逆向きから ReverseWindow 以内 (超えたら 1 から数え直す。R43-6)。
+        // 反転は Count = 2 で作る: 2 回ルールが重なって、反転後にもう 1 回要らないように (R41-7)。
+        // ただし、はっきりした反転でも、英語向きでよく使う日本語 (sushi) は Count = 1: 2 回ルールを効かせる (うっかり F10 を 1 回押しただけで英語にならない。R43-5)。
+        var now = UtcNow();
+        var reverse = old.Reverse > 0 && now - old.ReverseAt <= ReverseWindow ? old.Reverse : 0;
+        if (explicitChoice || reverse + 1 >= ReverseToFlip)
         {
-            AddEntry(word, english, explicitChoice, count: 2);
+            AddEntry(word, english, explicitChoice, count: explicitChoice && english && IsCommonJapanese?.Invoke(word) == true ? 1 : 2);
             return;
         }
-        old.Reverse++;
+        old.Reverse = reverse + 1;
+        old.ReverseAt = now;
         Diagnostics.Log.Decision($"{Diagnostics.Log.Text(word)}は逆向きの選択を {old.Reverse} 回見ましたが、向きは変えません (あと {ReverseToFlip - old.Reverse} 回続いたら変えます)。");
     }
 

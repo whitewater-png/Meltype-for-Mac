@@ -21,10 +21,10 @@ internal static class LastWordToggleTests
         public string Doc { get; private set; } = "";
         public SessionResult? Last { get; private set; }
 
-        public Editor(bool ctrlKeys = false, Func<string, bool>? commonJapanese = null)
+        public Editor(bool ctrlKeys = false, Func<string, bool>? commonJapanese = null, bool continueAfterConversion = false)
         {
             Memory = new LanguageMemory(null) { IsCommonJapanese = commonJapanese };
-            var options = new CompositionOptions { Languages = Memory, ToggleLastWordCtrlKeys = () => ctrlKeys };
+            var options = new CompositionOptions { Languages = Memory, ToggleLastWordCtrlKeys = () => ctrlKeys, ContinueAfterConversion = () => continueAfterConversion };
             Session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(), options, () => new Settings());
         }
 
@@ -61,6 +61,9 @@ internal static class LastWordToggleTests
         public SessionResult F6() => Key(VirtualKeys.F6);
         public SessionResult Enter() => Key(VirtualKeys.Return);
         public SessionResult Esc() => Key(VirtualKeys.Escape);
+
+        /// <summary>フォーカス移動・クリックなどの暗黙の確定。</summary>
+        public SessionResult Pending() => Apply(Session.CommitPending());
 
         /// <summary>Swift が書き換えを確かめられず飛ばしたつもり: edit は当てず、本体に取消を伝える。</summary>
         public void Cancel() => Session.CancelToggle();
@@ -138,7 +141,7 @@ internal static class LastWordToggleTests
 
         var late = new Editor();
         late.Type("nihongo\n");
-        Thread.Sleep(1700); // OwnCommitTrustMs と同じ時間
+        Thread.Sleep(3200); // LastWordTrustMs (3 秒) を過ぎる
         Assert.True(!late.F10().Consumed, "時間が経ったら直さない (マウス押下が届かないアプリに備える)");
         Assert.Equal("にほんご", late.Doc, "何も変えない");
 
@@ -171,17 +174,30 @@ internal static class LastWordToggleTests
         Assert.True(e.Memory.Get("nihongo") is null, "よく使う日本語は、1 回では英語として覚えない (2 回ルール)");
         Assert.Equal("もう一度英字にすると覚えます", e.Session.TakeSuggestionHint(), "1 回目は案内を出す");
         Assert.True(e.Session.TakeSuggestionHint() is null, "案内は 1 回だけ");
-        // もう一度かなにして英字にすると覚える
+        // もう一度かなにして (Esc で書き戻して)、また同じ語を打って英字にすると覚える
         e.F6();
         e.Esc();
-        e.Esc();
-        Assert.Equal("nihongo", e.Doc, "Esc で書き戻す");
+        Assert.Equal("nihongo", e.Doc, "Esc 1 回で書き戻す");
+        e.Type("nihongo\n");
+        Assert.Equal("nihongoにほんご", e.Doc, "前提: 1 回目は覚えていないので日本語で確定");
+        e.F10();
+        Assert.Equal("nihongonihongo", e.Doc);
+        Assert.Equal(true, e.Memory.Get("nihongo"), "2 回目の英字で覚える");
+        Assert.True(e.Session.TakeSuggestionHint() is null, "覚えたら案内は出さない");
+    }
+
+    [Test]
+    public static void SecondRule_ExplicitFlipToEnglish_OfCommonJapaneseWord_StillNeedsTwoTimes()
+    {
+        // 日本語として覚えた語 (F6 → Enter) を、うっかり F10 1 回で英語にしない (R43-5。設計 §4-7)
+        var e = new Editor(commonJapanese: word => word == "nihongo");
+        e.Type("nihongo\n");
+        e.F10();
         e.F6();
         e.Enter();
-        Assert.Equal("日本語", e.Doc, "かなの変換ボックスの先頭の候補で確定");
+        Assert.Equal(false, e.Memory.Get("nihongo"), "前提: 日本語として覚えた");
         e.F10();
-        Assert.Equal(true, e.Memory.Get("nihongo"), "2 回目の英字で覚える。反転は Count = 2 で作るので、続けてもう 1 回は要らない");
-        Assert.True(e.Session.TakeSuggestionHint() is null, "覚えたら案内は出さない");
+        Assert.True(e.Memory.Get("nihongo") is null, "F10 を 1 回押しただけでは、英語として効かない (2 回ルール)");
     }
 
     [Test]
@@ -210,10 +226,8 @@ internal static class LastWordToggleTests
         var e = new Editor();
         e.Type("hello api\n");
         e.F6();
-        e.Esc(); // 変換をやめてかなに戻る
-        Assert.True(e.Session.IsComposing && e.Doc == "hello ", "最初の Esc は変換をやめるだけ");
         var result = e.Esc();
-        Assert.Equal("hello api", e.Doc, "もう一度 Esc で、消した語を書き戻す");
+        Assert.Equal("hello api", e.Doc, "Esc 1 回で、消した語を書き戻す (R43-8)");
         Assert.True(!e.Session.IsComposing && result.View is null, "変換ボックスは閉じる");
         Assert.True(e.Memory.Get("api") is null, "Esc では学習しない");
         Assert.True(e.F6().Consumed, "書き戻した語は、また直せる");
@@ -277,8 +291,8 @@ internal static class LastWordToggleTests
         e.Cancel();
         Assert.True(e.Memory.Get("nihongo") is null, "取り消したので学習も戻る");
         Assert.True(e.Session.TakeSuggestionHint() is null, "案内も残さない");
-        Assert.True(e.F10().Consumed, "記録も戻っているので、もう一度直せる");
-        Assert.Equal("nihongo", e.Doc);
+        Assert.True(!e.F10().Consumed, "取消のあとは記録を捨てる (R43-7)");
+        Assert.Equal("にほんご", e.Doc);
     }
 
     [Test]
@@ -292,8 +306,8 @@ internal static class LastWordToggleTests
         Assert.True(!e.Session.IsComposing, "取り消したので変換ボックスは閉じる");
         Assert.Equal("hello api", e.Doc, "入力欄は元のまま");
         Assert.True(e.Memory.Get("api") is null, "学習していない");
-        Assert.True(e.F6().Consumed, "記録も戻っているので、もう一度直せる");
-        Assert.Equal("hello ", e.Doc);
+        Assert.True(!e.F6().Consumed, "取消のあとは記録を捨てる: 確かめられないアプリでもう一度押しても、また飛ばして取り消すだけ (R43-7)");
+        Assert.Equal("hello api", e.Doc);
     }
 
     [Test]
@@ -325,6 +339,69 @@ internal static class LastWordToggleTests
 
         var none = new Editor(ctrlKeys: true);
         Assert.True(!none.Key(0x4A, 'j', control: true).Consumed, "直せる語が無ければ、ON でも素通し");
+    }
+
+    [Test]
+    public static void Toggle_TargetsTheWholeCommit_MixedEnglishAndJapanese()
+    {
+        // 記録は「確定 1 回分」まるごと (R43-1): 英語の区間があれば F6、日本語の区間があれば F10 が効く
+        var e = new Editor();
+        e.Type("kyouhaSushidesu\n");
+        Assert.Equal("きょうはSushiです", e.Doc, "前提: 大文字で始めた Sushi だけ英字の確定: " + e.Doc);
+        var f6 = e.F6();
+        Assert.True(f6.Consumed && f6.Toggle, "英語の区間があるので F6 が効く");
+        Assert.Equal("きょうはすしです", f6.View?.Text, "確定 1 回分まるごとをかなにして変換ボックスに出す");
+        e.Enter();
+        Assert.Equal("きょうはすしです", e.Doc);
+
+        var j = new Editor();
+        j.Type("kyouhasushidesu\n");
+        Assert.Equal("きょうはすしです", j.Doc, "前提: 全部日本語の確定: " + j.Doc);
+        var noEnglish = new Editor();
+        noEnglish.Type("kyouhasushidesu\n");
+        Assert.True(!noEnglish.F6().Consumed, "英語の区間が無いので F6 は素通し");
+        var f10 = j.F10();
+        Assert.True(f10.Consumed && f10.Toggle, "日本語の区間があるので F10 が効く");
+        Assert.Equal("kyouhasushidesu", j.Doc, "確定 1 回分まるごとを打った英字に戻す");
+    }
+
+    [Test]
+    public static void F6_Box_ImplicitCommit_CommitsTheCharactersButDoesNotLearn()
+    {
+        // フォーカス移動・クリック・英数キー・Ctrl ショートカットでの確定は、学習しない (R43-3)
+        var implicitly = new Editor();
+        implicitly.Type("hello api\n");
+        implicitly.F6();
+        implicitly.Pending();
+        Assert.Equal("hello あぴ", implicitly.Doc, "文字は確定する");
+        Assert.True(implicitly.Memory.Get("api") is null, "暗黙の確定では日本語として学習しない");
+
+        var ctrl = new Editor();
+        ctrl.Type("hello api\n");
+        ctrl.F6();
+        ctrl.Key(0x11);
+        Assert.Equal("hello あぴ", ctrl.Doc, "Ctrl を押すと確定する");
+        Assert.True(ctrl.Memory.Get("api") is null, "Ctrl ショートカットでの確定でも学習しない");
+
+        var space = new Editor();
+        space.Type("hello api ");
+        space.F6();
+        space.Enter();
+        Assert.Equal(false, space.Memory.Get("api"), "Enter は学習する");
+    }
+
+    [Test]
+    public static void F6_Box_ContinuedTyping_KeepsTheTrailingSpace_AndLearns()
+    {
+        // ContinueAfterConversion が ON: F6 の変換ボックスに続けて打つと文節を固定する。末尾の空白は消えず、学習も走る (R43-4)
+        var e = new Editor(continueAfterConversion: true);
+        e.Type("hello api ");
+        Assert.Equal("hello api ", e.Doc, "前提: 英語 + Space で確定");
+        e.F6();
+        e.Type("wa");
+        e.Enter();
+        Assert.True(e.Doc.StartsWith("hello あぴ", StringComparison.Ordinal) && e.Doc.EndsWith(" ", StringComparison.Ordinal), "末尾の空白は消えない: " + e.Doc);
+        Assert.Equal(false, e.Memory.Get("api"), "続けて打っても、Enter で日本語として学習する");
     }
 
     [Test]

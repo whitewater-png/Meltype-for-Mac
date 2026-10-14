@@ -67,7 +67,60 @@ internal static class LanguageStrengthTests
         var twice = new LanguageMemory(null) { IsCommonJapanese = word => word == "kyouhax" };
         twice.Remember("kyouhax", english: false);
         twice.Remember("kyouhax", english: true, explicitChoice: true);
-        Assert.Equal(true, twice.Get("kyouhax"), "反転は Count = 2 なので、2 回ルールの語も効く");
+        Assert.True(twice.Get("kyouhax") is null, "はっきりした反転でも、英語向きでよく使う日本語の語は Count = 1: 2 回ルールが効く (R43-5)");
+        twice.Remember("kyouhax", english: true, explicitChoice: true);
+        Assert.Equal(true, twice.Get("kyouhax"), "もう 1 回で効く");
+        var other = new LanguageMemory(null) { IsCommonJapanese = word => word == "kyouhax" };
+        other.Remember("apix", english: false);
+        other.Remember("apix", english: true, explicitChoice: true);
+        Assert.Equal(true, other.Get("apix"), "それ以外のはっきりした反転は Count = 2 で、すぐ効く");
+        other.Remember("kyouhax", english: true);
+        other.Remember("kyouhax", english: true);
+        other.Remember("kyouhax", english: false, explicitChoice: true);
+        Assert.Equal(false, other.Get("kyouhax"), "日本語向きの反転は、2 回ルールの語でもすぐ効く");
+    }
+
+    [Test]
+    public static void Strength_ReverseOlderThanADay_IsCountedFromOneAgain()
+    {
+        var now = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+        var memory = new LanguageMemory(null) { UtcNow = () => now };
+        memory.Remember("apix", english: true);
+        memory.Remember("apix", english: true);
+        memory.Remember("apix", english: false); // 逆向き 1 回
+        now = now.AddHours(23);
+        memory.Remember("apix", english: false);
+        Assert.Equal(false, memory.Get("apix"), "24 時間以内なら続けて 2 回: 反転");
+
+        var stale = new LanguageMemory(null) { UtcNow = () => now };
+        stale.Remember("apix", english: true);
+        stale.Remember("apix", english: true);
+        stale.Remember("apix", english: false); // 逆向き 1 回
+        now = now.AddHours(25);
+        stale.Remember("apix", english: false);
+        Assert.Equal(true, stale.Get("apix"), "24 時間を超えたら 1 から数え直す: まだ反転しない");
+        now = now.AddHours(1);
+        stale.Remember("apix", english: false);
+        Assert.Equal(false, stale.Get("apix"), "数え直した 1 回目から続けてもう 1 回で反転");
+    }
+
+    [Test]
+    public static void Strength_ReverseTimeIsSavedAndReloaded()
+    {
+        var path = TempFile(out var cleanup);
+        try
+        {
+            var now = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+            var memory = new LanguageMemory(path) { UtcNow = () => now };
+            memory.Remember("apix", english: true);
+            memory.Remember("apix", english: true);
+            memory.Remember("apix", english: false);
+            Assert.True(File.ReadAllText(path).Contains("ReverseAt"), "逆向きの時刻をファイルに書く");
+            var reloaded = new LanguageMemory(path) { UtcNow = () => now.AddHours(25) };
+            reloaded.Remember("apix", english: false);
+            Assert.Equal(true, reloaded.Get("apix"), "読み直しても時刻が残っていて、24 時間を超えたら数え直す");
+        }
+        finally { cleanup(); }
     }
 
     [Test]
