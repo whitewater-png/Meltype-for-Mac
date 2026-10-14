@@ -214,7 +214,7 @@ public sealed class Settings
     public bool ShiftEnterNewline { get; set; } = true;
 
     [Category("1. 全般"), DisplayName("ATOK スタイルのキー操作"),
-     Description("変換中のキー操作を ATOK と同じにします。← で文節を縮め、→ で文節を伸ばす (区切りを前 / うしろへ)。↓ で選んでいる文節までを確定 (部分確定)。Shift+← → で文節を移り、Ctrl+← → で先頭 / 最後の文節へ。次の候補は Space、前の候補は ↑。OFF のときは、今までどおり ← → で文節を選び、↓ で次の候補、Shift+← → で区切りを変えます。")]
+     Description("変換中のキー操作を ATOK と同じにします。← で文節を縮め、→ で文節を伸ばす (区切りを前 / うしろへ)。↓ で選んでいる文節までを確定 (部分確定)。Shift+← → で文節を移り、Ctrl+← → で先頭 / 最後の文節へ。次の候補は Space、前の候補は ↑。変換前の入力中は、Shift+↓ で先頭の 1 音だけを確定します (1 音確定)。OFF のときは、今までどおり ← → で文節を選び、↓ で次の候補、Shift+← → で区切りを変えます (Shift+↓ も ↓ と同じ)。")]
     public bool TokMode { get; set; }
 
     [Category("1. 全般"), DisplayName("変換エンジン"),

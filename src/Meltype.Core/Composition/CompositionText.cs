@@ -592,6 +592,9 @@ public sealed class CompositionText
             }
         }
         _units.RemoveRange(0, index);
+        // 1 音確定で固定した見え方は、先頭の単位を基準にしているので捨てる (部分確定のあとは、残りを今までどおり判定する)。
+        _frozen = null;
+        _frozenPending = null;
         return true;
     }
 

@@ -7,7 +7,8 @@ using Meltype.Input;
 namespace Meltype.Tests;
 
 /// <summary>
-/// Shift+↓ で先頭の 1 音だけ確定する (ATOK の 1 音確定)。入力中だけ。変換中は今までどおり (次の候補)。
+/// Shift+↓ で先頭の 1 音だけ確定する (ATOK の 1 音確定)。ATOK スタイルのキー操作 (TokMode) が ON のときの、入力中だけ。
+/// 変換中・OFF のときは今までどおり。
 /// </summary>
 internal static class CommitFirstSoundTests
 {
@@ -21,7 +22,7 @@ internal static class CommitFirstSoundTests
     [Test]
     public static void Composing_CommitsTheFirstSound_AndKeepsTheRest()
     {
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         k.Type("kyouha");
         ShiftDown(k);
         Assert.Equal("きょ", k.Host.Document, "先頭の 1 音 (きょ) だけ確定する");
@@ -38,7 +39,7 @@ internal static class CommitFirstSoundTests
     [Test]
     public static void RestCanStillBeTypedAndConverted()
     {
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         k.Type("kyouha");
         ShiftDown(k);
         k.Type("re");
@@ -52,7 +53,7 @@ internal static class CommitFirstSoundTests
     public static void PendingConsonantOnly_CommitsIt()
     {
         // 語末の n は、最後に Shift+↓ を押せば ん で確定する。
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         k.Type("kan");
         ShiftDown(k);
         Assert.Equal("か", k.Host.Document, "か");
@@ -64,14 +65,14 @@ internal static class CommitFirstSoundTests
     [Test]
     public static void Katakana_CommitsInTheShownForm()
     {
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         k.Type("kyouha");
         k.Press(VirtualKeys.F7);
         ShiftDown(k);
         Assert.Equal("キョ", k.Host.Document, "F7 のカタカナのまま確定");
         Assert.Equal("ウハ", k.Host.View?.Text, "残りもカタカナのまま");
 
-        var half = new CompositionTests.Keyboard();
+        var half = new CompositionTests.Keyboard { TokMode = true };
         half.Type("kyouha");
         half.Press(VirtualKeys.F8);
         ShiftDown(half);
@@ -82,14 +83,14 @@ internal static class CommitFirstSoundTests
     public static void English_CommitsOneLetter()
     {
         // 英字として見せている部分は 1 文字ずつ (google の go を 1 音として丸ごと確定しない)。
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         k.Type("kyouha");
         k.Press(VirtualKeys.F10);
         ShiftDown(k);
         Assert.Equal("k", k.Host.Document, "F10 の英字は 1 文字");
         Assert.Equal("youha", k.Host.View?.Text, "残りも英字のまま");
 
-        var full = new CompositionTests.Keyboard();
+        var full = new CompositionTests.Keyboard { TokMode = true };
         full.Type("kyouha");
         full.Press(VirtualKeys.F9);
         ShiftDown(full);
@@ -99,7 +100,7 @@ internal static class CommitFirstSoundTests
         Assert.Equal("ｋｙｏｕｈａ", full.Host.Document, "最後の 1 文字も全角のまま");
         Assert.True(full.Host.View is null, "閉じる");
 
-        var auto = new CompositionTests.Keyboard();
+        var auto = new CompositionTests.Keyboard { TokMode = true };
         auto.Type("google");
         Assert.Equal("google", auto.Host.View?.Text, "前提: 英語として見せている");
         ShiftDown(auto);
@@ -110,7 +111,7 @@ internal static class CommitFirstSoundTests
     [Test]
     public static void Converting_KeepsTheCurrentBehavior()
     {
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         k.Type("kyouha ");
         Assert.True(k.Host.View is { Converting: true }, "前提: Space で変換中");
         ShiftDown(k);
@@ -122,7 +123,7 @@ internal static class CommitFirstSoundTests
     public static void PlainDown_IsUnchanged()
     {
         // Shift なしの ↓ は、今までどおり文節の選択に入る (確定しない)。
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         k.Type("kyouha");
         k.Press(VirtualKeys.Down);
         Assert.Equal("", k.Host.Document, "確定しない");
@@ -132,7 +133,7 @@ internal static class CommitFirstSoundTests
     [Test]
     public static void KanaInput_CommitsOneKana()
     {
-        var k = new CompositionTests.Keyboard { Kana = true };
+        var k = new CompositionTests.Keyboard { TokMode = true, Kana = true };
         k.TypeKanaKeys("t@u");
         Assert.Equal("がな", k.Showing, "前提: T + ゛ = が, U = な");
         ShiftDown(k);
@@ -144,7 +145,7 @@ internal static class CommitFirstSoundTests
     public static void LiveConversion_CommitsTheKana()
     {
         // ライブ変換で漢字に見えていても、確定するのは読みの 1 音。残りは読みからライブ変換し直す。
-        var k = new CompositionTests.Keyboard(live: true);
+        var k = new CompositionTests.Keyboard(live: true) { TokMode = true };
         k.Type("nihongo");
         Assert.Equal("日本語", k.Host.View?.Text, "前提: ライブ変換で漢字");
         ShiftDown(k);
@@ -156,7 +157,7 @@ internal static class CommitFirstSoundTests
     public static void FixedClauses_KeepTheCurrentBehavior()
     {
         // 変換後も続けて入力 (固定した文節がある) ときは、今までどおり (確定しない)。
-        var k = new CompositionTests.Keyboard { Continue = true };
+        var k = new CompositionTests.Keyboard { TokMode = true, Continue = true };
         k.Type("kyou ");
         k.Type("ha");
         Assert.Equal("", k.Host.Document, "前提: まだ何も確定していない");
@@ -191,7 +192,7 @@ internal static class CommitFirstSoundTests
                      ("Japan", "Japan"), ("London", null), ("Kotlin", null), ("Python", null), ("Hellow", null), ("kyouhaJapan", null),
                  })
         {
-            var k = new CompositionTests.Keyboard();
+            var k = new CompositionTests.Keyboard { TokMode = true };
             k.Type(typed);
             var view = k.Host.View?.Text ?? "";
             if (shown is not null) Assert.Equal(shown, view, $"前提: {typed} の見え方");
@@ -205,7 +206,7 @@ internal static class CommitFirstSoundTests
     [Test]
     public static void English_TypingAfterTheRest_IsJudgedAsBefore()
     {
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         k.Type("google");
         ShiftDown(k);
         Assert.Equal("oogle", k.Host.View?.Text, "残りは英字のまま");
@@ -221,7 +222,7 @@ internal static class CommitFirstSoundTests
     public static void FullWidthOpener_CommitsAsShown()
     {
         // 査読 (独立): 全角の設定でも、英語の前で半角に見せている ( を、全角 （ で確定していた。
-        var k = new CompositionTests.Keyboard { Parentheses = Meltype.Config.ParenthesisWidth.FullWidth };
+        var k = new CompositionTests.Keyboard { TokMode = true, Parentheses = Meltype.Config.ParenthesisWidth.FullWidth };
         k.Type("(Google)");
         var view = k.Host.View?.Text ?? "";
         ShiftDown(k);
@@ -232,7 +233,7 @@ internal static class CommitFirstSoundTests
     public static void Reconversion_EscAfterOneSound_DoesNotDuplicate()
     {
         // 査読 (独立): 再変換 → Esc → Shift+↓ → Esc で、元の文字を丸ごと書き戻して二重になっていた。
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         Assert.True(k.Controller.ReconvertKana("きょうは", "今日は"), "前提: 再変換が始まる");
         k.Press(VirtualKeys.Escape);
         Assert.Equal("きょうは", k.Host.View?.Text, "前提: Esc で読みに戻る");
@@ -250,7 +251,7 @@ internal static class CommitFirstSoundTests
         // 打ち間違いの直しが固定した英字を書き換えて (googlede → gooごえで、Meltype.amr → Meltype.aめ) いた。
         foreach (var typed in new[] { "Japan", "London", "Kotlin", "Amazon", "googlede", "Meltype.amr", "kyouhaJapan", "Hello!" })
         {
-            var k = new CompositionTests.Keyboard();
+            var k = new CompositionTests.Keyboard { TokMode = true };
             k.Type(typed);
             var view = k.Host.View?.Text ?? "";
             ShiftDown(k);
@@ -263,7 +264,7 @@ internal static class CommitFirstSoundTests
         // Space: 英語で終わっているなら、今までどおり確定して空白 (変換に入らない)。
         foreach (var (typed, expected) in new[] { ("Hellow", "Hellow "), ("e-mail", "e-mail "), ("GoogleMeet", "GoogleMeet "), ("Japan", "Japan ") })
         {
-            var k = new CompositionTests.Keyboard();
+            var k = new CompositionTests.Keyboard { TokMode = true };
             k.Type(typed);
             ShiftDown(k);
             k.Press(VirtualKeys.Space);
@@ -276,7 +277,7 @@ internal static class CommitFirstSoundTests
     public static void NumberUnit_StaysAsShown_AfterTheNumberIsCommitted()
     {
         // 3 回目の査読: 10 を確定したあとの mm を、数字の後ろの単位と分からず打ち間違いとして直して 10っまで にしていた。
-        var k = new CompositionTests.Keyboard();
+        var k = new CompositionTests.Keyboard { TokMode = true };
         k.Type("10mmde");
         Assert.Equal("10mmで", k.Host.View?.Text, "前提");
         ShiftDown(k);
@@ -302,7 +303,7 @@ internal static class CommitFirstSoundTests
                      ("kyouhaJapan", 1, "n", "きょうはJapan"),
                  })
         {
-            var k = new CompositionTests.Keyboard();
+            var k = new CompositionTests.Keyboard { TokMode = true };
             k.Type(typed);
             ShiftDown(k);
             for (var i = 0; i < back; i++) k.Press(VirtualKeys.Back);
@@ -320,7 +321,7 @@ internal static class CommitFirstSoundTests
         CompositionTests.Detector.Memory = memory;
         try
         {
-            var k = new CompositionTests.Keyboard(languages: memory);
+            var k = new CompositionTests.Keyboard(languages: memory) { TokMode = true };
             k.Type("kanpai");
             ShiftDown(k);
             k.Press(VirtualKeys.F10);
@@ -328,7 +329,7 @@ internal static class CommitFirstSoundTests
             Assert.Equal("かnpai", k.Host.Document, "前提: F10 の英字で確定");
             Assert.Equal(null, memory.Get("npai"), "残りの npai は覚えない");
 
-            var hello = new CompositionTests.Keyboard(languages: memory);
+            var hello = new CompositionTests.Keyboard(languages: memory) { TokMode = true };
             hello.Type("Hello");
             ShiftDown(hello);
             hello.Press(VirtualKeys.F6);
@@ -336,7 +337,7 @@ internal static class CommitFirstSoundTests
             Assert.Equal(null, memory.Get("ello"), "F6 の かな でも覚えない");
 
             // 1 音確定をしなかった次の入力は、今までどおり覚える。
-            var next = new CompositionTests.Keyboard(languages: memory);
+            var next = new CompositionTests.Keyboard(languages: memory) { TokMode = true };
             next.Type("api");
             next.Press(VirtualKeys.F10);
             next.Press(VirtualKeys.Return);
@@ -346,5 +347,50 @@ internal static class CommitFirstSoundTests
         {
             CompositionTests.Detector.Memory = null;
         }
+    }
+
+    [Test]
+    public static void TokModeOff_ShiftDownIsUnchanged()
+    {
+        // 1.2.0 の ATOK スタイルのキー操作 (TokMode、既定 OFF) の一部。OFF のときの Shift+↓ は、今までどおり ↓ と同じ (文節の選択に入る)。
+        var k = new CompositionTests.Keyboard();
+        k.Type("kyouha");
+        ShiftDown(k);
+        Assert.Equal("", k.Host.Document, "OFF では 1 音確定しない");
+        Assert.True(k.Host.View is { Converting: true }, "↓ と同じく文節の選択に入る");
+        Assert.True(!(k.Host.View?.Hint ?? "").Contains("1音確定"), "ヒントにも出さない");
+    }
+
+    [Test]
+    public static void TokModeOn_HintShowsOneSoundCommit_AndConversionKeysAreUnchanged()
+    {
+        var k = new CompositionTests.Keyboard { TokMode = true };
+        k.Type("kyouha");
+        Assert.True(k.Host.View?.Hint?.Contains("Shift+↓ 1音確定") == true, "入力中のヒントに出す: " + k.Host.View?.Hint);
+
+        // 変換中の ↓ は TokMode の部分確定、Shift+↓ は今までどおり (確定しない)。
+        var converting = new CompositionTests.Keyboard { TokMode = true };
+        converting.Type("kyouhaiitenki ");
+        Assert.True(converting.Host.View is { Converting: true }, "前提: 変換中");
+        ShiftDown(converting);
+        Assert.Equal("", converting.Host.Document, "変換中の Shift+↓ は確定しない");
+        converting.Press(VirtualKeys.Down);
+        Assert.True(converting.Host.Document.Length > 0, "↓ は部分確定 (TokMode): " + converting.Host.Document);
+    }
+
+    [Test]
+    public static void PartialCommitAfterOneSound_RestIsJudgedAgain()
+    {
+        // 1 音確定のあとに変換して ↓ (部分確定) したら、固定した見え方を捨てて、残りを今までどおり扱う。
+        var k = new CompositionTests.Keyboard { TokMode = true };
+        k.Type("kyouhaiitenki");
+        ShiftDown(k);
+        Assert.Equal("きょ", k.Host.Document, "1 音確定");
+        k.Press(VirtualKeys.Space);
+        Assert.True(k.Host.View is { Converting: true }, "残りを変換");
+        k.Press(VirtualKeys.Down);
+        k.Press(VirtualKeys.Return);
+        Assert.True(k.Host.View is null, "全部確定して閉じる");
+        Assert.True(k.Host.Document.StartsWith("きょ", StringComparison.Ordinal) && k.Host.Document.Length > 2, "確定した文: " + k.Host.Document);
     }
 }

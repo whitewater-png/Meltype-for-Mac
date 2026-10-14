@@ -104,7 +104,7 @@ internal static class MacSettingsCatalog
             "変換中に Shift+Enter を押すと、確定したうえで Shift+Enter をアプリに渡します (チャットや Web アプリでは改行)。OFF のときは Enter と同じく確定だけします。Mac 版は入力メニューの「Shift+Enter で確定して改行」で切り替え。",
             InputGroup, s => s.ShiftEnterNewline, (s, v) => s.ShiftEnterNewline = v),
         Bool(nameof(Settings.TokMode), "ATOK スタイルのキー操作",
-            "変換中のキー操作を ATOK と同じにします。← で文節を縮め、→ で文節を伸ばす (区切りを前 / うしろへ)。↓ で選んでいる文節までを確定 (部分確定)。Shift+← → で文節を移り、Ctrl+← → で先頭 / 最後の文節へ。次の候補は Space、前の候補は ↑。OFF のときは、今までどおり ← → で文節を選び、↓ で次の候補、Shift+← → で区切りを変えます。",
+            "変換中のキー操作を ATOK と同じにします。← で文節を縮め、→ で文節を伸ばす (区切りを前 / うしろへ)。↓ で選んでいる文節までを確定 (部分確定)。Shift+← → で文節を移り、Ctrl+← → で先頭 / 最後の文節へ。次の候補は Space、前の候補は ↑。変換前の入力中は、Shift+↓ で先頭の 1 音だけを確定します (1 音確定)。OFF のときは、今までどおり ← → で文節を選び、↓ で次の候補、Shift+← → で区切りを変えます (Shift+↓ も ↓ と同じ)。",
             InputGroup, s => s.TokMode, (s, v) => s.TokMode = v),
         Choice(nameof(Settings.DetectionLevel), "自動判定の強さ",
             "積極的 = 英語らしければすぐ英字 / 標準 = 短い語 (no, to, ga) は前後が英語のときだけ英字 / 慎重 = 確信度が高いときだけ英字 / 手動 = 自動では切り替えず提案だけ (変換ボックスで Tab を押すと提案どおり英字に)。Meltype キーボード・IME 自動切替・英数状態の検知・かな入力のすべてに効きます。",

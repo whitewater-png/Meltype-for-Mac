@@ -214,7 +214,7 @@ public sealed class CompositionOptions
 ///   Space   → 文節に区切って漢字変換 (英単語で終わっているときは確定して空白)
 ///   Shift+Space → 英単語と判定した語も、ローマ字として読んで変換 (go → 語)
 ///   ←→      → 文節を選ぶ (変換前に押しても文節の選択に入る) / Space・↓↑ でその文節の候補 / Shift+←→ で区切りを変える
-///   Shift+↓   → 入力中: 先頭の 1 音だけ確定 (ATOK の 1 音確定)
+///   Shift+↓   → 入力中: 先頭の 1 音だけ確定 (ATOK の 1 音確定。ATOK スタイルのキー操作 (TokMode) が ON のとき)
 ///   Enter   → 確定してテキストボックスへ入力
 ///   BackSpace / Esc → 1 音削除 / 変換取り消し・入力取り消し
 ///   F6 / F7 / F8 / F9 / F10, 半角/全角 → ひらがな / カタカナ / 全角英数 / 半角英数 / 日本語⇔英字
@@ -1012,8 +1012,9 @@ public sealed class CompositionController
             case VirtualKeys.F8: SetMode(DisplayMode.HalfWidthKatakana); return;
             case VirtualKeys.F9: SetMode(DisplayMode.FullWidthAlphanumeric); return;
             case VirtualKeys.F10: SetMode(DisplayMode.HalfWidthAlphanumeric); return;
-            case VirtualKeys.Down when _headCount == 0 && (_swallowedShift.Count > 0 || _host.IsShiftDown()):
-                // Shift+↓: 先頭の 1 音だけ確定し、残りは入力のまま (ATOK の 1 音確定)。変換中・固定した文節があるときは今までどおり。
+            case VirtualKeys.Down when _options.TokMode() && _headCount == 0 && (_swallowedShift.Count > 0 || _host.IsShiftDown()):
+                // ATOK スタイル (TokMode) の Shift+↓: 先頭の 1 音だけ確定し、残りは入力のまま (1 音確定)。
+                // OFF のとき・変換中・固定した文節があるときは今までどおり。
                 CommitFirstSound();
                 return;
             case VirtualKeys.Left or VirtualKeys.Right or VirtualKeys.Up or VirtualKeys.Down when !_text.IsAlphanumeric:
@@ -2738,6 +2739,7 @@ public sealed class CompositionController
         else
         {
             var hint = _text.IsAlphanumeric ? "Enter 確定　Space 確定+空白　Shift+Space 日本語で変換　半角/全角 日本語に" : "Space 変換　←→ 文節　Enter 確定　F7 カタカナ　F8 半角カナ　F10 英字";
+            if (_options.TokMode() && _headCount == 0) hint += "　Shift+↓ 1音確定";
             if (_text.Suggestion() is { } suggestion) hint = $"Tab → {suggestion} (英字に)　" + hint;
             RefreshPredictions();
             var tail = CurrentDisplay(final: false);
