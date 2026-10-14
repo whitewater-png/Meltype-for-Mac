@@ -20,6 +20,8 @@
 	<string>Meltype 辞書</string>
 	<key>CFBundleDisplayName</key>
 	<string>Meltype 辞書</string>
+	<key>CFBundleIconFile</key>
+	<string>Meltype</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

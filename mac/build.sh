@@ -72,6 +72,9 @@ mkdir -p "$HELPER/Contents/MacOS" "$HELPER/Contents/Resources"
 cp "$BIN/MeltypeDictionary" "$HELPER/Contents/MacOS/MeltypeDictionary"
 cp Resources/Dictionary/Info.plist "$HELPER/Contents/Info.plist"
 cp -R Resources/Dictionary/ja.lproj "$HELPER/Contents/Resources/"
+# アイコン (氷の M。入力メニューの icon.tiff と同じ絵柄の 1024px 版。元絵と作り方は docs/IMPROVEMENT_PLAN.md の 0-6)
+cp Resources/Meltype.icns "$APP/Contents/Resources/Meltype.icns"
+cp Resources/Meltype.icns "$HELPER/Contents/Resources/Meltype.icns"
 # 版は Meltype.app と同じにする (Info.plist は 1 か所で管理する)
 plutil -replace CFBundleShortVersionString -string "$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)" "$HELPER/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$(plutil -extract CFBundleVersion raw Resources/Info.plist)" "$HELPER/Contents/Info.plist"
