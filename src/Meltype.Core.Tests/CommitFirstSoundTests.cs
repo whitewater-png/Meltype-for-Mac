@@ -187,6 +187,7 @@ internal static class CommitFirstSoundTests
                      ("Hello!", "Hello!"), ("GitHub.", null), ("googlede", "googleで"), ("iPhone", null), ("e-mail", null), ("J-core", null),
                      ("tetr.io", null), ("Meltype.amr", null), ("kyouhaGoogle!", null), ("(Google)", null), ("kyouhann", null), ("ok?", null),
                      ("\"Go\"", "\"Go\""), ("10mmde", null), ("\"Go Through!\"", null),
+                     ("Japan", "Japan"), ("London", null), ("Kotlin", null), ("Python", null), ("Hellow", null), ("kyouhaJapan", null),
                  })
         {
             var k = new CompositionTests.Keyboard();
@@ -239,5 +240,34 @@ internal static class CommitFirstSoundTests
         Assert.Equal("うは", k.Host.View?.Text, "残り");
         k.Press(VirtualKeys.Escape);
         Assert.Equal("きょ", k.Host.Document, "Esc で元の文字を書き戻さない (二重にならない)");
+    }
+
+    [Test]
+    public static void EnterOrSpace_AfterOneSound_KeepsTheRestAsShown()
+    {
+        // 再査読: 1 回だけ Shift+↓ を押したあとの Enter で、語末の n が ん に (Japan → Japaん)、
+        // 打ち間違いの直しが固定した英字を書き換えて (googlede → gooごえで、Meltype.amr → Meltype.aめ) いた。
+        foreach (var typed in new[] { "Japan", "London", "Kotlin", "Amazon", "googlede", "Meltype.amr", "kyouhaJapan", "Hello!" })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed);
+            var view = k.Host.View?.Text ?? "";
+            ShiftDown(k);
+            var rest = k.Host.View?.Text ?? "";
+            Assert.Equal(view, k.Host.Document + rest, $"{typed}: 1 回目");
+            k.Press(VirtualKeys.Return);
+            Assert.Equal(view, k.Host.Document, $"{typed}: Enter で見えていたとおりに確定");
+        }
+
+        // Space: 英語で終わっているなら、今までどおり確定して空白 (変換に入らない)。
+        foreach (var (typed, expected) in new[] { ("Hellow", "Hellow "), ("e-mail", "e-mail "), ("GoogleMeet", "GoogleMeet "), ("Japan", "Japan ") })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed);
+            ShiftDown(k);
+            k.Press(VirtualKeys.Space);
+            Assert.Equal(expected, k.Host.Document, $"{typed}: Space で確定して空白");
+            Assert.True(k.Host.View is null, $"{typed}: 変換に入らない");
+        }
     }
 }

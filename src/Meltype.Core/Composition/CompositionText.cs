@@ -355,6 +355,10 @@ public sealed class CompositionText
             languages.Add((_units[i].Raw, offset < englishAt.Count && englishAt[offset]));
         }
 
+        // 入力途中の子音 (Japan の n) の見え方も固定する (英字に見えていた n を、残りが無くなってから ん にしない)。
+        var unitLength = _units.Sum(u => u.Raw.Length);
+        var pendingEnglish = _pending.Length > 0 && englishAt.Count == unitLength + _pending.Length ? englishAt[^1] : (bool?)null;
+
         var first = _units[0];
         var english = languages[0].English;
         string fallback;
@@ -380,6 +384,7 @@ public sealed class CompositionText
             }
         }
         _frozen = languages;
+        _frozenPending = pendingEnglish is null ? null : (Pending, pendingEnglish.Value);
         ResetIfEmpty();
         var after = IsEmpty ? "" : RenderSegments(final: false, null);
         // 見えていた文字列から、残りの見え方を除いた部分 = 取り出した 1 音の見え方。合わなければ単位の文字にする。
@@ -438,6 +443,13 @@ public sealed class CompositionText
     /// </summary>
     private List<(string Raw, bool English)>? _frozen;
 
+    /// <summary>1 音確定のときの入力途中の子音と、その英語 / 日本語。子音が変わらず、その前の単位がすべて固定のままのときだけ使う。</summary>
+    private (string Pending, bool English)? _frozenPending;
+
+    /// <summary>入力途中の子音を、1 音確定のときの見え方のまま扱うか (その前の単位 frozen 個がすべて固定のまま)。</summary>
+    private bool PendingFrozen(int frozen, int units) =>
+        _frozen is not null && frozen == units && _pending.Length > 0 && _frozenPending is { } p && p.Pending == Pending;
+
     private int FrozenCount(IReadOnlyList<CompositionUnit> units)
     {
         if (_frozen is null) return 0;
@@ -483,6 +495,7 @@ public sealed class CompositionText
     public void Clear()
     {
         _frozen = null;
+        _frozenPending = null;
         _units.Clear();
         _pending.Clear();
         Mode = DisplayMode.Auto;
@@ -653,7 +666,9 @@ public sealed class CompositionText
     {
         var key = new StringBuilder();
         foreach (var unit in _units) key.Append(unit.Kana).Append('\u0001').Append(unit.Raw).Append('\u0002');
-        for (var i = 0; i < FrozenCount(_units); i++) key.Append(_frozen![i].English ? 'E' : 'J');
+        var frozen = FrozenCount(_units);
+        for (var i = 0; i < frozen; i++) key.Append(_frozen![i].English ? 'E' : 'J');
+        if (PendingFrozen(frozen, _units.Count)) key.Append(_frozenPending!.Value.English ? 'e' : 'j');
         key.Append('\u0003').Append(_pending).Append('\u0003')
             .Append(PrecedingEnglish switch { true => 'E', false => 'J', null => '-' })
             .Append(FollowingEnglish switch { true => 'E', false => 'J', null => '-' })
@@ -672,7 +687,8 @@ public sealed class CompositionText
     private IReadOnlyList<CompositionSegment> SegmentUnits(IReadOnlyList<CompositionUnit> units, bool final)
     {
         var frozen = FrozenCount(units);
-        if (frozen == 0) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final);
+        var pendingFrozen = PendingFrozen(frozen, units.Count);
+        if (frozen == 0 && !pendingFrozen) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final);
         var result = new List<CompositionSegment>();
         void Add(CompositionSegment segment)
         {
@@ -684,7 +700,8 @@ public sealed class CompositionText
             else result.Add(segment);
         }
         for (var i = 0; i < frozen; i++) Add(new CompositionSegment(_frozen![i].English, _frozen[i].English ? "" : units[i].Kana, units[i].Raw));
-        if (frozen < units.Count || _pending.Length > 0)
+        if (pendingFrozen) Add(new CompositionSegment(_frozenPending!.Value.English, "", Pending));
+        else if (frozen < units.Count || _pending.Length > 0)
         {
             var precedingEnglish = result[^1].IsEnglish;
             foreach (var segment in _detector.Segment([.. units.Skip(frozen)], Pending, precedingEnglish, FollowingEnglish, EffectiveLevel,
@@ -961,6 +978,11 @@ public sealed class CompositionText
         // 今の表示で英字に見えている文字 (きょうは|meeting|です の meeting)。ここは直さない
         // (表示では英単語なのに、確定したら g が が に直されて めえちんがです になっていた)。
         var shownEnglish = EnglishMask();
+        // 1 音確定で英字のまま固定した文字 (Google の g を確定したあとの oogle) を含む並びも直さない (知っている語の一部でなくても、英字に見えていたため)。
+        var frozenEnglish = new List<bool>();
+        var frozenCount = FrozenCount(_units);
+        for (var i = 0; i < _units.Count; i++) foreach (var _ in _units[i].Raw) frozenEnglish.Add(i < frozenCount && _frozen![i].English);
+        if (PendingFrozen(frozenCount, _units.Count)) foreach (var _ in Pending) frozenEnglish.Add(_frozenPending!.Value.English);
         var offset = 0;
         var start = 0;
         while (start < _units.Count)
@@ -980,7 +1002,8 @@ public sealed class CompositionText
             // 数字のすぐ後ろの単位 (10|mm|で) は打ち間違いではない
             var unitAfterNumber = start > 0 && _units[start - 1].Raw is [var digit] && char.IsAsciiDigit(digit) &&
                 UnitWords.Any(u => letters.StartsWith(u, StringComparison.OrdinalIgnoreCase));
-            if (!unitAfterNumber && letters.All(char.IsAsciiLetterLower) && !_detector.IsKnownEnglishWord(letters) &&
+            var frozenRun = Enumerable.Range(runOffset, letters.Length).Any(i => i < frozenEnglish.Count && frozenEnglish[i]);
+            if (!unitAfterNumber && !frozenRun && letters.All(char.IsAsciiLetterLower) && !_detector.IsKnownEnglishWord(letters) &&
                 corrector.FirstUnreadable(letters, final: true) is var first and > 0 &&
                 !(runOffset + first < shownEnglish.Count && shownEnglish[runOffset + first]) &&
                 // 数字のすぐ前の短い英字 (kaibunsyo|rta|2026 の rta) は略語。打ち間違いとして直さない
