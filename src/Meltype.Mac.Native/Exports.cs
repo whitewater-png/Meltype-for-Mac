@@ -51,8 +51,10 @@ public static unsafe class Exports
     /// 7: 設定タブの関数 (meltype_settings_get / meltype_settings_set / meltype_settings_reset) を足した。
     /// 8: 自作の専門用語集の関数 (meltype_term_create ほか) を足し、meltype_term_domains の各行に 5 つ目の欄 (自作なら 1) を足した。
     /// 9: 学習した語の関数 (meltype_learned_words / _version / _check / _set / _remove) を足した。
+    /// 10: (別ブランチ feat/judge-tab の 1-3 が使う。こちらは 11 から数える)
+    /// 11: 確定した直後の語の F10 / F6 の取消 (meltype_cancel_toggle) を足し、結果の JSON にトグル由来の印 (toggle) を足した。
     /// </summary>
-    public const int AbiVersion = 9;
+    public const int AbiVersion = 11;
 
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
@@ -270,6 +272,13 @@ public static unsafe class Exports
             Diagnostics.Log.Warn($"確定の記録の破棄に失敗しました: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// 確定した直後の語を F10 / F6 で直した結果 (JSON の toggle) の入力欄の書き換えを、Swift が確かめられず飛ばしたとき。
+    /// 変換ボックス・記録・学習を直前に戻す。戻した後の表示 (変換ボックスは閉じる) を、他と同じ JSON で返す。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_cancel_toggle")]
+    public static byte* CancelToggle(IntPtr handle) => Run(handle, session => session.CancelToggle());
 
     /// <summary>
     /// 確定済みの文字列 (入力欄で選択されているもの) を読みに戻して変換を始める。結果は他と同じ JSON。
