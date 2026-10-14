@@ -81,7 +81,7 @@ internal static class LastWordToggleTests
         var edit = result.Commits.Single();
         Assert.True(edit.DeleteBefore == 4 && edit.Original == "にほんご" && edit.Text == "nihongo", "消す文字と元の文字を添えて 1 回で置き換える (Swift が確かめられる)");
         Assert.True(result.ToJson().Contains("\"toggle\":true"), "JSON にもトグル由来の印");
-        Assert.True(e.Memory.Get("nihongo") is null, "変換しない確定は文節が分からないので、1 語として曖昧な語 (sushi) でなければ覚えない");
+        Assert.Equal(true, e.Memory.Get("nihongo"), "明示的に直したので、次から英字 (変換しない確定は、日本語の区間が 1 つなら 1 語として覚える)");
         Assert.True(!e.Session.IsComposing, "変換ボックスは出さない");
 
         var learned = new Editor();
@@ -558,7 +558,7 @@ internal static class LastWordToggleTests
     [Test]
     public static void F10_AfterCommit_LearnsOnlyOneWord()
     {
-        // 査読 R44-8: 変換して確定したなら日本語の文節が 1 つのときだけ、変換しない確定は 1 語として曖昧な語のときだけ覚える
+        // 査読 R44-8: 変換して確定したなら日本語の文節が 1 つのときだけ覚える。変換しない確定は文節が分からないので、日本語の区間が 1 つなら覚える
         var one = new Editor();
         one.Type("atsui ");
         one.Enter();
@@ -575,12 +575,11 @@ internal static class LastWordToggleTests
         Assert.True(two.Memory.Get("hiruka") is null, "文節が 2 つ以上なら文として扱い、覚えない");
         Assert.True(two.Session.TakeSuggestionHint() is null, "案内も出さない");
 
-        // 変換しない確定 (文節が分からない): 1 語として曖昧な語 (sushi) でなければ覚えない
+        // 変換しない確定 (文節が分からない): 日本語の区間が 1 つなら 1 語として覚える (nihongo を覚えるため。文まるごとも覚えるのは KNOWN_LIMITS)
         var sentence = new Editor();
         sentence.Type("kyouhasamui\n");
         Assert.True(sentence.F10().Toggle, "前提: F10 そのものは効く");
-        Assert.True(sentence.Memory.Get("kyouhasamui") is null, "曖昧な語でないので覚えない");
-        Assert.True(sentence.Session.TakeSuggestionHint() is null, "案内も出さない");
+        Assert.Equal(true, sentence.Memory.Get("kyouhasamui"), "変換しない確定は、日本語の区間が 1 つなら覚える");
     }
 
     [Test]

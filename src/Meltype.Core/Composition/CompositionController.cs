@@ -2383,8 +2383,9 @@ public sealed class CompositionController
         {
             foreach (var segment in _text.Segments(final: true)) (segment.IsEnglish ? english : japanese).Add(segment.Raw);
         }
-        // 変換しない確定 (ライブ変換・かな) は文節が分からないので、1 語として曖昧な語 (sushi) のときだけ 1 語
-        return new SegmentRawSet(english, japanese, JapaneseWord: japanese.Count == 1 && _detector.IsAmbiguousWord(japanese[0]));
+        // 変換しない確定 (ライブ変換・かな) は文節が分からない。日本語の区間が 1 つなら 1 語として扱う
+        // (nihongo → F10 は覚えたい。kyouhasamui のような文まるごとも覚えるが、同じ文をそのまま打たない限り効かないだけで害は小さい。KNOWN_LIMITS)
+        return new SegmentRawSet(english, japanese, JapaneseWord: japanese.Count == 1);
     }
 
     /// <summary>
@@ -2445,7 +2446,7 @@ public sealed class CompositionController
 
     /// <summary>
     /// 確定の区間ごとの打った英字。JapaneseWord = 日本語の区間が 1 語と言えるか (F10 で英語として覚えてよいか)。
-    /// 変換して確定したなら日本語の文節が 1 つ、変換しない確定なら 1 語として曖昧な語。
+    /// 変換して確定したなら日本語の文節が 1 つ、変換しない確定なら日本語の区間が 1 つ。
     /// </summary>
     private sealed record SegmentRawSet(IReadOnlyList<string> English, IReadOnlyList<string> Japanese, bool JapaneseWord);
 
@@ -2544,7 +2545,7 @@ public sealed class CompositionController
             var replacement = word.Raw + tail;
             if (replacement == body) return false;
             // 学習するのは、確定が日本語の区間 1 つだけのとき。英語と日本語が混ざった確定 (きょうはsushiです) は、どの語を覚えるか決められない (文全体を英字にするのは稀) ので学習しない
-            // 変換して確定したなら日本語の文節が 1 つのときだけ、変換しない確定なら 1 語として曖昧な語のときだけ (今日は寒い のような文は覚えない)
+            // 変換して確定したなら日本語の文節が 1 つのときだけ (今日は|寒い のような文は覚えない)。変換しない確定は日本語の区間が 1 つなら覚える
             var learnable = word.Raws is { English.Count: 0, Japanese.Count: 1, JapaneseWord: true };
             var learning = learnable ? _options.Languages?.RememberUndoable(word.Raws.Japanese[0], english: true, explicitChoice: true) : null;
             // 2 回ルール: よく使う日本語 (sushi・kyouha) は、はっきり英字にしても 1 回目は効かない。そのことを 1 回だけ知らせる (学習したときだけ)
@@ -2972,7 +2973,7 @@ public sealed class CompositionController
         _lastCommitTime = Environment.TickCount64;
         // 確定後の F10 / F6 で直せる直前の 1 語 (打った英字が分かる確定だけ。固定した文節を含む・再変換の確定は記録しない)。
         // 区間ごとの打った英字が渡されない確定 (全部が英語・全部が日本語) は、確定 1 回分の打った英字が 1 区間
-        raws ??= new SegmentRawSet(hasEnglish && !hasJapanese ? [raw] : [], hasJapanese && !hasEnglish ? [raw] : [], JapaneseWord: hasJapanese && !hasEnglish && _detector.IsAmbiguousWord(raw));
+        raws ??= new SegmentRawSet(hasEnglish && !hasJapanese ? [raw] : [], hasJapanese && !hasEnglish ? [raw] : [], JapaneseWord: hasJapanese && !hasEnglish);
         _lastWord = !hadFixed && !reconverted && raw.Any(char.IsAsciiLetter) && (hasEnglish || hasJapanese) ? new LastWord(text, raw, hasEnglish, hasJapanese, _lastCommitTime, raws) : null;
         _host.CommitText(text);
         Committed?.Invoke(text);
