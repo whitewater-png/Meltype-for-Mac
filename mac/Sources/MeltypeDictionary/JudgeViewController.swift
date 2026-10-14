@@ -17,7 +17,7 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
     private let beforeField = NSTextField(string: "")
     private let afterField = NSTextField(string: "")
     private let levelPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let kanaCheckbox = NSButton(checkboxWithTitle: "かな入力 (JIS)", target: nil, action: nil)
+    private let kanaNotice = UI.wrapping(DetectionExplainInput.kanaNotice, secondary: true)
     private let resultStack = NSStackView()
     private let problemLabel = UI.wrapping("", secondary: false)
 
@@ -25,6 +25,8 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
     /// 最後に表示した結果を出したときの「学習した語」の版 (別の画面・IME で学習が変わったら、出し直す)。
     private var shownLearnedVersion: Int32 = -1
     private var hasResult = false
+    /// 学習した語の行が 10 件を超えたとき、残りも出しているか (打つ文字を変えたら畳む)。
+    private var showAllWords = false
     weak var hostWindow: NSWindow?
     private var window: NSWindow? { view.window ?? hostWindow }
 
@@ -65,11 +67,11 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
         levelPopup.target = self
         levelPopup.action = #selector(conditionChanged(_:))
         levelPopup.setAccessibilityLabel("判定の強さ")
-        kanaCheckbox.target = self
-        kanaCheckbox.action = #selector(conditionChanged(_:))
+        kanaNotice.setAccessibilityLabel(DetectionExplainInput.kanaNotice)
+        kanaNotice.isHidden = true
         syncWithSettings()
 
-        let levelRow = NSStackView(views: [UI.label("判定の強さ"), levelPopup, kanaCheckbox, UI.spacer()])
+        let levelRow = NSStackView(views: [UI.label("判定の強さ"), levelPopup, UI.spacer()])
         levelRow.orientation = .horizontal
         levelRow.spacing = 8
 
@@ -95,12 +97,12 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
         let guidance = UI.wrapping(DetectionExplainInput.guidance)
         guidance.setAccessibilityLabel("案内")
 
-        let content = NSStackView(views: [form, problemLabel, resultStack, guidance])
+        let content = NSStackView(views: [form, problemLabel, kanaNotice, resultStack, guidance])
         content.orientation = .vertical
         content.alignment = .leading
         content.spacing = 14
         content.translatesAutoresizingMaskIntoConstraints = false
-        for part in [form, problemLabel, resultStack, guidance] { part.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true }
+        for part in [form, problemLabel, kanaNotice, resultStack, guidance] { part.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true }
 
         let document = FlippedView()
         document.translatesAutoresizingMaskIntoConstraints = false
@@ -153,7 +155,8 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
         return row
     }
 
-    /// 判定の強さ・かな入力の初期値を、今の設定に合わせる (取れなければ標準・ローマ字入力のまま)。
+    /// 判定の強さを今の設定に合わせ (取れなければ標準)、かな入力の設定が ON なら「調べられません」の 1 行を出す。
+    /// 画面を表示するたびに取り直す (設定タブで変えたあとに開いても追う。ここで強さを選び直していても、設定に戻る)。
     private func syncWithSettings() {
         let items = settings.settings()?.items ?? []
         if case let .string(name)? = items.first(where: { $0.key == "DetectionLevel" })?.value, let strength = DetectionStrength(settingName: name) {
@@ -162,7 +165,9 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
             levelPopup.selectItem(at: Int(DetectionStrength.balanced.rawValue))
         }
         if case let .string(name)? = items.first(where: { $0.key == "InputStyle" })?.value {
-            kanaCheckbox.state = name == "Kana" ? .on : .off
+            kanaNotice.isHidden = name != "Kana"
+        } else {
+            kanaNotice.isHidden = true
         }
     }
 
@@ -172,9 +177,13 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
         (levelPopup.selectedItem?.representedObject as? Int32).flatMap(DetectionStrength.init(rawValue:)) ?? .balanced
     }
 
-    func controlTextDidChange(_ notification: Notification) { schedule(after: 0.3) }
+    func controlTextDidChange(_ notification: Notification) {
+        showAllWords = false
+        schedule(after: 0.3)
+    }
 
     @objc private func conditionChanged(_ sender: Any?) { schedule(after: 0) }
+    // 注: 調べる処理 (refresh) はメインスレッドで呼ぶ (NSSpellChecker を使うため)。ここからは DispatchQueue.main だけで呼ぶ。
 
     private func schedule(after delay: TimeInterval) {
         pending?.cancel()
@@ -193,11 +202,17 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
             hasResult = false
             return
         }
+        if let problem = DetectionExplainInput.problem(typed: typed) {
+            problemLabel.stringValue = problem
+            problemLabel.isHidden = false
+            hasResult = false
+            return
+        }
         shownLearnedVersion = learned.learnedVersion()
         guard let text = explainer.explainDetection(typed: typed,
                                                     before: DetectionExplainInput.clipBefore(beforeField.stringValue),
                                                     after: DetectionExplainInput.clipAfter(afterField.stringValue),
-                                                    level: strength, kanaInput: kanaCheckbox.state == .on),
+                                                    level: strength),
               let explanation = DetectionExplanation.parse(text) else {
             problemLabel.stringValue = "調べられませんでした。Meltype を入れ直してから、もう一度試してください。"
             problemLabel.isHidden = false
@@ -206,8 +221,19 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
         }
         problemLabel.isHidden = true
         hasResult = true
-        for line in explanation.lines { resultStack.addArrangedSubview(row(for: line)) }
+        let lines = explanation.lines
+        let folded = lines.filter(\.foldable).count
+        for line in lines where !line.foldable || showAllWords { resultStack.addArrangedSubview(row(for: line)) }
+        if folded > 0 {
+            let toggle = UI.button(showAllWords ? "たたむ" : "残り \(folded) 件の学習した語を表示", target: self, action: #selector(toggleWords(_:)))
+            resultStack.addArrangedSubview(toggle)
+        }
         UI.announce(explanation.lines.first?.text ?? "", in: window)
+    }
+
+    @objc private func toggleWords(_ sender: Any?) {
+        showAllWords.toggle()
+        refresh()
     }
 
     private func clearResult() {
@@ -254,6 +280,11 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
     }
 
     // ---- タブの出入り ----
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        syncWithSettings()
+    }
 
     override func viewDidAppear() {
         super.viewDidAppear()

@@ -39,8 +39,8 @@ public enum DetectionStrength: Int32, CaseIterable {
 /// 「判定を調べる」の操作 (本物は NativeDictionary。--self-test は偽物でも確かめる)。
 public protocol DetectionExplainOperations: AnyObject {
     /// 打ったローマ字の区間分けと、条件を 1 つ変えたときの結果 (TSV。DetectionExplanation.parse が読む)。取れなければ nil。
-    /// 学習 (languages.json) は読むだけで変えない。
-    func explainDetection(typed: String, before: String, after: String, level: DetectionStrength, kanaInput: Bool) -> String?
+    /// ローマ字入力としてだけ調べる (かな入力の判定は調べられない)。学習 (languages.json) は読むだけで変えない。メインスレッド専用。
+    func explainDetection(typed: String, before: String, after: String, level: DetectionStrength) -> String?
 }
 
 /// 区間 1 つ (英語なら打った英字、日本語ならかな)。
@@ -71,10 +71,13 @@ public struct DetectionVariant: Hashable {
 public struct ExplainLine: Hashable {
     public let text: String
     public let removableWord: String?
+    /// 学習した語の行が多いとき、先頭の 10 件より後ろは折りたたむ (画面が「残りを表示」で開く)。
+    public let foldable: Bool
 
-    public init(_ text: String, removableWord: String? = nil) {
+    public init(_ text: String, removableWord: String? = nil, foldable: Bool = false) {
         self.text = text
         self.removableWord = removableWord
+        self.foldable = foldable
     }
 }
 
@@ -136,6 +139,9 @@ public struct DetectionExplanation: Equatable {
         segments.isEmpty ? "(なし)" : segments.map { $0.isEnglish ? "[\($0.text)]" : $0.text }.joined(separator: " ")
     }
 
+    /// 学習した語を外す行を、折りたたまずに出す件数 (これより多い分は foldable)。
+    public static let visibleWordRows = 10
+
     /// 条件の名前 → 画面の言い方 (知らない名前は nil = 出さない)。
     static func describe(_ name: String) -> String? {
         switch name {
@@ -161,14 +167,17 @@ public struct DetectionExplanation: Equatable {
         if !segments.isEmpty {
             result.append(ExplainLine("1 つだけ条件を変えた場合:"))
             var any = false
+            var wordRows = 0
             for variant in variants {
                 guard let label = Self.describe(variant.name) else { continue }
                 let isWord = variant.name.hasPrefix("memory-without:")
                 if isWord && !variant.changed { continue }
                 any = true
+                if isWord { wordRows += 1 }
                 let outcome = variant.changed ? Self.render(variant.segments) : "変わりません"
                 result.append(ExplainLine("  \(label) → \(outcome)",
-                                          removableWord: isWord ? String(variant.name.dropFirst("memory-without:".count)) : nil))
+                                          removableWord: isWord ? String(variant.name.dropFirst("memory-without:".count)) : nil,
+                                          foldable: isWord && wordRows > Self.visibleWordRows))
             }
             if !any { result.append(ExplainLine("  (試せる条件がありません)")) }
         }
@@ -194,11 +203,19 @@ public enum DetectionExplainInput {
     /// この画面の判定器も最初に調べるときに 1 回読む) のとおりに書く。
     public static let guidance =
         "ここに出るのは確定する前の区間分けです。確定のしかた (Space / Enter) や、確定したあとの自動の直しで変わることがあります。"
-        + "英語にしたい語は『学習した語』に足すか、データフォルダの dictionaries/english.txt に書きます (ユーザー辞書と専門用語集は日英の判定には効きません)。"
-        + "english.txt は、IME が入力のセッションを作るとき (アプリや入力欄ごと。作り直しは macOS 任せ) に読み込むので、"
+        + "「前の文字」が空のときは、入力欄の直前に何も無いときの判定です (IME は、自分が直前に確定した文字の向きを引き継ぐので、続けて打つと違う答えになることがあります)。"
+        + "英語にしたい語は『学習した語』に足すか、データフォルダの dictionaries/english.txt (固有名詞は propernouns.txt) に書きます (ユーザー辞書と専門用語集は日英の判定には効きません)。"
+        + "english.txt・propernouns.txt は、IME が入力のセッションを作るとき (アプリや入力欄ごと。作り直しは macOS 任せ) に読み込むので、"
         + "直したあとは、Meltype を入れ直すかログインし直すまで、開いたままの入力欄に反映されないことがあります。"
         + "この画面は「Meltype 辞書」を開き直すと反映されます。"
 
+    /// かな入力の設定が ON のときに結果欄の上に出す 1 行 (この画面の判定はローマ字入力だけ)。
+    public static let kanaNotice = "かな入力の判定はこの画面では調べられません (ローマ字入力として調べています)"
+
+    /// 打つローマ字に空白が入っていたときの理由 (入っていなければ nil)。Space は変換のキーなので、区間分けには現れない。
+    public static func problem(typed: String) -> String? {
+        typed.contains { $0.isWhitespace } ? "空白は打てません (Space は変換のキーです)" : nil
+    }
     public static func clipBefore(_ text: String) -> String { clip(text, tail: true) }
     public static func clipAfter(_ text: String) -> String { clip(text, tail: false) }
 

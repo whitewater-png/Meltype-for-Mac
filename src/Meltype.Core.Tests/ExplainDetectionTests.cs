@@ -12,8 +12,34 @@ namespace Meltype.Tests;
 /// </summary>
 internal static class ExplainDetectionTests
 {
-    private static string Explain(string typed, LanguageMemory memory, string before = "", string after = "", DetectionLevel level = DetectionLevel.Balanced, bool kana = false) =>
-        DictionaryManagement.ExplainDetection(typed, before, after, level, kana, CompositionTests.Detector, memory, BuiltInWordChecker.Shared);
+    private static string Explain(string typed, LanguageMemory memory, string before = "", string after = "", DetectionLevel level = DetectionLevel.Balanced) =>
+        DictionaryManagement.ExplainDetection(typed, before, after, level, CompositionTests.Detector, memory, BuiltInWordChecker.Shared);
+
+    /// <summary>
+    /// 同じ入力を IME の本体 (CompositionController) に 1 キーずつ打ったときの、確定する前の区間 (ExplainDetection の 1 行目と同じ書き方)。
+    /// 学習 (memory)・スペルチェッカー (同梱の表) は、画面の判定と同じものを判定器に付けて打つ。
+    /// </summary>
+    private static string TypedIntoIme(string typed, LanguageMemory memory, string before, string after, DetectionLevel level)
+    {
+        var detector = CompositionTests.Detector;
+        var savedMemory = detector.Memory;
+        var savedChecker = detector.SpellChecker;
+        try
+        {
+            detector.Memory = memory;
+            detector.SpellChecker = BuiltInWordChecker.Shared;
+            var keyboard = new CompositionTests.Keyboard { Level = level };
+            keyboard.Host.PrecedingText = before.Length == 0 ? null : before;
+            keyboard.Host.FollowingText = after.Length == 0 ? null : after;
+            keyboard.Type(typed);
+            return string.Join('|', keyboard.Controller.AutomaticSegments().Select(s => s.IsEnglish ? "EN:" + s.Raw : "JA:" + s.Kana));
+        }
+        finally
+        {
+            detector.Memory = savedMemory;
+            detector.SpellChecker = savedChecker;
+        }
+    }
 
     private static string Segments(string result) => result.Split('\n').First(l => l.StartsWith("segments\t", StringComparison.Ordinal))["segments\t".Length..];
 
@@ -153,7 +179,7 @@ internal static class ExplainDetectionTests
         var mine = new LanguageMemory(null);
         detector.Memory = mine;
         detector.SpellChecker = null;
-        DictionaryManagement.ExplainDetection("hello", "", "", DetectionLevel.Balanced, false, detector, memory, checker);
+        DictionaryManagement.ExplainDetection("hello", "", "", DetectionLevel.Balanced, detector, memory, checker);
         Assert.True(ReferenceEquals(detector.Memory, mine) && detector.SpellChecker is null, "渡した判定器の設定は元に戻す");
     }
 
@@ -172,7 +198,72 @@ internal static class ExplainDetectionTests
         }
         Assert.Equal("segments\t", Explain("", empty), "空の入力は区間なし");
         Assert.Equal("segments\t", Explain("   ", empty), "空白だけも区間なし");
+        Assert.Equal("segments\t", Explain("kyou ha", empty), "空白の入った入力は判定しない (Space は変換のキー)");
         Assert.True(Segments(Explain(new string('a', 5000), empty)).Length > 0, "長すぎる入力も落ちない");
+    }
+
+    [Test]
+    public static void BeforeEnglish_ChangesResult()
+    {
+        var empty = new LanguageMemory(null);
+        // repo は前に何も無ければ「れぽ」。前が英語 (meeting) なら repo のまま
+        var result = Explain("repo", empty);
+        Assert.Equal("JA:れぽ", Segments(result), "前の文字が無いと日本語");
+        var variant = Variant(result, "before-english");
+        Assert.True(variant is { } && variant[2] == "EN:repo" && variant[3] == "1", "前の文字が英語なら結果が変わる: " + string.Join("\t", variant ?? []));
+        Assert.Equal("EN:repo", Segments(Explain("repo", empty, before: "meeting")), "実際に前が英語なら、1 行目もその答え");
+    }
+
+    [Test]
+    public static void MemoryWithout_TriesEveryLearnedWordInTyped()
+    {
+        var path = TempFile(out var cleanup);
+        try
+        {
+            // 2 文字の語が 10 語あっても、打った文字に含まれる語はすべて外す条件になる (8 件で打ち切らない)。含まれない語は出ない
+            var words = new[] { "ab", "cd", "ef", "gh", "ij", "kl", "mn", "op", "qr", "st" };
+            var memory = Memory(path, [.. words.Select(w => (w, true)), ("zz", true)]);
+            var result = Explain("abcdefghijklmnopqrst", memory);
+            foreach (var word in words) Assert.True(Variant(result, "memory-without:" + word) is not null, word + " を外す条件がある");
+            Assert.True(Variant(result, "memory-without:zz") is null, "含まれない語は出さない");
+            Assert.Equal(10, result.Split('\n').Count(l => l.StartsWith("variant\tmemory-without:", StringComparison.Ordinal)), "全部で 10 件");
+        }
+        finally { cleanup(); }
+    }
+
+    [Test]
+    public static void SegmentsMatchTheImeTypedOneKeyAtATime()
+    {
+        var path = TempFile(out var cleanup);
+        try
+        {
+            var empty = new LanguageMemory(null);
+            var learned = Memory(path, ("api", true), ("sushi", false));
+            // (学習, 前の文字, 後ろの文字) の 3 通り × 入力のいくつか。画面の答え (ExplainDetection の 1 行目) = IME の答え
+            var scenarios = new (string Name, LanguageMemory Memory, string Before, string After)[]
+            {
+                ("前の文字あり (日本語)", empty, "今日は", ""),
+                ("前の文字あり (英語)", empty, "meeting ", "です"),
+                ("学習あり", learned, "", ""),
+                ("なし", empty, "", ""),
+            };
+            var inputs = new[] { "repo", "sushi", "api", "kyouhasushidesu", "apiwotsukau", "kyouhagithubwotsukau", "meetingwoshimasu", "nihongo", "hello" };
+            foreach (var (name, memory, before, after) in scenarios)
+            {
+                foreach (var level in new[] { DetectionLevel.Balanced, DetectionLevel.Aggressive })
+                {
+                    foreach (var typed in inputs)
+                    {
+                        var ime = TypedIntoIme(typed, memory, before, after, level);
+                        var screen = Segments(Explain(typed, memory, before, after, level));
+                        Assert.Equal(ime, screen, $"{name} / {level} / {typed}");
+                    }
+                }
+            }
+            // 学習が答えに効く例 (一致しているだけでなく、学習の有無で違う答えを比べている)
+            Assert.True(TypedIntoIme("apiwotsukau", learned, "", "", DetectionLevel.Balanced) != TypedIntoIme("apiwotsukau", empty, "", "", DetectionLevel.Balanced), "学習ありと無しで IME の答えが違う例");
+        }
+        finally { cleanup(); }
     }
 
     [Test]

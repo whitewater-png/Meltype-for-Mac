@@ -26,7 +26,7 @@ private typealias Text2FlagFunction = @convention(c) (UnsafePointer<CChar>?, Uns
 private typealias TextFlagTextFunction = @convention(c) (UnsafePointer<CChar>?, Int32, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 private typealias WordCheckerCallback = @convention(c) (UnsafePointer<CChar>?) -> Int32
 private typealias SetWordCheckerFunction = @convention(c) (WordCheckerCallback?) -> Void
-private typealias ExplainFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, Int32, Int32) -> UnsafeMutablePointer<CChar>?
+private typealias ExplainFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, Int32) -> UnsafeMutablePointer<CChar>?
 private typealias TermEditFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
 
 /// 辞書の管理画面が使う操作 (本物は NativeDictionary。--self-test は偽物でも確かめる)。理由の文字列は、だめなときだけ (画面にそのまま出す)。
@@ -56,6 +56,7 @@ public protocol DictionaryOperations: AnyObject {
 
 /// libMeltypeNative.dylib を読み込んで、ユーザー辞書・専門用語集を操作する (中身は C# の DictionaryManagement / UserDictionary / TermDomains)。
 /// 関数はどれも、C# 側でロックしているので、どのスレッドから呼んでもよい (専門用語の一覧は重いので裏のスレッドで呼ぶ)。
+/// ただし explainDetection だけはメインスレッド専用 (NSSpellChecker を呼ぶため)。
 public final class NativeDictionary: DictionaryOperations, LearnedWordOperations, DetectionExplainOperations {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion・IME の NativeCore.expectedAbiVersion と必ず同じにする。
     public static let expectedAbiVersion: Int32 = 10
@@ -448,10 +449,11 @@ public final class NativeDictionary: DictionaryOperations, LearnedWordOperations
         setWordCheckerFunction(callback)
     }
 
-    public func explainDetection(typed: String, before: String, after: String, level: DetectionStrength, kanaInput: Bool) -> String? {
+    /// メインスレッド専用 (登録した英単語の関数が NSSpellChecker を呼ぶため。ほかのスレッドでは同梱の英単語表の答えになる)。
+    public func explainDetection(typed: String, before: String, after: String, level: DetectionStrength) -> String? {
         typed.withCString { typedPointer in
             before.withCString { beforePointer in
-                after.withCString { take(explainFunction(typedPointer, beforePointer, $0, level.rawValue, kanaInput ? 1 : 0)) }
+                after.withCString { take(explainFunction(typedPointer, beforePointer, $0, level.rawValue)) }
             }
         }
     }

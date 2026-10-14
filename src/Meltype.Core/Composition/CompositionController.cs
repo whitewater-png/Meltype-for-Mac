@@ -330,6 +330,9 @@ public sealed class CompositionController
     }
 
     /// <summary>変換ボックスに入力中か、英数状態で打ち始めの語を判定中か。</summary>
+    /// <summary>今の変換ボックスの、確定する前 (Enter の前) の自動の区間分け (「判定を調べる」の答えと突き合わせるテスト用)。</summary>
+    internal IReadOnlyList<CompositionSegment> AutomaticSegments() => _text.Segments(final: true);
+
     public bool IsComposing => !_text.IsEmpty || _heldLetters.Length > 0 || _headCount > 0;
 
     /// <summary>直近に確定した文字列 (テスト・ログ用)。</summary>

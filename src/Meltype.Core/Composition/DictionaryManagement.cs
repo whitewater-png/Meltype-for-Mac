@@ -167,7 +167,7 @@ internal static class DictionaryManagement
     });
 
     /// <summary>
-    /// 打ったローマ字 (typed) が、前の文字 (before)・後ろの文字 (after)・判定の強さ (level)・かな入力か (kanaInput) の下で
+    /// 打ったローマ字 (typed) が、前の文字 (before)・後ろの文字 (after)・判定の強さ (level) の下で
     /// どう英語 / 日本語に分かれるか (確定する前の区間分け) と、条件を 1 つだけ変えたときに結果が変わるかを返す。
     /// Mac の判定は理由を持たない (bool を返すだけ) ので、理由を作らず、同じ入力を条件を変えて判定し直して比べる (切り分け)。
     /// 形は 1 行 1 件・欄は Tab 区切り:
@@ -176,12 +176,15 @@ internal static class DictionaryManagement
     ///   memory-pending \t 語 (学習したが 2 回目を待っていて、まだ効いていない語)
     /// 条件は memory-off・memory-without:語・before-english/japanese/none・after-english/none・level:強さ。1 つずつ変え、組み合わせない。
     /// languages.json は読むだけで変えない (学習した語を外すのはメモリ上の写しで試す)。
+    /// ローマ字入力としてだけ調べる (かな入力は IME が別の組み立て方 = AppendKana をするので、同じ答えにならない。常に KanaInput = false)。
+    /// 打った文字に空白は入れない (Space は変換のキーなので、区間分けに現れない。画面が先に断る)。
+    /// 外部のスペルチェッカー (Mac の NSSpellChecker) を呼びうるので、メインスレッドから呼ぶこと (呼び元の Swift が守る)。
     /// </summary>
-    public static string ExplainDetection(string typed, string before, string after, DetectionLevel level, bool kanaInput) =>
-        ExplainDetection(typed, before, after, level, kanaInput, s_explainDetector.Value, Languages, ExternalWordChecker ?? Detection.BuiltInWordChecker.Shared);
+    public static string ExplainDetection(string typed, string before, string after, DetectionLevel level) =>
+        ExplainDetection(typed, before, after, level, s_explainDetector.Value, Languages, ExternalWordChecker ?? Detection.BuiltInWordChecker.Shared);
 
     /// <summary>判定器・学習・スペルチェッカーを渡す版 (テストが一時フォルダーの学習で確かめる。渡した判定器の Memory・SpellChecker は、終わったら元に戻す)。</summary>
-    internal static string ExplainDetection(string typed, string before, string after, DetectionLevel level, bool kanaInput,
+    internal static string ExplainDetection(string typed, string before, string after, DetectionLevel level,
         CompositionDetector detector, LanguageMemory memory, Detection.IWordChecker spellChecker)
     {
         // 打つ文字は長くても数十文字。際限なく長いと判定し直しの回数が膨らむので、画面の入力欄の上限を超えたぶんは読まない。
@@ -191,7 +194,8 @@ internal static class DictionaryManagement
         before = Tail(before ?? "", ContextLength);
         after = Head(after ?? "", ContextLength);
         var lines = new List<string>();
-        if (typed.Length == 0) return "segments\t";
+        // Space は変換のキーなので、空白の入った入力は IME の区間分けにならない (画面が先に断るが、本体でも判定しない)
+        if (typed.Length == 0 || typed.Any(char.IsWhiteSpace)) return "segments\t";
 
         lock (s_explainGate)
         {
@@ -201,7 +205,7 @@ internal static class DictionaryManagement
             {
                 detector.SpellChecker = spellChecker;
                 detector.Memory = memory;
-                var baseline = Segmented(detector, typed, before, after, level, kanaInput);
+                var baseline = Segmented(detector, typed, before, after, level);
                 lines.Add("segments\t" + baseline);
 
                 void Variant(string name, string segments) =>
@@ -209,29 +213,31 @@ internal static class DictionaryManagement
 
                 // 学習した語: 全部外す / 区間に含まれる語を 1 つずつ外す
                 detector.Memory = null;
-                Variant("memory-off", Segmented(detector, typed, before, after, level, kanaInput));
-                var raws = SegmentRaws(detector, typed, before, after, level, kanaInput, memory);
+                Variant("memory-off", Segmented(detector, typed, before, after, level));
+                var raws = SegmentRaws(detector, typed, before, after, level, memory);
                 var learned = memory.Entries();
-                foreach (var word in learned.Where(e => e.Active && raws.Any(r => r.Contains(e.Word, StringComparison.Ordinal)))
-                             .Select(e => e.Word).OrderByDescending(w => w.Length).ThenBy(w => w, StringComparer.Ordinal).Take(8))
+                // 打った文字全体 (小文字) に含まれる学習した語をすべて試す (区間の境目をまたぐ語も拾う。長い語が先。多いときの折りたたみは画面側)
+                var lowerTyped = typed.ToLowerInvariant();
+                foreach (var word in learned.Where(e => e.Active && lowerTyped.Contains(e.Word, StringComparison.Ordinal))
+                             .Select(e => e.Word).OrderByDescending(w => w.Length).ThenBy(w => w, StringComparer.Ordinal))
                 {
                     detector.Memory = memory.CopyWithout(w => w == word);
-                    Variant("memory-without:" + word, Segmented(detector, typed, before, after, level, kanaInput));
+                    Variant("memory-without:" + word, Segmented(detector, typed, before, after, level));
                 }
                 detector.Memory = memory;
 
                 // 前後の文字: 今と同じ分類の条件は試さない (変わりようがない)
                 var beforeNow = CompositionController.LanguageOf(before);
-                if (beforeNow != true) Variant("before-english", Segmented(detector, typed, "meeting", after, level, kanaInput));
-                if (beforeNow != false) Variant("before-japanese", Segmented(detector, typed, "今日は", after, level, kanaInput));
-                if (beforeNow != null) Variant("before-none", Segmented(detector, typed, "", after, level, kanaInput));
+                if (beforeNow != true) Variant("before-english", Segmented(detector, typed, "meeting", after, level));
+                if (beforeNow != false) Variant("before-japanese", Segmented(detector, typed, "今日は", after, level));
+                if (beforeNow != null) Variant("before-none", Segmented(detector, typed, "", after, level));
                 var afterNow = CompositionController.LanguageOfStart(after);
-                if (afterNow != true) Variant("after-english", Segmented(detector, typed, before, "meeting", level, kanaInput));
-                if (afterNow != null) Variant("after-none", Segmented(detector, typed, before, "", level, kanaInput));
+                if (afterNow != true) Variant("after-english", Segmented(detector, typed, before, "meeting", level));
+                if (afterNow != null) Variant("after-none", Segmented(detector, typed, before, "", level));
 
                 foreach (var other in Enum.GetValues<DetectionLevel>().Where(l => l != level))
                 {
-                    Variant("level:" + other, Segmented(detector, typed, before, after, other, kanaInput));
+                    Variant("level:" + other, Segmented(detector, typed, before, after, other));
                 }
 
                 foreach (var entry in learned.Where(e => !e.Active && raws.Any(r => r.Contains(e.Word, StringComparison.Ordinal))).Take(8))
@@ -249,22 +255,23 @@ internal static class DictionaryManagement
     }
 
     /// <summary>区間の文字列 (英語は打った英字、日本語はかな)。--segments と同じく CompositionText に 1 文字ずつ入れて、確定する前 (Enter の前) の区間を読む。</summary>
-    private static string Segmented(CompositionDetector detector, string typed, string before, string after, DetectionLevel level, bool kanaInput) =>
-        string.Join('|', SegmentsOf(detector, typed, before, after, level, kanaInput).Select(s => s.IsEnglish ? "EN:" + s.Raw : "JA:" + s.Kana));
+    private static string Segmented(CompositionDetector detector, string typed, string before, string after, DetectionLevel level) =>
+        string.Join('|', SegmentsOf(detector, typed, before, after, level).Select(s => s.IsEnglish ? "EN:" + s.Raw : "JA:" + s.Kana));
 
-    private static List<string> SegmentRaws(CompositionDetector detector, string typed, string before, string after, DetectionLevel level, bool kanaInput, LanguageMemory memory)
+    private static List<string> SegmentRaws(CompositionDetector detector, string typed, string before, string after, DetectionLevel level, LanguageMemory memory)
     {
         detector.Memory = memory;
-        return SegmentsOf(detector, typed, before, after, level, kanaInput).Select(s => s.Raw.ToLowerInvariant()).ToList();
+        return SegmentsOf(detector, typed, before, after, level).Select(s => s.Raw.ToLowerInvariant()).ToList();
     }
 
-    private static IReadOnlyList<CompositionSegment> SegmentsOf(CompositionDetector detector, string typed, string before, string after, DetectionLevel level, bool kanaInput)
+    private static IReadOnlyList<CompositionSegment> SegmentsOf(CompositionDetector detector, string typed, string before, string after, DetectionLevel level)
     {
-        // 前後の文脈は BeginComposition と同じ作り (LanguageOf で分類。日本語か分からなければ null のまま)
+        // 前後の文脈は BeginComposition と同じ作り (LanguageOf で分類。日本語か分からなければ null のまま)。
+        // 前の文字が分類できないときの null は、IME が「直前の確定の向き」を残すのと違って本当に「無し」(この画面には直前の確定が無い。画面の案内に書いてある)。
         var text = new CompositionText(detector)
         {
             Level = () => level,
-            KanaInput = kanaInput,
+            KanaInput = false,
             PrecedingEnglish = CompositionController.LanguageOf(before),
             PrecedingEnglishSentence = CompositionController.IsEnglishSentence(before),
             FollowingEnglish = CompositionController.LanguageOfStart(after),
