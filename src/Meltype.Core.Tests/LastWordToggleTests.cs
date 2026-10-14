@@ -81,8 +81,14 @@ internal static class LastWordToggleTests
         var edit = result.Commits.Single();
         Assert.True(edit.DeleteBefore == 4 && edit.Original == "にほんご" && edit.Text == "nihongo", "消す文字と元の文字を添えて 1 回で置き換える (Swift が確かめられる)");
         Assert.True(result.ToJson().Contains("\"toggle\":true"), "JSON にもトグル由来の印");
-        Assert.Equal(true, e.Memory.Get("nihongo"), "明示的に直したので、次から英字");
+        Assert.True(e.Memory.Get("nihongo") is null, "変換しない確定は文節が分からないので、1 語として曖昧な語 (sushi) でなければ覚えない");
         Assert.True(!e.Session.IsComposing, "変換ボックスは出さない");
+
+        var learned = new Editor();
+        learned.Type("sushi\n");
+        learned.F10();
+        Assert.Equal("sushi", learned.Doc);
+        Assert.Equal(true, learned.Memory.Get("sushi"), "1 語として曖昧な語は、明示的に直したので次から英字");
     }
 
     [Test]
@@ -167,22 +173,22 @@ internal static class LastWordToggleTests
     [Test]
     public static void SecondRule_FirstF10OnCommonJapaneseWordDoesNotLearnYet_AndExplainsOnce()
     {
-        var e = new Editor(commonJapanese: word => word == "nihongo");
-        e.Type("nihongo\n");
+        var e = new Editor(commonJapanese: word => word == "sushi");
+        e.Type("sushi\n");
         e.F10();
-        Assert.Equal("nihongo", e.Doc, "置き換え自体は 1 回目から効く");
-        Assert.True(e.Memory.Get("nihongo") is null, "よく使う日本語は、1 回では英語として覚えない (2 回ルール)");
+        Assert.Equal("sushi", e.Doc, "置き換え自体は 1 回目から効く");
+        Assert.True(e.Memory.Get("sushi") is null, "よく使う日本語は、1 回では英語として覚えない (2 回ルール)");
         Assert.Equal("もう一度英字にすると覚えます", e.Session.TakeSuggestionHint(), "1 回目は案内を出す");
         Assert.True(e.Session.TakeSuggestionHint() is null, "案内は 1 回だけ");
         // もう一度かなにして (Esc で書き戻して)、また同じ語を打って英字にすると覚える
         e.F6();
         e.Esc();
-        Assert.Equal("nihongo", e.Doc, "Esc 1 回で書き戻す");
-        e.Type("nihongo\n");
-        Assert.Equal("nihongoにほんご", e.Doc, "前提: 1 回目は覚えていないので日本語で確定");
+        Assert.Equal("sushi", e.Doc, "Esc 1 回で書き戻す");
+        e.Type("kyouha\nsushi\n");
+        Assert.Equal("sushiきょうはすし", e.Doc, "前提: 1 回目は覚えていないので、日本語の流れでは日本語で確定");
         e.F10();
-        Assert.Equal("nihongonihongo", e.Doc);
-        Assert.Equal(true, e.Memory.Get("nihongo"), "2 回目の英字で覚える");
+        Assert.Equal("sushiきょうはsushi", e.Doc);
+        Assert.Equal(true, e.Memory.Get("sushi"), "2 回目の英字で覚える");
         Assert.True(e.Session.TakeSuggestionHint() is null, "覚えたら案内は出さない");
     }
 
@@ -190,14 +196,14 @@ internal static class LastWordToggleTests
     public static void SecondRule_ExplicitFlipToEnglish_OfCommonJapaneseWord_StillNeedsTwoTimes()
     {
         // 日本語として覚えた語 (F6 → Enter) を、うっかり F10 1 回で英語にしない (R43-5。設計 §4-7)
-        var e = new Editor(commonJapanese: word => word == "nihongo");
-        e.Type("nihongo\n");
+        var e = new Editor(commonJapanese: word => word == "sushi");
+        e.Type("sushi\n");
         e.F10();
         e.F6();
         e.Enter();
-        Assert.Equal(false, e.Memory.Get("nihongo"), "前提: 日本語として覚えた");
+        Assert.Equal(false, e.Memory.Get("sushi"), "前提: 日本語として覚えた");
         e.F10();
-        Assert.True(e.Memory.Get("nihongo") is null, "F10 を 1 回押しただけでは、英語として効かない (2 回ルール)");
+        Assert.True(e.Memory.Get("sushi") is null, "F10 を 1 回押しただけでは、英語として効かない (2 回ルール)");
     }
 
     [Test]
@@ -285,14 +291,14 @@ internal static class LastWordToggleTests
     public static void CancelToggle_RestoresRecordAndLearning_AfterF10()
     {
         var e = new Editor();
-        e.Type("nihongo\n");
+        e.Type("sushi\n");
         var result = e.Session.HandleKey(VirtualKeys.F10, null, false, false, false, false, e.Doc);
-        Assert.True(result.Consumed && result.Toggle && e.Memory.Get("nihongo") == true, "前提: 直して学習した (Swift は edit を当てない)");
+        Assert.True(result.Consumed && result.Toggle && e.Memory.Get("sushi") == true, "前提: 直して学習した (Swift は edit を当てない)");
         e.Cancel();
-        Assert.True(e.Memory.Get("nihongo") is null, "取り消したので学習も戻る");
+        Assert.True(e.Memory.Get("sushi") is null, "取り消したので学習も戻る");
         Assert.True(e.Session.TakeSuggestionHint() is null, "案内も残さない");
         Assert.True(!e.F10().Consumed, "取消のあとは記録を捨てる (R43-7)");
-        Assert.Equal("にほんご", e.Doc);
+        Assert.Equal("すし", e.Doc);
     }
 
     [Test]
@@ -402,6 +408,179 @@ internal static class LastWordToggleTests
         e.Enter();
         Assert.True(e.Doc.StartsWith("hello あぴ", StringComparison.Ordinal) && e.Doc.EndsWith(" ", StringComparison.Ordinal), "末尾の空白は消えない: " + e.Doc);
         Assert.Equal(false, e.Memory.Get("api"), "続けて打っても、Enter で日本語として学習する");
+    }
+
+    /// <summary>判定が Editor の学習を引くように、共有の検出器に付ける (テストの後で外す)。</summary>
+    private static void WithMemory(Editor e, Action body)
+    {
+        CompositionTests.Detector.Memory = e.Memory;
+        try { body(); }
+        finally { CompositionTests.Detector.Memory = null; }
+    }
+
+    [Test]
+    public static void F6_Enter_LearnsEachEnglishWord_NotTheWholeTyping()
+    {
+        // 実機の不具合 B: kyouhasushidesu → F6 → Enter で、まるごと (kyouhasushidesu) を覚えても、判定は区間の語 (sushi) で引くので効かなかった
+        var e = new Editor();
+        WithMemory(e, () =>
+        {
+            e.Memory.Remember("sushi", english: true, explicitChoice: true);
+            e.Type("kyouhasushidesu\n");
+            Assert.Equal("きょうはsushiです", e.Doc, "前提: sushi は英語として覚えてあるので、英語の区間になる: " + e.Doc);
+            e.F6();
+            e.Enter();
+            Assert.Equal("きょうはすしです", e.Doc, "F6 → Enter で日本語に");
+            Assert.Equal(false, e.Memory.Get("sushi"), "英語だった区間の語 (sushi) を日本語として覚える");
+            Assert.True(e.Memory.Get("kyouhasushidesu") is null, "確定 1 回分まるごとは覚えない");
+            e.Type("kyouhasushidesu\n");
+            Assert.Equal("きょうはすしです" + "きょうはすしです", e.Doc, "もう一度打つと、sushi の区間も日本語になる: " + e.Doc);
+        });
+    }
+
+    [Test]
+    public static void F10_LearnsOnlyWhenTheCommitIsOneJapaneseSegment()
+    {
+        // 日本語の区間が 1 つだけ: 英字として覚える。もう一度打っても英字のまま
+        var e = new Editor();
+        WithMemory(e, () =>
+        {
+            e.Type("sushi\n");
+            e.F10();
+            Assert.Equal(true, e.Memory.Get("sushi"), "日本語 1 区間の確定は覚える");
+            e.Type("sushi\n");
+            Assert.Equal("sushisushi", e.Doc, "もう一度打っても英字のまま: " + e.Doc);
+        });
+
+        // 英語と日本語が混ざった確定: どの語を覚えるか決められないので何も覚えない (案内も出さない)
+        var mixed = new Editor();
+        WithMemory(mixed, () =>
+        {
+            mixed.Type("kyouhaSushidesu\n");
+            Assert.True(mixed.F10().Toggle, "前提: 混ざった確定でも F10 は効く");
+            Assert.Equal("kyouhaSushidesu", mixed.Doc);
+            Assert.True(mixed.Memory.Get("sushi") is null && mixed.Memory.Get("kyouha") is null && mixed.Memory.Get("kyouhasushidesu") is null && mixed.Memory.Get("desu") is null, "何も覚えない");
+            Assert.True(mixed.Session.TakeSuggestionHint() is null, "学習しないので 2 回ルールの案内も出さない");
+        });
+    }
+
+    [Test]
+    public static void F6_Enter_AfterSpaceCommit_LearnsTheEnglishWord()
+    {
+        // 査読 R44-1: Space で確定する経路 (今日はsushi + 空白) でも、F6 → Enter で sushi を日本語として覚える
+        var e = new Editor();
+        WithMemory(e, () =>
+        {
+            e.Memory.Remember("sushi", english: true, explicitChoice: true);
+            e.Type("kyouhasushi ");
+            Assert.Equal("きょうはsushi ", e.Doc, "前提: sushi は英語の区間のまま Space で確定: " + e.Doc);
+            e.F6();
+            e.Enter();
+            Assert.Equal("きょうはすし ", e.Doc, "F6 → Enter で日本語に: " + e.Doc);
+            Assert.Equal(false, e.Memory.Get("sushi"), "Space の確定でも、英語だった区間の語を日本語として覚える");
+            Assert.True(e.Memory.Get("kyouhasushi") is null, "確定 1 回分まるごとは覚えない");
+        });
+    }
+
+    [Test]
+    public static void F10_AfterF6Enter_OfAMixedCommit_DoesNotLearnTheWholeTyping()
+    {
+        // 査読 R44-2: kyouhasushidesu → F6 → Enter → F10 で、文まるごとを英語として覚えない
+        var e = new Editor();
+        WithMemory(e, () =>
+        {
+            e.Memory.Remember("sushi", english: true, explicitChoice: true);
+            e.Type("kyouhasushidesu\n");
+            e.F6();
+            e.Enter();
+            Assert.Equal("きょうはすしです", e.Doc, "前提: F6 → Enter で日本語に");
+            var before = e.Memory.Get("sushi");
+            Assert.True(e.F10().Consumed, "前提: 3 秒以内なので F10 は文まるごとを英字に戻す");
+            Assert.Equal("kyouhasushidesu", e.Doc);
+            Assert.True(e.Memory.Get("kyouhasushidesu") is null, "文まるごとを英語として覚えない");
+            Assert.Equal(before, e.Memory.Get("sushi"), "F6 で覚えた sushi はそのまま");
+            Assert.True(e.Session.TakeSuggestionHint() is null, "学習しないので 2 回ルールの案内も出さない");
+        });
+
+        // 区間が 1 つで打った英字まるごと (sushi) を F6 → Enter した後の F10 は、その語を英語として覚え直せる
+        var single = new Editor();
+        WithMemory(single, () =>
+        {
+            single.Memory.Remember("sushi", english: true, explicitChoice: true);
+            single.Type("sushi\n");
+            single.F6();
+            single.Enter();
+            Assert.Equal("すし", single.Doc);
+            single.F10();
+            Assert.Equal("sushi", single.Doc);
+            Assert.Equal(true, single.Memory.Get("sushi"), "区間が 1 つで打った英字まるごとなら、F10 で英語として覚え直せる");
+        });
+    }
+
+    [Test]
+    public static void F6_Enter_AfterF10_OfAMixedCommit_StillLearnsTheEnglishWord()
+    {
+        // 査読 R44-9: F10 → F6 → Enter でも、元の英語の区間 (sushi) を日本語として覚える
+        var e = new Editor();
+        WithMemory(e, () =>
+        {
+            e.Memory.Remember("sushi", english: true, explicitChoice: true);
+            e.Type("kyouhasushidesu\n");
+            Assert.True(e.F10().Toggle, "前提: 混ざった確定でも F10 は効く");
+            Assert.Equal("kyouhasushidesu", e.Doc);
+            e.F6();
+            e.Enter();
+            Assert.Equal("きょうはすしです", e.Doc, "F10 を挟んでも F6 → Enter で日本語に");
+            Assert.Equal(false, e.Memory.Get("sushi"), "F10 を挟んでも、英語だった区間の語を日本語として覚える");
+            Assert.True(e.Memory.Get("kyouhasushidesu") is null, "まるごとは覚えない");
+        });
+    }
+
+    [Test]
+    public static void F6_Enter_AdjacentEnglishWords_AreLearnedOneByOne()
+    {
+        // 査読 R44-3: 続く英語の語はつなげない (判定は語ごとに学習を引く)
+        var e = new Editor();
+        WithMemory(e, () =>
+        {
+            e.Memory.Remember("sushi", english: true, explicitChoice: true);
+            e.Memory.Remember("ramen", english: true, explicitChoice: true);
+            e.Type("kyouhasushiramen\n");
+            Assert.Equal("きょうはsushiramen", e.Doc, "前提: 続く英語の語はどちらも英語の区間: " + e.Doc);
+            e.F6();
+            e.Enter();
+            Assert.Equal(false, e.Memory.Get("sushi"), "語ごとに日本語として覚える (sushi)");
+            Assert.Equal(false, e.Memory.Get("ramen"), "語ごとに日本語として覚える (ramen)");
+            Assert.True(e.Memory.Get("sushiramen") is null, "つないだ語 (sushiramen) は覚えない");
+        });
+    }
+
+    [Test]
+    public static void F10_AfterCommit_LearnsOnlyOneWord()
+    {
+        // 査読 R44-8: 変換して確定したなら日本語の文節が 1 つのときだけ、変換しない確定は 1 語として曖昧な語のときだけ覚える
+        var one = new Editor();
+        one.Type("atsui ");
+        one.Enter();
+        Assert.Equal("熱い", one.Doc, "前提: 文節 1 つで変換して確定");
+        one.F10();
+        Assert.Equal(true, one.Memory.Get("atsui"), "変換して確定した日本語の文節が 1 つなら、F10 で覚える");
+
+        var two = new Editor();
+        two.Type("hiruka ");
+        two.Enter();
+        Assert.Equal("昼か", two.Doc, "前提: 文節 2 つで変換して確定");
+        Assert.True(two.F10().Toggle, "前提: F10 そのものは効く");
+        Assert.Equal("hiruka", two.Doc);
+        Assert.True(two.Memory.Get("hiruka") is null, "文節が 2 つ以上なら文として扱い、覚えない");
+        Assert.True(two.Session.TakeSuggestionHint() is null, "案内も出さない");
+
+        // 変換しない確定 (文節が分からない): 1 語として曖昧な語 (sushi) でなければ覚えない
+        var sentence = new Editor();
+        sentence.Type("kyouhasamui\n");
+        Assert.True(sentence.F10().Toggle, "前提: F10 そのものは効く");
+        Assert.True(sentence.Memory.Get("kyouhasamui") is null, "曖昧な語でないので覚えない");
+        Assert.True(sentence.Session.TakeSuggestionHint() is null, "案内も出さない");
     }
 
     [Test]
