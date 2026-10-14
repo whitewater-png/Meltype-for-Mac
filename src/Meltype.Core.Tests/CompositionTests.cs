@@ -1165,6 +1165,69 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void AutoCorrect_NotAfterAnExplicitChoice_F10_F6_Tab()
+    {
+        // 利用者が F10 / F6 / Tab ではっきり決めた確定は、後ろの語を見て自動で確定し直さない。
+        // 対照: 決めていない確定は、後ろの語で書き戻される (どの対照も、実際に消して入れ直す: bs: が出る)
+        var plainEnglish = new Keyboard();
+        plainEnglish.Host.PrecedingText = "I love ";
+        plainEnglish.Type("sushi ");
+        Assert.Equal("sushi ", plainEnglish.Host.Document, "前提: 前が英語なので英語で確定");
+        plainEnglish.Host.PrecedingText = null;
+        plainEnglish.Type("gasuki\n");
+        Assert.Equal("すしがすき", plainEnglish.Host.Document, "対照: 後ろに日本語が続いたので書き戻す");
+        Assert.True(plainEnglish.Host.Events.Any(e => e.StartsWith("bs:")), "対照: 実際に消して入れ直す: " + string.Join("|", plainEnglish.Host.Events));
+
+        var plainKana = new Keyboard();
+        plainKana.Type("i ");
+        plainKana.Type("want ");
+        Assert.Equal("I want ", plainKana.Host.Document, "対照: 後ろに英語が続いたので書き戻す");
+        Assert.True(plainKana.Host.Events.Any(e => e.StartsWith("bs:")), "対照: 実際に消して入れ直す: " + string.Join("|", plainKana.Host.Events));
+
+        // F10 で英字にして確定した sushi は、後ろの日本語で「すし」に書き戻さない
+        var f10 = new Keyboard();
+        f10.Host.PrecedingText = "I love ";
+        f10.Type("sushi");
+        f10.Press(VirtualKeys.F10);
+        f10.Type(" ");
+        Assert.Equal("sushi ", f10.Host.Document, "前提: F10 で英字のまま確定");
+        f10.Host.PrecedingText = null;
+        f10.Type("gasuki\n");
+        Assert.True(!f10.Host.Events.Any(e => e.StartsWith("bs:")), "F10 で決めた確定は書き戻さない: " + string.Join("|", f10.Host.Events));
+        Assert.True(f10.Host.Document.StartsWith("sushi ", StringComparison.Ordinal), "sushi のまま: " + f10.Host.Document);
+
+        // F6 でかなにして確定した「い」は、後ろの英語で I に書き戻さない
+        var plainEnter = new Keyboard();
+        plainEnter.Type("i\n");
+        Assert.Equal("い", plainEnter.Host.Document, "前提: 単独の i は Enter でかなのまま確定");
+        plainEnter.Type("want ");
+        Assert.Equal("Iwant ", plainEnter.Host.Document, "対照: F6 を押さなければ、後ろに英語が続いたので I に書き戻す: " + string.Join("|", plainEnter.Host.Events));
+        Assert.True(plainEnter.Host.Events.Any(e => e.StartsWith("bs:")), "対照: 実際に消して入れ直す");
+        var f6 = new Keyboard();
+        f6.Type("i");
+        f6.Press(VirtualKeys.F6);
+        f6.Press(VirtualKeys.Return);
+        Assert.Equal("い", f6.Host.Document, "前提: F6 でかなのまま確定");
+        f6.Type("want ");
+        Assert.True(!f6.Host.Events.Any(e => e.StartsWith("bs:")), "F6 で決めた確定は書き戻さない: " + string.Join("|", f6.Host.Events));
+        Assert.True(f6.Host.Document.StartsWith("い", StringComparison.Ordinal), "い のまま: " + f6.Host.Document);
+
+        // 判定の強さが手動のとき、Tab で受けた提案 (LevelOverride) の確定も、書き戻さない
+        var tab = new Keyboard { Level = Meltype.Config.DetectionLevel.Manual };
+        tab.Host.PrecedingText = "I love ";
+        tab.Type("sushi");
+        Assert.Equal("すし", tab.Showing, "前提: 手動の強さでは日本語のまま (英字は Tab の提案)");
+        tab.Press(VirtualKeys.Tab);
+        Assert.Equal("sushi", tab.Showing, "前提: Tab で提案どおり英字に");
+        tab.Type(" ");
+        Assert.Equal("sushi ", tab.Host.Document, "前提: Tab で英字のまま確定");
+        tab.Host.PrecedingText = null;
+        tab.Type("gasuki\n");
+        Assert.True(!tab.Host.Events.Any(e => e.StartsWith("bs:")), "Tab で決めた確定は書き戻さない: " + string.Join("|", tab.Host.Events));
+        Assert.True(tab.Host.Document.StartsWith("sushi ", StringComparison.Ordinal), "sushi のまま: " + tab.Host.Document);
+    }
+
+    [Test]
     public static void AutoCorrect_NotAfterCaretMoved()
     {
         var k = new Keyboard();

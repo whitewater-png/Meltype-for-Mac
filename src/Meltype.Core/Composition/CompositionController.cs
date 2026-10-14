@@ -983,8 +983,8 @@ public sealed class CompositionController
                 {
                     Commit(suffix: " ", fixEnglish: true);
                 }
-                else if (EndsWithEnglish(final: true)) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + " ", english: true, _text.Raw, hasEnglish: true, hasJapanese: _text.Segments(final: true).Any(s => !s.IsEnglish));
-                else if (_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level())) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.Raw) + " ", english: true, _text.Raw, hasEnglish: true);
+                else if (EndsWithEnglish(final: true)) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + " ", english: true, _text.Raw, ChosenByUser(clausesInUse: true), hasEnglish: true, hasJapanese: _text.Segments(final: true).Any(s => !s.IsEnglish));
+                else if (_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level())) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.Raw) + " ", english: true, _text.Raw, ChosenByUser(clausesInUse: true), hasEnglish: true);
                 else
                 {
                     // Space で変換した = 語の後に空白を打とうとした、とも取れる (確定し直して英語にするときに空白を足す)。
@@ -2292,7 +2292,9 @@ public sealed class CompositionController
         // 確定後の F10 / F6 の対象: 英語の区間・日本語の区間があるか (確定 1 回分まるごと)
         var hasEnglish = english || (converting ? _clauses.Any(c => c.IsEnglish) : _text.Mode == DisplayMode.Auto && _text.Segments(final: true).Any(s => s.IsEnglish));
         var hasJapanese = !english && (converting ? _clauses.Any(c => !c.IsEnglish) : _text.Mode != DisplayMode.Auto || _text.Segments(final: true).Any(s => !s.IsEnglish));
-        var chosen = (converting || fixedOnly) && _clauses.Any(c => c.Changed);
+        // 利用者がはっきり決めた確定 (候補を選び直した・F6〜F10 で表示を変えた・Tab で手動の提案を受けた) は、後ろの語を見て自動で確定し直さない
+        // (sushi を F10 で英字にして確定したのに、次の「です」で「すし」に書き戻されていた)
+        var chosen = ChosenByUser(converting || fixedOnly);
         // 確定後の F6 で開いた変換ボックス (読みは打った英字から作ったかな。Raw は変換ボックスの中身ではなく、元の英字を使う)。
         // 続けて打って文節を固定していても (ContinueAfterConversion)、控えがあれば末尾の空白を戻す
         var toggle = _toggleBox;
@@ -2308,6 +2310,13 @@ public sealed class CompositionController
         if (toggle is not null && !implicitly) _options.Languages?.Remember(toggle.Raw, english: false, explicitChoice: true);
         CommitText(text + (suffix.Length > 0 ? suffix : toggle?.Tail ?? ""), english, toggle?.Raw ?? _text.Raw, chosen, hasEnglish, hasJapanese);
     }
+
+    /// <summary>
+    /// 利用者がはっきり決めた確定か (候補を選び直した・F6〜F10 で表示を変えた・Tab で手動の提案を受けた)。決めた確定は、後ろの語を見て自動で確定し直さない。
+    /// clausesInUse = 文節が確定の中身になっているか (変換中・固定した文節あり)。
+    /// </summary>
+    private bool ChosenByUser(bool clausesInUse) =>
+        (clausesInUse && _clauses.Any(c => c.Changed)) || _text.Mode != DisplayMode.Auto || _text.LevelOverride is not null;
 
     /// <summary>
     /// 英単語で終わる文字列の最後の語が、よくある打ち間違い (teh、recieve) なら正しい綴りにする (Space で確定するとき)。
