@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Yukishiro
 
+using Meltype.Composition;
 using Meltype.Input;
 
 namespace Meltype.Tests;
@@ -268,6 +269,79 @@ internal static class CommitFirstSoundTests
             k.Press(VirtualKeys.Space);
             Assert.Equal(expected, k.Host.Document, $"{typed}: Space で確定して空白");
             Assert.True(k.Host.View is null, $"{typed}: 変換に入らない");
+        }
+    }
+
+    [Test]
+    public static void NumberUnit_StaysAsShown_AfterTheNumberIsCommitted()
+    {
+        // 3 回目の査読: 10 を確定したあとの mm を、数字の後ろの単位と分からず打ち間違いとして直して 10っまで にしていた。
+        var k = new CompositionTests.Keyboard();
+        k.Type("10mmde");
+        Assert.Equal("10mmで", k.Host.View?.Text, "前提");
+        ShiftDown(k);
+        ShiftDown(k);
+        Assert.Equal("10", k.Host.Document, "数字を確定");
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("10mmで", k.Host.Document, "Enter で見えていたとおり");
+    }
+
+    [Test]
+    public static void BackSpace_DropsTheFrozenLook()
+    {
+        // 3 回目の査読: BackSpace で消したあとに打った文字が、固定した英字と綴りが同じだと英字のままになっていた。
+        foreach (var (typed, back, retyped, expected) in new[]
+                 {
+                     ("kyouhaJapan", 5, "n", "きょうはん"),
+                     ("kyouhaissue", 5, "ika", "きょうはいか"),
+                     ("Google", 5, "oyogu", "Gおよぐ"),
+                     ("Japan", 4, "apa", "Jあぱ"),
+                     ("Japan", 4, "n", "Jん"),
+                 })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed);
+            ShiftDown(k);
+            for (var i = 0; i < back; i++) k.Press(VirtualKeys.Back);
+            k.Type(retyped);
+            k.Press(VirtualKeys.Return);
+            Assert.Equal(expected, k.Host.Document, $"{typed} → Shift+↓ → BackSpace ×{back} → {retyped}");
+        }
+    }
+
+    [Test]
+    public static void Rest_IsNotLearned()
+    {
+        // 3 回目の査読: 1 音確定のあとの F10 + Enter で、語の途中から始まる残り (kanpai の npai) を英字として覚えていた。
+        var memory = new LanguageMemory(null);
+        CompositionTests.Detector.Memory = memory;
+        try
+        {
+            var k = new CompositionTests.Keyboard(languages: memory);
+            k.Type("kanpai");
+            ShiftDown(k);
+            k.Press(VirtualKeys.F10);
+            k.Press(VirtualKeys.Return);
+            Assert.Equal("かnpai", k.Host.Document, "前提: F10 の英字で確定");
+            Assert.Equal(null, memory.Get("npai"), "残りの npai は覚えない");
+
+            var hello = new CompositionTests.Keyboard(languages: memory);
+            hello.Type("Hello");
+            ShiftDown(hello);
+            hello.Press(VirtualKeys.F6);
+            hello.Press(VirtualKeys.Return);
+            Assert.Equal(null, memory.Get("ello"), "F6 の かな でも覚えない");
+
+            // 1 音確定をしなかった次の入力は、今までどおり覚える。
+            var next = new CompositionTests.Keyboard(languages: memory);
+            next.Type("api");
+            next.Press(VirtualKeys.F10);
+            next.Press(VirtualKeys.Return);
+            Assert.Equal(true, memory.Get("api"), "ふつうの確定は覚える");
+        }
+        finally
+        {
+            CompositionTests.Detector.Memory = null;
         }
     }
 }

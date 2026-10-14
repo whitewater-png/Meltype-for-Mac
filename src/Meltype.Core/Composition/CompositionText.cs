@@ -308,11 +308,15 @@ public sealed class CompositionText
     /// <summary>1 音 (または 1 文字) 消す。入力途中の子音があればそれを 1 文字消す。</summary>
     public void RemoveLast()
     {
+        // 1 音確定で固定した見え方は、消した所から後ろを捨てる (消したあとに打った文字は、固定した英字と綴りが同じでも判定し直す)。
+        _frozenPending = null;
         if (_pending.Length > 0) _pending.Length--;
         else if (_units.Count > 0)
         {
+            // 末尾が英字に見えているか (1 文字ずつ消すか) は、固定した見え方のままで決める。
             var englishTail = Mode is DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric ||
                               (Mode == DisplayMode.Auto && Segments() is { Count: > 0 } segments && segments[^1].IsEnglish);
+            if (_frozen is not null) _frozen = _frozen.Take(Math.Min(FrozenCount(_units), _units.Count - 1)).ToList();
             var last = _units[^1];
             _units.RemoveAt(_units.Count - 1);
             // 英字として見せている部分は 1 文字ずつ消す (google の "le" のように 1 音にまとまった単位を丸ごと消さない)。
@@ -326,6 +330,7 @@ public sealed class CompositionText
         {
             Mode = DisplayMode.Auto;
             LevelOverride = null;
+            _frozen = null;
         }
     }
 
@@ -448,7 +453,7 @@ public sealed class CompositionText
 
     /// <summary>入力途中の子音を、1 音確定のときの見え方のまま扱うか (その前の単位 frozen 個がすべて固定のまま)。</summary>
     private bool PendingFrozen(int frozen, int units) =>
-        _frozen is not null && frozen == units && _pending.Length > 0 && _frozenPending is { } p && p.Pending == Pending;
+        _frozen is not null && frozen == units && units == _frozen.Count && _pending.Length > 0 && _frozenPending is { } p && p.Pending == Pending;
 
     private int FrozenCount(IReadOnlyList<CompositionUnit> units)
     {
@@ -978,11 +983,12 @@ public sealed class CompositionText
         // 今の表示で英字に見えている文字 (きょうは|meeting|です の meeting)。ここは直さない
         // (表示では英単語なのに、確定したら g が が に直されて めえちんがです になっていた)。
         var shownEnglish = EnglishMask();
-        // 1 音確定で英字のまま固定した文字 (Google の g を確定したあとの oogle) を含む並びも直さない (知っている語の一部でなくても、英字に見えていたため)。
-        var frozenEnglish = new List<bool>();
+        // 1 音確定で見え方を固定した文字 (Google の g を確定したあとの oogle、10 を確定したあとの mm) を含む並びも直さない
+        // (知っている語の一部でなくても、見えていたまま確定する。数字はもう確定していて、数字の後ろの単位とは分からないため)。
+        var frozenChars = new List<bool>();
         var frozenCount = FrozenCount(_units);
-        for (var i = 0; i < _units.Count; i++) foreach (var _ in _units[i].Raw) frozenEnglish.Add(i < frozenCount && _frozen![i].English);
-        if (PendingFrozen(frozenCount, _units.Count)) foreach (var _ in Pending) frozenEnglish.Add(_frozenPending!.Value.English);
+        for (var i = 0; i < _units.Count; i++) foreach (var _ in _units[i].Raw) frozenChars.Add(i < frozenCount);
+        if (PendingFrozen(frozenCount, _units.Count)) foreach (var _ in Pending) frozenChars.Add(true);
         var offset = 0;
         var start = 0;
         while (start < _units.Count)
@@ -1002,7 +1008,7 @@ public sealed class CompositionText
             // 数字のすぐ後ろの単位 (10|mm|で) は打ち間違いではない
             var unitAfterNumber = start > 0 && _units[start - 1].Raw is [var digit] && char.IsAsciiDigit(digit) &&
                 UnitWords.Any(u => letters.StartsWith(u, StringComparison.OrdinalIgnoreCase));
-            var frozenRun = Enumerable.Range(runOffset, letters.Length).Any(i => i < frozenEnglish.Count && frozenEnglish[i]);
+            var frozenRun = Enumerable.Range(runOffset, letters.Length).Any(i => i < frozenChars.Count && frozenChars[i]);
             if (!unitAfterNumber && !frozenRun && letters.All(char.IsAsciiLetterLower) && !_detector.IsKnownEnglishWord(letters) &&
                 corrector.FirstUnreadable(letters, final: true) is var first and > 0 &&
                 !(runOffset + first < shownEnglish.Count && shownEnglish[runOffset + first]) &&

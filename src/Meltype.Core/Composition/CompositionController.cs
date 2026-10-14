@@ -680,6 +680,8 @@ public sealed class CompositionController
 
     /// <summary>ローマ字の再変換で開いた変換ボックスか (学習しない・Esc / BackSpace でそのまま元に戻す)。</summary>
     private bool _reconvertRomaji;
+    // この入力で 1 音確定 (Shift+↓) をしたか。残りは語の途中からなので、確定のときに学習しない。
+    private bool _firstSoundCommitted;
 
     /// <summary>ローマ字の再変換をやめて、選んでいた元の文字を書き戻す (変換ボックスは閉じる)。</summary>
     private void CancelRomajiReconversion()
@@ -727,6 +729,7 @@ public sealed class CompositionController
         _text.Clear();
         _reconvertOriginal = null;
         _reconvertRomaji = false;
+        _firstSoundCommitted = false;
         _converting = false;
         _clauses = [];
         _headCount = 0;
@@ -1013,6 +1016,7 @@ public sealed class CompositionController
         ResetPrediction();
         _reconvertOriginal = null;
         _reconvertRomaji = false;
+        _firstSoundCommitted = false;
         var id = ++_compositionId;
         // 自分が確定した直後は、アプリ側のテキストがまだ更新されていないかもしれないので自分の記録を信じる。
         var recentOwnCommit = Environment.TickCount64 - _lastCommitTime < OwnCommitTrustMs;
@@ -2185,6 +2189,8 @@ public sealed class CompositionController
         _reconvertOriginal = null;
         // 最後の 1 音なら入力を終える (表示は閉じる)。
         if (_text.IsEmpty) CommitText("", first.English);
+        // 残りは語の途中から始まるので、このあとの確定で英字 / かなの選び方 (F6〜F10) や変換を学習しない (kanpai の npai を英字として覚えない)。
+        else _firstSoundCommitted = true;
         var text = first.Text;
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, null);
         _correctable.Clear();
@@ -2218,6 +2224,7 @@ public sealed class CompositionController
     /// </summary>
     private void LearnLanguage()
     {
+        if (_firstSoundCommitted) return;
         if (_options.Languages is not { } memory) return;
         var raw = _text.Raw;
         if (raw.Length < 2 || !raw.All(char.IsAsciiLetter)) return;
@@ -2408,6 +2415,7 @@ public sealed class CompositionController
     /// <summary>選び直した文節を学習する (次に同じ読みを変換したとき最初の候補にする)。</summary>
     private void Learn()
     {
+        if (_firstSoundCommitted) return;
         // 変換の候補から打ったままの英字 (api) を選んで確定したら、その語は次から英字にする (F10 と同じ)。
         foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Changed && c.Raw is { } raw && c.Text == raw))
         {
@@ -2521,6 +2529,7 @@ public sealed class CompositionController
         _text.Clear();
         _reconvertOriginal = null;
         _reconvertRomaji = false;
+        _firstSoundCommitted = false;
         _converting = false;
         _clauses = [];
         _headCount = 0;
