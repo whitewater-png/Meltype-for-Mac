@@ -2318,3 +2318,29 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **tap の履歴**: 最初の `brew tap-new` の自動コミットに個人のメールアドレスが入っていたので、履歴を書き換えて noreply にして force push した (新規リポジトリで、取得者はいない)。今後 tap で commit するときは `git config user.email` を本体リポジトリと同じ noreply にする。
 - **README・リリース手順**: README の「インストール」の先頭に Homebrew の節を足した。リリースごとの cask の更新 (`tools/update-cask.py` → tap へ写して push。push は Release の公開と同時) は `docs/RELEASE.md`。`tools/check-release.py` が cask の `version` (built app と) と `sha256` (`mac/dist` の zip と) を照合する。
 - **Windows・Linux は対象外** (Mac 版だけ。配布 zip は Apple シリコン・macOS 13 以降のみ)。
+
+## 追加項目 0-5 (既知の制限の仕分けと README の制限節)
+
+- **目的**: [STRATEGY_2026-10.md](STRATEGY_2026-10.md) の施策 0-5。計画書の各節に散らばった「既知の制限」を 1 か所に集め、「仕様 / 直す予定 / 直った / 未確認」に仕分けて、利用者向けの README に短い「制限」節として載せる (「翌日アンインストール」型の失望を減らす)。
+- **作ったもの**: [KNOWN_LIMITS.md](KNOWN_LIMITS.md) (開発者向けの正本。50 行)。README に「## 制限 (知っておいてほしいこと)」(8 行) と、「よくある質問」に 3 問 (ライブ変換との違い・かな入力・明示的な切り替え)。Core・Swift のコードは変えていない。
+- **仕分けの件数**: 仕様 28 / 直す予定 11 / 直った 3 / 未確認 8 (計 50)。「直った」の hash は、作業中に `git log` が承認待ちで止まったため、`a490a09` (Q7・Q8) 以外は未取得。
+- **番号待ちの `候補`**: K02・K03 小文字の人名・名字 (専門用語集に「人名」分野を足すか。Phase 1-1 Zenzai・本家 #487 の経過を見て)、K16 本家の判定修正の残り 28 件 (`-pedia` は前の日本語を巻き込まない条件が先)、K20 空白の無い 1 語の英単語の再変換 (リョウさんの判断待ち、HANDOFF:76)、K33 英単語の前後の空白設定を ON にしたときの二重空白、K40 全角スペースを打つ手段。
+- **全角スペース (K40) の確認**: 入力中でないときの Space は `StartWith` → `ReplayDown` でアプリに渡り、半角スペースが入る。Shift+Space は、選択があれば再変換、無ければ同じく素通し (読み直せない選択では飲み込んで何も起きない)。全角スペースを出す設定・候補は無い。本家 #310 (Shift+Space の全角スペース) はリョウさんが却下済みなので、Shift+Space には割り当てない。**実機では確かめていない** (コードを読んだ範囲)。
+- **半角スペースの再変換 (K41・K42)**: スペースを含むローマ字の文の再変換は P36 で直っている (TextEdit で実機確認済み、2026-10-12)。日本語の確定済みの文字の途中に半角スペースがある場合は、コードを読むと読みに戻せない可能性があるが、再現は取っていない (未確認)。
+- **`--repro` で確かめた打鍵と結果** (2026-10-14、変換エンジンは偽物。Enter で確定した結果):
+  | 打鍵 | 結果 |
+  | --- | --- |
+  | `thanks, yui!` | `thanks, ゆい！` |
+  | `Kyou wa genki desu` | `Kyou わげんきです` |
+  | `tanaka san ni aimasu` | `たなかさんにあいます` |
+  | `Yamada san to hanashimashita` / `yamada san to hanashimashita` | `Yamada さんとはなしました` / `やまださんとはなしました` |
+  | `Node de deploy shimasu` / `Frobnitz de deploy shimasu` | `Node でdeploy します` / `Frobnitz でdeploy します` (HANDOFF:71 の `Node` は再現しない) |
+  | `kyou wa Frobnitz wo tsukatta` / `kyou wa frobnitz wo tsukatta` | `今日わFrobnitz をつかった` / `今日わfrobにtzをつかった` |
+  | `kyou wa mp3 kakeru 5` | `今日わmp3駆ける` |
+  | `ollama run llama3` / `gpt-oss` / `gemma4-27b` | `ollama るんllama3` / `gpt-おっs` / `gemma4-27b` (HANDOFF:72 のうち `gemma4-27b` は直っている) |
+  | `10-ji ni kaigi desu` / `- kyou wa` | `10-じにかいぎです` / `- 今日わ` (Q7 で直っている) |
+  | `maindo` / `pushoyobi` | `まいんど` (途中は `まindo`、Q12) / `ぷしょよび` |
+  | 100 文字超のかな文 | 判定は崩れない (外れるのは 50 文字の区切りをまたぐ文脈だけ) |
+- **README の文言について**: 「語の頭を大文字で打つと英字のまま」は、上の `Yamada`・`Frobnitz`・`Node` で確かめた範囲だけを書いた。本家 USAGE の「Shift を押しながら打てば英語」がそのまま成り立つかは、Shift を押したまま続けた場合を確かめていないので、README には Shift のことを書いていない。
+- **実機について**: 実機・brew・`/Users/ryo/Meltype` には触っていない。
+- **Windows・Linux は対象外** (Mac 版だけ)。
