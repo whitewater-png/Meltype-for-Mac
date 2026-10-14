@@ -96,6 +96,12 @@ public sealed class CompositionOptions
     /// </summary>
     public Func<bool> TokMode { get; init; } = () => false;
 
+    /// <summary>
+    /// 確定した直後の語を直す Ctrl+' (英字) / Ctrl+J (かな) を、F10 / F6 と同じに読み替えるか (MeltypeSession)。
+    /// 既定は false: Ctrl+J はターミナルの改行と重なり、Ctrl は変換ボックスが空ならアプリの操作なので、利用者が選んだときだけ。
+    /// </summary>
+    public Func<bool> ToggleLastWordCtrlKeys { get; init; } = () => false;
+
     /// <summary>英数 (直接入力) 状態か。</summary>
     public Func<bool> DirectMode { get; init; } = () => false;
 
@@ -398,6 +404,7 @@ public sealed class CompositionController
     {
         _spaceStartedConversion = false;
         _correctable.Clear();
+        _lastWord = null;
         if (text.Length == 0) return;
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, null);
         _lastCommitEnglish = english;
@@ -523,6 +530,7 @@ public sealed class CompositionController
         }
         // 選んだことでキャレットは動いている。直前に確定した語を、あとで確定し直さない (確定し直すと、選んだ文字ではなく手前の文字を消す)
         _correctable.Clear();
+        _lastWord = null;
         BeginComposition();
         // 選んだ文字の前後の空白・改行・タブは、置き換えても残す
         var converted = lead
@@ -781,6 +789,8 @@ public sealed class CompositionController
     {
         if (_heldLetters.Length > 0) ReleaseHeldAsEnglish();
         CommitIfAny();
+        // フォーカス外れ・英数キーなどの暗黙の確定は、確定後の F10 / F6 の対象にしない (打った語を自分で確定したわけではない)
+        _lastWord = null;
         UpdateView();
     }
 
@@ -796,6 +806,7 @@ public sealed class CompositionController
         Diagnostics.Log.Warn($"{reason}ので、変換中の入力を取り消しました (移った先に入らないように)。");
         Reset();
         _correctable.Clear();
+        _lastWord = null;
         UpdateView();
         return true;
     }
@@ -806,6 +817,9 @@ public sealed class CompositionController
         _text.Clear();
         _reconvertOriginal = null;
         _reconvertRomaji = false;
+        _toggleBox = null;
+        _toggleUndo = null;
+        _lastWord = null;
         _converting = false;
         _clauses = [];
         _headCount = 0;
@@ -824,6 +838,7 @@ public sealed class CompositionController
         _lastCommitEnglish = null;
         _lastCommitText = null;
         _correctable.Clear();
+        _lastWord = null;
     }
 
     /// <summary>入力言語が対象外になったとき。判定を止め、未処理のキー・クリックは順番どおりに通す。</summary>
@@ -845,6 +860,7 @@ public sealed class CompositionController
         // クリックで別の場所に移る前に、今の位置へ確定しておく。
         CommitPending();
         _correctable.Clear();
+        _lastWord = null;
         _host.Replay(e);
     }
 
@@ -988,6 +1004,8 @@ public sealed class CompositionController
                 {
                     _reconvertOriginal = null;
                     _host.CommitText(original);
+                    // 確定後の F6 で開いた変換ボックスなら、直す前の記録も戻す (学習はまだしていない)
+                    if (_toggleBox is { } box) RestoreToggleBox(box);
                 }
                 return;
             case VirtualKeys.Tab when FindMisspelling() is { } typo:
@@ -1002,6 +1020,10 @@ public sealed class CompositionController
                 // 予測変換: 候補に入る (もしかして・英字への提案が優先)。
                 _predicting = true;
                 _predictionIndex = 0;
+                return;
+            case VirtualKeys.F10 when _toggleBox is not null && _headCount == 0:
+                // 確定後の F6 で開いた変換ボックスで F10: 打った英字どおりに戻す (F10 → F6 → F10 の往復)
+                RevertToggleBox();
                 return;
             case VirtualKeys.F6: SetMode(DisplayMode.Hiragana); return;
             case VirtualKeys.F7: SetMode(DisplayMode.Katakana); return;
@@ -1023,6 +1045,7 @@ public sealed class CompositionController
         if (_text.KanaInput && KanaOf(e) is { } key)
         {
             if (_converting) EndConversionForNewInput();
+            _toggleBox = null; // 続けて打った: 直した語だけの変換ボックスではなくなる
             _text.AppendKana(key.Raw, key.Kana);
             return;
         }
@@ -1032,6 +1055,7 @@ public sealed class CompositionController
             // 変換中に次の文字を打ったら、今の候補で確定して新しい入力を始める (IME と同じ)。
             // ContinueAfterConversion が ON なら、確定せずに、今の候補のまま固定して続きを未変換の文節にする。
             if (_converting) EndConversionForNewInput();
+            _toggleBox = null;
             _text.Append(ch);
             return;
         }
@@ -1088,6 +1112,7 @@ public sealed class CompositionController
         ResetPrediction();
         _reconvertOriginal = null;
         _reconvertRomaji = false;
+        _toggleBox = null;
         var id = ++_compositionId;
         // 自分が確定した直後は、アプリ側のテキストがまだ更新されていないかもしれないので自分の記録を信じる。
         var recentOwnCommit = Environment.TickCount64 - _lastCommitTime < OwnCommitTrustMs;
@@ -1259,6 +1284,7 @@ public sealed class CompositionController
     {
         ClearHeld();
         _correctable.Clear();
+        _lastWord = null;
         _options.DirectDecided?.Invoke(false);
     }
 
@@ -2243,14 +2269,18 @@ public sealed class CompositionController
         if (fixEnglish && !converting && _text.Mode == DisplayMode.Auto) text = FixEnglishTypo(text);
         var english = converting ? _clauses.All(c => c.IsEnglish) : _text.IsAlphanumericAt(final: true);
         var chosen = (converting || fixedOnly) && _clauses.Any(c => c.Changed);
+        // 確定後の F6 で開いた変換ボックス (読みは打った英字から作ったかな。Raw は変換ボックスの中身ではなく、元の英字を使う)
+        var toggle = _headCount == 0 ? _toggleBox : null;
         // ローマ字の再変換は、打ち直した文ではないので学習しない (日本語にした文を読みとして覚えない)
         if (converting && !_reconvertRomaji) Learn();
         else
         {
             if (fixedOnly) Learn();
-            LearnLanguage();
+            if (toggle is null) LearnLanguage();
         }
-        CommitText(text + suffix, english, _text.Raw, chosen);
+        // 日英の学習は、ここで 1 回だけ (Learn・LearnLanguage は、打った英字が無い変換ボックスでは日英を書かないので、二重にならない。R41-6)
+        if (toggle is not null) _options.Languages?.Remember(toggle.Raw, english: false, explicitChoice: true);
+        CommitText(text + (suffix.Length > 0 ? suffix : toggle?.Tail ?? ""), english, toggle?.Raw ?? _text.Raw, chosen);
     }
 
     /// <summary>
@@ -2298,6 +2328,38 @@ public sealed class CompositionController
     /// </summary>
     private sealed record CommitRecord(string Text, string Raw, bool English, bool SpaceIntended);
 
+    /// <summary>
+    /// 確定後の F10 / F6 (<see cref="TryToggleLastWord"/>) で直せる、直前に確定した 1 語。表示した文字・打った英字・向き・確定した時刻。
+    /// 自動の確定し直し用の <see cref="_correctable"/> とは別に持つ: そちらに全部の確定を入れると、曖昧でない語まで自動で書き換わる (R41-1)。
+    /// </summary>
+    private sealed record LastWord(string Text, string Raw, bool English, long Time);
+
+    private LastWord? _lastWord;
+
+    /// <summary>
+    /// 直前の語を直せる時間。マウス押下が届かないアプリで、キャレットが動いたのに記録が残り続けないよう、確定し直しが自分の確定を信じる時間
+    /// (<see cref="OwnCommitTrustMs"/>) に揃えた短い時間にする (R41-5)。
+    /// </summary>
+    private const long LastWordTrustMs = OwnCommitTrustMs;
+
+    /// <summary>
+    /// F6 で英字からかなに直して開いた変換ボックスの元。Raw = 打った英字、Lead / Tail = 記録した文字の前後の空白 (直さずに残す)、
+    /// Body = 入力欄から消した文字 (Esc で書き戻す)、Previous = 直す前の記録 (Esc で戻す)。
+    /// Enter で確定するときに Raw を日本語として学習する (Esc では学習しない)。
+    /// </summary>
+    private sealed record ToggleBox(string Raw, string Lead, string Tail, string Body, LastWord Previous);
+
+    private ToggleBox? _toggleBox;
+
+    /// <summary>
+    /// 直前のトグルを取り消す (<see cref="CancelToggle"/>) ための控え。Swift が入力欄の書き換えを確かめられず飛ばしたとき、
+    /// 変換ボックス・記録・学習を直前に戻す (R41-3)。
+    /// </summary>
+    private sealed record ToggleUndo(LastWord Previous, List<CommitRecord> Correctable, string? OwnText, bool? OwnEnglish, long OwnTime, bool OpenedBox, LanguageMemory.RememberUndo? Learning);
+
+    private ToggleUndo? _toggleUndo;
+    private string? _toggleNotice;
+
     /// <summary>続けて確定した、英語とも日本語とも読める語 (古い順)。make sure you → have で全部英語に直す。</summary>
     private readonly List<CommitRecord> _correctable = [];
     private const int MaxCorrectable = 4;
@@ -2313,7 +2375,172 @@ public sealed class CompositionController
     private static string NoBreakToSpace(string text) => text.Replace('\u00A0', ' ');
 
     /// <summary>キャレットが動いたかもしれないとき (Meltype を通らなかったキー・クリック)。直前の語は確定し直さない。</summary>
-    public void ForgetLastCommit() => _correctable.Clear();
+    public void ForgetLastCommit()
+    {
+        _correctable.Clear();
+        _lastWord = null;
+    }
+
+    /// <summary>
+    /// 確定した直後の語を、1 キーで英字 (F10) / かな (F6) に直す。変換ボックスが無く、記録があり、キャレットの前 (precedingText) の末尾が
+    /// 記録と一致したときだけ直して true (R41-4)。そうでなければ何もせず false で、キーはアプリに渡す (読めないホストでは飲み込まない)。
+    /// 記録は選択に頼らない: 選択を返さないホスト (ターミナル・Google ドキュメント) でも、確定し直しと同じ「消す前に中身を確かめる」形で直せる。
+    /// 英字にする: 入力欄の語を打った英字に置き換えて確定し、英字として学習する (2 回ルールはそのまま。1 回目で効かなければ <see cref="TakeToggleNotice"/>)。
+    /// かなにする: 入力欄の語を消し、打った英字を読みにした変換ボックスを開く。Enter で確定したときに日本語として学習し、Esc なら元の語を書き戻す。
+    /// 記録の前後の空白 (確定の Space・英単語の前後の空白の設定) は直さずに残す。
+    /// </summary>
+    public bool TryToggleLastWord(bool toEnglish, string? precedingText)
+    {
+        _toggleUndo = null;
+        _toggleNotice = null;
+        if (IsComposing || _lastWord is not { } word) return false;
+        if (Environment.TickCount64 - word.Time >= LastWordTrustMs)
+        {
+            _lastWord = null;
+            return false;
+        }
+        if (word.English == toEnglish || precedingText is null) return false;
+        var preceding = NoBreakToSpace(precedingText);
+        var recorded = NoBreakToSpace(word.Text);
+        if (!preceding.EndsWith(recorded, StringComparison.Ordinal))
+        {
+            Diagnostics.Log.Decision("キャレットの前の文字が記録と違うので、確定後の F10 / F6 は効かせません");
+            _lastWord = null;
+            return false;
+        }
+        var lead = recorded.Length - recorded.TrimStart(' ').Length;
+        var tailLength = recorded.Length - recorded.TrimEnd(' ').Length;
+        if (lead + tailLength >= recorded.Length) return false;
+        var body = word.Text[lead..];
+        var tail = word.Text[^tailLength..];
+        var beforeBody = preceding[..^body.Length];
+        var previousCorrectable = _correctable.ToList();
+        var ownText = _lastCommitText;
+        var ownEnglish = _lastCommitEnglish;
+        var ownTime = _lastCommitTime;
+
+        if (toEnglish)
+        {
+            var replacement = word.Raw + tail;
+            if (replacement == body) return false;
+            var learning = _options.Languages?.RememberUndoable(word.Raw, english: true, explicitChoice: true);
+            // 2 回ルール: よく使う日本語 (sushi・kyouha) は、はっきり英字にしても 1 回目は効かない。そのことを 1 回だけ知らせる
+            if (learning is not null && _options.Languages!.Get(word.Raw.ToLowerInvariant()) != true) _toggleNotice = "もう一度英字にすると覚えます";
+            Diagnostics.Log.Decision($"確定した直後の語を英字にしました: {Diagnostics.Log.Text(body)}→{Diagnostics.Log.Text(replacement)}");
+            _host.DeleteBackward(body.Length, body);
+            _host.CommitText(replacement);
+            // 手で直した語を、自動の確定し直しが元に戻さない (R41-2)
+            _correctable.Clear();
+            _lastWord = new LastWord(replacement, word.Raw, English: true, Environment.TickCount64);
+            SetOwnContext(beforeBody + replacement, english: true);
+            Committed?.Invoke(replacement);
+            _toggleUndo = new ToggleUndo(word, previousCorrectable, ownText, ownEnglish, ownTime, OpenedBox: false, learning);
+            return true;
+        }
+
+        var kana = _detector.Romaji.ConvertLenient(word.Raw.ToLowerInvariant(), final: true);
+        // かなに読めない語 (数字・記号・綴りがローマ字として成り立たない語) は直せないので、キーをそのまま通す
+        if (kana.Length == 0 || kana.Any(char.IsAsciiLetter) || !kana.Any(c => c is >= 'ぁ' and <= 'ゖ')) return false;
+        BeginComposition();
+        // 変換の文脈は、消す語の前。BeginComposition は今の入力欄の文字 (消す語を含む) と、自分が最後に確定した語 (英語) を文脈にするので、直す
+        _precedingText = beforeBody;
+        _text.PrecedingEnglish = LanguageOf(beforeBody);
+        _text.PrecedingEnglishSentence = IsEnglishSentence(beforeBody);
+        _reconvertOriginal = body;
+        _text.SetKana(kana);
+        StartConversion();
+        if (!_converting)
+        {
+            _text.Clear();
+            _reconvertOriginal = null;
+            return false;
+        }
+        Diagnostics.Log.Decision($"確定した直後の語をかなにして変換を始めました: {Diagnostics.Log.Text(body)}→{Diagnostics.Log.Text(kana)}");
+        _host.DeleteBackward(body.Length, body);
+        _toggleBox = new ToggleBox(word.Raw, word.Text[..lead], tail, body, word);
+        _lastWord = null;
+        _correctable.Clear();
+        SetOwnContext(beforeBody, LanguageOf(beforeBody));
+        _toggleUndo = new ToggleUndo(word, previousCorrectable, ownText, ownEnglish, ownTime, OpenedBox: true, Learning: null);
+        _gate.Capture();
+        return true;
+    }
+
+    /// <summary>
+    /// 直前の確定後の F10 / F6 を、なかったことにする。Swift が入力欄の書き換えを確かめられず飛ばしたときに呼ぶ (変換ボックスも出さない)。
+    /// 変換ボックス・記録・学習・自分の確定の記録を、トグルの前に戻す (R41-3)。直前にトグルしていなければ何もしない。
+    /// </summary>
+    public void CancelToggle()
+    {
+        if (_toggleUndo is not { } undo) return;
+        _toggleUndo = null;
+        _toggleNotice = null;
+        if (undo.OpenedBox)
+        {
+            _text.Clear();
+            _converting = false;
+            _clauses = [];
+            _selectedClause = 0;
+            _headCount = 0;
+            _fixedUnits = [];
+            _reconvertOriginal = null;
+            _toggleBox = null;
+            ResetPrediction();
+        }
+        if (undo.Learning is not null) _options.Languages?.Undo(undo.Learning);
+        _correctable.Clear();
+        _correctable.AddRange(undo.Correctable);
+        _lastCommitText = undo.OwnText;
+        _lastCommitEnglish = undo.OwnEnglish;
+        _lastCommitTime = undo.OwnTime;
+        _lastWord = undo.Previous;
+        Diagnostics.Log.Decision("入力欄の書き換えを確かめられなかったので、確定後の F10 / F6 を取り消しました");
+    }
+
+    /// <summary>直前のトグルを取り消すための控えを捨てる (次のキーを処理するとき。取消は書き換えの直後にだけ呼ぶ)。</summary>
+    internal void DiscardToggleUndo() => _toggleUndo = null;
+
+    /// <summary>トグルで 1 回目の学習が効かなかったときの案内 (1 回だけ。無ければ null)。</summary>
+    public string? TakeToggleNotice()
+    {
+        var notice = _toggleNotice;
+        _toggleNotice = null;
+        return notice;
+    }
+
+    /// <summary>自分が最後に確定した文字の記録 (次の入力の文脈。アプリの読みが遅れても使う) を、書き換えた入力欄に合わせる。</summary>
+    private void SetOwnContext(string? preceding, bool? english)
+    {
+        _lastCommitText = preceding is null ? null : preceding.Length > 20 ? preceding[^20..] : preceding;
+        _lastCommitEnglish = english;
+        _lastCommitTime = Environment.TickCount64;
+    }
+
+    /// <summary>F6 で開いた変換ボックスで F10: 打った英字どおりに戻す (往復)。学習はしない (F6 は Enter のときに学習するので、戻す学習が無い)。</summary>
+    private void RevertToggleBox()
+    {
+        var box = _toggleBox!;
+        _toggleBox = null;
+        _text.Clear();
+        _converting = false;
+        _clauses = [];
+        _selectedClause = 0;
+        _reconvertOriginal = null;
+        ResetPrediction();
+        var restored = box.Raw + box.Tail;
+        _host.CommitText(restored);
+        _lastWord = new LastWord(restored, box.Raw, English: true, Environment.TickCount64);
+        SetOwnContext((_precedingText ?? "") + restored, english: true);
+        Committed?.Invoke(restored);
+    }
+
+    /// <summary>F6 で開いた変換ボックスを Esc で取り消した: 消した語を書き戻し、記録も元に戻す。</summary>
+    private void RestoreToggleBox(ToggleBox box)
+    {
+        _toggleBox = null;
+        _lastWord = box.Previous with { Time = Environment.TickCount64 };
+        SetOwnContext((_precedingText ?? "") + box.Body, box.Previous.English);
+    }
 
     /// <summary>
     /// 変換中でない Enter・Tab をアプリに渡した。アプリの入力欄には改行・タブが入るので、自分の確定の記録 (直後の 1.5 秒は入力欄より優先して使う) にも入れる。
@@ -2566,6 +2793,11 @@ public sealed class CompositionController
         _spaceStartedConversion = false;
         // 固定した文節を含む確定は、語の単位の判定 (英語とも日本語とも読める語の確定し直し) の対象にしない。
         var hadFixed = _headCount > 0;
+        // 確定後の F6 で開いた変換ボックスの確定は、手で直した語。自動の確定し直しの対象にも、確定し直しの元にもしない (R41-2)。
+        var fromToggle = _toggleBox is not null && !hadFixed;
+        // 再変換 (選択 + Shift+Space) で入れ替えた文字は、打った英字ではないので、確定後の F10 / F6 の対象にしない。
+        var reconverted = (_reconvertOriginal is not null && !fromToggle) || _reconvertRomaji;
+        _toggleBox = null;
         // 誤変換の報告を調べられるように、打った英字・読み・文節の区切りもログに残す (ログはファイルに書く設定のときだけ保存される)。
         if (!_text.IsEmpty)
         {
@@ -2582,9 +2814,9 @@ public sealed class CompositionController
         ResetPrediction();
         if (text.Length == 0) return;
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, _followingText);
-        if (!hadFixed) CorrectPreviousCommit(raw, english);
+        if (!hadFixed && !fromToggle) CorrectPreviousCommit(raw, english);
         // 英語とも日本語とも読める語を、文脈を決めずに (選び直さずに) 確定したときだけ、後で確定し直せるようにしておく。
-        if (!hadFixed && !chosen && _detector.IsAmbiguousWord(raw))
+        if (!hadFixed && !fromToggle && !chosen && _detector.IsAmbiguousWord(raw))
         {
             // 前の語の後に Space で区切って続けたときだけつなげる (それ以外は新しい並び)。
             if (_correctable.Count > 0 && !_correctable[^1].SpaceIntended) _correctable.Clear();
@@ -2596,6 +2828,8 @@ public sealed class CompositionController
         var joined = (_lastCommitText ?? "") + text;
         _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
         _lastCommitTime = Environment.TickCount64;
+        // 確定後の F10 / F6 で直せる直前の 1 語 (打った英字が分かる確定だけ。固定した文節を含む・再変換の確定は記録しない)。
+        _lastWord = !hadFixed && !reconverted && raw.Any(char.IsAsciiLetter) ? new LastWord(text, raw, english, _lastCommitTime) : null;
         _host.CommitText(text);
         Committed?.Invoke(text);
     }
@@ -2651,6 +2885,7 @@ public sealed class CompositionController
     {
         // Meltype を通らないキーを送る = キャレットが動くかもしれないので、直前の語はもう確定し直さない。
         _correctable.Clear();
+        _lastWord = null;
         // 握りつぶしていた Shift を先に送る (Shift+矢印 の範囲選択、Ctrl+Shift+Z など)。
         foreach (var shift in _swallowedShift)
         {

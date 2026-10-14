@@ -14,8 +14,10 @@ public readonly record struct TextEdit(int DeleteBefore, string Text, string? Or
 /// <summary>
 /// 1 回のキー入力の結果。Consumed が false ならそのキーはアプリにそのまま渡す (Commits を入れた後で)。
 /// View は変換ボックスの内容 (null なら変換ボックスを閉じる)。
+/// Toggle は、確定した直後の語を F10 / F6 で直した結果か (R41-3)。Swift が入力欄の書き換えを確かめられず飛ばしたときに、
+/// 変換ボックスを出さず取消 (meltype_cancel_toggle) を呼ぶ目印にする。
 /// </summary>
-public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commits, CompositionView? View)
+public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commits, CompositionView? View, bool Toggle = false)
 {
     /// <summary>Swift などから読みやすいように JSON にする (NativeAOT でも使えるよう手書き)。</summary>
     public string ToJson()
@@ -34,7 +36,10 @@ public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commit
             }
             builder.Append('}');
         }
-        builder.Append("],\"view\":");
+        builder.Append(']');
+        // トグル由来のときだけ書く (Swift は無いキーを nil として読む。ふつうの結果の JSON は今までと同じ形のまま)
+        if (Toggle) builder.Append(",\"toggle\":true");
+        builder.Append(",\"view\":");
         if (View is not { } view)
         {
             builder.Append("null}");
@@ -171,6 +176,8 @@ public sealed class MeltypeSession
             TypeDigitsAfterConversion = () => shared.Current.TypeDigitsAfterConversion,
             // ATOK スタイルのキー操作。config.json の変更 (「Meltype 辞書」の「設定」タブ) がすぐ効くよう、共有の値を毎回見る。
             TokMode = () => shared.Current.TokMode,
+            // 確定した直後の語を直す Ctrl+' / Ctrl+J。既定は OFF (Ctrl+J はターミナルの改行と重なる)。
+            ToggleLastWordCtrlKeys = () => shared.Current.ToggleLastWordCtrlKeys,
             AutoCorrect = () => shared.Current is { AutoCorrectAfterCommit: true, DetectionLevel: not DetectionLevel.Manual },
             Level = () => shared.Current.DetectionLevel,
             // かな入力 (JIS)。設定の「入力方式」。既定はローマ字入力なので、変えなければ今までどおり。
@@ -276,6 +283,8 @@ public sealed class MeltypeSession
     /// <summary>提案待ちができた直後に 1 行だけ出すヒント (1 日 1 回まで)。出さないときは null。確定のたびに呼んでよい。</summary>
     public string? TakeSuggestionHint()
     {
+        // 確定後の F10 で 1 回目の学習が効かなかったときの案内 (変換ボックスが無いので、確定のヒントと同じ場所に出す)
+        if (_controller.TakeToggleNotice() is { } notice) return notice;
         if (_options.Suggestions is not { } suggestions || !_settings().DictionarySuggest) return null;
         return suggestions.TakeHint() is { } word ? $"『{DictionarySuggestions.DisplayWord(word.Word)}』を辞書に登録できます (入力メニューから)" : null;
     }
@@ -403,11 +412,22 @@ public sealed class MeltypeSession
         var down = new KeyEvent(vk, ch ?? 0, false, false, false, Environment.TickCount64);
         // Ctrl・Option・Command と一緒のキーは、変換ボックスが空ならアプリの操作 (コピーなど) なので触らない。
         var modifier = control || alt || command;
+        // 前のトグルの取消の控えは、次のキーを処理する前に捨てる (取消は書き換えの直後にだけ呼ぶ)
+        _controller.DiscardToggleUndo();
         if (Direct || !AppEnabled || !_settings().Enabled)
         {
             // アプリに渡したキーでキャレットが動くかもしれないので、確定し直しの記録は捨てる (Windows 版と同じ)。
             _controller.ForgetLastCommit();
             return _host.Result(consumed: false);
+        }
+        // 確定した直後の語を 1 キーで直す: F10 = 英字、F6 = かな (設定が ON なら Ctrl+' / Ctrl+J も)。
+        // 変換ボックスが無く、直せる語があるときだけキーを使う。無ければ、素通し (Ctrl の読み替えは素通し判定より前に行う。R41-9)。
+        if (!_controller.IsComposing && ToggleDirection(vk, shift, control, alt, command) is { } toEnglish
+            && _controller.TryToggleLastWord(toEnglish, before))
+        {
+            _controller.Pump();
+            _host.MarkToggle();
+            return _host.Result(consumed: true);
         }
         // 英数へ切り替えるときなどに、Shift を押したことを変換ボックスにも伝える (Shift + 英字は大文字)。
         if (shift && _controller.IsComposing) Feed(new KeyEvent(VirtualKeys.LShift, 0, false, false, false, down.TimeMs));
@@ -435,6 +455,18 @@ public sealed class MeltypeSession
     /// Ctrl + 文字を、同じ意味のキーにする (J=F6 K=F7 L=F9 '=F10 は Apple と同じ、; = F8 は半角カナ用の独自割り当て)。
     /// H = BackSpace は Microsoft IME・本家 #150 と同じ (ホームポジションのまま消せる。変換中なら変換をやめてかなに戻る)。
     /// </summary>
+    /// <summary>
+    /// 変換ボックスが無いときの、確定した直後の語を直すキー。F10 = 英字 (true)、F6 = かな (false)、それ以外は null。
+    /// 設定 ToggleLastWordCtrlKeys が ON のときだけ Ctrl+' = F10・Ctrl+J = F6 (変換中の読み替えと同じ。ターミナルの Ctrl+J と重なるので既定は OFF)。
+    /// </summary>
+    private bool? ToggleDirection(int vk, bool shift, bool control, bool alt, bool command)
+    {
+        if (shift || alt || command) return null;
+        if (!control) return vk switch { VirtualKeys.F10 => true, VirtualKeys.F6 => false, _ => null };
+        if (!_options.ToggleLastWordCtrlKeys()) return null;
+        return vk switch { VirtualKeys.Oem7 => true, 0x4A => false, _ => null };
+    }
+
     private static int? CtrlShortcutToFunctionKey(int vk) => vk switch
     {
         0x4A => VirtualKeys.F6,
@@ -448,6 +480,18 @@ public sealed class MeltypeSession
 
     /// <summary>キャレットが動いたかもしれないとき (マウスのクリックなど)。直前の語は確定し直さない。変換中の文字には触らない。</summary>
     public void ForgetLastCommit() => _controller.ForgetLastCommit();
+
+    /// <summary>
+    /// 確定後の F10 / F6 の結果 (Toggle) で、入力欄の書き換えを確かめられず飛ばしたとき。変換ボックス・記録・学習を直前に戻す (R41-3)。
+    /// 戻した後の表示 (変換ボックスは閉じる) を返す。
+    /// </summary>
+    public SessionResult CancelToggle() => Safely(() =>
+    {
+        _host.Begin(null, false, null, null);
+        _controller.CancelToggle();
+        _controller.Pump();
+        return _host.Result(consumed: false);
+    });
 
     /// <summary>予測候補ウィンドウで候補をクリックしたとき。</summary>
     public SessionResult SelectPrediction(int index) => Safely(() =>
@@ -533,8 +577,14 @@ public sealed class MeltypeSession
 
         public bool ReplayedCurrent { get; private set; }
 
+        private bool _toggle;
+
+        /// <summary>この結果は、確定した直後の語を F10 / F6 で直したもの (SessionResult.Toggle)。</summary>
+        public void MarkToggle() => _toggle = true;
+
         public void Begin(char? ch, bool shift, string? before, string? after)
         {
+            _toggle = false;
             _commits.Clear();
             _pendingDelete = 0;
             _pendingDeleteText = null;
@@ -572,7 +622,7 @@ public sealed class MeltypeSession
             _pendingDelete = 0;
             _pendingDeleteText = null;
             _delivered = _hidden ? null : _view;
-            return new SessionResult(consumed, _commits.ToList(), _delivered);
+            return new SessionResult(consumed, _commits.ToList(), _delivered, _toggle);
         }
 
         public void CommitText(string text)
