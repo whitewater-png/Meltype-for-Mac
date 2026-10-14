@@ -393,4 +393,27 @@ internal static class CommitFirstSoundTests
         Assert.True(k.Host.View is null, "全部確定して閉じる");
         Assert.True(k.Host.Document.StartsWith("きょ", StringComparison.Ordinal) && k.Host.Document.Length > 2, "確定した文: " + k.Host.Document);
     }
+
+    [Test]
+    public static void Session_MacPath_ShiftDownCommitsTheFirstSound()
+    {
+        // Mac / Linux の経路 (MeltypeSession.HandleKey)。Swift は Shift を modifiers で渡し、↓ は文字なし (U+F701 は渡さない)。
+        foreach (var tok in new[] { true, false })
+        {
+            var session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(),
+                new CompositionOptions { TokMode = () => tok }, () => new Meltype.Config.Settings());
+            foreach (var c in "kyouha") session.HandleKey(char.ToUpperInvariant(c), c, false, false, false, false);
+            var result = session.HandleKey(VirtualKeys.Down, null, true, false, false, false);
+            Assert.True(result.Consumed, $"TokMode={tok}: Shift+↓ はアプリに渡さない");
+            if (tok)
+            {
+                Assert.Equal("きょ", string.Concat(result.Commits.Select(c => c.Text)), "ON: 先頭の 1 音を確定");
+                Assert.Equal("うは", result.View?.Text, "ON: 残りは入力のまま");
+            }
+            else
+            {
+                Assert.True(result.Commits.Count == 0 && result.View is { Converting: true }, "OFF: ↓ と同じく文節の選択に入る");
+            }
+        }
+    }
 }
