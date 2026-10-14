@@ -163,4 +163,81 @@ internal static class CommitFirstSoundTests
         Assert.Equal("", k.Host.Document, "固定した文節があるときは 1 音確定しない");
         Assert.True(k.Host.View is not null, "入力は続いている");
     }
+
+    /// <summary>Shift+↓ を、変換ボックスが閉じるまで押し続ける (ATOK で 1 音ずつ確定していく使い方)。毎回、見えていた文字の頭が確定されたかも見る。</summary>
+    private static void ShiftDownUntilClosed(CompositionTests.Keyboard k)
+    {
+        for (var i = 0; i < 40 && k.Host.View is { } view; i++)
+        {
+            var document = k.Host.Document;
+            ShiftDown(k);
+            var committed = k.Host.Document[document.Length..];
+            var rest = k.Host.View?.Text ?? "";
+            Assert.Equal(view.Text, committed + rest, $"見えていた「{view.Text}」= 確定「{committed}」+ 残り「{rest}」");
+        }
+        Assert.True(k.Host.View is null, "閉じる");
+    }
+
+    [Test]
+    public static void English_RestStaysAsShown()
+    {
+        // 査読 (独立): 英語の頭の 1 文字を確定したあと、残り (ello) を日本語として読み直して えっぉ になっていた。
+        foreach (var (typed, shown) in new[]
+                 {
+                     ("Hello!", "Hello!"), ("GitHub.", null), ("googlede", "googleで"), ("iPhone", null), ("e-mail", null), ("J-core", null),
+                     ("tetr.io", null), ("Meltype.amr", null), ("kyouhaGoogle!", null), ("(Google)", null), ("kyouhann", null), ("ok?", null),
+                     ("\"Go\"", "\"Go\""), ("10mmde", null), ("\"Go Through!\"", null),
+                 })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed);
+            var view = k.Host.View?.Text ?? "";
+            if (shown is not null) Assert.Equal(shown, view, $"前提: {typed} の見え方");
+            // 空白を含むもの ("Go Through!") は、空白までが先に確定している。
+            var document = k.Host.Document;
+            ShiftDownUntilClosed(k);
+            Assert.Equal(document + view, k.Host.Document, $"{typed}: 1 音ずつ確定しても、見えていたとおりの文字になる");
+        }
+    }
+
+    [Test]
+    public static void English_TypingAfterTheRest_IsJudgedAsBefore()
+    {
+        var k = new CompositionTests.Keyboard();
+        k.Type("google");
+        ShiftDown(k);
+        Assert.Equal("oogle", k.Host.View?.Text, "残りは英字のまま");
+        k.Type("de");
+        Assert.Equal("oogleで", k.Host.View?.Text, "後ろに打った de は日本語");
+        k.Press(VirtualKeys.Back);
+        k.Press(VirtualKeys.Back);
+        k.Press(VirtualKeys.Back);
+        Assert.Equal("oog", k.Host.View?.Text, "BackSpace で消しても、残りは英字のまま");
+    }
+
+    [Test]
+    public static void FullWidthOpener_CommitsAsShown()
+    {
+        // 査読 (独立): 全角の設定でも、英語の前で半角に見せている ( を、全角 （ で確定していた。
+        var k = new CompositionTests.Keyboard { Parentheses = Meltype.Config.ParenthesisWidth.FullWidth };
+        k.Type("(Google)");
+        var view = k.Host.View?.Text ?? "";
+        ShiftDown(k);
+        Assert.Equal(view[..1], k.Host.Document, "見えているとおりの幅で確定: " + view);
+    }
+
+    [Test]
+    public static void Reconversion_EscAfterOneSound_DoesNotDuplicate()
+    {
+        // 査読 (独立): 再変換 → Esc → Shift+↓ → Esc で、元の文字を丸ごと書き戻して二重になっていた。
+        var k = new CompositionTests.Keyboard();
+        Assert.True(k.Controller.ReconvertKana("きょうは", "今日は"), "前提: 再変換が始まる");
+        k.Press(VirtualKeys.Escape);
+        Assert.Equal("きょうは", k.Host.View?.Text, "前提: Esc で読みに戻る");
+        ShiftDown(k);
+        Assert.Equal("きょ", k.Host.Document, "再変換の読みも、小書きのかなまでで 1 音 (きょ)");
+        Assert.Equal("うは", k.Host.View?.Text, "残り");
+        k.Press(VirtualKeys.Escape);
+        Assert.Equal("きょ", k.Host.Document, "Esc で元の文字を書き戻さない (二重にならない)");
+    }
 }

@@ -330,44 +330,120 @@ public sealed class CompositionText
     }
 
     /// <summary>
-    /// 先頭の 1 音を取り出して、見えている形 (カタカナにしていればカタカナ) で返す (ATOK の 1 音確定、Shift+↓)。残りは入力のまま残す。
-    /// 英字として見せている部分は 1 文字だけ取り出す (google の g)。英語の判定は残りの文字で改めて行う。
+    /// 先頭の 1 音を取り出して、見えている形 (カタカナにしていればカタカナ、半角にした開きの記号は半角) で返す (ATOK の 1 音確定、Shift+↓)。残りは入力のまま残す。
+    /// 英字として見せている部分は 1 文字だけ取り出す (google の g)。きょ のように小書きのかなが続く音は、単位が分かれていても (再変換・かな入力) まとめて 1 音。
+    /// 自動判定では、残りの英語 / 日本語の判定を、取り出す前に見えていたまま固定する (Hello の H を取り出したあとの ello を、日本語として読み直さない)。
     /// 取り出せる音が無い (入力途中の子音だけ) なら null。
     /// </summary>
     public (string Text, bool English)? TakeFirst()
     {
         if (_units.Count == 0) return null;
+        if (Mode != DisplayMode.Auto || IsNumeric) return TakeFirstShown();
+
+        // 開きの記号を半角で見せているなら、その形を単位に書き込んでおく (取り出したあとも同じ形で見せる)。
+        if (HalfWidthOpeners(Segments()) is { } adjusted)
+        {
+            for (var i = 0; i < _units.Count; i++) _units[i] = adjusted[i];
+        }
+        var segments = Segments();
+        var before = RenderSegments(final: false, null);
+        var englishAt = new List<bool>();
+        foreach (var segment in segments) foreach (var _ in segment.Raw) englishAt.Add(segment.IsEnglish);
+        var languages = new List<(string Raw, bool English)>();
+        for (int i = 0, offset = 0; i < _units.Count; offset += _units[i].Raw.Length, i++)
+        {
+            languages.Add((_units[i].Raw, offset < englishAt.Count && englishAt[offset]));
+        }
+
         var first = _units[0];
-        var english = Mode is DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric ||
-                      (Mode == DisplayMode.Auto && (IsNumeric || Segments() is { Count: > 0 } segments && segments[0].IsEnglish));
+        var english = languages[0].English;
+        string fallback;
         if (!english)
         {
+            var count = SoundLength(0, i => !languages[i].English);
+            fallback = string.Concat(_units.Take(count).Select(u => u.Kana));
+            _units.RemoveRange(0, count);
+            languages.RemoveRange(0, count);
+        }
+        else
+        {
+            // かな入力は 1 キー 1 単位 (濁点を付けたものは 2 キー) なので、単位ごと取り出す。
+            fallback = KanaInput ? first.Raw : first.Raw[..1];
             _units.RemoveAt(0);
+            languages.RemoveAt(0);
+            if (first.Raw.Length > 1 && !KanaInput)
+            {
+                // 1 音にまとまった英字 (go) の残り (o) は、単位に分け直す (F6 で かな にしたときの読み)。英字として見せるのは変わらない。
+                var rest = SplitIntoUnits(first.Raw[1..]);
+                _units.InsertRange(0, rest);
+                languages.InsertRange(0, rest.Select(u => (u.Raw, true)));
+            }
+        }
+        _frozen = languages;
+        ResetIfEmpty();
+        var after = IsEmpty ? "" : RenderSegments(final: false, null);
+        // 見えていた文字列から、残りの見え方を除いた部分 = 取り出した 1 音の見え方。合わなければ単位の文字にする。
+        var text = before.Length > after.Length && before.EndsWith(after, StringComparison.Ordinal) ? before[..^after.Length] : fallback;
+        return (text, english);
+    }
+
+    /// <summary>自動判定でないとき (F6〜F10・数字だけ) の 1 音確定。見え方は表示モードで決まる。</summary>
+    private (string Text, bool English) TakeFirstShown()
+    {
+        var first = _units[0];
+        var english = Mode is DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric || Mode == DisplayMode.Auto;
+        if (!english)
+        {
+            var count = SoundLength(0, _ => true);
+            var reading = string.Concat(_units.Take(count).Select(u => u.Kana));
+            _units.RemoveRange(0, count);
             var kana = Mode switch
             {
-                DisplayMode.Katakana => ToKatakana(first.Kana),
-                DisplayMode.HalfWidthKatakana => ToHalfWidthKatakana(first.Kana),
-                _ => first.Kana,
+                DisplayMode.Katakana => ToKatakana(reading),
+                DisplayMode.HalfWidthKatakana => ToHalfWidthKatakana(reading),
+                _ => reading,
             };
             ResetIfEmpty();
             return (kana, false);
         }
-        // かな入力は 1 キー 1 単位 (濁点を付けたものは 2 キー) なので、単位ごと取り出す。
         var letter = KanaInput ? first.Raw : first.Raw[..1];
         // 最後の 1 文字を取り出すと表示モードが戻るので、先に見えている形にしておく。
         var shown = Mode == DisplayMode.FullWidthAlphanumeric ? ToFullWidth(letter) : letter;
-        if (first.Raw.Length > 1 && !KanaInput)
-        {
-            // 1 音にまとまった英字 (go) の残り (o) は、打ち直して単位に分け直す (英字の後ろが日本語の音になることもあるため)。
-            var rest = first.Raw[1..] + string.Concat(_units.Skip(1).Select(u => u.Raw)) + _pending;
-            var (mode, levelOverride) = (Mode, LevelOverride);
-            Clear();
-            foreach (var c in rest) Append(c);
-            (Mode, LevelOverride) = (mode, levelOverride);
-        }
-        else _units.RemoveAt(0);
+        _units.RemoveAt(0);
+        if (first.Raw.Length > 1 && !KanaInput) _units.InsertRange(0, SplitIntoUnits(first.Raw[1..]));
         ResetIfEmpty();
         return (shown, true);
+    }
+
+    private static readonly string SmallKana = "ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ";
+
+    /// <summary>start から 1 音の単位の数。後ろに続く小書きのかな 1 文字だけの単位 (再変換の き|ょ、かな入力の き|ょ) は同じ音。</summary>
+    private int SoundLength(int start, Func<int, bool> sameRun)
+    {
+        var end = start + 1;
+        while (end < _units.Count && sameRun(end) && _units[end].Kana is [var c] && SmallKana.Contains(c)) end++;
+        return end - start;
+    }
+
+    /// <summary>英字の並び (1 音の一部) を、打ったときと同じように単位に分ける。音にならない英字は 1 文字ずつの単位にする。</summary>
+    private List<CompositionUnit> SplitIntoUnits(string letters)
+    {
+        var text = new CompositionText(_detector);
+        foreach (var c in letters) text.Append(c);
+        return [.. text.Units, .. text.Pending.Select(c => new CompositionUnit(c.ToString(), c.ToString()))];
+    }
+
+    /// <summary>
+    /// 1 音確定で固定した、先頭からの単位ごとの英語 / 日本語 (取り出す前の見え方)。単位の英字が合う所まで使い、その後ろ (新しく打った文字など) は今までどおり判定する。
+    /// </summary>
+    private List<(string Raw, bool English)>? _frozen;
+
+    private int FrozenCount(IReadOnlyList<CompositionUnit> units)
+    {
+        if (_frozen is null) return 0;
+        var count = 0;
+        while (count < _frozen.Count && count < units.Count && units[count].Raw == _frozen[count].Raw) count++;
+        return count;
     }
 
     private void ResetIfEmpty()
@@ -393,14 +469,20 @@ public sealed class CompositionText
     /// </summary>
     public void PrependReading(string kana)
     {
+        _frozen = null;
         _units.InsertRange(0, kana.Select(c => new CompositionUnit(c.ToString(), c.ToString())));
     }
 
     /// <summary>単位 (読みと打った英字) を、今の内容の前に付ける。固定していた文節を、打ったままの状態に戻すのに使う。</summary>
-    public void PrependUnits(IEnumerable<CompositionUnit> units) => _units.InsertRange(0, units.ToList());
+    public void PrependUnits(IEnumerable<CompositionUnit> units)
+    {
+        _frozen = null;
+        _units.InsertRange(0, units.ToList());
+    }
 
     public void Clear()
     {
+        _frozen = null;
         _units.Clear();
         _pending.Clear();
         Mode = DisplayMode.Auto;
@@ -571,6 +653,7 @@ public sealed class CompositionText
     {
         var key = new StringBuilder();
         foreach (var unit in _units) key.Append(unit.Kana).Append('\u0001').Append(unit.Raw).Append('\u0002');
+        for (var i = 0; i < FrozenCount(_units); i++) key.Append(_frozen![i].English ? 'E' : 'J');
         key.Append('\u0003').Append(_pending).Append('\u0003')
             .Append(PrecedingEnglish switch { true => 'E', false => 'J', null => '-' })
             .Append(FollowingEnglish switch { true => 'E', false => 'J', null => '-' })
@@ -581,10 +664,33 @@ public sealed class CompositionText
 
     private IReadOnlyList<CompositionSegment> ComputeSegments(bool final)
     {
-        var segments = _detector.Segment(_units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final);
-        return HalfWidthOpeners(segments) is { } adjusted
-            ? _detector.Segment(adjusted, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final)
-            : segments;
+        var segments = SegmentUnits(_units, final);
+        return HalfWidthOpeners(segments) is { } adjusted ? SegmentUnits(adjusted, final) : segments;
+    }
+
+    /// <summary>区間分け。1 音確定で固定した先頭の単位 (<see cref="_frozen"/>) はそのままの英語 / 日本語にし、残りだけを判定する。</summary>
+    private IReadOnlyList<CompositionSegment> SegmentUnits(IReadOnlyList<CompositionUnit> units, bool final)
+    {
+        var frozen = FrozenCount(units);
+        if (frozen == 0) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final);
+        var result = new List<CompositionSegment>();
+        void Add(CompositionSegment segment)
+        {
+            // 同じ言語が続くなら 1 つの区間にする (変換で 1 つの読みとして扱うため)。英語の区間の Kana は空のまま。
+            if (result.Count > 0 && result[^1].IsEnglish == segment.IsEnglish)
+            {
+                result[^1] = new CompositionSegment(segment.IsEnglish, result[^1].Kana + segment.Kana, result[^1].Raw + segment.Raw);
+            }
+            else result.Add(segment);
+        }
+        for (var i = 0; i < frozen; i++) Add(new CompositionSegment(_frozen![i].English, _frozen[i].English ? "" : units[i].Kana, units[i].Raw));
+        if (frozen < units.Count || _pending.Length > 0)
+        {
+            var precedingEnglish = result[^1].IsEnglish;
+            foreach (var segment in _detector.Segment([.. units.Skip(frozen)], Pending, precedingEnglish, FollowingEnglish, EffectiveLevel,
+                         PrecedingEnglishSentence && precedingEnglish, KanaInput, final)) Add(segment);
+        }
+        return result;
     }
 
     /// <summary>英数字以外の半角の記号 1 文字か (! . , ? など)。</summary>

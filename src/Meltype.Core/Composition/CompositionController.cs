@@ -2181,6 +2181,8 @@ public sealed class CompositionController
             Commit();
             return;
         }
+        // 一部を確定したので、再変換の Esc で元の文字を書き戻さない (確定した分と二重になる)。
+        _reconvertOriginal = null;
         // 最後の 1 音なら入力を終える (表示は閉じる)。
         if (_text.IsEmpty) CommitText("", first.English);
         var text = first.Text;
