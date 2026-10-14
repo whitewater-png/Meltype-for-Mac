@@ -567,7 +567,8 @@ enum Updater {
         return delegate.failureReason
     }
 
-    private static func sha256(of file: URL) -> String? {
+    /// ファイルの SHA-256 (小文字の 16 進)。読めなければ nil。Zenzai のモデルの検査 (ZenzaiModel) も使う。
+    static func sha256(of file: URL) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: file) else { return nil }
         defer { try? handle.close() }
         var hasher = SHA256()

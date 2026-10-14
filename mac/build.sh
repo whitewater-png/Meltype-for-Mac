@@ -58,7 +58,12 @@ dotnet publish ../src/Meltype.Mac.Native/Meltype.Mac.Native.csproj -c Release -r
     --source https://api.nuget.org/v3/index.json -o "$BUILD/native"
 
 echo "== 2/3 IME (Swift) をビルド (初回は azooKey の変換エンジンと辞書のダウンロードに時間がかかります)"
-swift build -c release --force-resolved-versions
+# ビルドしたマシンのフォルダーの絶対パス (/Users/<名前>/…/mac/.build/checkouts/…) が、実行ファイルの文字列 (assert・エラーの __FILE__ や #filePath) に残る。
+# Zenzai を付けて (C++ の marisa・azooKey の Zenzai のコードが入って) から、この文字列が 75 件に増え、strip -S (下) では消えなかった。
+# 配布先の Mac でユーザー名と作業フォルダーが読めてしまうので、コンパイラに「このフォルダーは . と書く」と頼む (C/C++ と Swift の両方)。
+SOURCE_ROOT="$(pwd -P)"
+swift build -c release --force-resolved-versions \
+    -Xcc "-ffile-prefix-map=$SOURCE_ROOT=." -Xswiftc -file-prefix-map -Xswiftc "$SOURCE_ROOT=."
 
 echo "== 3/3 Meltype.app を組み立て"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
@@ -80,9 +85,20 @@ plutil -replace CFBundleShortVersionString -string "$(plutil -extract CFBundleSh
 plutil -replace CFBundleVersion -string "$(plutil -extract CFBundleVersion raw Resources/Info.plist)" "$HELPER/Contents/Info.plist"
 # azooKey が使う llama.framework などの動的なフレームワークも同梱する。
 # 入れていなかったため、1.0.0 は起動できなかった (dyld: Library not loaded: @rpath/llama.framework、#13)。
-for framework in "$BIN"/*.framework; do
-    [[ -e "$framework" ]] && cp -R "$framework" "$APP/Contents/Frameworks/"
-done
+# $BIN にあるものを全部入れると、実行ファイルが使わないものまで配布物に入る (サイズが増え、検査の対象も増える)。
+# なので、実行ファイルを otool -L して @rpath/<名前>.framework/... で参照されているものだけを入れる。
+while read -r name; do
+    [[ -n "$name" ]] || continue
+    if [[ ! -d "$BIN/$name.framework" ]]; then echo "実行ファイルが参照するフレームワークが見つかりません: $BIN/$name.framework" >&2; exit 1; fi
+    cp -R "$BIN/$name.framework" "$APP/Contents/Frameworks/"
+    # azooKey の出来合いの llama.framework は arm64 と x86_64 の 2 つ入り (5.6 MB)。配布物は 1 つの CPU 用なので、使う方だけにする (約半分)。
+    # 署名は後ろの codesign が付け直す (薄くすると、元の署名は無効になる)。
+    framework_binary="$APP/Contents/Frameworks/$name.framework/Versions/A/$name"
+    if [[ -f "$framework_binary" && "$(lipo -archs "$framework_binary")" == *" "* ]]; then
+        lipo -thin "$(uname -m)" "$framework_binary" -output "$framework_binary.thin"
+        mv "$framework_binary.thin" "$framework_binary"
+    fi
+done < <( (otool -L "$BIN/MeltypeIME"; otool -L "$BIN/MeltypeDictionary") | sed -n 's|^[[:space:]]*@rpath/\([^/]*\)\.framework/.*|\1|p' | sort -u)
 # Swift 6.2 以降は、古い macOS 向けの互換ライブラリ (libswiftCompatibilitySpan.dylib など) を @rpath で読む。
 # macOS 26 は OS に入っているが、13〜15 では無いので、ツールチェーンから同梱する (#20)。辞書の管理画面も同じものを使う (二重に入れない)。
 TOOLCHAIN_SWIFT_LIBS="$(dirname "$(xcrun --find swift)")/../lib"

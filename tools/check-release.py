@@ -538,6 +538,21 @@ def check_app(app, label, signed):
     check(not minos_bad, "minos が LSMinimumSystemVersion 以下 (§7-6)", "最大 %s 以下 (platform 1 の行だけを見た)" % lsmin, "; ".join(minos_bad))
     check(not rpath_bad, "RPATH にビルド機の絶対パスが無い (§7-6)", "@ で始まる %d / OS 標準 %d / その他 0 (文字列は出さない)" % (rpath_stat["@"], rpath_stat["OS 標準"]), "OS 標準でも @ でもない (相対・絶対パスの) RPATH が %d 本 (文字列は出さない): %s" % (rpath_stat["その他"], ", ".join(sorted(set(rpath_bad)))))
     check(not dep_bad, "リンクされた依存が OS 標準か同梱 (§7-6)", "依存 %d 件" % n_deps, "; ".join(dep_bad[:5]))
+    # Contents/Frameworks の *.framework が、2 つの実行ファイルの otool -L (@rpath/<名前>.framework/...) と一致するか (mac/build.sh の B1)。
+    # 参照されないものが入っていれば無駄な同梱 (サイズ増)、参照されるのに無ければ起動できない (dependencies の検査と別に、余分も見る)。
+    referenced, why = set(), None
+    for exe in (exe_main, os.path.join(helper, "Contents", "MacOS", "MeltypeDictionary")):
+        arch_flag = ["-arch", "arm64"] if "arm64" in (archs_of(exe) or []) and len(archs_of(exe) or []) > 1 else []
+        rc, out, _ = run(["otool"] + arch_flag + ["-L", exe])
+        if rc != 0:
+            why = "otool -L が読めない"
+            break
+        referenced |= set(re.findall(r"@rpath/([^/\s]+)\.framework/", text(out)))
+    if why:
+        skip("Contents/Frameworks の *.framework が otool -L の参照と一致 (B1)", why)
+    else:
+        bundled = {n[:-len(".framework")] for n in real_names(frameworks) if n.endswith(".framework")}
+        check(bundled == referenced, "Contents/Frameworks の *.framework が otool -L の参照と一致 (B1)", "%d 個 (%s)" % (len(bundled), ", ".join(sorted(bundled)) or "なし"), "足りない: %s / 余分: %s" % (", ".join(sorted(referenced - bundled)) or "-", ", ".join(sorted(bundled - referenced)) or "-"))
     total = sum(paths.values())
     detail = ", ".join("%s %d" % (os.path.basename(k), v) for k, v in sorted(paths.items()))
     check(total == 0, "実行ファイルに残るビルド時の絶対パス (ホームフォルダー配下) が 0 件 (§7-6)", "Mach-O %d 本で 0 件" % len(paths), "合計 %d 件 (%s)。mac/build.sh の strip -S (S2) が入る前のビルド、または効いていない" % (total, detail))

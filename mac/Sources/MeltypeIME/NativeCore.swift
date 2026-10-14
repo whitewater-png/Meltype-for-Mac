@@ -34,6 +34,7 @@ private typealias AbiVersionFunction = @convention(c) () -> Int32
 private typealias ClearLearningFunction = @convention(c) () -> Int32
 private typealias GetFlagFunction = @convention(c) () -> Int32
 private typealias SetFlagFunction = @convention(c) (Int32) -> Int32
+private typealias SettingsSetFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 private typealias TermDomainsFunction = @convention(c) () -> UnsafeMutablePointer<CChar>?
 private typealias SetTermDomainFunction = @convention(c) (UnsafePointer<CChar>?, Int32) -> Int32
 private typealias UpdateEvaluateFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
@@ -198,6 +199,9 @@ final class NativeCore {
     private let getShiftEnterNewlineFunction: GetFlagFunction?
     private let setShiftEnterNewlineFunction: SetFlagFunction?
     private let getKanaInputFunction: GetFlagFunction?
+    /// ABI 版数は上げていない (古い本体には無い)。無ければ Zenzai は使わない。
+    private let getZenzaiFunction: GetFlagFunction?
+    private let settingsSetFunction: SettingsSetFunction?
     private let termDomainsFunction: TermDomainsFunction?
     private let setTermDomainFunction: SetTermDomainFunction?
     private let updateEvaluateFunction: UpdateEvaluateFunction?
@@ -267,6 +271,8 @@ final class NativeCore {
         setShiftEnterNewlineFunction = symbol("meltype_set_shift_enter_newline", as: SetFlagFunction.self)
         // これも ABI 版数は上げていない。無ければ (古い本体) かな入力は使わない
         getKanaInputFunction = symbol("meltype_get_kana_input", as: GetFlagFunction.self)
+        getZenzaiFunction = symbol("meltype_get_zenzai", as: GetFlagFunction.self)
+        settingsSetFunction = symbol("meltype_settings_set", as: SettingsSetFunction.self)
         termDomainsFunction = symbol("meltype_term_domains", as: TermDomainsFunction.self)
         setTermDomainFunction = symbol("meltype_set_term_domain", as: SetTermDomainFunction.self)
         updateEvaluateFunction = symbol("meltype_update_evaluate", as: UpdateEvaluateFunction.self)
@@ -436,6 +442,22 @@ final class NativeCore {
     var kanaInput: Bool {
         guard isCompatible, let getKanaInputFunction else { return false }
         return getKanaInputFunction() == 1
+    }
+
+    /// 設定の「Zenzai (ニューラル変換、実験的)」が ON か。設定は config.json (「Meltype 辞書」の「設定」タブで変える) が持ち、本体が変更を見て読み直す。
+    /// 既定は OFF。本体が古い・合わないときも false (今までの変換)。
+    var zenzaiEnabled: Bool {
+        guard isCompatible, let getZenzaiFunction else { return false }
+        return getZenzaiFunction() == 1
+    }
+
+    /// 設定の Zenzai を切り替えて config.json に保存する (モデルの取得に失敗したとき、OFF に戻すのに使う)。保存できたら true。
+    func setZenzaiEnabled(_ on: Bool) -> Bool {
+        guard isCompatible, let settingsSetFunction else { return false }
+        let reason = "Zenzai".withCString { key in (on ? "true" : "false").withCString { settingsSetFunction(key, $0) } }
+        guard let reason else { return true }
+        freeFunction?(reason)
+        return false
     }
 
     /// 専門用語集の分野の一覧 (ID・名称・語数・有効か)。設定はすべての入力欄で共通 (本体が持つ)。取れなければ空。

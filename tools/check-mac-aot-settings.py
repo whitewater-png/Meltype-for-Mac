@@ -49,6 +49,7 @@ def load(lib_path):
         "meltype_get_continue_after_conversion": ([], i),
         "meltype_set_shift_enter_newline": ([i], i),
         "meltype_get_shift_enter_newline": ([], i),
+        "meltype_get_zenzai": ([], i),
         "meltype_term_create": ([s, ctypes.POINTER(p)], p),
         "meltype_term_rename": ([s, s], p),
         "meltype_term_delete": ([s, ctypes.POINTER(p), ctypes.POINTER(i)], p),
@@ -187,6 +188,16 @@ def child_settings_ops(lib):
     out["input_style"] = items["InputStyle"]
     out["min_length"] = items["PredictionMinLength"]
     out["live_default"] = items["LiveConversion"]["value"]
+    # Zenzai (ニューラル変換): 既定 OFF。設定タブから ON にすると IME 用の getter (meltype_get_zenzai) にすぐ見える。確かめたら OFF に戻す
+    out["zenzai_default"] = items["Zenzai"]["value"]
+    out["flag_zenzai_default"] = lib.meltype_get_zenzai()
+    # 共有の設定は config.json を 0.5 秒に 1 回しか調べない (SharedSettings.IntervalMs)。IME ではこの間隔で反映されるので、ここでも待つ
+    out["set_zenzai"] = setting(lib, "Zenzai", True)
+    time.sleep(0.8)
+    out["flag_zenzai_on"] = lib.meltype_get_zenzai()
+    out["set_zenzai_off"] = setting(lib, "Zenzai", False)
+    time.sleep(0.8)
+    out["flag_zenzai_off"] = lib.meltype_get_zenzai()
     out["set_bool"] = setting(lib, "LiveConversion", False)
     out["set_enum"] = setting(lib, "DetectionLevel", "Conservative")
     out["set_punct"] = setting(lib, "Punctuation", "CommaJapanese")
@@ -728,6 +739,9 @@ def check_settings_tab(lib_path, failures):
         expect(ops["detection"]["label"] == "自動判定の強さ" and ops["detection"]["group"] == "入力" and ops["detection"]["description"], "名前・グループ・説明が違う")
         expect(ops["min_length"]["kind"] == "int" and (ops["min_length"]["min"], ops["min_length"]["max"]) == (1, 5) and ops["min_length"]["value"] == 2, f"数の項目が違う: {ops['min_length']}")
         expect(ops["live_default"] is True, "ライブ変換が既定で ON でない")
+        expect("Zenzai" in ops["keys"] and ops["zenzai_default"] is False and ops["flag_zenzai_default"] == 0, "Zenzai が一覧に無い、または既定で OFF でない")
+        expect(ops["set_zenzai"] is None and ops["flag_zenzai_on"] == 1, "Zenzai を ON にしても、IME 用の getter (meltype_get_zenzai) に見えない")
+        expect(ops["set_zenzai_off"] is None and ops["flag_zenzai_off"] == 0, "Zenzai を OFF に戻しても、IME 用の getter に見えない")
         for name in ("set_bool", "set_enum", "set_punct", "set_int", "set_continue", "set_shift_enter", "set_log"):
             expect(ops[name] is None, f"設定を保存できない ({name}): {ops[name]}")
         expect(ops["bad_unknown"] and "NoSuchKey" in ops["bad_unknown"], f"未知の項目を断らない: {ops['bad_unknown']}")

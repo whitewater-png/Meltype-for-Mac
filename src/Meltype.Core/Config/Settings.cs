@@ -197,6 +197,10 @@ public sealed class Settings
      Description("Keyboard モードで、Space を押さなくても打ったそばから漢字に変換して表示します。")]
     public bool LiveConversion { get; set; } = true;
 
+    [Category("1. 全般"), DisplayName("Zenzai (ニューラル変換、実験的)"),
+     Description("文脈に合う漢字が先頭に来やすくなります。ON にすると変換モデル (約 74 MB) を 1 回だけダウンロードします。ダウンロードが終わるまでは今までどおりの変換です。")]
+    public bool Zenzai { get; set; }
+
     [Category("1. 全般"), DisplayName("変換後も続けて入力できる"),
      Description("Space で変換したあと、続けて文字を打っても確定せず、打った文字を含めて編集・変換を続ける。OFF のときは、今までどおり変換した結果を確定して新しい入力を始めます。現在は Mac 版だけで動きます (入力メニューの「変換後も続けて入力できる」で切り替え)。")]
     public bool ContinueAfterConversion { get; set; }

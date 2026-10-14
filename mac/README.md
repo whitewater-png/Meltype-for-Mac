@@ -50,6 +50,17 @@ cd mac
 - 打った英字を「英字のまま」/「かなにする」と Meltype が覚えた語 (`languages.json`) を一覧で見られる (⌘3)。語で検索し、追加・編集 (つづり・扱い)・削除ができる。手で足した語・直した語は 2 回目を待たずにすぐ効く。削除は元に戻せない。
 - 変えるとすぐ `languages.json` に保存され、動いている IME も次に語を確かめるときに読み直す。入力メニューの「学習データをすべて消去」は、これを含む学習データ全部を消す。
 
+## Zenzai (ニューラル変換、実験的) とモデルの取得 (通信)
+
+- 設定タブの「Zenzai (ニューラル変換、実験的)」(`Settings.Zenzai`、既定 OFF)。ON にすると、文脈に合う漢字が先頭に来やすくなる (実験: 212 文で第一候補の一致 +17〜22 ポイント、1 キーの p95 61 ms、メモリ +30〜100 MB。CPU 版。`docs/ZENZAI_EXPERIMENT_2026-10.md`)。
+- **通信**: ON にしたときだけ、IME が変換モデル (zenz-v3.1-small の Q5_K_M、73,871,968 バイト) を `https://huggingface.co/Miwa-Keita/zenz-v3.1-small-gguf/resolve/main/ggml-model-Q5_K_M.gguf` から 1 回取得する (GET。転送先は `huggingface.co` と `*.cdn.hf.co` (実測 `us.aws.cdn.hf.co`) の https だけ。認証・Cookie・キャッシュなし、使い捨てセッション)。打った内容は送らない。OFF のあいだは通信しない。ダウンロードが終わるまで (と、失敗したとき) は、今までどおりの変換。
+- **検査**: サイズと SHA-256 (`4de930c0…14f6c`) をアプリに固定していて、一時ファイルに書いて検査してから所定の場所に移す。一致しなければ捨てて、設定を OFF に戻す。重い native コード (llama.cpp) に読ませるのは、この検査を通った 1 ファイルだけ。
+- **保存場所**: `~/Library/Application Support/Meltype/models/zenz-v3.1-small-Q5_K_M.gguf` (フォルダー 0700、ファイル 0600)。**消し方**: `models/` を消せばよい (次に ON のとき取り直す)。`uninstall.sh --remove-data` でデータごと消える。
+- **状態の表示**: IME が `~/Library/Application Support/Meltype/zenzai.json` (`state` = downloading / ready / failed / slow、`progress`、`error`、`updatedAt`。0600) に書き、「Meltype 辞書」の設定タブの Zenzai の下に「ダウンロード中 (xx%)」「失敗: …」「準備できました」「遅いため一時的に OFF」を出す。壊れていれば何も出さない。
+- **安全弁**: モデルを読み込めなかった、または 1 キーの変換 (予測・ライブ変換・文節候補の合計) が 300 ms を超えることが 3 キー続いたら、その IME のプロセスでは Zenzai を使わない (設定はそのまま。IME を起動し直すと戻る)。
+- **確かめ方** (開発者向け): `.build/release/MeltypeIME --zenzai-self-test` (一時フォルダーとローカルのファイルで、ダウンロード中・失敗・準備完了を確かめる。通信しない)。`--network` を付けると本物の URL から 1 回だけ取得して、サイズと SHA-256 を確かめる。`--weights <gguf> --cases eval/kanji/kanji-cases.tsv` を付けると、製品の変換の経路で OFF と ON の一致数を比べる。
+- ビルド: `Package.swift` は swift-tools-version 6.1、azooKey に trait `ZenzaiCPU` (CPU 版。GPU 版は llama.cpp b4846 の Metal 初期化で落ちるので使わない) と `.interoperabilityMode(.Cxx)`。`llama.framework` は `build.sh` が `otool -L` に出るものだけ同梱し (B1)、自分の CPU の分だけに薄くする (`lipo -thin`)。
+
 ## 新しい版の通知と更新 (通信)
 
 - 既定 ON。入力メニューの「更新を確認する」(チェック付き) でいつでも ON/OFF。設定は `~/Library/Application Support/Meltype/update.json` (`enabled` / `lastCheck` / `notifiedVersion`、0600。`uninstall.sh --remove-data` でデータごと消える)。

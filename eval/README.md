@@ -59,3 +59,8 @@
 ## 回帰ゲート
 
 `tools/eval-compare.sh <base-tree> <new-tree> <cases-dir> <out-dir>` が、2 つの作業ツリーで同じ表を回します。`broken` (base で当たり、new で外れた) が 1 件でもあれば終了コード 1、dotnet や入力の失敗は 2、問題なしは 0 です。本家のゲートは broken + addedFailing ですが、こちらは broken のみです (同じフォルダーの表なら added は 0)。手順は [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) を見てください。
+
+## かな→漢字の正解表 (`eval/kanji/kanji-cases.tsv`)
+
+Zenzai (ニューラル変換) の計測用の、かな → 漢字の正解表です (212 文。列: category / reading / expected / left_context / note / accepted。accepted は `|` 区切りの別の正解)。上の `cases/` (日英判定用) とは別物で、日英判定の `--expect-all` には読ませません。
+計測は `exp/zenzai-1-1` ブランチの `ZenzaiEval` (結果は [docs/ZENZAI_EXPERIMENT_2026-10.md](../docs/ZENZAI_EXPERIMENT_2026-10.md))。製品の変換の経路での配線の確認は `MeltypeIME --zenzai-self-test --weights <gguf> --cases eval/kanji/kanji-cases.tsv` (`mac/README.md`)。

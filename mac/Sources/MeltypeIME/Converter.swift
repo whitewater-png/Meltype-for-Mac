@@ -14,6 +14,7 @@ final class MeltypeConverter {
     // ビルドしたマシンのフォルダーしか見ない。辞書のバンドルは Contents/Resources に入れているので、見つからずに落ちていた (#26)。
     // (Meltype.app の直下には置けない: 署名が通らない)。なので、辞書の場所をこちらで渡す。
     private let converter: KanaKanjiConverter
+    /// Zenzai を使わない (.off) 基本の変換オプション。Zenzai を使うときは、要求ごとに zenzaiMode (左文脈を含む) だけ差し替えた複製を使う (requestCandidates)。
     private let options: ConvertRequestOptions
 
     /// true のとき、変換のたびに azooKey の組版 (stopComposition) を終えず、差分変換 (kana2lattice_changed / no_change) を使う。
@@ -55,11 +56,32 @@ final class MeltypeConverter {
 
     private convenience init() {
         self.init(dictionaryURL: MeltypeConverter.resource("Dictionary"), emojiDictionaryURL: MeltypeConverter.emojiDictionary(),
-                  memoryDirectory: MeltypeConverter.defaultMemoryDirectory, incremental: true)
+                  memoryDirectory: MeltypeConverter.defaultMemoryDirectory, incremental: true,
+                  zenzai: ZenzaiModel.shared, zenzaiEnabled: { NativeCore.shared.zenzaiEnabled })
     }
 
+    /// Zenzai (ニューラル変換) のモデルの管理と、設定が ON か。zenzai が nil なら、常に使わない (ベンチなど)。
+    private let zenzai: ZenzaiModel?
+    private let zenzaiEnabled: () -> Bool
+
+    /// Zenzai の推論の上限。実験 (docs/ZENZAI_EXPERIMENT_2026-10.md) で 3 で頭打ち (5 でも増えない) だった。
+    private static let zenzaiInferenceLimit = 3
+    /// 1 キーの変換 (予測・ライブ変換・文節候補の呼び出しの合計) がこの時間を超えるのが、連続この回数になったら、このプロセスでは Zenzai を使わない。
+    private static let zenzaiSlowSeconds = 0.3
+    private static let zenzaiSlowStreakLimit = 3
+    /// 前の呼び出しの終わりから、この時間以内に始まった呼び出しは、同じキーのものとして数える (Core は 1 キーのうちに続けて呼ぶ)。
+    private static let zenzaiSameKeyGap = 0.1
+    private var zenzaiWarmedUp = false
+    private var zenzaiLastEnd: Date?
+    private var zenzaiKeyTotal = 0.0
+    private var zenzaiKeyIsSlow = false
+    private var zenzaiSlowStreak = 0
+
     /// 辞書・学習データの場所と、差分変換を使うかを指定して作る (ベンチが従来・新の 2 つを比べるのに使う。通常は shared)。
-    init(dictionaryURL: URL, emojiDictionaryURL: URL, memoryDirectory directory: URL, incremental: Bool) {
+    init(dictionaryURL: URL, emojiDictionaryURL: URL, memoryDirectory directory: URL, incremental: Bool,
+         zenzai: ZenzaiModel? = nil, zenzaiEnabled: @escaping () -> Bool = { false }) {
+        self.zenzai = zenzai
+        self.zenzaiEnabled = zenzaiEnabled
         self.incremental = incremental
         let engine = KanaKanjiConverter(dicdataStore: DicdataStore(dictionaryURL: dictionaryURL))
         converter = engine
@@ -104,18 +126,79 @@ final class MeltypeConverter {
     private static let resultCacheLimit = 16
 
     /// ひらがな全体に対する変換結果 (入力をすべて使ったものだけ、よい順)。
-    private func results(for hiragana: String) -> [Candidate] {
-        if let cached = resultCache[hiragana] {
+    /// Zenzai を使うときは、結果が左文脈で変わるので、左文脈もキャッシュの鍵に入れる (同じ読みを文脈ありとなしで続けて変換して、
+    /// 2 度目が 1 度目の結果に当たらないように)。Zenzai を使わないときの鍵は、今までどおり読みだけ。
+    private func results(for hiragana: String, context: String? = nil) -> [Candidate] {
+        let leftContext = zenzaiActive ? (context ?? "") : nil
+        let key = leftContext.map { "Z\u{1}" + $0 + "\u{1}" + hiragana } ?? hiragana
+        if let cached = resultCache[key] {
             remember(cached, for: hiragana)
             return cached
         }
-        let filtered = rawMainResults(for: hiragana)
+        let filtered = rawMainResults(for: hiragana, context: context)
         if resultCacheOrder.count >= MeltypeConverter.resultCacheLimit {
             resultCache.removeValue(forKey: resultCacheOrder.removeFirst())
         }
-        resultCacheOrder.append(hiragana)
-        resultCache[hiragana] = filtered
+        resultCacheOrder.append(key)
+        resultCache[key] = filtered
         return filtered
+    }
+
+    /// Zenzai を、今の要求に使うか: 設定が ON で、モデルが準備でき、このプロセスで止められていない。
+    private var zenzaiActive: Bool {
+        guard let zenzai, zenzai.isUsable else { return false }
+        return zenzaiEnabled()
+    }
+
+    /// azooKey に変換を要求する。Zenzai を使うときは、この要求の左文脈を入れたオプションにする (context が空なら左文脈なし)。
+    /// ConvertRequestOptions は値型で、複製は軽い (重いのは辞書や学習データの参照ではなく、Zenzai のモデルを読む最初の 1 回だけ)。
+    /// prediction が true なら、予測も要求する (通常の変換結果が変わらないよう、予測は予測変換のときだけ .manualMix で要求する)。
+    private func requestCandidates(_ composing: ComposingText, reading: String, context: String?, prediction: Bool = false) -> ConversionResult {
+        var request = options
+        if prediction { request.requireJapanesePrediction = .manualMix }
+        guard zenzaiActive, let zenzai else {
+            return inSession(for: reading) { converter.requestCandidates(composing, options: request) }
+        }
+        // personalizationMode は既定値が無いので明記する。profile も空 (個人の情報は渡さない)
+        request.zenzaiMode = .on(weight: zenzai.weightURL, inferenceLimit: Self.zenzaiInferenceLimit, requestRichCandidates: false,
+                                 personalizationMode: nil, versionDependentMode: .v3(.init(profile: "", leftSideContext: context ?? "")))
+        let start = Date()
+        let result = inSession(for: reading) { converter.requestCandidates(composing, options: request) }
+        noteZenzaiRequest(from: start)
+        return result
+    }
+
+    /// Zenzai を使った 1 回の要求の安全弁。モデルを読み込めなかった (azooKey は黙って Zenzai なしの変換に落ちる) か、
+    /// 1 キーの変換が遅いことが続いたら、このプロセスでは Zenzai を使わない (IME を起動し直すと戻る)。
+    private func noteZenzaiRequest(from start: Date) {
+        guard let zenzai else { return }
+        let end = Date()
+        // 読み込みに失敗すると、azooKey は zenzStatus に理由を足す ("load <URL>    <理由>")。成功のときは足さない
+        if converter.zenzStatus.contains("    ") {
+            zenzai.suspend(reason: "モデルを読み込めなかったため一時的に OFF")
+            return
+        }
+        // 最初の 1 回はモデルの読み込み (数百 ms〜数秒、1 回だけ) を含むので、遅さの数には入れない
+        guard zenzaiWarmedUp else {
+            zenzaiWarmedUp = true
+            zenzaiLastEnd = end
+            return
+        }
+        if let last = zenzaiLastEnd, start.timeIntervalSince(last) > Self.zenzaiSameKeyGap {
+            // 新しいキー。前のキーが遅くなかったら、連続を切る
+            if !zenzaiKeyIsSlow { zenzaiSlowStreak = 0 }
+            zenzaiKeyTotal = 0
+            zenzaiKeyIsSlow = false
+        }
+        zenzaiKeyTotal += end.timeIntervalSince(start)
+        zenzaiLastEnd = end
+        if zenzaiKeyTotal > Self.zenzaiSlowSeconds, !zenzaiKeyIsSlow {
+            zenzaiKeyIsSlow = true
+            zenzaiSlowStreak += 1
+            if zenzaiSlowStreak >= Self.zenzaiSlowStreakLimit {
+                zenzai.suspend(reason: "変換が遅いため一時的に OFF")
+            }
+        }
     }
 
     /// 要求の読みに合うセッションを選んで body を実行する。読みの共通接頭辞が最長のセッション (同点は最近使った方)、
@@ -155,10 +238,10 @@ final class MeltypeConverter {
     }
 
     /// キャッシュ (resultCache) を通さずに azooKey を呼んだ、入力をすべて使った変換結果 (よい順)。
-    func rawMainResults(for hiragana: String) -> [Candidate] {
+    func rawMainResults(for hiragana: String, context: String? = nil) -> [Candidate] {
         var composing = ComposingText()
         composing.insertAtCursorPosition(hiragana, inputStyle: .direct)
-        let results = inSession(for: hiragana) { converter.requestCandidates(composing, options: options) }
+        let results = requestCandidates(composing, reading: hiragana, context: context)
         let count = hiragana.count
         // 入力 (ひらがな) をすべて使った候補だけ (.direct で入れたので、入力の文字数 = ひらがなの文字数)
         let filtered = results.mainResults.filter { $0.composingCount == .inputCount(count) || $0.composingCount == .surfaceCount(count) }
@@ -209,7 +292,7 @@ final class MeltypeConverter {
 
     /// 文節に区切った変換結果 (読みをつなげると元のひらがなになる)。変換できなければ空。
     func clauses(for hiragana: String, context: String?) -> [(reading: String, text: String)] {
-        guard let best = results(for: hiragana).first else { return [] }
+        guard let best = results(for: hiragana, context: context).first else { return [] }
         var clauses: [(reading: String, text: String)] = []
         for element in best.data {
             let reading = element.ruby.applyingTransform(.hiraganaToKatakana, reverse: true) ?? element.ruby
@@ -228,13 +311,11 @@ final class MeltypeConverter {
     }
 
     /// 読みに対する予測候補 (読みそのままのものは除き、重複なし、8 個まで)。
-    /// 通常の変換結果が変わらないよう、予測は予測変換のときだけ .manualMix で要求する (変換のたびに予測を計算しない)。
     func predictions(for hiragana: String) -> [String] {
         var composing = ComposingText()
         composing.insertAtCursorPosition(hiragana, inputStyle: .direct)
-        var predictionOptions = options
-        predictionOptions.requireJapanesePrediction = .manualMix
-        let results = inSession(for: hiragana) { converter.requestCandidates(composing, options: predictionOptions) }
+        // 予測は左文脈なしで要求する (実験と同じ。1 キーの 95% 61 ms は、この呼び方で測った値)
+        let results = requestCandidates(composing, reading: hiragana, context: nil, prediction: true)
         var seen = Set<String>()
         var list: [String] = []
         for candidate in results.predictionResults where candidate.text != hiragana && seen.insert(candidate.text).inserted {

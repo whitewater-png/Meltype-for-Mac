@@ -31,6 +31,17 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate {
     weak var hostWindow: NSWindow?
     private var window: NSWindow? { view.window ?? hostWindow }
 
+    private static let zenzaiKey = "Zenzai"
+    /// Zenzai のモデルの状態 (「ダウンロード中 (xx%)」「失敗: …」「準備できました」)。状態が無いときは隠す。
+    private let zenzaiStatusLabel = UI.label("", secondary: true)
+
+    /// IME が書く zenzai.json を読んで、状態の文を出す。壊れていれば (OFF 扱いで) 何も出さない。
+    private func updateZenzaiStatus() {
+        let text = dictionary.dataDirectory.flatMap { ZenzaiStatus.read(dataDirectory: $0) }?.displayText()
+        zenzaiStatusLabel.stringValue = text ?? ""
+        zenzaiStatusLabel.isHidden = text == nil
+    }
+
     /// 説明の文字を、チェックボックスの文字にそろえるための字下げ。
     private static let indent: CGFloat = 20
     private static let maxContentWidth: CGFloat = 640
@@ -207,7 +218,14 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate {
             line = indented(stack, by: Self.indent)
         }
 
-        let block = NSStackView(views: [line, indented(description, by: descriptionIndent)])
+        var parts = [line, indented(description, by: descriptionIndent)]
+        // Zenzai は、モデルの取得 (IME が行う) の状態を、説明の下に 1 行出す (zenzai.json。ダウンロード中・失敗・準備できました)
+        if item.key == Self.zenzaiKey {
+            zenzaiStatusLabel.setAccessibilityLabel("Zenzai の状態")
+            parts.append(indented(zenzaiStatusLabel, by: descriptionIndent))
+            updateZenzaiStatus()
+        }
+        let block = NSStackView(views: parts)
         block.orientation = .vertical
         block.alignment = .leading
         block.spacing = 2
@@ -264,6 +282,7 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate {
         // タブの画面は、初めて開くまで作られない (作る前に組み立てると、loadView で順番が崩れる)
         guard isViewLoaded else { return }
         reload()
+        updateZenzaiStatus()
     }
 
     /// 入力中の数の欄を、内容を保存せずに閉じる (閉じるときに action が送られて、古い値を書き戻さないように)。

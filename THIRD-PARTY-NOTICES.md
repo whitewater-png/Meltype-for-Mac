@@ -48,6 +48,8 @@ Meltype.app には、このファイルと各ライセンスの全文を `Conten
 | [Jinja](https://github.com/johnmai-dev/Jinja) (Copyright (c) 2024 John Mai) | MIT License | swift-tokenizers の依存として取得され、Meltype.app に組み込まれる |
 | [swift-collections](https://github.com/apple/swift-collections) | Apache License 2.0 (Runtime Library Exception 付き) | AzooKeyKanaKanjiConverter の依存として取得され、Meltype.app に組み込まれる |
 | [swift-algorithms](https://github.com/apple/swift-algorithms) | Apache License 2.0 (Runtime Library Exception 付き) | 同上 |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) (Copyright (c) The ggml authors。azooKey が配る出来合いの `llama.framework` (b4846) をそのまま使う) | MIT License | Meltype.app の `Contents/Frameworks/llama.framework` に同梱する (Zenzai のニューラル変換の実行に使う。既定 OFF)。ライセンス全文は <https://github.com/ggml-org/llama.cpp/blob/master/LICENSE> |
+| [zenz-v3.1-small](https://huggingface.co/Miwa-Keita/zenz-v3.1-small-gguf) (Copyright Miwa Keita (Keita Miwa)。かな漢字変換のニューラルモデルの重み。`ggml-model-Q5_K_M.gguf`、約 74 MB) | CC BY-SA 4.0 (<https://creativecommons.org/licenses/by-sa/4.0/>) | **Meltype.app には同梱しない**。設定の「Zenzai」を ON にしたときだけ、利用者の Mac が Hugging Face から 1 回ダウンロードして `~/Library/Application Support/Meltype/models/` に置く (サイズと SHA-256 を固定して検査する)。Meltype は重みを改変しない |
 | [swift-numerics](https://github.com/apple/swift-numerics) | Apache License 2.0 (Runtime Library Exception 付き) | 同上 |
 | .NET ランタイム (NativeAOT) | MIT License | libMeltypeNative.dylib に組み込まれる |
 

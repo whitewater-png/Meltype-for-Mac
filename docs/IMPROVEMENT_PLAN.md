@@ -2366,3 +2366,15 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - 注意: `plutil -insert` は Info.plist のコメントを消して並べ替えるので、plist は手で編集する。
 - 残り: 入力メニュー用の 16/32px tiff は別の元絵なので、絵柄を揃えるなら同じ元絵から tiff も作り直す (今は保留。小さいサイズでは今の tiff のほうが見やすい)。
 
+## 追加項目 1-1 (Zenzai)
+
+- **設計・実験**: 設計は [ZENZAI_DESIGN_1-1.md](ZENZAI_DESIGN_1-1.md) (§3 が製品の形)、実験の結果は [ZENZAI_EXPERIMENT_2026-10.md](ZENZAI_EXPERIMENT_2026-10.md) (212 文で第一候補の一致 +17〜22 ポイント、1 キーの p95 61 ms、メモリ +30〜100 MB。CPU 版)。決定: go。既定 OFF、推論の上限 3、左文脈あり、CPU 版、重みは ON にしたときだけ取得。
+- **実装の要点**:
+  - `mac/Package.swift` を swift-tools-version 6.1、azooKey に trait `ZenzaiCPU`、`.interoperabilityMode(.Cxx)` に。GPU 版 (`Zenzai`) は llama.cpp b4846 の Metal 初期化で落ちるので使わない。
+  - B1: `build.sh` が `otool -L` に出るフレームワークだけを同梱し (`llama.framework` は `lipo -thin` で自分の CPU の分だけに)、`tools/check-release.py` が `Contents/Frameworks` と一致するかを検査する。ビルド機の絶対パスが文字列に残らないよう、`swift build` に `-ffile-prefix-map` を渡す。
+  - 設定 `Settings.Zenzai` (既定 false)・設定タブの項目・IME 用の getter `meltype_get_zenzai` (ABI 版数は上げない)。
+  - `ZenzaiModel.swift`: モデル (73,871,968 バイト、SHA-256 固定) を、設定が ON のときだけ IME が取得する (Updater と同じ作法。転送先は `huggingface.co` と `*.cdn.hf.co`)。状態は `zenzai.json` で辞書アプリの設定タブに出す。失敗したら設定を OFF に戻す。
+  - `Converter.swift`: 要求ごとに `zenzaiMode` (`.on(… .v3(.init(profile: "", leftSideContext: context)))`) を決め、結果キャッシュの鍵に左文脈を足す。モデルを読めない・1 キーが 300 ms 超を 3 キー続けて、はそのプロセスだけ OFF。
+- **実機で確かめること** (リョウさん): ① 設定タブで ON → 状態が「ダウンロード中 (xx%)」→「準備できました」になり、そのあと変換が変わる (同音異義語・文脈で漢字が選ばれる) ② OFF に戻すと今までの変換に戻る ③ 機内モード (ネットワーク無し) で ON → 「失敗: …」が出て、スイッチが OFF に戻る ④ パスワード欄 (秘匿入力) では Meltype がキーを触らないので変換は起きない (左文脈も渡らない) ⑤ M1 級の Mac が有れば、打ち心地 (K67) ⑥ `~/Library/Application Support/Meltype/models/` を消してから ON → 取り直す。
+- **未確認 (この作業では確かめていない)**: 実機の IME での操作 (①〜⑥)。macOS 13.0〜13.2 での起動 (llama.framework の minos が 13.3 で、`LSMinimumSystemVersion` (13.0) より新しい。`tools/check-release.py` の minos の検査が FAIL する。13.3 に上げるかはリョウさんが決める)。llama.framework に残る上流の作者のパス (`/Users/miwa/` 55 件、`tools/check-release.py` のビルド機のパスの検査が FAIL する)。llama.cpp の MIT ライセンス全文を Meltype.app の `Licenses/` に入れること (今は THIRD-PARTY-NOTICES に表記だけ)。
+
