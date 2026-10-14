@@ -2378,3 +2378,8 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **実機で確かめること** (リョウさん): ① 設定タブで ON → 状態が「ダウンロード中 (xx%)」→「準備できました」になり、そのあと変換が変わる (同音異義語・文脈で漢字が選ばれる) ② OFF に戻すと今までの変換に戻る ③ 機内モード (ネットワーク無し) で ON → 「失敗: …」が出て、スイッチが OFF に戻る ④ パスワード欄 (秘匿入力) では Meltype がキーを触らないので変換は起きない (左文脈も渡らない) ⑤ M1 級の Mac が有れば、打ち心地 (K67) ⑥ `~/Library/Application Support/Meltype/models/` を消してから ON → 取り直す。
 - **未確認 (この作業では確かめていない)**: 実機の IME での操作 (①〜⑥)。macOS 13.0〜13.2 での起動 (llama.framework の minos が 13.3 で、`LSMinimumSystemVersion` (13.0) より新しい。`tools/check-release.py` の minos の検査が FAIL する。13.3 に上げるかはリョウさんが決める)。llama.framework に残る上流の作者のパス (`/Users/miwa/` 55 件、`tools/check-release.py` のビルド機のパスの検査が FAIL する)。llama.cpp の MIT ライセンス全文を Meltype.app の `Licenses/` に入れること (今は THIRD-PARTY-NOTICES に表記だけ)。
 
+### 1-1 の実機確認 (2026-10-14、macOS 26.6.2、JIS、feat/zenzai 51767c3)
+- OFF のままの変換は従来どおり。設定タブで ON → 「ダウンロード中」→「準備できました」。左文脈で「講演」「公園」が切り替わり、日英混在 (`kyouhameetingdesu`) も従来どおり。OFF に戻すと状態文が OFF になり変換が元に戻る。リョウさん「きちんと動作しました」。
+- 通信を切った状態での失敗表示は実機では未確認 (自己テスト `--zenzai-self-test` の取得元なし・SHA 不一致・転送先拒否の経路で代替)。
+- 査読: R39 (実験の計測と結果)、R40 (製品実装、セキュリティ重視: 必須 0、推奨 9 を反映)。
+
