@@ -4,7 +4,7 @@
 import AppKit
 import MeltypeDictionaryKit
 
-/// メインのウインドウ: 「ユーザー辞書」「専門用語集」「学習した語」「設定」のタブ。メニューの独自の項目 (登録・取り込み・書き出し・検索・タブの切り替え) を受ける
+/// メインのウインドウ: 「ユーザー辞書」「専門用語集」「学習した語」「設定」「判定を調べる」のタブ。メニューの独自の項目 (登録・取り込み・書き出し・検索・タブの切り替え) を受ける
 /// (ウインドウの delegate はアクションの responder chain に入る)。取り消す (⌘Z) は、ユーザー辞書・専門用語集・設定のタブで 1 つの NSUndoManager を共有する。
 /// 「学習した語」のタブには取り消しが無いので、そのタブを選んでいる間は別の空の NSUndoManager を返す (⌘Z でほかのタブの変更を取り消さないように)。
 final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
@@ -14,6 +14,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private let termController: TermDictionaryViewController
     private let learnedController: LearnedWordsViewController
     private let settingsController: SettingsViewController
+    private let judgeController: JudgeViewController
     /// ウインドウの取り消し (windowWillReturnUndoManager で返す)。学習した語のタブは learnedUndoManager。
     private let sharedUndoManager = UndoManager()
     private let learnedUndoManager = UndoManager()
@@ -24,6 +25,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         termController = TermDictionaryViewController(dictionary: dictionary)
         learnedController = LearnedWordsViewController(operations: dictionary)
         settingsController = SettingsViewController(dictionary: dictionary)
+        judgeController = JudgeViewController(dictionary: dictionary)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 620),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = MainMenu.appName
@@ -49,6 +51,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         let settingsTab = NSTabViewItem(viewController: settingsController)
         settingsTab.label = "設定"
         tabs.addTabViewItem(settingsTab)
+        let judgeTab = NSTabViewItem(viewController: judgeController)
+        judgeTab.label = "判定を調べる"
+        tabs.addTabViewItem(judgeTab)
         window.contentViewController = tabs
         window.setContentSize(NSSize(width: 900, height: 620))
         window.delegate = self
@@ -57,6 +62,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         termController.hostWindow = window
         learnedController.hostWindow = window
         settingsController.hostWindow = window
+        judgeController.hostWindow = window
         // 片方のタブの変更 (専門用語の「直す」でユーザー辞書が変わるなど) を、もう片方にもすぐ反映する
         userController.didChange = { [weak self] in self?.termController.pollChanges() }
         termController.didChange = { [weak self] in self?.userController.pollChanges() }
@@ -78,17 +84,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         termController.pollChanges()
         learnedController.pollChanges()
         settingsController.pollChanges()
+        judgeController.pollChanges()
     }
 
     // ---- メニュー ----
 
-    /// タブの位置 (表示メニューの ⌘1〜⌘4 と同じ順)。
-    private enum Tab: Int { case user = 0, term, learned, settings }
+    /// タブの位置 (表示メニューの ⌘1〜⌘5 と同じ順)。
+    private enum Tab: Int { case user = 0, term, learned, settings, judge }
 
-    /// 設定のタブには検索が無い。
+    /// 設定・判定を調べるのタブには検索が無い。
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(focusSearch(_:)): return tabs.selectedTabViewItemIndex != Tab.settings.rawValue
+        case #selector(focusSearch(_:)): return ![Tab.settings.rawValue, Tab.judge.rawValue].contains(tabs.selectedTabViewItemIndex)
         case #selector(moveToTermDomain(_:)): return tabs.selectedTabViewItemIndex == 0 && userController.hasSelection
         case #selector(exportTermDomain(_:)): return tabs.selectedTabViewItemIndex == 1 && termController.hasUserDomainSelected
         default: return true
@@ -115,7 +122,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case 0: userController.focusSearch()
         case 1: termController.focusSearch()
         case Tab.learned.rawValue: learnedController.focusSearch()
-        default: break   // 設定のタブに検索は無い
+        default: break   // 設定・判定を調べるのタブに検索は無い
         }
     }
 
@@ -147,6 +154,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc func showLearnedWords(_ sender: Any?) { tabs.selectedTabViewItemIndex = Tab.learned.rawValue }
 
     @objc func showSettings(_ sender: Any?) { tabs.selectedTabViewItemIndex = Tab.settings.rawValue }
+
+    @objc func showJudge(_ sender: Any?) { tabs.selectedTabViewItemIndex = Tab.judge.rawValue }
 
     @objc func openDataFolder(_ sender: Any?) {
         guard let directory = dictionary.dataDirectory else { return }

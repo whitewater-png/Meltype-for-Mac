@@ -2383,3 +2383,14 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - 通信を切った状態での失敗表示は実機では未確認 (自己テスト `--zenzai-self-test` の取得元なし・SHA 不一致・転送先拒否の経路で代替)。
 - 査読: R39 (実験の計測と結果)、R40 (製品実装、セキュリティ重視: 必須 0、推奨 9 を反映)。
 
+## 追加項目 1-3 (「判定を調べる」タブ)
+
+- **設計の前提のずれ** ([DESIGN-1-2-1-3](STRATEGY_2026-10.md) の調査): 計画書の「Core の判定理由は既にある」は誤りで、理由と点数を持つのは Windows の `ScoreEngine` だけ。Mac の判定 `CompositionDetector` は bool を返すだけで、分岐は約 35 か所に散らばる。
+- **切り分け方式にした理由**: 理由を付ける本格版 (中〜高、1 週間超) は避け、同じ入力を条件を 1 つずつ変えて判定し直し、結果が変わる条件を並べる。「どうすれば直るか」に直接答えられ、嘘の理由を出さない。損: 「なぜそうなったか」の文は出ない。得: 変更が小さい。
+- **実装**: Core `DictionaryManagement.ExplainDetection` (TSV。条件は memory-off / memory-without:語 / before-* / after-* / level:*、2 回目待ちの語は memory-pending)。学習した語を 1 つ外す試しは、`LanguageMemory` が封印・非仮想なので包みではなく、ファイルに結び付かない写し (`CopyWithout`) で行う (languages.json は読むだけ)。判定器は `CreateDefault` + 共有の学習 + `IsCommonJapanese` で IME と揃え、1 回だけ作って使い回す (初回 36 ms、2 回目以降 0.4〜3 ms。AOT 版で実測)。
+- **英単語の判定の差**: 画面から `meltype_set_word_checker` で NSSpellChecker を登録し、IME と同じ答えにする (未登録なら同梱の表)。`isWordCallback` は IME 側と辞書アプリ側 (`WordChecker.swift`) に同じものを置き、互いに「同じにしておく」と書いた (IME は AppKit を持ち込まない Kit に移せなかったため複製)。
+- **ABI 9 → 10** (`Exports.AbiVersion`、`NativeDictionary`、`NativeCore` の 3 か所)。`tools/check-mac-aot-settings.py` の版数の期待値も 10 に。並行する 1-2 は 11 を取る。
+- **english.txt の読み直し**: 辞書ファイルは `MeltypeSession.CreateDefault` (= 入力欄ごとの入力のセッションの作成、IME の `InputController.init`) で 1 回だけ読む。この画面の判定器も最初に調べるときに 1 回。案内文はこのとおりに書いた。
+- **実機で確かめること** (リョウさん): ① 「設定・辞書…」の ⌘5 のタブで `kyouhasushidesu` を打つと区間と「条件を変えた場合」が出る ② 「学習した語」に sushi (英字) を足すと「学習した語「sushi」を外す → …」と「この語を消す」が出て、確認のあと消せる (languages.json は調べるだけでは変わらない) ③ 判定の強さ・かな入力の既定が設定タブの今の値になる ④ IME での実際の判定と、画面の区間が一致する (NSSpellChecker 登録の効果。特に `zh` のような語) ⑤ english.txt に語を足したあとの反映の時期が案内文のとおり。
+- **未確認**: 画面 (AppKit) の見た目と操作は自動テストが無く、実機で見ていない。IME の判定との一致 (④) は実機未確認。
+

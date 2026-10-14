@@ -51,8 +51,9 @@ public static unsafe class Exports
     /// 7: 設定タブの関数 (meltype_settings_get / meltype_settings_set / meltype_settings_reset) を足した。
     /// 8: 自作の専門用語集の関数 (meltype_term_create ほか) を足し、meltype_term_domains の各行に 5 つ目の欄 (自作なら 1) を足した。
     /// 9: 学習した語の関数 (meltype_learned_words / _version / _check / _set / _remove) を足した。
+    /// 10: 判定を調べる (meltype_explain_detection と、画面のプロセスで英単語を調べる関数を登録する meltype_set_word_checker) を足した。
     /// </summary>
-    public const int AbiVersion = 9;
+    public const int AbiVersion = 10;
 
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
@@ -715,6 +716,33 @@ public static unsafe class Exports
         {
             return Failure("学習した語の削除", ex);
         }
+    }
+
+    /// <summary>
+    /// 英単語かを調べる Swift 側の関数 (meltype_init の isWord と同じ引数: 小文字の英単語 → 英語として正しい綴りなら 1) を登録する。
+    /// 「Meltype 辞書」の画面は meltype_init を呼ばないので、「判定を調べる」の答えを IME (NSSpellChecker) と揃えるのに使う (最初に 1 回)。
+    /// NULL を渡すと外す (同梱の英単語表に戻る)。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_set_word_checker")]
+    public static void SetWordChecker(delegate* unmanaged<byte*, int> isWord)
+    {
+        s_isWord = isWord;
+        DictionaryManagement.ExternalWordChecker = isWord == null ? null : new CallbackWordChecker();
+    }
+
+    /// <summary>
+    /// 打ったローマ字 (typed) の区間分けと、条件を 1 つだけ変えたときに変わるかを返す (形は DictionaryManagement.ExplainDetection)。
+    /// before・after はキャレットの前後の文字 (NULL 可。20 文字で切る)、level は判定の強さ (0 積極的・1 標準・2 慎重・3 手動)、kanaInput は 1 ならかな入力。
+    /// 学習 (languages.json) は読むだけで変えない。取れなければ NULL。meltype_free で解放する。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_explain_detection")]
+    public static byte* ExplainDetection(byte* typed, byte* before, byte* after, int level, int kanaInput)
+    {
+        var typedText = FromUtf8(typed) ?? "";
+        var beforeText = FromUtf8(before) ?? "";
+        var afterText = FromUtf8(after) ?? "";
+        var detectionLevel = Enum.IsDefined((Config.DetectionLevel)level) ? (Config.DetectionLevel)level : Config.DetectionLevel.Balanced;
+        return Text("判定の調べもの", () => DictionaryManagement.ExplainDetection(typedText, beforeText, afterText, detectionLevel, kanaInput != 0));
     }
 
     /// <summary>理由 (null なら成功) を返り値にする: 成功なら NULL、理由があればその文字列。</summary>

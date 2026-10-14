@@ -88,6 +88,8 @@ private func reading(of text: String) -> String? {
 }
 
 /// 英単語として正しい綴りか (macOS のスペルチェッカー、英語で調べる)。
+/// 「Meltype 辞書」の「判定を調べる」(mac/Sources/MeltypeDictionary/WordChecker.swift の isEnglishWordCallback) と同じ判定にしておくこと
+/// (違うと、画面の答えが IME とずれる)。
 private let isWordCallback: IsWordCallback = { word in
     guard let word else { return 0 }
     let text = String(cString: word)
@@ -164,7 +166,7 @@ final class NativeCore {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion と、
     /// 辞書の管理画面の NativeDictionary.expectedAbiVersion (Sources/MeltypeDictionaryKit) と必ず同じにする。
     /// 食い違う dylib (別の版が混ざった) を読むと関数の引数が合わずに落ちるので、食い違ったら初期化を止める。
-    static let expectedAbiVersion: Int32 = 9
+    static let expectedAbiVersion: Int32 = 10
 
     /// dylib の版数が expectedAbiVersion と合っているか (initialize で確かめる)。合わなければ入力を一切扱わない (キーはアプリに渡る)。
     private(set) var isCompatible = false

@@ -19,6 +19,7 @@ public enum SelfTest {
         }
         checkLogic(check)
         checkLearnedLogic(check)
+        checkExplainLogic(check)
         log("ロジック: \(checks) 件")
 
         let before = checks
@@ -27,6 +28,7 @@ public enum SelfTest {
                 let native = try NativeDictionary(libraryPath: libraryPath)
                 checkNative(native, directory: directory, check)
                 checkNativeLearned(native, directory: directory, check)
+                checkNativeExplain(native, directory: directory, check)
                 log("本体を通した操作: \(checks - before) 件 (保存場所 \(directory))")
             } catch {
                 failures.append("本体を読み込めない: \(error)")
@@ -448,6 +450,91 @@ public enum SelfTest {
         // 編集のシートを開いている間に、元の語がほかで (IME・別の画面で) 消されたとき
         check(dictionary.setLearned("xnotoukouha", english: true, oldWord: "xnotoukou") != nil, "消された語を直そうとすると理由を返す")
         check(dictionary.learnedWords() == [], "消された語を直そうとしても、新しい語は足されない")
+    }
+
+    // ---- 判定を調べる ----
+
+    static func checkExplainLogic(_ check: (Bool, String) -> Void) {
+        // 本体の返す TSV (DictionaryManagement.ExplainDetection の形) の読み取りと、画面の文の組み立て
+        let tsv = [
+            "segments\tJA:きょうは|EN:sushi|JA:です",
+            "variant\tmemory-off\tJA:きょうはすしです\t1",
+            "variant\tmemory-without:sushi\tJA:きょうはすしです\t1",
+            "variant\tmemory-without:kyouha\tJA:きょうは|EN:sushi|JA:です\t0",
+            "variant\tbefore-japanese\tJA:きょうは|EN:sushi|JA:です\t0",
+            "variant\tlevel:Conservative\tJA:きょうはすしです\t1",
+            "variant\tlevel:Unknown\tJA:あ\t1",
+            "memory-pending\tgo",
+        ].joined(separator: "\n")
+        let explanation = DetectionExplanation.parse(tsv)
+        check(explanation?.segments == [DetectionSegment(isEnglish: false, text: "きょうは"), DetectionSegment(isEnglish: true, text: "sushi"), DetectionSegment(isEnglish: false, text: "です")], "区間を読める")
+        check(explanation?.variants.count == 6 && explanation?.pending == ["go"], "条件と 2 回目待ちを読める")
+        let lines = explanation?.lines ?? []
+        check(lines.first?.text == "結果 (確定前の区間分け): きょうは [sushi] です", "結果の行 (英語は [ ] で囲む): \(lines.first?.text ?? "nil")")
+        check(lines.contains(ExplainLine("  学習した語「sushi」を外す → きょうはすしです", removableWord: "sushi")), "学習した語を外して変わる行には、消す語が付く")
+        check(!lines.contains { $0.text.contains("「kyouha」") }, "外しても変わらない語の行は出さない")
+        check(lines.contains(ExplainLine("  前の文字が日本語 → 変わりません")), "変わらない条件は「変わりません」")
+        check(lines.contains(ExplainLine("  判定の強さを「慎重」に → きょうはすしです")), "判定の強さは設定タブの呼び方")
+        check(!lines.contains { $0.text.contains("Unknown") || $0.text.contains("あ") }, "知らない条件の名前は出さない")
+        check(lines.last?.text.hasPrefix("まだ効いていない学習") == true && lines.last?.text.contains("「go」") == true, "2 回目待ちの語")
+        check(explanation?.displayText.contains("きょうはすしです   [この語を消す]") == true, "表示文には [この語を消す] が付く")
+        check(DetectionExplanation.parse("segments\tEN:a|b|JA:あ")?.segments == [DetectionSegment(isEnglish: true, text: "a|b"), DetectionSegment(isEnglish: false, text: "あ")], "英字に | が入っても区間が崩れない")
+        let empty = DetectionExplanation.parse("segments\t")
+        check(empty?.segments == [] && empty?.lines.count == 1, "打った文字が空なら区間なし")
+        check(DetectionExplanation.parse("") == nil && DetectionExplanation.parse("variant\tx\ty\t1") == nil, "segments の行が無ければ nil")
+        check(DetectionExplanation.parse("segments\tEN:a\n\n壊れた\nvariant\tx\nfuture\t1")?.segments.count == 1, "知らない行・欄が足りない行は飛ばす")
+
+        // 前後の文字は IME と同じ 20 文字 (UTF-16) で切る
+        let long = String(repeating: "あ", count: 30)
+        check(DetectionExplainInput.clipBefore(long + "ab") == String(repeating: "あ", count: 18) + "ab", "前の文字は末尾の 20 文字")
+        check(DetectionExplainInput.clipAfter("ab" + long) == "ab" + String(repeating: "あ", count: 18), "後ろの文字は先頭の 20 文字")
+        check(DetectionExplainInput.clipBefore("😀😀😀😀😀😀😀😀😀😀😀").utf16.count == 20 && DetectionExplainInput.clipAfter("😀😀😀😀😀😀😀😀😀😀😀").utf16.count == 20, "絵文字は途中で切らない (UTF-16 で 20 まで)")
+        check(DetectionExplainInput.clipBefore("") == "" && DetectionExplainInput.clipAfter("短い") == "短い", "短い・空はそのまま")
+        check(DetectionStrength.allCases.map(\.rawValue) == [0, 1, 2, 3] && DetectionStrength(settingName: "Manual") == .manual && DetectionStrength(settingName: "x") == nil, "判定の強さの並びと設定の名前")
+
+        // 偽の操作で、タブが渡す引数
+        let fake = FakeDetectionExplain(response: tsv)
+        let result = fake.explainDetection(typed: "kyouhasushidesu", before: "", after: "", level: .conservative, kanaInput: true)
+        check(result == tsv && fake.calls.count == 1 && fake.calls[0].level == .conservative && fake.calls[0].kanaInput, "偽の操作: 引数をそのまま受ける")
+        check(DetectionExplainInput.guidance.contains("english.txt") && DetectionExplainInput.guidance.contains("ユーザー辞書と専門用語集は日英の判定には効きません"), "案内文")
+    }
+
+    /// 本体を通して。languages.json を変えないこと (読むだけ) も確かめる。
+    static func checkNativeExplain(_ dictionary: NativeDictionary, directory: String, _ check: (Bool, String) -> Void) {
+        let resolved = URL(fileURLWithPath: directory).resolvingSymlinksInPath().path
+        guard dictionary.dataDirectory.map({ URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }) == resolved else { return }   // 実際のデータには書かない
+        let path = resolved + "/languages.json"
+        check(dictionary.setLearned("github", english: true, oldWord: nil) == nil, "判定を調べる用の学習を足す")
+        func stamp() -> (Date?, Data?) {
+            ((try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date, FileManager.default.contents(atPath: path))
+        }
+        let before = stamp()
+        Thread.sleep(forTimeInterval: 1.1)   // 更新時刻が 1 秒単位でも、書き直せば変わって見えるように
+        let text = dictionary.explainDetection(typed: "kyouhagithubwotsukau", before: "", after: "", level: .balanced, kanaInput: false)
+        check(text?.hasPrefix("segments\t") == true, "explain が TSV を返す (\(text ?? "nil"))")
+        let explanation = text.flatMap(DetectionExplanation.parse)
+        check(explanation?.segments.contains { $0.isEnglish && $0.text == "github" } == true, "github が英語の区間になる")
+        check(text?.contains("variant\tmemory-without:github\t") == true && text?.contains("variant\tmemory-off\t") == true, "学習した語を外した条件がある")
+        check(text?.contains("variant\tlevel:Balanced\t") == false && text?.contains("variant\tlevel:Manual\t") == true, "今の強さ以外を試す")
+        check(dictionary.explainDetection(typed: "", before: "", after: "", level: .balanced, kanaInput: false) == "segments\t", "空の入力は区間なし")
+        _ = dictionary.explainDetection(typed: "sushi", before: String(repeating: "あ", count: 50), after: "😀", level: .manual, kanaInput: true)
+        let after = stamp()
+        check(before.0 != nil && before.0 == after.0 && before.1 == after.1, "languages.json は読むだけで変わらない (更新時刻・中身)")
+        check(dictionary.learnedWords()?.map(\.word) == ["github"], "学習した語もそのまま")
+        check(dictionary.removeLearned(["github"]) == nil, "後始末")
+    }
+}
+
+/// --self-test 用の、判定を調べるの偽の操作 (呼ばれた引数を覚えて、決めた文字列を返す)。
+final class FakeDetectionExplain: DetectionExplainOperations {
+    var calls: [(typed: String, before: String, after: String, level: DetectionStrength, kanaInput: Bool)] = []
+    let response: String?
+
+    init(response: String?) { self.response = response }
+
+    func explainDetection(typed: String, before: String, after: String, level: DetectionStrength, kanaInput: Bool) -> String? {
+        calls.append((typed, before, after, level, kanaInput))
+        return response
     }
 }
 

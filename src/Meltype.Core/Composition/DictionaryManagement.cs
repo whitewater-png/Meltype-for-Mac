@@ -144,6 +144,151 @@ internal static class DictionaryManagement
         return new string(kana.Select(c => c is >= 'ァ' and <= 'ヶ' ? (char)(c - 0x60) : c).ToArray());
     }
 
+    // ---- 判定を調べる (「判定を調べる」タブ) ----
+
+    /// <summary>
+    /// 画面から登録された外部のスペルチェッカー (Mac の NSSpellChecker)。IME は meltype_init で登録した同じ関数で英単語を調べるので、
+    /// 答えを IME と揃えるには画面のプロセスでも登録する。無ければ同梱の英単語表 (BuiltInWordChecker) に落ちる (K13 と同じ差が出うる)。
+    /// </summary>
+    public static Detection.IWordChecker? ExternalWordChecker { get; set; }
+
+    /// <summary>文脈として読む前後の文字数の上限 (IME が Core に渡す長さ = InputController.surroundingText と同じ)。</summary>
+    internal const int ContextLength = 20;
+
+    private static readonly object s_explainGate = new();
+
+    // 判定器は辞書の読み込みが重いので 1 回だけ作って使い回す。設定は IME の MeltypeSession.CreateDefault と同じ:
+    // 学習した語 (共有の Languages) と IsCommonJapanese (CompositionController の生成時に付くもの) を付けないと、答えが IME とずれる。
+    private static readonly Lazy<CompositionDetector> s_explainDetector = new(() =>
+    {
+        var detector = CompositionDetector.CreateDefault(AppPaths.UserDictionaryDirectory);
+        detector.IsCommonJapanese ??= RomajiTypoCorrector.Load(detector.Romaji).IsCommonJapanese;
+        return detector;
+    });
+
+    /// <summary>
+    /// 打ったローマ字 (typed) が、前の文字 (before)・後ろの文字 (after)・判定の強さ (level)・かな入力か (kanaInput) の下で
+    /// どう英語 / 日本語に分かれるか (確定する前の区間分け) と、条件を 1 つだけ変えたときに結果が変わるかを返す。
+    /// Mac の判定は理由を持たない (bool を返すだけ) ので、理由を作らず、同じ入力を条件を変えて判定し直して比べる (切り分け)。
+    /// 形は 1 行 1 件・欄は Tab 区切り:
+    ///   segments \t 区間 (EN:語|JA:かな)
+    ///   variant \t 条件の名前 \t その条件での区間 \t 変わったなら 1 (変わらなければ 0)
+    ///   memory-pending \t 語 (学習したが 2 回目を待っていて、まだ効いていない語)
+    /// 条件は memory-off・memory-without:語・before-english/japanese/none・after-english/none・level:強さ。1 つずつ変え、組み合わせない。
+    /// languages.json は読むだけで変えない (学習した語を外すのはメモリ上の写しで試す)。
+    /// </summary>
+    public static string ExplainDetection(string typed, string before, string after, DetectionLevel level, bool kanaInput) =>
+        ExplainDetection(typed, before, after, level, kanaInput, s_explainDetector.Value, Languages, ExternalWordChecker ?? Detection.BuiltInWordChecker.Shared);
+
+    /// <summary>判定器・学習・スペルチェッカーを渡す版 (テストが一時フォルダーの学習で確かめる。渡した判定器の Memory・SpellChecker は、終わったら元に戻す)。</summary>
+    internal static string ExplainDetection(string typed, string before, string after, DetectionLevel level, bool kanaInput,
+        CompositionDetector detector, LanguageMemory memory, Detection.IWordChecker spellChecker)
+    {
+        // 打つ文字は長くても数十文字。際限なく長いと判定し直しの回数が膨らむので、画面の入力欄の上限を超えたぶんは読まない。
+        // Tab・改行は戻りの形 (TSV) を壊すので、打った文字には含めない
+        typed = string.Concat((typed ?? "").Where(c => !char.IsControl(c))).Trim();
+        if (typed.Length > 200) typed = typed[..(char.IsHighSurrogate(typed[199]) ? 199 : 200)];
+        before = Tail(before ?? "", ContextLength);
+        after = Head(after ?? "", ContextLength);
+        var lines = new List<string>();
+        if (typed.Length == 0) return "segments\t";
+
+        lock (s_explainGate)
+        {
+            var savedMemory = detector.Memory;
+            var savedChecker = detector.SpellChecker;
+            try
+            {
+                detector.SpellChecker = spellChecker;
+                detector.Memory = memory;
+                var baseline = Segmented(detector, typed, before, after, level, kanaInput);
+                lines.Add("segments\t" + baseline);
+
+                void Variant(string name, string segments) =>
+                    lines.Add($"variant\t{name}\t{segments}\t{(segments == baseline ? 0 : 1)}");
+
+                // 学習した語: 全部外す / 区間に含まれる語を 1 つずつ外す
+                detector.Memory = null;
+                Variant("memory-off", Segmented(detector, typed, before, after, level, kanaInput));
+                var raws = SegmentRaws(detector, typed, before, after, level, kanaInput, memory);
+                var learned = memory.Entries();
+                foreach (var word in learned.Where(e => e.Active && raws.Any(r => r.Contains(e.Word, StringComparison.Ordinal)))
+                             .Select(e => e.Word).OrderByDescending(w => w.Length).ThenBy(w => w, StringComparer.Ordinal).Take(8))
+                {
+                    detector.Memory = memory.CopyWithout(w => w == word);
+                    Variant("memory-without:" + word, Segmented(detector, typed, before, after, level, kanaInput));
+                }
+                detector.Memory = memory;
+
+                // 前後の文字: 今と同じ分類の条件は試さない (変わりようがない)
+                var beforeNow = CompositionController.LanguageOf(before);
+                if (beforeNow != true) Variant("before-english", Segmented(detector, typed, "meeting", after, level, kanaInput));
+                if (beforeNow != false) Variant("before-japanese", Segmented(detector, typed, "今日は", after, level, kanaInput));
+                if (beforeNow != null) Variant("before-none", Segmented(detector, typed, "", after, level, kanaInput));
+                var afterNow = CompositionController.LanguageOfStart(after);
+                if (afterNow != true) Variant("after-english", Segmented(detector, typed, before, "meeting", level, kanaInput));
+                if (afterNow != null) Variant("after-none", Segmented(detector, typed, before, "", level, kanaInput));
+
+                foreach (var other in Enum.GetValues<DetectionLevel>().Where(l => l != level))
+                {
+                    Variant("level:" + other, Segmented(detector, typed, before, after, other, kanaInput));
+                }
+
+                foreach (var entry in learned.Where(e => !e.Active && raws.Any(r => r.Contains(e.Word, StringComparison.Ordinal))).Take(8))
+                {
+                    lines.Add("memory-pending\t" + entry.Word);
+                }
+            }
+            finally
+            {
+                detector.Memory = savedMemory;
+                detector.SpellChecker = savedChecker;
+            }
+        }
+        return string.Join('\n', lines);
+    }
+
+    /// <summary>区間の文字列 (英語は打った英字、日本語はかな)。--segments と同じく CompositionText に 1 文字ずつ入れて、確定する前 (Enter の前) の区間を読む。</summary>
+    private static string Segmented(CompositionDetector detector, string typed, string before, string after, DetectionLevel level, bool kanaInput) =>
+        string.Join('|', SegmentsOf(detector, typed, before, after, level, kanaInput).Select(s => s.IsEnglish ? "EN:" + s.Raw : "JA:" + s.Kana));
+
+    private static List<string> SegmentRaws(CompositionDetector detector, string typed, string before, string after, DetectionLevel level, bool kanaInput, LanguageMemory memory)
+    {
+        detector.Memory = memory;
+        return SegmentsOf(detector, typed, before, after, level, kanaInput).Select(s => s.Raw.ToLowerInvariant()).ToList();
+    }
+
+    private static IReadOnlyList<CompositionSegment> SegmentsOf(CompositionDetector detector, string typed, string before, string after, DetectionLevel level, bool kanaInput)
+    {
+        // 前後の文脈は BeginComposition と同じ作り (LanguageOf で分類。日本語か分からなければ null のまま)
+        var text = new CompositionText(detector)
+        {
+            Level = () => level,
+            KanaInput = kanaInput,
+            PrecedingEnglish = CompositionController.LanguageOf(before),
+            PrecedingEnglishSentence = CompositionController.IsEnglishSentence(before),
+            FollowingEnglish = CompositionController.LanguageOfStart(after),
+        };
+        foreach (var c in typed) text.Append(c);
+        return text.Segments(final: true);
+    }
+
+    /// <summary>末尾の n 文字 (UTF-16)。サロゲートペアの途中では切らない。</summary>
+    private static string Tail(string text, int n)
+    {
+        if (text.Length <= n) return text;
+        var start = text.Length - n;
+        if (char.IsLowSurrogate(text[start])) start++;
+        return text[start..];
+    }
+
+    /// <summary>先頭の n 文字 (UTF-16)。サロゲートペアの途中では切らない。</summary>
+    private static string Head(string text, int n)
+    {
+        if (text.Length <= n) return text;
+        return text[..(char.IsHighSurrogate(text[n - 1]) ? n - 1 : n)];
+    }
+
     // ---- 専門用語集の「編集」 ----
 
     /// <summary>

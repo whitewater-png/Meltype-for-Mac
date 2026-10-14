@@ -24,6 +24,9 @@ private typealias Text2CountFunction = @convention(c) (UnsafePointer<CChar>?, Un
 private typealias TextOutIntFunction = @convention(c) (UnsafePointer<CChar>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
 private typealias Text2FlagFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, Int32) -> UnsafeMutablePointer<CChar>?
 private typealias TextFlagTextFunction = @convention(c) (UnsafePointer<CChar>?, Int32, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+private typealias WordCheckerCallback = @convention(c) (UnsafePointer<CChar>?) -> Int32
+private typealias SetWordCheckerFunction = @convention(c) (WordCheckerCallback?) -> Void
+private typealias ExplainFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, Int32, Int32) -> UnsafeMutablePointer<CChar>?
 private typealias TermEditFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<CChar>?
 
 /// 辞書の管理画面が使う操作 (本物は NativeDictionary。--self-test は偽物でも確かめる)。理由の文字列は、だめなときだけ (画面にそのまま出す)。
@@ -53,9 +56,9 @@ public protocol DictionaryOperations: AnyObject {
 
 /// libMeltypeNative.dylib を読み込んで、ユーザー辞書・専門用語集を操作する (中身は C# の DictionaryManagement / UserDictionary / TermDomains)。
 /// 関数はどれも、C# 側でロックしているので、どのスレッドから呼んでもよい (専門用語の一覧は重いので裏のスレッドで呼ぶ)。
-public final class NativeDictionary: DictionaryOperations, LearnedWordOperations {
+public final class NativeDictionary: DictionaryOperations, LearnedWordOperations, DetectionExplainOperations {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion・IME の NativeCore.expectedAbiVersion と必ず同じにする。
-    public static let expectedAbiVersion: Int32 = 9
+    public static let expectedAbiVersion: Int32 = 10
 
     /// 読み込めなかった理由 (画面に出す)。
     public enum LoadError: Error, CustomStringConvertible {
@@ -124,6 +127,8 @@ public final class NativeDictionary: DictionaryOperations, LearnedWordOperations
     private let learnedCheckFunction: Text2Function
     private let learnedSetFunction: TextFlagTextFunction
     private let learnedRemoveFunction: Text1Function
+    private let setWordCheckerFunction: SetWordCheckerFunction
+    private let explainFunction: ExplainFunction
 
     public init(libraryPath: String?) throws {
         guard let libraryPath else { throw LoadError.notFound }
@@ -178,6 +183,8 @@ public final class NativeDictionary: DictionaryOperations, LearnedWordOperations
         learnedCheckFunction = try symbol("meltype_learned_check", as: Text2Function.self)
         learnedSetFunction = try symbol("meltype_learned_set", as: TextFlagTextFunction.self)
         learnedRemoveFunction = try symbol("meltype_learned_remove", as: Text1Function.self)
+        setWordCheckerFunction = try symbol("meltype_set_word_checker", as: SetWordCheckerFunction.self)
+        explainFunction = try symbol("meltype_explain_detection", as: ExplainFunction.self)
     }
 
     /// 本体が返した文字列を Swift の文字列にして解放する。
@@ -430,6 +437,23 @@ public final class NativeDictionary: DictionaryOperations, LearnedWordOperations
 
     public func removeLearned(_ words: [String]) -> String? {
         FfiFormat.formatWords(words).withCString { take(learnedRemoveFunction($0)) }
+    }
+
+    // ---- 判定を調べる ----
+
+    /// 英単語かを調べる関数 (小文字の英単語 → 英語として正しい綴りなら 1) を本体に登録する (最初に 1 回)。
+    /// IME が meltype_init で登録するもの (NSSpellChecker) と同じ答えにするため、「判定を調べる」の答えを実際の IME に揃える。
+    /// 登録しないと同梱の英単語表で調べる (IME と答えが違うことがある)。
+    public func setWordChecker(_ callback: @escaping @convention(c) (UnsafePointer<CChar>?) -> Int32) {
+        setWordCheckerFunction(callback)
+    }
+
+    public func explainDetection(typed: String, before: String, after: String, level: DetectionStrength, kanaInput: Bool) -> String? {
+        typed.withCString { typedPointer in
+            before.withCString { beforePointer in
+                after.withCString { take(explainFunction(typedPointer, beforePointer, $0, level.rawValue, kanaInput ? 1 : 0)) }
+            }
+        }
     }
 
     // ---- 設定 ----
