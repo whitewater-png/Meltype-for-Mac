@@ -169,6 +169,8 @@ public sealed class MeltypeSession
             ContinueAfterConversion = () => ContinueAfterConversionSetting.IsOn,
             ShiftEnterNewline = () => ShiftEnterNewlineSetting.IsOn,
             TypeDigitsAfterConversion = () => shared.Current.TypeDigitsAfterConversion,
+            // ATOK スタイルのキー操作。config.json の変更 (「Meltype 辞書」の「設定」タブ) がすぐ効くよう、共有の値を毎回見る。
+            TokMode = () => shared.Current.TokMode,
             AutoCorrect = () => shared.Current is { AutoCorrectAfterCommit: true, DetectionLevel: not DetectionLevel.Manual },
             Level = () => shared.Current.DetectionLevel,
             // かな入力 (JIS)。設定の「入力方式」。既定はローマ字入力なので、変えなければ今までどおり。
@@ -390,6 +392,13 @@ public sealed class MeltypeSession
             vk = functionKey;
             ch = null;
             control = false;
+        }
+        // ATOK スタイル (TokMode) で変換中の Ctrl+← / Ctrl+→: 先頭 / 最後の文節へ (ふだんの Ctrl は「確定してアプリへ」なので先に受ける)。
+        if (control && !alt && !command && !shift && (vk is VirtualKeys.Left or VirtualKeys.Right)
+            && !Direct && AppEnabled && _settings().Enabled && _options.TokMode() && _controller.IsConverting)
+        {
+            _controller.SelectEdgeClause(last: vk == VirtualKeys.Right);
+            return _host.Result(consumed: true);
         }
         var down = new KeyEvent(vk, ch ?? 0, false, false, false, Environment.TickCount64);
         // Ctrl・Option・Command と一緒のキーは、変換ボックスが空ならアプリの操作 (コピーなど) なので触らない。

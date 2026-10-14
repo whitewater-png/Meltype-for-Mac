@@ -135,7 +135,7 @@ public sealed class CompositionText
                    // 語の頭の大文字の X 1 文字 (SNS の X) も、次の文字と合わせて小書き文字 (xn = ん・xa = ぁ) にしない。
                    !(last.Raw is "X" && IsLoneCapitalX(_units.Count - 1, last.Raw)) &&
                    // 英単語の最後の t (commit の t) も、続けて打った s と合わせて ts (つ) にしない。
-                   !(last.Raw is "t" or "T" && _pending.Length > 0 && _pending[0] is 's' or 'S' && EndsWithEnglishWordFromUnit(_units.Count)))
+                   !(last.Raw is "t" or "T" && _pending.Length > 0 && _pending[0] is 's' or 'S' && EndsWithEnglishWordFromUnit(_units.Count, tsuFollows: true)))
             {
                 pulled.Insert(0, last.Raw);
                 _units.RemoveAt(_units.Count - 1);
@@ -149,14 +149,24 @@ public sealed class CompositionText
             }
             // 英単語の最後の t の次に打った s は、t と合わせて ts (つ・つぃ) にしない
             // (commit + suru・site → こっみつる・こっみつぃて ではなく commitする・commitして)。
-            if (_pending.Length == 1 && _pending[0] is 't' or 'T' && c is 's' or 'S' && EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString()))
+            // 読めない子音がいくつか残っていても同じ (reflect + sareta の ct + s → reflectされた。refェcつァれた になっていた。本家 #77、P45-3)。
+            if (_pending.Length >= 1 && _pending[^1] is 't' or 'T' && c is 's' or 'S' && _pending.ToString().All(char.IsAsciiLetter) &&
+                EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString(), tsuFollows: true))
             {
-                _units.Add(new CompositionUnit(_pending.ToString(), _pending.ToString()));
+                foreach (var letter in _pending.ToString()) _units.Add(new CompositionUnit(letter.ToString(), letter.ToString()));
                 _pending.Clear();
+            }
+            // つ にまとめた t + s (shut + s) の後ろが u 以外の母音なら つぁ・つぃ ではないので、英単語の t と s に分け直す (shutした。本家 35beb60、P45-11)。
+            if (_pending.Length >= 2 && _pending[^2] is 't' or 'T' && _pending[^1] is 's' or 'S' && c is 'a' or 'i' or 'e' or 'o' or 'A' or 'I' or 'E' or 'O' &&
+                _pending.ToString().All(char.IsAsciiLetter) && EndsWithEnglishWordFromUnit(_units.Count, _pending.ToString()[..^1]))
+            {
+                foreach (var letter in _pending.ToString()[..^1]) _units.Add(new CompositionUnit(letter.ToString(), letter.ToString()));
+                _pending.Remove(0, _pending.Length - 1);
             }
             _pending.Append(c);
             SplitUnitAfterNumber(final: false);
             Normalize(final: false);
+            RereadSmallTsuAfterEnglishL();
             return;
         }
         if (_pending.Length > 0 && char.ToLowerInvariant(_pending[^1]) == 'z' && ZSymbol(c) is { } z)
@@ -246,6 +256,54 @@ public sealed class CompositionText
         }
     }
 
+    /// <summary>
+    /// 英単語の最後の l + tu / tsu を、英単語 + つ ではなく、英単語 + 小書きの っ で読み直す (moral|ltu|te = もらって)。
+    /// 英単語の最後の l は、次の文字を打った時点で英字として固定される (moral|tu = moralつ) ので、ここで読み直す。
+    /// 後ろの tute が日本語として不自然で、英単語 + つ の方が自然なとき (mail|tukau = つかう) は、今までどおり英単語 + つ に戻す。
+    /// 大文字を含むとき (Moraltute) と「っっ」になるとき (sukilltute) は読み直さない。本家 #104 (P45-5)。
+    /// </summary>
+    private void RereadSmallTsuAfterEnglishL()
+    {
+        var common = _detector.IsCommonJapanese;
+        if (common is null) return;
+        var start = _units.Count;
+        while (start > 0 && _units[start - 1].Raw is { Length: > 0 } raw && raw.All(char.IsAsciiLetter)) start--;
+        // 末尾に近い方から、英字として固定された l (次が tu/tsu) か、ltu/ltsu を っ として読んだ単位を探す
+        var li = -1;
+        for (var i = _units.Count - 1; i >= start && li < 0; i--)
+        {
+            var fixedL = _units[i] is { Raw: "l", Kana: "l" } && i + 1 < _units.Count && _units[i + 1] is { Raw: "tu" or "tsu", Kana: "つ" };
+            if (fixedL || _units[i] is { Raw: "ltu" or "ltsu", Kana: "っ" }) li = i;
+        }
+        if (li < 0) return;
+        // 英単語の始まり: li - 1 から前へ、stem + l が 4 文字以上の知っている英単語になる位置
+        var w = -1;
+        var stem = "";
+        for (var i = li - 1; i >= start && w < 0; i--)
+        {
+            stem = _units[i].Raw + stem;
+            if (stem.Length + 1 >= 4 && (stem + "l") is var word && word.All(char.IsAsciiLetterLower) && _detector.IsKnownEnglishWord(word)) w = i;
+        }
+        if (w < 0) return;
+        var isFixedL = _units[li].Kana == "l";
+        var restAfterL = _units[li].Raw[1..] + string.Concat(_units.Skip(li + 1).Select(u => u.Raw));
+        var whole = stem + "l" + restAfterL;
+        if (whole.Any(char.IsAsciiLetterUpper)) return;
+        var useTsu = common(whole) && !common(restAfterL) && !_detector.Romaji.AnalyzeFragment(whole).Kana.Contains("っっ");
+        if (isFixedL && useTsu)
+        {
+            var tsu = _units[li + 1];
+            _units.RemoveRange(li, 2);
+            _units.Insert(li, new CompositionUnit("っ", "l" + tsu.Raw));
+        }
+        else if (!isFixedL && !useTsu)
+        {
+            var raw = _units[li].Raw;
+            _units[li] = new CompositionUnit("l", "l");
+            _units.Insert(li + 1, new CompositionUnit("つ", raw[1..]));
+        }
+    }
+
     /// <summary>units の count 個目より前で、英字だけの単位が続く部分 (前の英字)。</summary>
     private string LettersBefore(int count)
     {
@@ -276,12 +334,35 @@ public sealed class CompositionText
     /// 英単語は単位の区切りから始まるものだけを見る。音の途中から始まる語 (から|な|l の anal、だ|め|x の amex) は、
     /// ローマ字で打っている日本語 (からなぁ・だめぇ) の一部なので英単語とみなさない。
     /// </summary>
-    private bool EndsWithEnglishWordFromUnit(int count, string extra = "")
+    /// <summary>
+    /// 単位 start から最後の t までを、t + s の つ まで含めて読むと日本語の語かその頭になるか
+    /// (shitsumon の しつ、teishutsu の しゅつ)。前の かな から読んでもよい (ochitsuku の おちつ)。本家 35beb60 (P45-11)。
+    /// </summary>
+    private bool ReadsAsJapaneseWithTsu(int start, int count, string extra)
+    {
+        var last = count;
+        if (extra.Length == 0 && count > start && _units[count - 1].Raw is "t" or "T") last = count - 1;
+        else if (extra is not ("t" or "T")) return false;
+        var kana = "";
+        for (var i = last - 1; i >= 0; i--)
+        {
+            if (!_units[i].Kana.All(c => c is >= 'ぁ' and <= 'ゖ' or 'ー') || _units[i].Raw.Length == 0 || !_units[i].Raw.All(char.IsAsciiLetter)) return false;
+            kana = _units[i].Kana + kana;
+            if (i <= start && kana.Length + 1 >= (i == start ? 2 : 3) && _detector.IsJapaneseWordOrPrefix(kana + "つ")) return true;
+        }
+        return false;
+    }
+
+    private bool EndsWithEnglishWordFromUnit(int count, string extra = "", bool tsuFollows = false)
     {
         var letters = extra;
         for (var i = count - 1; i >= 0 && _units[i].Raw.Length > 0 && _units[i].Raw.All(char.IsAsciiLetter); i--)
         {
             letters = _units[i].Raw + letters;
+            // 大文字の略語の途中 (AI の I) から始まる語 (Init) は見ない (AInitsuite の t と s を つ にまとめるように。本家 #129、P45-10)
+            if (i > 0 && char.IsAsciiLetterUpper(_units[i].Raw[0]) && _units[i - 1].Raw is [.., var before] && char.IsAsciiLetterUpper(before)) continue;
+            // 続けて打った s と合わせた つ まで読むと日本語の語 (shitsumon の shit) なら、英単語として見ない (本家 35beb60、P45-11)
+            if (tsuFollows && ReadsAsJapaneseWithTsu(i, count, extra)) continue;
             if (letters.Length >= 4 && _detector.IsKnownEnglishWord(letters)) return true;
         }
         return false;
@@ -489,6 +570,29 @@ public sealed class CompositionText
     {
         _frozen = null;
         _units.InsertRange(0, kana.Select(c => new CompositionUnit(c.ToString(), c.ToString())));
+    }
+
+    /// <summary>
+    /// 先頭から、文節の並び (日本語の文節は読み、英語の文節は打った英字) に当たる単位を取り除く (部分確定で、確定した分を除く)。
+    /// 文節の区切りが 1 音の途中にある・中身が合わないときは false で、何も変えない。
+    /// </summary>
+    public bool RemoveLeading(IEnumerable<(string Text, bool English)> parts)
+    {
+        var index = 0;
+        foreach (var (text, english) in parts)
+        {
+            var position = 0;
+            while (position < text.Length)
+            {
+                if (index >= _units.Count) return false;
+                var piece = english ? _units[index].Raw : _units[index].Kana;
+                if (piece.Length == 0 || position + piece.Length > text.Length || string.CompareOrdinal(text, position, piece, 0, piece.Length) != 0) return false;
+                position += piece.Length;
+                index++;
+            }
+        }
+        _units.RemoveRange(0, index);
+        return true;
     }
 
     /// <summary>単位 (読みと打った英字) を、今の内容の前に付ける。固定していた文節を、打ったままの状態に戻すのに使う。</summary>

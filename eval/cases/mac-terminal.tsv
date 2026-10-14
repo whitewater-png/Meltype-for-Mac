@@ -1,0 +1,26 @@
+# ターミナル・AI ツールの名前が出る入力 (docs/STRATEGY_2026-10.md の施策 1-4)。
+# 期待は、今の Mac 版 Core の「望ましい」出力。今は外れると分かっているものも入れてある (出典に「既知の外れ」と書いた)。
+# 実機の結果ではなく、Core のテスト用キーボードで打った結果を測る。漢字の変換は測らない (ascii は印字可能 ASCII の連続 (空白で区切った並び) を比べる)。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。
+# カテゴリ: AI ツール名 + 日本語
+Claude Code de kaku	Claude Code でかく	ascii	計画書 1-4
+Codex de kakunin shite	Codex で確認して	ascii	計画書 1-4
+Hermes ni kiku	Hermes に聞く	ascii	計画書 1-4
+Cursor de kodo wo kaku	Cursor でコードを書く	ascii	計画書 1-4
+AGENTS.md wo yomu	AGENTS.md を読む	ascii	計画書 1-4
+npm install shimasu	npm install します	ascii	計画書 1-4
+gpt-oss wo tsukau	gpt-oss を使う	ascii	計画書 1-4 / HANDOFF §4 (既知の外れ: gpt-おっs になる)
+gemma4-27b wo tsukau	gemma4-27b を使う	ascii	計画書 1-4 / HANDOFF §4 (実機で既知の外れ: gemma4ー27b になる。Mac 版 Core のテスト用キーボードでは再現しない (本家の Core では再現する))
+# カテゴリ: 英語のまま残したいコマンド (期待は打鍵そのものなので full で、1 文字も崩れないこと)
+Claude	Claude	full	本家 #316 (Claude が日本語にならない)
+git push origin main	git push origin main	full	計画書 1-4
+ollama run gemma	ollama run gemma	full	計画書 1-4 / HANDOFF §4 (実機で既知の外れ: run が るん になる。Core のテスト用キーボードでは本家・Mac 版とも再現しない)
+claude --dangerously-skip-permissions	claude --dangerously-skip-permissions	full	計画書 1-4
+docker compose up -d	docker compose up -d	full	計画書 1-4
+brew install ripgrep	brew install ripgrep	full	計画書 1-4
+cd ~/Documents/Meltype	cd ~/Documents/Meltype	full	計画書 1-4
+python3 -m venv .venv	python3 -m venv .venv	full	計画書 1-4
+kubectl get pods	kubectl get pods	full	計画書 1-4
+npx create-next-app	npx create-next-app	full	計画書 1-4
+git commit -m "fix bug"	git commit -m "fix bug"	full	計画書 1-4
+ssh user@example.com	ssh user@example.com	full	計画書 1-4

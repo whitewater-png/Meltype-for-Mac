@@ -109,3 +109,69 @@ dotnet run --project src/Meltype.Core.Tests -- --eval       # 品質テスト (�
 - `src/Meltype.Core.Tests/` — 共通部分のテスト (判定・入力セッション・変換ボックス・学習・品質テスト)。Mac・Linux でも動く
 - `src/Meltype.Tests/` — Windows 版のテストと調査用の道具 (共通部分のテストもまとめて流す)
 - `dictionaries/` — 組み込み辞書
+
+## 評価基盤 (`eval/`)
+
+同じ「正解表」で、本家 Meltype の Core と Mac 版の Core の判定結果を並べ、回帰 (本家や前回で当たっていたのに今は外れる例) を 0 件にするための仕組みです。表の形式・比べ方・実機の結果の足し方は [eval/README.md](../eval/README.md) にあります。
+
+### 正解表
+
+`eval/cases/*.tsv`。1 行 = `打鍵<Tab>期待<Tab>比べ方<Tab>出典` の 4 列です。比べ方は `full` (完全一致。期待にカタカナがあるときだけ、カタカナ→ひらがなと英字の大小を吸収。本家の `Expect` と同じ)・`ascii` (印字可能 ASCII の連続の並びだけ)・`nojp` (日本語・全角記号・半角カナが 1 文字も無い。英文が崩れないことだけ見たい行用)。`upstream-quality.tsv` (本家の品質テストの写し)・`mac-device.tsv` (実機の記録と計画書の期待)・`mac-terminal.tsv` (ターミナル・AI ツール名) の 3 つがあります。
+
+### 1 つの作業ツリーで流す (`--expect-all`)
+
+```bash
+cd src/Meltype.Core.Tests
+dotnet run -c Release -- --expect-all ../../eval/cases /tmp/eval.json
+```
+
+`eval/cases/*.tsv` をすべて確かめ、`{file, typed, expected, mode, source, actual, ok}` の配列を JSON で出します (`file` は表のファイル名)。1 つの表だけなら、これまでどおり `--expect <表> <出力>` です (2 列だけの古い表も動きます)。変換エンジンはテスト用の偽物なので、漢字の変換は測りません。
+
+### 本家との比較と回帰ゲート
+
+```bash
+git clone --depth 1 https://github.com/yksr-melt/Meltype.git /tmp/meltype-upstream
+tools/eval-compare.sh /tmp/meltype-upstream . eval/cases /tmp/eval-out
+```
+
+`tools/eval-compare.sh <base-tree> <new-tree> <cases-dir> <out-dir>` は、2 つの作業ツリーで同じ表を回し、`tools/eval_compare.py` で比べます。`out-dir` に `base.json`・`new.json`・`compare.md` (ファイルごとの `ok/total` の表と、`broken`・`fixed` の一覧) ができます。
+
+- `broken` … base で当たり、new で外れた例 (回帰)。**1 件でもあれば終了コード 1** です (dotnet や入力の失敗は 2、問題なしは 0。本家のゲートは broken + addedFailing、こちらは broken のみ)。これが回帰ゲートで、`broken` が 0 件になるまで取り込んだ変更を「回帰なし」と言いません。
+- `fixed` … base で外れ、new で当たった例。`added` / `removed` … 片方にしかない例 (表の増減)。
+- base には Mac 版の前回のコミットの作業ツリー (`git worktree add /tmp/prev <コミット>`) も使えます。
+- 本家の `Meltype.Core.Tests` には `--expect-all` と 3 つの比べ方が無いので、本家側は `tools/eval_legacy_base.py` が `--expect` を表ごとに回し、返ってきた `actual` を同じ規則で判定し直します。この判定は C# の `Checks.Judge` と同じで、`python3 tools/eval_legacy_base.py --rejudge <--expect-all の JSON>` で食い違いが無いことを確かめられます。
+- `dotnet` は作業ツリーの中に `bin/` `obj/` を作ります。本家の clone を汚したくないときは、コピーを渡します。
+- `/tmp` のようにシンボリックリンクを通る絶対パスで `dotnet run --project` を呼ぶとビルドが失敗することがあったので、スクリプトは作業ツリーに入って相対パスで呼びます。
+
+この比較は Core のテスト用キーボードの結果で、**実機の確認の代わりにはなりません**。Windows・Linux は対象外です。
+
+### 本家追従 (`tools/upstream_watch.py`)
+
+本家 Meltype の新しいコミットを PR 単位で拾い、Mac 版に取り込み済みか・そのまま当たるか・新しい正解ケースがあるかを [docs/UPSTREAM_WATCH.md](UPSTREAM_WATCH.md) の候補表にまとめます。
+
+```bash
+git clone https://github.com/yksr-melt/Meltype.git ~/meltype-upstream   # 初回だけ。完全な履歴が要ります (--depth 1 は不可)
+export MELTYPE_UPSTREAM=~/meltype-upstream
+python3 tools/upstream_watch.py --since <hash>   # 初回だけ --since。2 回目からは UPSTREAM_WATCH.md 先頭の seen から
+python3 tools/upstream_watch.py                  # 以降
+```
+
+- 引数: `--upstream <clone>` (既定: `MELTYPE_UPSTREAM`)、`--mac <tree>` (既定: このスクリプトのあるリポジトリ)、`--since <hash>`、`--no-fetch` (fetch しない)、`--dry-run` (文書も候補ファイルも書かず、標準出力だけ)、`--no-eval` (dotnet を回さない)。通信は本家の clone への `git fetch` だけです。終了コードは 0 = 正常 (新コミット 0 件も 0)、2 = 引数・環境の誤り (dotnet の失敗も 2。文書は更新しません)。標準出力に 3〜6 行の要約が出ます (Hermes の定期実行はこれを読みます。定期実行はこのリポジトリの外です)。
+- 出力: `docs/UPSTREAM_WATCH.md` の先頭に、新しい順で節が増えます。本家の `QualityTests.cs` に足された `new("カテゴリ", "打鍵", "期待")` の行は `eval/candidates/upstream-<日付>-<since の短い hash>.tsv` に書き (4 列。同じ日・同じ since の再実行は上書き。一時フォルダーで評価し、成功してから置きます)、Mac 版で何件当たるかを表と節の末尾に出します。
+- **候補ファイルは正解表に自動では足されません。** 正解表に移すのは人です:
+  1. 候補ファイルの行を見て、期待が本家の意図どおりか、私的な文が入っていないかを確かめる (当たる行も、外れる行も。外れる行は Mac 版にまだ無い修正を示します)。
+  2. 入れる行を `eval/cases/upstream-quality.tsv` の**末尾**に移す (出典の列は `本家 <hash> #NNN` のまま)。
+  3. 上の「1 つの作業ツリーで流す」で回し、数字が期待どおりか見る。
+  4. push すれば表は公開されます。`git add` した時点で履歴にも残るので、迷う行は入れません。
+- `Before:` などの名前付き引数がある行、かなで打つ行、複数行の行は 4 列で表せないので、候補ファイルには出さず、表の「新ケース」の列に件数だけ出ます。必要なら本家のテストを見て手で足します。
+- 自己テスト: `python3 tools/test_upstream_watch.py` (git・dotnet は使いません)。Windows・Linux の変更は一覧に出すだけで、取り込み・評価はしません。
+
+## Homebrew cask (自前 tap)
+
+`mac/homebrew/Casks/meltype-for-mac.rb` が cask の正本です (配布物は zip。Apple シリコン・macOS 13 以降)。使い方・ローカル tap での確かめ方・版の上げ方は [mac/homebrew/README.md](../mac/homebrew/README.md) にあります。
+
+- 版を上げるとき: `python3 tools/update-cask.py <version> <sha256>` で version と sha256 の 2 行だけを書き換える (`python3 tools/test_update_cask.py` が自己テスト)。`scripts/release_build.sh` にはまだ結線していません。
+- **quarantine は postflight で外す**: cask で入れると Meltype.app に `com.apple.quarantine` が付き、ad-hoc 署名の実行ファイルは Gatekeeper に `Killed: 9` で止められる (IME は裏で起動するので表示も出ず、入力メニューに出ないだけ。`--register` も失敗)。pkg と同じ結果にするため `xattr -dr` で外している (得: 確実に起きる / 損: Gatekeeper の確認を飛ばし、Release の SHA-256 を信頼する形になる)。
+- **既に `~/Library/Input Methods/Meltype.app` があると入らない** (zip の install.sh・build.sh で入れた場合。Homebrew の仕様)。先に `uninstall.sh` か Finder で外す。
+- 確かめ: ローカル tap (`brew tap-new whitewater-png/meltype-for-mac`) にコピーして `brew audit --cask --strict --online` と `brew style`。
+- **公開 tap (`whitewater-png/homebrew-meltype-for-mac`) はまだありません。** 作るのは公開行為なので、許可を取ってからです。README の入れ方の節への追記も、公開してからにします。

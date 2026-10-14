@@ -1,0 +1,257 @@
+# 本家 Meltype の品質テスト (src/Meltype.Core.Tests/QualityTests.cs の Typing 配列、コミット a4b6f1a) の写し。
+# 出典: https://github.com/yksr-melt/Meltype (GPL-3.0)。1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。
+# 本家の採点 (Score) は actual == Expected の完全一致。ここの full はカタカナ→ひらがなと英字の大小だけ吸収する (eval/README.md)。
+# 本家の表には「直前の文字 (Before)」を入れた 13 件がある。この形式には直前の文字の列が無いので、下に # で写すだけにして判定しない。
+
+# --- 日本語の文 (テスト用の変換エンジンはかなのまま返す) ---
+# カテゴリ: 日本語
+kyouhaiitenkidesune	きょうはいいてんきですね	full	本家 QualityTests 2026-10-13 a4b6f1a
+hosuthingu	ほすてぃんぐ	full	本家 QualityTests 2026-10-13 a4b6f1a
+tsukuenouenoitsumonohon	つくえのうえのいつものほん	full	本家 QualityTests 2026-10-13 a4b6f1a
+matsurinokatsudounoketsuron	まつりのかつどうのけつろん	full	本家 QualityTests 2026-10-13 a4b6f1a
+watashihagakuseidesu	わたしはがくせいです	full	本家 QualityTests 2026-10-13 a4b6f1a
+arigatougozaimasu	ありがとうございます	full	本家 QualityTests 2026-10-13 a4b6f1a
+yoroshikuonegaishimasu	よろしくおねがいします	full	本家 QualityTests 2026-10-13 a4b6f1a
+ashitahaamedesu	あしたはあめです	full	本家 QualityTests 2026-10-13 a4b6f1a
+konnnichiha	こんにちは	full	本家 QualityTests 2026-10-13 a4b6f1a
+nihongowobenkyoushiteimasu	にほんごをべんきょうしています	full	本家 QualityTests 2026-10-13 a4b6f1a
+kaigiha3jikaradesu	かいぎは3じからです	full	本家 QualityTests 2026-10-13 a4b6f1a
+sushigatabetai	すしがたべたい	full	本家 QualityTests 2026-10-13 a4b6f1a
+anatahadaredesuka	あなたはだれですか	full	本家 QualityTests 2026-10-13 a4b6f1a
+sorehachigaimasu	それはちがいます	full	本家 QualityTests 2026-10-13 a4b6f1a
+kinouhatanoshikatta	きのうはたのしかった	full	本家 QualityTests 2026-10-13 a4b6f1a
+mainichiasagohanwotabemasu	まいにちあさごはんをたべます	full	本家 QualityTests 2026-10-13 a4b6f1a
+denshaninoriokureteshimatta	でんしゃにのりおくれてしまった	full	本家 QualityTests 2026-10-13 a4b6f1a
+nanimoshiranai	なにもしらない	full	本家 QualityTests 2026-10-13 a4b6f1a
+makenaide	まけないで	full	本家 QualityTests 2026-10-13 a4b6f1a
+sonotoori	そのとおり	full	本家 QualityTests 2026-10-13 a4b6f1a
+hontouni	ほんとうに	full	本家 QualityTests 2026-10-13 a4b6f1a
+dokodemoii	どこでもいい	full	本家 QualityTests 2026-10-13 a4b6f1a
+chottomatte	ちょっとまって	full	本家 QualityTests 2026-10-13 a4b6f1a
+kaimononiikimasu	かいものにいきます	full	本家 QualityTests 2026-10-13 a4b6f1a
+namaewooshiete	なまえをおしえて	full	本家 QualityTests 2026-10-13 a4b6f1a
+kanjiwokaku	かんじをかく	full	本家 QualityTests 2026-10-13 a4b6f1a
+sakewonomu	さけをのむ	full	本家 QualityTests 2026-10-13 a4b6f1a
+animegasuki	あにめがすき	full	本家 QualityTests 2026-10-13 a4b6f1a
+mangawoyomu	まんがをよむ	full	本家 QualityTests 2026-10-13 a4b6f1a
+karaokeniiku	からおけにいく	full	本家 QualityTests 2026-10-13 a4b6f1a
+itadakimasu	いただきます	full	本家 QualityTests 2026-10-13 a4b6f1a
+otsukaresamadesu	おつかれさまです	full	本家 QualityTests 2026-10-13 a4b6f1a
+sumimasen	すみません	full	本家 QualityTests 2026-10-13 a4b6f1a
+daijoubu	だいじょうぶ	full	本家 QualityTests 2026-10-13 a4b6f1a
+ganbatte	がんばって	full	本家 QualityTests 2026-10-13 a4b6f1a
+tanakasannnihanashita	たなかさんにはなした	full	本家 QualityTests 2026-10-13 a4b6f1a
+toukyouniiku	とうきょうにいく	full	本家 QualityTests 2026-10-13 a4b6f1a
+kore ha pen desu	これはぺんです	full	本家 QualityTests 2026-10-13 a4b6f1a
+sore de ii	それでいい	full	本家 QualityTests 2026-10-13 a4b6f1a
+watashi ha sushi ga suki	わたしはすしがすき	full	本家 QualityTests 2026-10-13 a4b6f1a
+nani wo shiteru no	なにをしてるの	full	本家 QualityTests 2026-10-13 a4b6f1a
+# --- 英語とも日本語とも読める語 (文脈がなければ日本語) ---
+# カテゴリ: 曖昧な語
+same	さめ	full	本家 QualityTests 2026-10-13 a4b6f1a
+mine	みね	full	本家 QualityTests 2026-10-13 a4b6f1a
+sake	さけ	full	本家 QualityTests 2026-10-13 a4b6f1a
+sushi	すし	full	本家 QualityTests 2026-10-13 a4b6f1a
+repo	れぽ	full	本家 QualityTests 2026-10-13 a4b6f1a
+# --- 英語 ---
+# カテゴリ: 英語
+hello	hello	full	本家 QualityTests 2026-10-13 a4b6f1a
+google	google	full	本家 QualityTests 2026-10-13 a4b6f1a
+github	github	full	本家 QualityTests 2026-10-13 a4b6f1a
+python	python	full	本家 QualityTests 2026-10-13 a4b6f1a
+javascript	javascript	full	本家 QualityTests 2026-10-13 a4b6f1a
+thank you	thank you	full	本家 QualityTests 2026-10-13 a4b6f1a
+good morning	good morning	full	本家 QualityTests 2026-10-13 a4b6f1a
+I love you	I love you	full	本家 QualityTests 2026-10-13 a4b6f1a
+see you later	see you later	full	本家 QualityTests 2026-10-13 a4b6f1a
+what is this	what is this	full	本家 QualityTests 2026-10-13 a4b6f1a
+how are you	how are you	full	本家 QualityTests 2026-10-13 a4b6f1a
+the quick brown fox	the quick brown fox	full	本家 QualityTests 2026-10-13 a4b6f1a
+please check the log	please check the log	full	本家 QualityTests 2026-10-13 a4b6f1a
+open the file	open the file	full	本家 QualityTests 2026-10-13 a4b6f1a
+run the tests	run the tests	full	本家 QualityTests 2026-10-13 a4b6f1a
+git push origin main	git push origin main	full	本家 QualityTests 2026-10-13 a4b6f1a
+npm install	npm install	full	本家 QualityTests 2026-10-13 a4b6f1a
+meeting at nine	meeting at nine	full	本家 QualityTests 2026-10-13 a4b6f1a
+I want to go to the park	I want to go to the park	full	本家 QualityTests 2026-10-13 a4b6f1a
+make sure you have time	make sure you have time	full	本家 QualityTests 2026-10-13 a4b6f1a
+this is a pen	this is a pen	full	本家 QualityTests 2026-10-13 a4b6f1a
+my name is taro	my name is taro	full	本家 QualityTests 2026-10-13 a4b6f1a
+do it now	do it now	full	本家 QualityTests 2026-10-13 a4b6f1a
+let me know	let me know	full	本家 QualityTests 2026-10-13 a4b6f1a
+can you send me the file	can you send me the file	full	本家 QualityTests 2026-10-13 a4b6f1a
+# --- 日本語の中の英単語 ---
+# カテゴリ: 混在
+kyouhagoogledekensaku	きょうはgoogleでけんさく	full	本家 QualityTests 2026-10-13 a4b6f1a
+tanaka@example.com	tanaka@example.com	full	本家 QualityTests 2026-10-13 a4b6f1a
+yamada.taro@example.co.jp	yamada.taro@example.co.jp	full	本家 QualityTests 2026-10-13 a4b6f1a
+foo_bar@example.com	foo_bar@example.com	full	本家 QualityTests 2026-10-13 a4b6f1a
+taro+news@example.com	taro+news@example.com	full	本家 QualityTests 2026-10-13 a4b6f1a
+yamada-taro@example.com	yamada-taro@example.com	full	本家 QualityTests 2026-10-13 a4b6f1a
+reflectsareta	reflectされた	full	本家 QualityTests 2026-10-13 a4b6f1a
+selectshita	selectした	full	本家 QualityTests 2026-10-13 a4b6f1a
+inviteshimashita	inviteしました	full	本家 QualityTests 2026-10-13 a4b6f1a
+invitewookutta	inviteをおくった	full	本家 QualityTests 2026-10-13 a4b6f1a
+githubnipushshita	githubにpushした	full	本家 QualityTests 2026-10-13 a4b6f1a
+pythondekaita	pythonでかいた	full	本家 QualityTests 2026-10-13 a4b6f1a
+korehathin	これはthin	full	本家 QualityTests 2026-10-13 a4b6f1a
+zoomdekaigi	zoomでかいぎ	full	本家 QualityTests 2026-10-13 a4b6f1a
+slackderenraku	slackでれんらく	full	本家 QualityTests 2026-10-13 a4b6f1a
+amazondekaimono	amazonでかいもの	full	本家 QualityTests 2026-10-13 a4b6f1a
+youtubewomiru	youtubeをみる	full	本家 QualityTests 2026-10-13 a4b6f1a
+chatgptnikiku	chatgptにきく	full	本家 QualityTests 2026-10-13 a4b6f1a
+netflixdemiru	netflixでみる	full	本家 QualityTests 2026-10-13 a4b6f1a
+discordnisanka	discordにさんか	full	本家 QualityTests 2026-10-13 a4b6f1a
+linewookuru	lineをおくる	full	本家 QualityTests 2026-10-13 a4b6f1a
+apinoerror	apiのerror	full	本家 QualityTests 2026-10-13 a4b6f1a
+bugwonaosu	bugをなおす	full	本家 QualityTests 2026-10-13 a4b6f1a
+windowsnoupdate	windowsのupdate	full	本家 QualityTests 2026-10-13 a4b6f1a
+# カテゴリ: 日本語
+shiryouwookurimasu	しりょうをおくります	full	本家 QualityTests 2026-10-13 a4b6f1a
+kakuninshitekudasai	かくにんしてください	full	本家 QualityTests 2026-10-13 a4b6f1a
+yoroshiidesuka	よろしいですか	full	本家 QualityTests 2026-10-13 a4b6f1a
+ryoukaishimashita	りょうかいしました	full	本家 QualityTests 2026-10-13 a4b6f1a
+ashitanokaiginitsuite	あしたのかいぎについて	full	本家 QualityTests 2026-10-13 a4b6f1a
+shoushouomachikudasai	しょうしょうおまちください	full	本家 QualityTests 2026-10-13 a4b6f1a
+otsukaresamadeshita	おつかれさまでした	full	本家 QualityTests 2026-10-13 a4b6f1a
+tesutogaowarimashita	てすとがおわりました	full	本家 QualityTests 2026-10-13 a4b6f1a
+sonokenhakentoushimasu	そのけんはけんとうします	full	本家 QualityTests 2026-10-13 a4b6f1a
+mouichidoonegaishimasu	もういちどおねがいします	full	本家 QualityTests 2026-10-13 a4b6f1a
+nanjigaiidesuka	なんじがいいですか	full	本家 QualityTests 2026-10-13 a4b6f1a
+zenzenmondainai	ぜんぜんもんだいない	full	本家 QualityTests 2026-10-13 a4b6f1a
+tokorodesa	ところでさ	full	本家 QualityTests 2026-10-13 a4b6f1a
+hayakukaerou	はやくかえろう	full	本家 QualityTests 2026-10-13 a4b6f1a
+kyouhasamuine	きょうはさむいね	full	本家 QualityTests 2026-10-13 a4b6f1a
+# カテゴリ: 英語
+good job	good job	full	本家 QualityTests 2026-10-13 a4b6f1a
+see you tomorrow	see you tomorrow	full	本家 QualityTests 2026-10-13 a4b6f1a
+no problem	no problem	full	本家 QualityTests 2026-10-13 a4b6f1a
+hello world	hello world	full	本家 QualityTests 2026-10-13 a4b6f1a
+thank you so much	thank you so much	full	本家 QualityTests 2026-10-13 a4b6f1a
+we need to fix the bug	we need to fix the bug	full	本家 QualityTests 2026-10-13 a4b6f1a
+please take a look at this	please take a look at this	full	本家 QualityTests 2026-10-13 a4b6f1a
+the meeting is at nine	the meeting is at nine	full	本家 QualityTests 2026-10-13 a4b6f1a
+happy birthday	happy birthday	full	本家 QualityTests 2026-10-13 a4b6f1a
+what time is it	what time is it	full	本家 QualityTests 2026-10-13 a4b6f1a
+# カテゴリ: 混在
+reactdekaita	reactでかいた	full	本家 QualityTests 2026-10-13 a4b6f1a
+dockergaugokanai	dockerがうごかない	full	本家 QualityTests 2026-10-13 a4b6f1a
+typescriptnikaeta	typescriptにかえた	full	本家 QualityTests 2026-10-13 a4b6f1a
+excelnofairu	excelのふぁいる	full	本家 QualityTests 2026-10-13 a4b6f1a
+spotifydekiku	spotifyできく	full	本家 QualityTests 2026-10-13 a4b6f1a
+microsoftnokaisha	microsoftのかいしゃ	full	本家 QualityTests 2026-10-13 a4b6f1a
+kyouhaclaudetohanashita	きょうはclaudeとはなした	full	本家 QualityTests 2026-10-13 a4b6f1a
+pythonnobug	pythonのbug	full	本家 QualityTests 2026-10-13 a4b6f1a
+GitHub no repo	GitHub のれぽ	full	本家 QualityTests 2026-10-13 a4b6f1a
+Google to Apple	Google とApple	full	本家 QualityTests 2026-10-13 a4b6f1a
+# 助詞「や」+ 英単語 / 英単語 + 助詞「や」(Particles / TrailingParticles に ya)
+yagithub	やgithub	full	本家 QualityTests 2026-10-13 a4b6f1a
+kyouhayagithub	きょうはやgithub	full	本家 QualityTests 2026-10-13 a4b6f1a
+hagithub	はgithub	full	本家 QualityTests 2026-10-13 a4b6f1a
+githubya	githubや	full	本家 QualityTests 2026-10-13 a4b6f1a
+githubni	githubに	full	本家 QualityTests 2026-10-13 a4b6f1a
+# 助詞「や」+ 英単語が 1 語にまとまらないこと (IsUnknownEnglishWord / yap|lay の誤分割)
+yapython	やpython	full	本家 QualityTests 2026-10-13 a4b6f1a
+yacursor	やcursor	full	本家 QualityTests 2026-10-13 a4b6f1a
+yaslack	やslack	full	本家 QualityTests 2026-10-13 a4b6f1a
+yastack	やstack	full	本家 QualityTests 2026-10-13 a4b6f1a
+yaplay	やplay	full	本家 QualityTests 2026-10-13 a4b6f1a
+yasync	やsync	full	本家 QualityTests 2026-10-13 a4b6f1a
+# 全体で 1 語の英単語は、助詞 + 英単語に分けない (de|light、mo|rally)
+# カテゴリ: 英語
+delight	delight	full	本家 QualityTests 2026-10-13 a4b6f1a
+devote	devote	full	本家 QualityTests 2026-10-13 a4b6f1a
+morally	morally	full	本家 QualityTests 2026-10-13 a4b6f1a
+# カテゴリ: 混在
+kokodevote	ここでvote	full	本家 QualityTests 2026-10-13 a4b6f1a
+githubdevote	githubでvote	full	本家 QualityTests 2026-10-13 a4b6f1a
+# 英字のあいだの と は、chotto の っと や、英単語の途中 (stories) では助詞にしない
+chottodehijacked	ちょっとでhijacked	full	本家 QualityTests 2026-10-13 a4b6f1a
+korekarastories	これからstories	full	本家 QualityTests 2026-10-13 a4b6f1a
+devtoprod	devとprod	full	本家 QualityTests 2026-10-13 a4b6f1a
+edittopub	editとpub	full	本家 QualityTests 2026-10-13 a4b6f1a
+dottonet	dotとnet	full	本家 QualityTests 2026-10-13 a4b6f1a
+rdstoredshift	rdsとredshift	full	本家 QualityTests 2026-10-13 a4b6f1a
+mottopython	もっとpython	full	本家 QualityTests 2026-10-13 a4b6f1a
+uikittoswiftui	uikitとswiftui	full	本家 QualityTests 2026-10-13 a4b6f1a
+# 英単語の最後の t + s は つ にしないが、つ まで読むと日本語の語になるなら つ (しゅつ・おちつ)
+# カテゴリ: 日本語
+teishutsushita	ていしゅつした	full	本家 QualityTests 2026-10-13 a4b6f1a
+ochitsuite	おちついて	full	本家 QualityTests 2026-10-13 a4b6f1a
+# カテゴリ: 混在
+kyoucommitsuru	きょうcommitする	full	本家 QualityTests 2026-10-13 a4b6f1a
+shutsita	shutした	full	本家 QualityTests 2026-10-13 a4b6f1a
+# -pedia / -pedias (ローマ字だと ぺぢあ。#207)
+# site (=して) のあと英字が続いても、確定し直しで site に戻さない
+sitePR	してPR	full	本家 QualityTests 2026-10-13 a4b6f1a
+site PR	して PR	full	本家 QualityTests 2026-10-13 a4b6f1a
+# -pedia (ローマ字だと ぺぢあ。#207)
+pedia	pedia	full	本家 QualityTests 2026-10-13 a4b6f1a
+protopedia	protopedia	full	本家 QualityTests 2026-10-13 a4b6f1a
+conservapedia	conservapedia	full	本家 QualityTests 2026-10-13 a4b6f1a
+wikipedia	wikipedia	full	本家 QualityTests 2026-10-13 a4b6f1a
+wikipedias	wikipedias	full	本家 QualityTests 2026-10-13 a4b6f1a
+protopedias	protopedias	full	本家 QualityTests 2026-10-13 a4b6f1a
+Protopedia	Protopedia	full	本家 QualityTests 2026-10-13 a4b6f1a
+Protopedias	Protopedias	full	本家 QualityTests 2026-10-13 a4b6f1a
+worldpedia	worldpedia	full	本家 QualityTests 2026-10-13 a4b6f1a
+# カテゴリ: 英語
+yahoo	yahoo	full	本家 QualityTests 2026-10-13 a4b6f1a
+# --- 英語の後の短い語 (助詞と同じ形) ---
+# --- 記号・数字 ---
+# カテゴリ: 記号・数字
+!	！	full	本家 QualityTests 2026-10-13 a4b6f1a
+?	？	full	本家 QualityTests 2026-10-13 a4b6f1a
+~	～	full	本家 QualityTests 2026-10-13 a4b6f1a
+kore,sore.	これ、それ。	full	本家 QualityTests 2026-10-13 a4b6f1a
+[kagi]	「かぎ」	full	本家 QualityTests 2026-10-13 a4b6f1a
+ra-men	らーめん	full	本家 QualityTests 2026-10-13 a4b6f1a
+3.14	3.14	full	本家 QualityTests 2026-10-13 a4b6f1a
+2026/09/30	2026/09/30	full	本家 QualityTests 2026-10-13 a4b6f1a
+10ji	10じ	full	本家 QualityTests 2026-10-13 a4b6f1a
+# --- 小書き文字・特殊な綴り ---
+# カテゴリ: 綴り
+xa	ぁ	full	本家 QualityTests 2026-10-13 a4b6f1a
+la	ぁ	full	本家 QualityTests 2026-10-13 a4b6f1a
+mala	まぁ	full	本家 QualityTests 2026-10-13 a4b6f1a
+ltu	っ	full	本家 QualityTests 2026-10-13 a4b6f1a
+moraltute	もらって	full	本家 QualityTests 2026-10-13 a4b6f1a
+moraltsute	もらって	full	本家 QualityTests 2026-10-13 a4b6f1a
+kyouhamoraltute	きょうはもらって	full	本家 QualityTests 2026-10-13 a4b6f1a
+thi	てぃ	full	本家 QualityTests 2026-10-13 a4b6f1a
+fa	ふぁ	full	本家 QualityTests 2026-10-13 a4b6f1a
+je	じぇ	full	本家 QualityTests 2026-10-13 a4b6f1a
+nn	ん	full	本家 QualityTests 2026-10-13 a4b6f1a
+kanji	かんじ	full	本家 QualityTests 2026-10-13 a4b6f1a
+# --- Shift を押した大文字 ---
+# カテゴリ: 大文字
+Tokyo	Tokyo	full	本家 QualityTests 2026-10-13 a4b6f1a
+Apple	Apple	full	本家 QualityTests 2026-10-13 a4b6f1a
+I	I	full	本家 QualityTests 2026-10-13 a4b6f1a
+W	W	full	本家 QualityTests 2026-10-13 a4b6f1a
+kaW	かW	full	本家 QualityTests 2026-10-13 a4b6f1a
+AInituite	AIについて	full	本家 QualityTests 2026-10-13 a4b6f1a
+AIdekiru	AIできる	full	本家 QualityTests 2026-10-13 a4b6f1a
+McAfeeto	McAfeeと	full	本家 QualityTests 2026-10-13 a4b6f1a
+# --- #406 ---
+# カテゴリ: 英語
+overcute	overcute	full	本家 QualityTests 2026-10-13 a4b6f1a
+# --- #434 数字挟み略語 ---
+i18n	i18n	full	本家 QualityTests 2026-10-13 a4b6f1a
+l10n	l10n	full	本家 QualityTests 2026-10-13 a4b6f1a
+h2o	h2o	full	本家 QualityTests 2026-10-13 a4b6f1a
+
+# --- 直前の文字 (Before) つきの 13 件 (この形式では判定できないので写すだけ) ---
+# 前="I like " 打鍵=sushi 期待=sushi (曖昧な語)
+# 前="今日は" 打鍵=sushi 期待=すし (曖昧な語)
+# 前="Please " 打鍵=make 期待=make (曖昧な語)
+# 前="GitHub" 打鍵=no 期待=の (短い語)
+# 前="Chrome" 打鍵=de 期待=で (短い語)
+# 前="今日は GitHub " 打鍵=ni 期待=に (短い語)
+# 前="Python" 打鍵=ga 期待=が (短い語)
+# 前="GitHub" 打鍵=ya 期待=や (短い語)
+# 前="I want " 打鍵=to 期待=to (短い語)
+# 前="this " 打鍵=is 期待=is (短い語)
+# 前="look " 打鍵=at 期待=at (短い語)
+# 前="this is " 打鍵=a 期待=a (短い語)
+# 前="Hello" 打鍵=! 期待=! (記号・数字)

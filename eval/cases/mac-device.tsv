@@ -1,0 +1,60 @@
+# Mac 実機 (TextEdit など) で確かめた「打った → 結果」と、計画書に期待が書いてある例。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。出典は docs/IMPROVEMENT_PLAN.md の節の名前。
+# この評価基盤は変換エンジン (azooKey) を使わないので、期待に漢字があるものは ascii で、印字可能 ASCII の連続 (空白で区切った並び) を比べる。
+# 打鍵が文書に書かれていない行は、期待から打鍵を復元した (出典に「打鍵は復元」と書いた)。
+
+# 実機の結果を記録した例 (ここから)
+# カテゴリ: Q4 確定し直し (TextEdit、Core の --repro でも同じ期待)
+I love sushi gasuki	I love すしがすき	full	Q4 実機 TextEdit 2026-10-11
+New York no tenki	New York のてんき	full	Q4 実機 TextEdit 2026-10-11
+Let It Go no uta	Let It Go のうた	full	Q4 実機 TextEdit 2026-10-11
+# カテゴリ: Q5 英文の 2 行目以降 (1 行目の判定として確かめる。2 行目の記録の部分は対象外)
+We're here susi	We're here すし	full	Q5 実機 TextEdit 2026-10-11 (TextEdit は ' を ’ にする)
+Let's go susi	Let's go すし	full	Q5 実機 TextEdit 2026-10-11
+Please take susi	Please take すし	full	Q5 実機 TextEdit 2026-10-11
+I want to go susi	I want to go すし	full	Q5 実機 TextEdit 2026-10-11
+Hi there	Hi there	full	Q5 実機 TextEdit 2026-10-11
+# カテゴリ: Q9 SNS の X
+Xnotoukouha	Xの投稿は	ascii	Q9 実機 TextEdit 2026-10-12 (修正前は んお投稿は)
+Xnado	Xなど	full	Q9 実機 TextEdit 2026-10-12 (期待どおり。打鍵は復元)
+Xni	Xに	full	Q9 実機 TextEdit 2026-10-12 (期待どおり。打鍵は復元)
+Xnoyouna	Xのような	full	Q9 実機 TextEdit 2026-10-12 (期待どおり。打鍵は復元)
+kyouhaXnitoukousita	きょうはXにとうこうした	full	Q9 実機 TextEdit 2026-10-12 (期待どおり。打鍵は復元)
+# カテゴリ: Q11 git のブランチ名 main
+mainnima-jisitehosii	mainにマージしてほしい	ascii	Q11 実機 TextEdit 2026-10-12 (メンテナーの報告)
+# カテゴリ: Q6・Q7 数字とハイフン
+10-ji ni kaigi desu	10-じにかいぎです	full	Q6・Q7 実機 TextEdit 2026-10-12 (期待どおり。漢字は変換エンジン)
+denwa wa 03-1234-5678desu	でんわわ03-1234-5678です	full	Q6・Q7 実機 TextEdit 2026-10-12 (期待どおり)
+ra-menwotaberu	らーめんをたべる	full	Q6・Q7 実機 TextEdit 2026-10-12 (期待どおり)
+# カテゴリ: S1 実機確認
+ko1	こ1	full	S1 実機 TextEdit 2026-10-11
+Hello world	Hello world	full	S1 実機 TextEdit 2026-10-11
+# カテゴリ: P29 ファイル名・拡張子 (実機 TextEdit 2026-10-11、期待どおり。打鍵は復元)
+setup.exewojikkou	setup.exeを実行	ascii	P29 実機 TextEdit 2026-10-11 (打鍵は復元)
+report.pdfwohiraku	report.pdfを開く	ascii	P29 実機 TextEdit 2026-10-11 (打鍵は復元)
+MeltypeTip.dll	MeltypeTip.dll	full	P29 実機 TextEdit 2026-10-11
+Meltype.config	Meltype.config	full	P29 実機 TextEdit 2026-10-11
+README.mddayo	README.mdだよ	full	P29 実機 TextEdit 2026-10-11 (打鍵は復元)
+github.comnipush	github.comにpush	full	P29 実機 TextEdit 2026-10-11 (打鍵は復元)
+Meltype.desu	Meltype.です	full	P29 実機 TextEdit 2026-10-11 (打鍵は復元)
+final.mp4wokesu	final.mp4をけす	full	P29 実機 TextEdit 2026-10-11 (打鍵は復元)
+No.5kaime	No.5回目	ascii	P29 実機 TextEdit 2026-10-11 (打鍵は復元)
+pythongasuki	pythonがすき	full	P29 実機 TextEdit 2026-10-11 (打鍵は復元)
+# 実機の結果を記録した例 (ここまで)
+
+# 期待だけが書いてある例 (実機で打つ候補として挙げたもの。実機の結果ではない)
+# カテゴリ: P34 アーティスト名・記号入りの名前 (計画書 P34 の「実機で打って確かめる候補」)
+Wiz Khalifa	Wiz Khalifa	full	P34 実機で打って確かめる候補 (期待のみ)
+Ed Sheeran	Ed Sheeran	full	P34 実機で打って確かめる候補 (期待のみ)
+Marshmello	Marshmello	full	P34 実機で打って確かめる候補 (期待のみ)
+B.o.B	B.o.B	full	P34 実機で打って確かめる候補 (期待のみ)
+U.S.A.	U.S.A.	full	P34 実機で打って確かめる候補 (期待のみ)
+Ke$ha	Ke$ha	full	P34 実機で打って確かめる候補 (期待のみ)
+Chri$tian Gate$	Chri$tian Gate$	full	P34 実機で打って確かめる候補 (期待のみ)
+Anisiyouka	Aにしようか	full	P34 実機で打って確かめる候補 (期待のみ)
+# カテゴリ: Q10 既知の外れ (期待は計画書の「期待は pushおよび」)
+pushoyobi	pushおよび	full	Q10 (記録だけ。今は プ書呼び になる)
+# 査読 R35 で見つけた形 (P45)
+kyouhawikipediadeshirabeta	きょうはwikipediaでしらべた	ascii	査読 R35
+anowikipedia	あのwikipedia	ascii	査読 R35
+ato@hitori	ato@hitori	full	査読 R35 (トレードオフ: 本家と同じ)

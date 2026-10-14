@@ -91,6 +91,24 @@ public static unsafe class Exports
     }
 
     /// <summary>
+    /// 設定の「Zenzai (ニューラル変換、実験的)」が ON なら 1、OFF・読めないときは 0 (既定は OFF)。Swift 側が、モデルの取得を始めるか・変換に使うかを決めるのに使う。
+    /// 設定は config.json が持ち、SharedSettings が変更を見て読み直す (「Meltype 辞書」の「設定」タブで変えたあと、1.5 秒ほどで効く)。
+    /// ABI 版数は上げていない (古い本体には無く、その場合 Swift 側は 0 として扱う)。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_get_zenzai")]
+    public static int GetZenzai()
+    {
+        try
+        {
+            return Config.SharedSettings.Shared.Current.Zenzai ? 1 : 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
     /// 専門用語集の分野の一覧。1 行 1 分野で「ID\t名称\t語数\t有効なら 1・そうでなければ 0」を改行でつないだ文字列 (meltype_free で解放する)。
     /// 分野が無い・取れないときは NULL。
     /// </summary>

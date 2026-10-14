@@ -23,6 +23,7 @@
 #   pkg ........................ §7-1 digest、§7-2 署名・Installer への問い合わせ、§7-3 展開、§7-4 Distribution・PackageInfo・Scripts が postinstall の 1 つだけ、
 #                                §7-5 postinstall・Resources・Distribution がリポジトリと同じか、§7-6 ペイロード (生のモードで setuid なども見る)
 #   版 ......................... §7-8 Info.plist・Core の csproj・Converter.swift・zip/pkg の名前と中身・(任意で) --expect-version
+#   cask ....................... mac/homebrew/Casks/meltype-for-mac.rb の version が built app と、sha256 が mac/dist/Meltype-mac-<版>.zip と一致するか
 #   案内文 ..................... §7-9 「右クリック → 開く」の近くに「このまま開く」があるか
 #   導入済みの Meltype ......... §7-10 (--compare-installed。参考の表示だけで、失敗にはしない)
 # 終了コード: 0 = FAIL なし、1 = FAIL あり、2 = 使い方の誤り (明示した --ref が読めない場合や、想定外の例外で検査を続けられない場合を含む)。SKIP (検査できなかった) と INFO (参考) は失敗にしない。
@@ -59,6 +60,7 @@ PKG_TOP_EXPECTED = {"Distribution", "Resources", "Meltype-component.pkg"}
 PKG_COMP_EXPECTED = {"Bom", "PackageInfo", "Payload", "Scripts"}
 REPO_PKG_RESOURCES = "mac/pkg/resources"
 REPO_PKG_SCRIPTS = "mac/pkg/scripts"
+REPO_CASK = "mac/homebrew/Casks/meltype-for-mac.rb"
 MAIN_MACHOS = [  # app の中に必ず要る Mach-O (件数ではなく名前で見る。Swift の互換 dylib などは、ツールチェーンによって有無が変わる)
     "Contents/MacOS/Meltype",
     "Contents/Helpers/MeltypeDictionary.app/Contents/MacOS/MeltypeDictionary",
@@ -80,6 +82,8 @@ ZIP_EXPECTED = {  # zip の中の Meltype-mac/ の直下 (mac/make-zip.sh が置
 POSTINSTALL_DENY = [r"\bcurl\b", r"\bwget\b", r"\bnc\b", r"\bssh\b", r"\bscp\b", r"\bosascript\b", r"\bbase64\b", r"\beval\b", r"\brm\s+-[a-zA-Z]*r"]
 MACHO_MAGICS = {bytes.fromhex(h) for h in ("cffaedfe", "feedfacf", "cafebabe", "bebafeca", "cafebabf")}
 USERS_RE = re.compile(rb"/Users/[A-Za-z0-9._-]+/")  # 数え方は grep -a -o -E '/Users/[A-Za-z0-9._-]+/' | wc -l と同じ
+LLAMA_FRAMEWORK_PREFIX = "Contents/Frameworks/llama.framework/"
+THIRD_PARTY_BUILD_USER = b"/Users/miwa/"
 OPEN_RE = r"右クリック[^→]*→ *「開く」"
 
 
@@ -487,10 +491,18 @@ def check_app(app, label, signed):
     arch_bad, minos_bad, rpath_bad, dep_bad, paths = [], [], [], [], {}
     rpath_stat = {"@": 0, "OS 標準": 0, "その他": 0}
     n_deps = 0
+    third_party_paths = 0
     for rel in machos:
         path = os.path.join(app, rel)
         with open(path, "rb") as f:
-            paths[rel] = len(USERS_RE.findall(f.read()))
+            found_paths = USERS_RE.findall(f.read())
+        # 例外: azooKey の出来合いの llama.framework の中の /Users/miwa/ だけは、第三者の作者のビルド機のパスで、利用者 (自分) の情報ではない。
+        # SwiftPM が checksum で中身を固定している。FAIL にせず件数だけ INFO に出す (件数が変わったら気づけるように)。
+        # 自前の Mach-O (Meltype・MeltypeDictionary・libMeltypeNative.dylib) と、llama.framework の中でも /Users/miwa/ 以外は、0 件のまま FAIL で守る。
+        if rel.startswith(LLAMA_FRAMEWORK_PREFIX):
+            third_party_paths += sum(1 for p in found_paths if p == THIRD_PARTY_BUILD_USER)
+            found_paths = [p for p in found_paths if p != THIRD_PARTY_BUILD_USER]
+        paths[rel] = len(found_paths)
         result["exe"][rel] = sha256(path)
         archs = archs_of(path)
         if archs is None or "arm64" not in archs:
@@ -536,9 +548,25 @@ def check_app(app, label, signed):
     check(not minos_bad, "minos が LSMinimumSystemVersion 以下 (§7-6)", "最大 %s 以下 (platform 1 の行だけを見た)" % lsmin, "; ".join(minos_bad))
     check(not rpath_bad, "RPATH にビルド機の絶対パスが無い (§7-6)", "@ で始まる %d / OS 標準 %d / その他 0 (文字列は出さない)" % (rpath_stat["@"], rpath_stat["OS 標準"]), "OS 標準でも @ でもない (相対・絶対パスの) RPATH が %d 本 (文字列は出さない): %s" % (rpath_stat["その他"], ", ".join(sorted(set(rpath_bad)))))
     check(not dep_bad, "リンクされた依存が OS 標準か同梱 (§7-6)", "依存 %d 件" % n_deps, "; ".join(dep_bad[:5]))
+    # Contents/Frameworks の *.framework が、2 つの実行ファイルの otool -L (@rpath/<名前>.framework/...) と一致するか (mac/build.sh の B1)。
+    # 参照されないものが入っていれば無駄な同梱 (サイズ増)、参照されるのに無ければ起動できない (dependencies の検査と別に、余分も見る)。
+    referenced, why = set(), None
+    for exe in (exe_main, os.path.join(helper, "Contents", "MacOS", "MeltypeDictionary")):
+        arch_flag = ["-arch", "arm64"] if "arm64" in (archs_of(exe) or []) and len(archs_of(exe) or []) > 1 else []
+        rc, out, _ = run(["otool"] + arch_flag + ["-L", exe])
+        if rc != 0:
+            why = "otool -L が読めない"
+            break
+        referenced |= set(re.findall(r"@rpath/([^/\s]+)\.framework/", text(out)))
+    if why:
+        skip("Contents/Frameworks の *.framework が otool -L の参照と一致 (B1)", why)
+    else:
+        bundled = {n[:-len(".framework")] for n in real_names(frameworks) if n.endswith(".framework")}
+        check(bundled == referenced, "Contents/Frameworks の *.framework が otool -L の参照と一致 (B1)", "%d 個 (%s)" % (len(bundled), ", ".join(sorted(bundled)) or "なし"), "足りない: %s / 余分: %s" % (", ".join(sorted(referenced - bundled)) or "-", ", ".join(sorted(bundled - referenced)) or "-"))
     total = sum(paths.values())
     detail = ", ".join("%s %d" % (os.path.basename(k), v) for k, v in sorted(paths.items()))
     check(total == 0, "実行ファイルに残るビルド時の絶対パス (ホームフォルダー配下) が 0 件 (§7-6)", "Mach-O %d 本で 0 件" % len(paths), "合計 %d 件 (%s)。mac/build.sh の strip -S (S2) が入る前のビルド、または効いていない" % (total, detail))
+    info("llama.framework (azooKey の出来合い) に残る第三者のビルド機のパス %s (参考。自分のパスではない)" % THIRD_PARTY_BUILD_USER.decode(), "%d 件" % third_party_paths)
     others = 0
     for rel in non_macho:
         try:
@@ -856,6 +884,33 @@ def check_versions(sources, expect):
             fail("CFBundleVersion (ビルド番号)", "食い違い: " + " / ".join("%s = %s" % (v, ", ".join(ks)) for v, ks in sorted(by.items())))
 
 
+def check_cask(ref, app_versions):
+    """Homebrew cask の version が built app の CFBundleShortVersionString と、sha256 が mac/dist の zip と一致するか。cask は --ref のコミットから読む。"""
+    R.section("Homebrew cask (%s)" % REPO_CASK)
+    src = git_show(ref, REPO_CASK)
+    if src is None:
+        ref_unreadable("cask の version と sha256", "git で %s の %s を読めない" % (ref, REPO_CASK))
+        return
+    body = text(src)
+    mv = re.search(r'(?m)^\s*version\s+"([^"]+)"', body)
+    ms = re.search(r'(?m)^\s*sha256\s+"([0-9a-fA-F]{64})"', body)
+    if not mv or not ms:
+        fail("cask に version と sha256 (64 桁) がある", "読めない")
+        return
+    cask_ver, cask_sha = mv.group(1), ms.group(1).lower()
+    shorts = sorted({v[0] for v in app_versions if v and v[0]})
+    if not shorts:
+        skip("cask の version が built app と同じ", "built app の版を読めていない (app の検査を省いた)")
+    else:
+        check(shorts == [cask_ver], "cask の version が built app の CFBundleShortVersionString と同じ", cask_ver, "cask は %s、app は %s" % (cask_ver, ", ".join(shorts)))
+    zpath = os.path.join(REPO, "mac", "dist", "Meltype-mac-%s.zip" % cask_ver)
+    if not os.path.isfile(zpath):
+        skip("cask の sha256 が mac/dist/Meltype-mac-%s.zip と同じ" % cask_ver, "zip が無い (make-zip.sh のあとに実行する)")
+    else:
+        h = sha256(zpath)
+        check(h == cask_sha, "cask の sha256 が mac/dist/Meltype-mac-%s.zip と同じ" % cask_ver, "一致", "cask は %s…、zip は %s… (python3 tools/update-cask.py <版> <zip の sha256> で直す)" % (cask_sha[:12], h[:12]))
+
+
 def check_open_text(ref):
     R.section("案内文の整合 (§7-9)")
     rc, out, _ = git("grep", "-n", "-E", OPEN_RE, ref, "--", "README.md", "mac")
@@ -1008,6 +1063,7 @@ def main():
         sources.update(rv)
         check_versions(sources, args.expect_version)
         check_open_text(args.ref)
+        check_cask(args.ref, [res["version"] for _l, res in results if res and _l not in ("zip", "pkg")])
     if rv is None and sources:
         check_versions(sources, args.expect_version)
 

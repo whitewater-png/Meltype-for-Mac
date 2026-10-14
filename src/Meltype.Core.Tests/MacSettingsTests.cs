@@ -123,6 +123,29 @@ internal static class MacSettingsTests
     }
 
     [Test]
+    public static void Zenzai_DefaultsOff_SavesAndReloads()
+    {
+        // 重い機能 (モデルの取得を伴う) なので、何も書かれていない config.json では OFF
+        Assert.True(!new Settings().Zenzai, "既定は OFF");
+        Assert.Equal(false, Item(MacSettingsCatalog.ToJson(new Settings()), nameof(Settings.Zenzai)).GetProperty("value").GetBoolean());
+        var path = UseTempConfig(out var restore);
+        try
+        {
+            File.WriteAllText(path, "{ \"SettingsVersion\": 5, \"LiveConversion\": false }");
+            Assert.Equal<string?>(null, MacSettingsCatalog.Apply(nameof(Settings.Zenzai), "true"), "設定タブから ON にできる");
+            Assert.True(Item(MacSettingsCatalog.Read()!, nameof(Settings.Zenzai)).GetProperty("value").GetBoolean(), "画面の値が ON");
+            var saved = Settings.Load(path);
+            Assert.True(saved.Zenzai && !saved.LiveConversion, "config.json に保存され、ほかの項目は消えない");
+            Assert.True(File.ReadAllText(path).Contains("\"Zenzai\": true"), "保存された名前は Zenzai");
+            Assert.True(MacSettingsCatalog.Apply(nameof(Settings.Zenzai), "\"yes\"") is { Length: > 0 }, "型の違う値は断る");
+            Assert.True(Settings.Load(path).Zenzai, "断られても値は変わらない");
+            Assert.Equal<string?>(null, MacSettingsCatalog.Apply(nameof(Settings.Zenzai), "false"), "OFF に戻せる");
+            Assert.True(!Settings.Load(path).Zenzai, "OFF が保存される");
+        }
+        finally { restore(); }
+    }
+
+    [Test]
     public static void Apply_RoundTrip_BoolEnumInt_KeepsOtherSettings()
     {
         var path = UseTempConfig(out var restore);

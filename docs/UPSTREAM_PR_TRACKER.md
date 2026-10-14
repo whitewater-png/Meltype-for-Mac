@@ -36,6 +36,12 @@
 | P42 | #10 | 保護区間 (メンション・URL・メール・パス) | 要判断 | 保留 | - | 助詞つきパス (./build.shde) の扱いを先に決める。別項目として設計する |
 | P43 | #335 | 直した誤判定をその場で報告にする | 低 | 未着手 | - | Mac 版リポジトリに誤判定の報告テンプレートを作ってから |
 | P44 | #292 | コード系アプリの一覧に WezTerm・Rio・Hyper を足す | 低 | 未着手 | - | bundle ID を実機で確かめる |
+| P45 | #406 #153 #77 #104 #59 #129 ほか (本家の判定修正 7 コミット) | 本家の判定修正を手で移植し、`eval/` の回帰ゲートの broken 40 件を 28 件に (取り込み前 216/261 → 231/264、取り込み前の Mac 版に対する broken 0 / fixed 12)。取り込み: overcute・hosuthingu・reflectsareta・moraltute・メールの @ より前・AIdekiru・teishutsushita。見送り: 4 (githubdevote)・6 (MP3ni・3かける4)・8 の や・11 の と・12 (make sure you have time)・13 の 2 件 (未特定)・**8・9 の -pedia (一度入れたが、査読 R35 で `kyouhawikipediadeshirabeta` が前の日本語ごと英字になる悪化が見つかり外した。本家 a4b6f1a も同じ。本家への報告は判断待ち)** | 中 | 完了 (2026-10-14 実機確認) | 4534aab (P45-12 = batch/p45b の最後のコード変更。文書コミットは自分の hash を書けないので、この欄は文書の前の hash) | TextEdit で `overcute`・`hosuthingu`・`reflectsareta`・`moraltute`・`tanaka@gmail.com`・`yamada.taro@example.co.jp` (→ そのまま)・`AIdekiru`・`teishutsushita`、`kyouhawikipediadeshirabeta` (→ きょうはwikipediaでしらべた)、`ato@hitori` (→ ato@hitori、トレードオフの確認)。変わらないこと: `umaindesu`・`ato@3nin`・`Xnotoukouha`。実機は NSSpellChecker なので答えが違うことがある。詳細は計画書 P45 |
+| 0-4 | #229 (本家 Mac 版への要望: Homebrew で入れたい) | Homebrew cask `meltype-for-mac` (自前 tap https://github.com/whitewater-png/homebrew-meltype-for-mac)。zip を `input_method` で入れ、postflight で quarantine を外す。入力ソースの登録はサンドボックス内でできないので、インストール後にログアウト・ログイン (caveats・README に記載)。計画書 0-4 | 中 | 完了 (2026-10-14 実機確認) | 295f07b | きれいな Mac での初回 (Gatekeeper の判定が記憶されていない状態) は未確認 |
+| 0-5 | - (戦略計画 0-5) | 既知の制限の仕分け表 `docs/KNOWN_LIMITS.md` (50 件: 仕様 28 / 直す予定 10 / 直った 4 / 未確認 8) と README の「制限 (知っておいてほしいこと)」節・よくある質問 3 問。査読 R37 でライブ変換が既にあることが分かり (実機確認)、戦略計画 2-3 を訂正。番号待ちの候補: K02/K03 (人名分野)・K16 (-pedia の残り)・K20 (1 語英単語の再変換)・K33 (二重空白)・K40 (全角スペースの手段、リョウさん判断) | 低 | 完了 (2026-10-14) | c60b4f4 | 実機は関係しない (文書のみ) |
+| 0-3 | - (戦略計画 0-3) | ホストアプリ互換マトリクス `docs/HOST_COMPAT.md` (TextEdit・Hermes・LibreOffice・Chrome・Google ドキュメント・Discord・ターミナル × 8 項目)。再変換が効かないのは Google ドキュメント (何も起きない) とターミナル (スペースが入る → K66 候補) のみ。LibreOffice の確定し直しは効いた (K30 を未確認に) | 低 | 完了 (2026-10-14 実機確認) | f2af372 | VS Code・Slack は未確認 |
+| 0-6 | #222 (本家: アイコンの要望) | 辞書アプリと Meltype.app に氷の M の `.icns` (入力メニューの氷の M/A は 1188c89 で済み)。`tools/make_icon.py` で元絵から生成 | 低 | 完了 (2026-10-14 実機確認) | ac3ff1c | Finder・Dock・⌘Tab で確認済み |
+| 1-1 | - (戦略計画 1-1、柱 C) | Zenzai (ニューラル変換) を設定で ON にできる (既定 OFF、上限 3、左文脈あり、CPU 版)。重みは ON 時のみ取得 (URL・サイズ・SHA-256 固定、ホスト制限)。実験: 212 文で +17〜22 ポイント、1 キー p95 61 ms (M4 Max)、メモリ +30〜100 MB。最低 OS 13.3 に。設計 `docs/ZENZAI_DESIGN_1-1.md`、結果 `docs/ZENZAI_EXPERIMENT_2026-10.md` | 高 | 完了 (2026-10-14 実機確認) | 51767c3 | M1 級の速さ、通信断での失敗表示 |
 
 ## 2. 本家 PR に由来しない項目
 
@@ -75,6 +81,12 @@
 | --- | --- |
 | 2026-10-11 | 調査結果の文書と、この管理表を作成。P30〜P33 を並列で作業開始 |
 | 2026-10-14 | A1 (ATOK の 1 音確定、Shift+↓) を実装。独立査読 4 回 (1 回目 4 件・2 回目 4 件・3 回目 5 件・4 回目 1 件の指摘を直した。P2 の一部は限界として記録)。Core のテスト 606 → 624 件。**実機未確認** |
+| 2026-10-14 | 1-1 (Zenzai): 実験 (前回 10/12 の結果を復元・再現、212 文、製品経路の速さ) → go → 製品実装 (設定・取得・変換・安全弁・文書) → 査読 R40 → 実機確認 OK。最低 OS を 13.3 に (llama.framework の要件)。 |
+| 2026-10-14 | 0-6 (アイコン): 辞書アプリ・本体に氷の M の .icns。これで Phase 0 (0-1〜0-6・P45) は全部完了。 |
+| 2026-10-14 | 0-3 (ホスト互換): 7 アプリ × 8 項目を実機で確認。再変換 NG は Google ドキュメントとターミナルだけ、確定し直しは全アプリで効いた (LibreOffice の以前の記録と食い違い → K30 未確認)。`docs/HOST_COMPAT.md` 新規、README 制限節の LibreOffice の行を訂正。 |
+| 2026-10-14 | 0-5 (既知の制限の仕分け): `docs/KNOWN_LIMITS.md` 50 件、README に制限節と FAQ 3 問。ライブ変換は Mac 版に既にあり既定 ON (実機確認) → 戦略計画 2-3 と調査レポートの前提を訂正。全角スペースの手段 (K40) はリョウさんの判断待ち。 |
+| 2026-10-14 | 0-4 (Homebrew cask): 公開 tap whitewater-png/homebrew-meltype-for-mac を作成 (29b083a)。実機で cask のみ 1.1.7 を入れ、ログアウト・ログイン後に入力できた。quarantine 付きだと Gatekeeper が IME を黙って止める、サンドボックス内では `--register` が効かない、既存の Meltype.app があると入らない、を計画書 0-4 に記録。README・RELEASE.md・check-release.py を更新。 |
+| 2026-10-13 | P45 (本家の判定修正の取り込み): 本家 7 コミット → Mac 7 コミット + 守り 1 (P45-12)、-pedia 2 件は査読 R35 で外した。eval 216/261 → 231/264、取り込み前の Mac 版に対する broken 0 / fixed 12、本家に対する broken 40 → 28、テスト 617 → 618 件。見送り: c6b281e (githubdevote)・b4484c4 (MP3ni・3かける4)・3cb0758 の や と ffd7e6a・35beb60 の と (前提の 74ca494 が無い)・8dfec9d (make sure you have time)・-pedia (2a1ccb9・40bcad9 は一度入れて外した。本家 a4b6f1a も `kyouhawikipedia…` で前の日本語ごと英字になる。報告は判断待ち)。`my name is taro`・`apinoerror` は未特定。実機確認待ち |
 | 2026-10-13 | Q13 (アプリ内の更新のあとも古い IME が動き続ける) の原因を調査して修正: `install.sh` の `pkill -x Meltype` が、IME が起動した `install.sh` からは祖先として対象から外されていた。`killall Meltype` に変更し、`tools/check-install-stop-ime.py` を追加 (公開前の検査にも載せた)。独立査読 R34 を 4 回 (P0 なし、P1 は直した)。実機未確認 (公開した版での更新が最初の確認)。1.1.7 として公開した (タグ `v1.1.7-mac`) |
 | 2026-10-13 | 1.1.6 の準備: Q7・Q8 を完了に (計画書の 10-12 の実機確認に合わせた)。配布物に古い `llama.framework` が混ざる問題を B1 として記録 (1.1.6 はきれいな worktree から作り直して配布前チェック FAIL 0) |
 | 2026-10-13 | 実機確認 (`b619f34` のビルド): L1 の画面・IME の学習の自動反映、Q9 (学習から `xnotoukouha` を消したあと)、Q11 の追加修正、Q6 の再変換の行頭の `- ` がすべて問題なし → Q6・Q9・Q11・L1 を完了にした。入力途中の `まindo` を Q12 (既存、記録だけ) として記録 |

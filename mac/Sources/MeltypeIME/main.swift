@@ -14,6 +14,7 @@ case "--register-add": exit(InputSourceRegistration.add())
 case "--register-enable": exit(InputSourceRegistration.enable())
 case "--unregister": exit(InputSourceRegistration.disable())
 case "--bench": exit(Bench.run() ? 0 : 1)   // 変換の速度と正しさの計測 (IMKServer は立てない。Bench.swift)。変換の食い違いがあれば終了コード 1
+case "--zenzai-self-test": exit(ZenzaiSelfTest.run(network: CommandLine.arguments.contains("--network")) ? 0 : 1)   // Zenzai のモデルの取得の 3 状態 (一時フォルダー。--network で本物の URL から 1 回だけ)
 default: break
 }
 
@@ -30,6 +31,9 @@ var candidatesWindow: IMKCandidates? = IMKCandidates(server: server, panelType: 
 
 // 本体 (libMeltypeNative.dylib) を読み込み、漢字変換・英単語の判定の関数を登録しておく。
 NativeCore.shared.initialize()
+
+// Zenzai (ニューラル変換) のモデル。設定が ON のときだけ、必要なら取得する (既定 OFF のあいだは通信しない)。
+ZenzaiModel.shared.start()
 
 // 新しい版の確認 (既定 ON。起動 5 分後から、24 時間に 1 回。OFF のときは通信しない)。
 UpdateManager.shared.start()

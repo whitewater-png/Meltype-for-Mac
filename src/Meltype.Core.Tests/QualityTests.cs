@@ -25,6 +25,7 @@ internal static class Quality
     [
         // --- 日本語の文 (テスト用の変換エンジンはかなのまま返す) ---
         new("日本語", "kyouhaiitenkidesune", "きょうはいいてんきですね"),
+        new("日本語", "hosuthingu", "ほすてぃんぐ"),
         new("日本語", "watashihagakuseidesu", "わたしはがくせいです"),
         new("日本語", "arigatougozaimasu", "ありがとうございます"),
         new("日本語", "yoroshikuonegaishimasu", "よろしくおねがいします"),
@@ -102,6 +103,26 @@ internal static class Quality
 
         // --- 日本語の中の英単語 ---
         new("混在", "kyouhagoogledekensaku", "きょうはgoogleでけんさく"),
+        new("混在", "reflectsareta", "reflectされた"),
+        new("混在", "selectshita", "selectした"),
+        new("混在", "kyouhawikipediadeshirabeta", "きょうはwikipediaでしらべた"),
+        // 全体で 1 語の英単語は、助詞 + 英単語に分けない (de|light、mo|rally)。本家 35beb60 の「英語」行
+        new("英語", "delight", "delight"),
+        new("英語", "devote", "devote"),
+        new("英語", "morally", "morally"),
+        // P45-2 (てぃ の続き) の巻き添えで、日本語の後ろの think が てぃ にならない守り (査読 R35)
+        new("混在", "kyouhathinkdesu", "きょうはthinkです"),
+        new("混在", "kyouhathinkpad", "きょうはthinkpad"),
+        new("混在", "chottodehijacked", "ちょっとでhijacked"),
+        new("混在", "korekarastories", "これからstories"),
+        new("混在", "mottopython", "もっとpython"),
+        new("混在", "tanaka@gmail.com", "tanaka@gmail.com"),
+        new("混在", "yamada.taro@example.co.jp", "yamada.taro@example.co.jp"),
+        // 英単語の最後の t + s は つ にしないが、つ まで読むと日本語の語になるなら つ (しゅつ・おちつ。本家 35beb60、P45-11)
+        new("日本語", "teishutsushita", "ていしゅつした"),
+        new("日本語", "ochitsuite", "おちついて"),
+        new("混在", "kyoucommitsuru", "きょうcommitする"),
+        new("混在", "shutsita", "shutした"),
         new("混在", "githubnipushshita", "githubにpushした"),
         new("混在", "pythondekaita", "pythonでかいた"),
         new("混在", "zoomdekaigi", "zoomでかいぎ"),
@@ -178,6 +199,9 @@ internal static class Quality
         new("綴り", "la", "ぁ"),
         new("綴り", "mala", "まぁ"),
         new("綴り", "ltu", "っ"),
+        new("綴り", "moraltute", "もらって"),
+        new("綴り", "moraltsute", "もらって"),
+        new("綴り", "kyouhamoraltute", "きょうはもらって"),
         new("綴り", "thi", "てぃ"),
         new("綴り", "fa", "ふぁ"),
         new("綴り", "je", "じぇ"),
@@ -191,6 +215,11 @@ internal static class Quality
         new("大文字", "W", "W"),
         new("大文字", "kaW", "かW"),
         new("大文字", "McAfeeto", "McAfeeと"),
+        new("大文字", "AInituite", "AIについて"),
+        new("大文字", "AIdekiru", "AIできる"),
+
+        // --- 本家 #406 (P45-1) ---
+        new("英語", "overcute", "overcute"),
     ];
 
     /// <summary>コードの行のキャレット位置 (コメント・文字列の中か)。</summary>

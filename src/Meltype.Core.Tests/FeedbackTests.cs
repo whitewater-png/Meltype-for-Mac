@@ -704,6 +704,23 @@ internal static class LanguageLearningTests
     }
 
     [Test]
+    public static void AcronymThenRomaji_IsJapanese()
+    {
+        // 大文字の略語の後ろのローマ字 (AInituite → AIについて: 本家 #129、P45-10)。
+        // AIde を英単語 aide、AInit を init と読んで、後ろまで英字にしていた
+        foreach (var (typed, expected) in new[]
+        {
+            ("AInituite", "AIについて"), ("AInitsuite", "AIについて"), ("AIdekiru", "AIできる"), ("GPTnituite", "GPTについて"),
+            ("AIde", "AIで"), ("iOSdekiru", "iOSできる"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void UnitsAfterNumbers_StayLetters()
     {
         // 単位 (mm、min) が打ちにくく、日本語になることがあった (10mmで → 10っまで、5min → 5みん)。
@@ -824,6 +841,8 @@ internal static class LanguageLearningTests
                 ("gpgga", "gpgが"), ("jwtto", "jwtと"), ("tddde", "tddで"),
                 // summary.json (2026-10-05): 音の途中から始まる英単語 (kara|na|l の anal、da|me|x の amex) で小書き文字が崩れていた
                 ("yakaranala", "やからなぁ"), ("damexe", "だめぇ"), ("hotelya", "hotelや"),
+                // 本家 #104 (P45-5): 英単語 (moral) の最後の l + tu が っ にならなかった。英単語 + つ (hotel|tukau) は今までどおり
+                ("moraltute", "もらって"), ("hoteltukau", "hotelつかう"), ("hoteltsukau", "hotelつかう"), ("mailtukau", "mailつかう"), ("realtukau", "realつかう"), ("tooltukau", "toolつかう"), ("sukilltute", "すkillつて"), ("Moraltute", "Moralつて"),
                 // 笑いの w (文末の w が消えていた、ww が っw になっていた)。英単語の最後の w はそのまま
                 ("kiyagattaw", "きやがったw"), ("daneww", "だねww"), ("toottawwwww", "とおったwwwww"), ("wwww", "wwww"), ("kitaww!", "きたww！"), ("new", "new"), ("aww", "aww"),
                 // 読めない略語の最後の c + は・や (vrc|ya が vr|ちゃ になっていた)。読める語 (まち) と大文字の略語の後ろ (EDちゃう) は分けない
@@ -840,7 +859,10 @@ internal static class LanguageLearningTests
                 ("tougouhandakaraBEkana?", "とうごうはんだからBEかな？"), ("fubusangaXshisuginadakenanda!!", "ふぶさんがXしすぎなだけなんだ！！"), ("tsubemyunorevancedtsukatteru", "つべみゅのrevancedつかってる"),
                 // テスターの報告 (2026-10-05): 英語のユーザー名が打てない。@ の後ろ (メンション)・_ の入った語は英字のまま
                 ("@kuraido", "@kuraido"), ("@una08142009 arigatou", "@una08142009 ありがとう"), ("upah_setu", "upah_setu"), ("cafely_latte", "cafely_latte"),
-                ("taro@gmail.com", "たろ@gmail.com"), ("@akisamesan", "@akisamesan"),
+                // メールアドレスは @ の前も英字のまま (本家 #59、P45-7。前は たろ@gmail.com だった)
+                ("taro@gmail.com", "taro@gmail.com"), ("@akisamesan", "@akisamesan"),
+                // @ の後ろが英字で始まらなければメールではない (domainStarts。査読 R35)
+                ("ato@3nin", "あと@3nin"),
                 // Issue #12: ローマ字として読めてしまう英単語 (feature → ふぇあつれ)。日本語の中でも英字
                 ("feature", "feature"), ("future", "future"), ("nature", "nature"), ("remote", "remote"), ("online", "online"),
                 ("atarashiifeaturewotsuika", "あたらしいfeatureをついか"), ("kyouharemotedesu", "きょうはremoteです"),
@@ -1167,6 +1189,8 @@ internal static class RomajiTypoTests
         foreach (var word in words)
         {
             Assert.True(word.Length >= 4 && word.All(char.IsAsciiLetterLower), "4 文字以上の小文字の英字: " + word);
+            // overcute (本家 #406、P45-1) は全体ではローマ字として読めないが、over|cute と 2 語に割れて overくて になるので入れる (割れる語だけ例外)
+            if (word == "overcute") continue;
             Assert.True(CompositionTests.Detector.Romaji.AnalyzeFragment(word).IsValid, "ローマ字として読める語 (features の s のような最後の子音は残ってよい): " + word);
         }
         Assert.Equal(words.Count, words.Distinct().Count(), "重複が無い");

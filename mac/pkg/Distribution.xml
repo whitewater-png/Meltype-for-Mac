@@ -8,7 +8,7 @@
     <options customize="never" require-scripts="false" hostArchitectures="arm64"/>
     <volume-check>
         <allowed-os-versions>
-            <os-version min="13.0"/>
+            <os-version min="13.3"/>
         </allowed-os-versions>
     </volume-check>
     <choices-outline>

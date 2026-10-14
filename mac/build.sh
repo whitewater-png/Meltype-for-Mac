@@ -5,7 +5,7 @@
 # Meltype の Mac 版をビルドして ~/Library/Input Methods にインストールする。
 #   ./build.sh            ビルドしてインストール
 #   ./build.sh --no-install  ビルドだけ (build/Meltype.app)
-# 必要なもの: macOS 13 以降、Xcode (またはコマンドライン ツール: xcode-select --install)、.NET 10 SDK
+# 必要なもの: macOS 13.3 以降、Xcode (またはコマンドライン ツール: xcode-select --install)、.NET 10 SDK
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -58,7 +58,12 @@ dotnet publish ../src/Meltype.Mac.Native/Meltype.Mac.Native.csproj -c Release -r
     --source https://api.nuget.org/v3/index.json -o "$BUILD/native"
 
 echo "== 2/3 IME (Swift) をビルド (初回は azooKey の変換エンジンと辞書のダウンロードに時間がかかります)"
-swift build -c release --force-resolved-versions
+# ビルドしたマシンのフォルダーの絶対パス (/Users/<名前>/…/mac/.build/checkouts/…) が、実行ファイルの文字列 (assert・エラーの __FILE__ や #filePath) に残る。
+# Zenzai を付けて (C++ の marisa・azooKey の Zenzai のコードが入って) から、この文字列が 75 件に増え、strip -S (下) では消えなかった。
+# 配布先の Mac でユーザー名と作業フォルダーが読めてしまうので、コンパイラに「このフォルダーは . と書く」と頼む (C/C++ と Swift の両方)。
+SOURCE_ROOT="$(pwd -P)"
+swift build -c release --force-resolved-versions \
+    -Xcc "-ffile-prefix-map=$SOURCE_ROOT=." -Xswiftc -file-prefix-map -Xswiftc "$SOURCE_ROOT=."
 
 echo "== 3/3 Meltype.app を組み立て"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
@@ -72,14 +77,29 @@ mkdir -p "$HELPER/Contents/MacOS" "$HELPER/Contents/Resources"
 cp "$BIN/MeltypeDictionary" "$HELPER/Contents/MacOS/MeltypeDictionary"
 cp Resources/Dictionary/Info.plist "$HELPER/Contents/Info.plist"
 cp -R Resources/Dictionary/ja.lproj "$HELPER/Contents/Resources/"
+# アイコン (氷の M。入力メニューの icon.tiff と同じ絵柄の 1024px 版。元絵と作り方は docs/IMPROVEMENT_PLAN.md の 0-6)
+cp Resources/Meltype.icns "$APP/Contents/Resources/Meltype.icns"
+cp Resources/Meltype.icns "$HELPER/Contents/Resources/Meltype.icns"
 # 版は Meltype.app と同じにする (Info.plist は 1 か所で管理する)
 plutil -replace CFBundleShortVersionString -string "$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)" "$HELPER/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$(plutil -extract CFBundleVersion raw Resources/Info.plist)" "$HELPER/Contents/Info.plist"
 # azooKey が使う llama.framework などの動的なフレームワークも同梱する。
 # 入れていなかったため、1.0.0 は起動できなかった (dyld: Library not loaded: @rpath/llama.framework、#13)。
-for framework in "$BIN"/*.framework; do
-    [[ -e "$framework" ]] && cp -R "$framework" "$APP/Contents/Frameworks/"
-done
+# $BIN にあるものを全部入れると、実行ファイルが使わないものまで配布物に入る (サイズが増え、検査の対象も増える)。
+# なので、実行ファイルを otool -L して @rpath/<名前>.framework/... で参照されているものだけを入れる。
+while read -r name; do
+    [[ -n "$name" ]] || continue
+    if [[ ! -d "$BIN/$name.framework" ]]; then echo "実行ファイルが参照するフレームワークが見つかりません: $BIN/$name.framework" >&2; exit 1; fi
+    cp -R "$BIN/$name.framework" "$APP/Contents/Frameworks/"
+    # azooKey の出来合いの llama.framework は arm64 と x86_64 の 2 つ入り (5.6 MB)。配布物は 1 つの CPU 用なので、使う方だけにする (約半分)。
+    # 署名は後ろの codesign が付け直す (薄くすると、元の署名は無効になる)。
+    framework_binary="$APP/Contents/Frameworks/$name.framework/Versions/A/$name"
+    if [[ -f "$framework_binary" && "$(lipo -archs "$framework_binary")" == *" "* ]]; then
+        # ビルドする CPU ($RID。別の CPU 向けにビルドしても、その CPU の分を残す) に合わせて薄くする
+        lipo -thin "$([[ "$RID" == osx-arm64 ]] && echo arm64 || echo x86_64)" "$framework_binary" -output "$framework_binary.thin"
+        mv "$framework_binary.thin" "$framework_binary"
+    fi
+done < <( (otool -L "$BIN/MeltypeIME"; otool -L "$BIN/MeltypeDictionary") | sed -n 's|^[[:space:]]*@rpath/\([^/]*\)\.framework/.*|\1|p' | sort -u)
 # Swift 6.2 以降は、古い macOS 向けの互換ライブラリ (libswiftCompatibilitySpan.dylib など) を @rpath で読む。
 # macOS 26 は OS に入っているが、13〜15 では無いので、ツールチェーンから同梱する (#20)。辞書の管理画面も同じものを使う (二重に入れない)。
 TOOLCHAIN_SWIFT_LIBS="$(dirname "$(xcrun --find swift)")/../lib"
@@ -118,9 +138,10 @@ LICENSES="$APP/Contents/Resources/Licenses"
 mkdir -p "$LICENSES"
 cp ../LICENSE "$LICENSES/LICENSE-Meltype-GPL-3.0.txt"
 cp ../THIRD-PARTY-NOTICES.md "$LICENSES/THIRD-PARTY-NOTICES.md"
-for dep in AzooKeyKanaKanjiConverter Jinja swift-algorithms swift-collections swift-numerics swift-tokenizers; do
+for dep in AzooKeyKanaKanjiConverter Jinja swift-algorithms swift-collections swift-numerics swift-tokenizers SwiftyMarisa; do
     found=
-    for name in LICENSE LICENSE.txt NOTICE NOTICE.txt; do
+    # SwiftyMarisa (と、その中の marisa-trie) のライセンスは LICENSE.md (BSD 2-clause と LGPL のデュアル。Meltype は BSD 2-clause で使う)
+    for name in LICENSE LICENSE.txt LICENSE.md NOTICE NOTICE.txt; do
         if [[ -f ".build/checkouts/$dep/$name" ]]; then cp ".build/checkouts/$dep/$name" "$LICENSES/$dep-$name"; found=1; fi
     done
     [[ -n "$found" ]] || { echo "$dep のライセンスファイルが見つかりません (.build/checkouts/$dep)。ライセンス表示なしでは配布できません。" >&2; exit 1; }
@@ -133,6 +154,10 @@ cp "$AZ_DICT_LICENSE" "$LICENSES/azooKey_dictionary_storage-LICENSE"
 # (native/mozc/MOZC_COMMIT の版から取ったもの) を mac/Resources/Licenses に置いてある
 [[ -f Resources/Licenses/Mozc-LICENSE.txt ]] || { echo "Mozc のライセンスファイル (mac/Resources/Licenses/Mozc-LICENSE.txt) が見つかりません。" >&2; exit 1; }
 cp Resources/Licenses/Mozc-LICENSE.txt "$LICENSES/Mozc-LICENSE.txt"
+# llama.cpp (MIT)。azooKey が配る出来合いの llama.framework (Contents/Frameworks) をそのまま同梱するので、MIT の条件どおり著作権表示と許諾文の全文を一緒に渡す
+# (xcframework には LICENSE が入っていないので、mac/Resources/Licenses に置いてある)
+[[ -f Resources/Licenses/llama.cpp-LICENSE.txt ]] || { echo "llama.cpp のライセンスファイル (mac/Resources/Licenses/llama.cpp-LICENSE.txt) が見つかりません。" >&2; exit 1; }
+cp Resources/Licenses/llama.cpp-LICENSE.txt "$LICENSES/llama.cpp-LICENSE.txt"
 # 実行ファイルの RPATH に、ビルドしたマシンの絶対パス (/Library/Developer/CommandLineTools/... など) が残っていると、
 # 配布先の Mac でそのパスを探しに行く (ビルドした人の環境が漏れ、同じパスに置かれたライブラリを読み込まされる余地も残る)。
 # 署名すると中身を変えられなくなるので、署名の前に外す。無いときに失敗しないよう || true。

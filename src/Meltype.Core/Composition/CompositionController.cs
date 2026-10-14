@@ -89,6 +89,13 @@ public sealed class CompositionOptions
     /// </summary>
     public Func<bool> ShiftEnterNewline { get; init; } = () => true;
 
+    /// <summary>
+    /// ATOK スタイルのキー操作 (変換中)。← で文節を縮める (区切りを前へ)、→ で文節を伸ばす (区切りをうしろへ)、
+    /// ↓ で選んでいる文節までを確定 (部分確定)、Shift+← → で文節を移る、Ctrl+← → で先頭 / 最後の文節へ (MeltypeSession)。
+    /// 既定は false (今までどおり ← → で文節を移り、↓ で次の候補、Shift+← → で区切りを変える)。
+    /// </summary>
+    public Func<bool> TokMode { get; init; } = () => false;
+
     /// <summary>英数 (直接入力) 状態か。</summary>
     public Func<bool> DirectMode { get; init; } = () => false;
 
@@ -328,6 +335,79 @@ public sealed class CompositionController
 
     /// <summary>直近に確定した文字列 (テスト・ログ用)。</summary>
     public event Action<string>? Committed;
+
+    /// <summary>変換中の文節があるか。</summary>
+    internal bool IsConverting => _converting && _clauses.Count > 0;
+
+    /// <summary>
+    /// ATOK スタイル (TokMode) の Ctrl+← / Ctrl+→: 先頭 / 最後の文節を選ぶ (MeltypeSession が呼ぶ。Ctrl は
+    /// ふだん「確定してショートカットへ」なので、変換ボックスの外で受ける)。変換中でなければ何もしない。
+    /// </summary>
+    internal void SelectEdgeClause(bool last)
+    {
+        if (!IsConverting) return;
+        _candidatesMoved = true;
+        _selectedClause = last ? _clauses.Count - 1 : 0;
+        UpdateView();
+    }
+
+    /// <summary>選んでいる文節を delta だけ動かす (端では止まる)。</summary>
+    private void MoveClauseBy(int delta) => _selectedClause = Math.Clamp(_selectedClause + delta, 0, _clauses.Count - 1);
+
+    /// <summary>
+    /// ATOK スタイル (TokMode) の ↓ (部分確定): 先頭から選んでいる文節までを確定し、残りの文節は変換中のまま残して先頭を選ぶ。
+    /// 最後の文節を選んでいれば、全部を確定する (Enter と同じ)。
+    /// 変換後も続けて入力 (固定した文節) ・選んだ文の再変換の途中は、残す読みの扱いが合わないので、全部を確定する。
+    /// </summary>
+    private void CommitThroughSelectedClause()
+    {
+        var count = _selectedClause + 1;
+        if (count >= _clauses.Count || _headCount > 0 || _reconvertRomaji || _reconvertOriginal is not null)
+        {
+            Commit();
+            return;
+        }
+        var committed = _clauses.Take(count).ToList();
+        var rest = _clauses.Skip(count).ToList();
+        var text = string.Concat(committed.Select(c => c.Text));
+        // 確定する文節だけを学習する (Learn は _clauses を見る)
+        _clauses = committed;
+        Learn();
+        // 残りの読み: 打った単位 (打った英字つき) をそのまま残せればそうする (F10 で打ったままの英字に戻せる)。合わなければ読みだけ。
+        if (!_text.RemoveLeading(committed.Select(c => (c.Reading, c.IsEnglish))))
+        {
+            var mode = _text.Mode;
+            _text.SetKana(string.Concat(rest.Select(c => c.Reading)));
+            _text.Mode = mode;
+        }
+        var english = committed.All(c => c.IsEnglish);
+        CommitPart(text, english);
+        _clauses = rest;
+        _selectedClause = 0;
+        _converting = true;
+        _candidatesMoved = false;
+        // 確定した分は、残りの変換と学習の文脈 (キャレットの前) になる
+        _precedingText = (_precedingText ?? "") + text;
+        _text.PrecedingEnglish = english;
+    }
+
+    /// <summary>
+    /// 変換中の一部だけを確定して入力する (部分確定)。変換ボックスの中身は呼び出し側が残す。
+    /// 確定し直し (英語とも日本語とも読める語) の対象にはしない。
+    /// </summary>
+    private void CommitPart(string text, bool english)
+    {
+        _spaceStartedConversion = false;
+        _correctable.Clear();
+        if (text.Length == 0) return;
+        if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, null);
+        _lastCommitEnglish = english;
+        var joined = (_lastCommitText ?? "") + text;
+        _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
+        _lastCommitTime = Environment.TickCount64;
+        _host.CommitText(text);
+        Committed?.Invoke(text);
+    }
 
     /// <summary>キューにたまった入力をすべて処理する。UI スレッドで呼ぶ。</summary>
     public void Pump()
@@ -1247,6 +1327,15 @@ public sealed class CompositionController
                 if (!clause.IsEnglish && !clause.Expanded) Expand(clause);
                 clause.Index = Math.Max(clause.Index - 9, 0);
                 clause.Changed = true;
+                return true;
+            // ATOK スタイル (TokMode): ← → は文節の区切り、Shift+← → は文節の移動、↓ は部分確定。
+            case VirtualKeys.Left or VirtualKeys.Right when _options.TokMode():
+                if (_reconvertRomaji) return true; // ローマ字の再変換は区切りを変えられない
+                if (shift) MoveClauseBy(vk == VirtualKeys.Left ? -1 : +1);
+                else Resize(vk == VirtualKeys.Left ? -1 : +1);
+                return true;
+            case VirtualKeys.Down when _options.TokMode() && !shift:
+                CommitThroughSelectedClause();
                 return true;
             case VirtualKeys.Space:
             case VirtualKeys.Down:
@@ -2637,7 +2726,9 @@ public sealed class CompositionController
                 selected.Candidates,
                 selected.Index,
                 true,
-                "←→ 文節　Space/↓ 候補　Shift+←→ 区切り　Enter 確定　Esc 戻る",
+                _options.TokMode()
+                    ? "←→ 区切り　Shift+←→ 文節　Space 候補　↓ 部分確定　Enter 確定　Esc 戻る"
+                    : "←→ 文節　Space/↓ 候補　Shift+←→ 区切り　Enter 確定　Esc 戻る",
                 _clauses.Select(c => c.Text).ToList(),
                 _selectedClause,
                 CandidateNotes(selected),

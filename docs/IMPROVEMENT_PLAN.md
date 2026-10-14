@@ -53,6 +53,8 @@
 
 ## 1. 優先度と実装順
 
+> 2026-10 の戦略計画 (本家との比較、5 本の柱、Phase 0〜3 の施策、リョウさんの決定 8 件) は `docs/STRATEGY_2026-10.md`。以降の新しい項目は、その Phase 表の ID (0-1 など) を書く。
+
 | # | 項目 | 価値 | 大きさ | 依存 |
 | --- | --- | --- | --- | --- |
 | P1 | F6〜F10 を完備 (F8 半角カナ追加) + Mac の Ctrl 代替キー | 高 (メンテナー要望) | 小 | なし |
@@ -904,7 +906,7 @@ Core の 1 キーあたり (ms)。「末尾」は最後の 10% のキー (一番
 - 取り消し (⌘Z) は画面を開いている間だけ (閉じると消える)。それより前の状態は `userdict.txt.bak` (削除・編集の直前の 1 世代)。
 - 画面は 1.5 秒ごとに版を確かめて読み直す (IME の側の登録がすぐには出ないことがある)。編集のシートを開いている間に、ほかのプロセスが元の語を消すと、保存のときに「元の語が見つかりません」と出る。
 - 除外は読みと語の組で、すべての分野に効く (分野ごとの除外はしない)。同梱の語が版の更新で無くなっても、除外の行は残る (「除外した語 (すべての分野)」から戻せる)。
-- アプリのアイコンは無い (汎用のアイコン)。
+- アプリのアイコンは氷の M (`mac/Resources/Meltype.icns`、0-6 で追加。2026-10-14 以前は汎用のアイコンだった)。
 
 
 ---
@@ -2200,6 +2202,186 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **査読 R34 (独立、4 回。各回 2 本: コード・検査の敵対的査読と、この記録の事実確認)**: 1 回目: 原因の説明は独立に再確認された (ほかの説 — `pkill` が名前に一致しなかった・SIGTERM のあとで IME が復活した — は、`pgrep -x` が名前に一致すること・launchd に SIGTERM の記録がないこと・pid と起動時刻の不変で除外。「シグナルが届いてブロックされた」は、ログからは区別できず残る)。P0 なし。記録の P1 4 件 (offer が「消えなかった」は誤り・「1.0.10 以降すべて同じ症状」は 1.1.3 以降だけ・管理表の書きかけの状態・P15 の古い節の訂正) と、検査の P2 は直した。2 回目: P0 なし。P1 2 件 — 検査: `xcrun --find cc` が返したコンパイラの実体を直接呼んでいたので、SDKROOT が無い環境 (Homebrew の python など) でコンパイルできず終了コード 2 になった (`xcrun cc` 経由にして、同じ環境で通ることを確かめた)。記録: 変異体 m03 (`command pkill -x Meltype`) を「正しい書き方」に分類していた (`command` は `pkill` の動きを変えないので、元のバグそのもの。間違った書き方に移した)。P2 は直した (行の継続・想定の形の拡大・身代わりがシグナルで終わったら「止まった」とみなす・止める行の字下げと前の `exit`・CRLF・読めないファイル・`RELEASE.md` の文言・P15 の訂正の範囲と書式・題とコメントの「1.1.3 以降」・得と損・限界の言い回し)。直さなかった P2: `install.sh` の「16 文字を超え `pkill -x` では合わない」というコメントが、今の macOS では古い可能性 (変更対象外。`pkill -f` を使う実装には影響しない)、検査の python が SIGTERM で落ちたときの一時フォルダーの残り (身代わりは 120 秒で自然に終わる)。3 回目: P0 なし。コードに P1 なし。記録の P1 1 件 — 変異体 `killall -s TERM Meltype` を「正しい書き方」に分類していたが、macOS の `killall -s` は、`-v` と同じ表示を出すだけでシグナルは送らない (`-v` は送る) ので何も止めない (間違った書き方に移した)。検査の P2 4 件 — `pkill -v` を実行してよい形として通していた (実行すると、本物を含む自分のプロセスのほとんどに飛ぶので、オプションを許可リストにした)・`\` の後ろに空白がある行を継続として連結していた (bash は継続にしない)・`exit;` やタブ区切りの `exit` を見逃していた・バックスラッシュの数え方 (奇数個だけ継続)。あわせて、P15 の訂正のあとに残る文の注記・テスト (5) の説明・R34 の言い過ぎも直した。4 回目 (差分だけの最終確認): P0・P1 なし。コードの P2 3 件 — here-document に包んだ止める行が検査をすり抜ける (限界の一覧に書いた)・SHAPE が bash の解釈と食い違う形 (Unicode の空白・対でない引用符・`killall -a`) を受理する (実行すると赤になるだけで、本物を巻き込む経路はないので、直さず限界に書いた)・`exit||true` を拾わない (「粗い検査」の限界の内)。記録の P2 2 件 (`killall -s` の言い回し・シグナル名の範囲) と P3 1 件 (検査の冒頭コメントが古い) は直した。この最後の差分は文言とコメントだけで、検査のコードは 4 回目に見てもらった版のまま (構文木の比較で確かめた)。
 - **得と損**: 得 = 更新のあと、IME が止まり、次のキー入力で新しい版が起動するはず (設計どおり。実機では未確認)。損 = (1) 更新の瞬間に IME が止まるので、入力中の変換は 1 回途切れる (手で入れ替えるときと同じ。変換中の文字が確定されるか消えるかは未確認)。(2) すでに 1.1.6 へ更新した人と、1.1.6 の `install.sh` を使う更新は直らない。この修正を含む版を出すまで、1.1.6 へのアプリ内の更新は全員が、旧版の IME が動き続ける状態になる (見え方は版で違う。上の「症状の出方は版で違う」を参照。1.1.6 の完了ダイアログは「次にキーを打ったときから新しい版になります」と出るが、実際は旧版のまま)。直し方は、ログアウトか再起動 (推測。未確認)、またはターミナルで `killall Meltype`。(3) `build.sh`・`uninstall.sh`・pkg の `postinstall` の `pkill -x Meltype` は直していない (どれも IME が起動した側ではないので、祖先にならない。`docs/SECURITY_REVIEW_2026-10.md` の `install.sh` の記述は当時のまま)。
 - **限界・未確認**: (1) **本物の更新で IME が止まることは、まだ見ていない。** この修正を含む版を公開したあとの最初の更新が、最初の実機確認になる。**1.1.7 として 2026-10-13 に公開した** (タグ `v1.1.7-mac` = `0cd131a`。添付は zip と dmg。GitHub の digest は手元の値と一致、`check-release.py` を digest と `--ref v1.1.7-mac` つきで実行して PASS 97 / FAIL 0)。リリースノートと X の下書きは、別に独立査読を 3 回 (P0・P1 なし。確かめていないことは本文に「確かめていません」と書いた)。公開したあとに、旧版の IME で「更新する」を試した結果は、まだ無い。(2) 本物の IME (名前 `Meltype`) を止める所は、身代わりの名前で確かめた (本物を止めると、その Mac の日本語入力が途切れるため)。(3) macOS 26.6.2 でだけ確かめた。macOS 13〜15 では、`pkill` の祖先の除外も `killall` の動きも見ていない。(4) `Updater.swift` はコメントだけの変更で、`swiftc -parse` の構文検査だけ (`build.sh` は未実行)。(5) 入れ替え後、旧プロセスが新しい版のリソースを読むことで不具合が出ないかは見ていない。(6) 今回の旧 IME の版は、置き換えたファイルが読めず直接は未確認。L1 の実機確認の記述から、main の 00:31 のビルド (`b619f34`。Info.plist は 1.1.5 のビルド 21 で、`detachedInstallDidEnd` を持つ) のはず (推測。再表示が出たことと矛盾しない)。(7) 検査は `install.sh` 全体を動かさない (`lsregister` が本物の登録に触れるため)。止める行の位置は、字下げと `exit` / `return` の有無で見る粗い検査で、字下げをそろえたまま呼ばれない形にしたもの (呼ばれない関数の定義・here-document や複数行の文字列の中・`{ exit 0; }` で抜ける書き方など) は見つからない。検査には Command Line Tools の C のコンパイラが要る。Windows / Linux は対象外。
+
+## 追加項目 0-1 (評価基盤 `eval/` と本家 Core との比較)
+
+- **目的**: 計画書 `docs/STRATEGY_2026-10.md` の柱 A・施策 0-1。同じ正解表で、本家 Meltype の Core と Mac 版の Core の判定結果を並べ、回帰 (本家や前回で当たっていたのに今は外れる例) を 0 件にするゲートを持ちます。公開 (push・README への反映) はこの項目に含めません。
+- **作ったもの**:
+  - `eval/README.md`、`eval/cases/upstream-quality.tsv`・`mac-device.tsv`・`mac-terminal.tsv` (正解表。1 行 = 打鍵・期待・比べ方 (`full`/`ascii`/`nojp`)・出典)。
+  - `src/Meltype.Core.Tests/Repro.cs` (`Checks.Expect` を 4 列形式に対応。`ParseCases`・`Judge`・`ExpectAll` を追加)、`Program.cs` (`--expect-all <dir> <out.json>`)、`EvalFormatTests.cs` (新規。10 件)。
+  - `tools/eval-compare.sh`・`tools/eval_compare.py` (key = `file + typed + 何回目か` ごとに `broken`/`fixed`/`added`/`removed`。`broken` があれば終了コード 1、入力・dotnet の失敗は 2)、`tools/eval_legacy_base.py` (`--expect-all` が無い本家の作業ツリー用)。
+  - `docs/DEVELOPMENT.md` に「評価基盤 (`eval/`)」の節。Core 本体 (`src/Meltype.Core/`) は変えていません。
+- **最初の計測** (Mac 版 = この作業ツリー、base `0556cca`。本家 = `a4b6f1a` の clone のコピー。BuiltIn の英単語表)。査読 1 回目の修正 (full の大小の扱い・ascii の語・nojp の範囲・`nojp` 行の `full` 化) のあとに取り直した数字:
+
+  | ファイル | 本家 | Mac 版 |
+  |---|---|---|
+  | `upstream-quality.tsv` | 203/203 (100.0%) | 163/203 (80.3%) |
+  | `mac-device.tsv` | 24/38 (63.2%) | 37/38 (97.4%) |
+  | `mac-terminal.tsv` | 15/20 (75.0%) | 16/20 (80.0%) |
+  | 合計 | 242/261 (92.7%) | 216/261 (82.8%) |
+
+  - **`broken` (本家で当たり、Mac 版で外れる) は 40 件**。すべて `upstream-quality.tsv` で、本家の修正のうち Mac 版にまだ入っていないもの (`-pedia` の語 (#207)、助詞「や」+ 英単語 (`yapython`)、英字に挟まれた「と」(`devtoprod`)、メールアドレス (`tanaka@example.com` が `たなか@example.com`)、`my name is taro`・`apinoerror`、`i18n`・`l10n`・`h2o`、`site PR` など)。**回帰ゲートは今は赤**で、本家の判定修正を取り込んでいくと下がります。
+  - `fixed` (本家で外れ、Mac 版で当たる) は 14 件 (`mac-device.tsv` の Q4・Q9・Q11・Q6/Q7・P29 の修正 13 件と、`mac-terminal.tsv` の `gemma4-27b` 1 件。Mac 版が先に直したもの)。
+  - `mac-terminal.tsv` で Mac 版が外すのは `gpt-oss`→`gpt-おっs`、`python3 -m venv .venv`→`python3ーmvenv`、`npx create-next-app`→`create-next-あっp`、`cd ~/Documents/Meltype`→`cd～/Documents/Meltype` (全角の `～`。本家は空白が落ちて `cd~/…`) の 4 件 (後ろの 3 件は新しく見つかった外れ)。
+  - 自前のテストは **616/616 通過** (この作業ツリーの変更前は L1 のあとの 606 件。新規の `EvalFormatTests` は 10 件)。`--expect-all` の結果を `eval_legacy_base.py --rejudge` で判定し直して食い違い 0 件 (261 件)。`tools/check-mac-aot-settings.py` は PASS (5 項目。`mac/build.sh --no-install` で作った dylib を使用)。
+- **本家 `Score` と `full` の違い**: 本家の採点 (`QualityTests.cs` の `Run()`、`actual == Expected`) は完全一致です。`full` は本家の `Expect` と同じ形で、期待にカタカナがあるときだけ「カタカナ→ひらがな」と「英字の大小の無視」をし、それ以外は大小も区別します (査読 1 回目の修正)。本家の `--eval-json` は全件当たり (1337/1337)、`upstream-quality.tsv` も本家で 203/203 になり、この差で結果が変わる行はありませんでした。本家の品質テストには「直前の文字 (`Before`)」を持つ 13 件があり、4 列の形式には直前の文字の列が無いので、TSV には `#` のコメントで写しただけで判定していません (216 − 13 = 203 件)。
+- **旧 `--expect` の挙動**: `#` で始まらない空でない行に 4 列の行が 1 つも無い表 (Pull Request のチェックが使う) は、変更前の `Expect` と同じです: `#` の行も読み、2 列でない行 (見出し・3 列の行) は黙って捨てる (変更前と同じ)、期待に漢字があれば英字の語の並び、無ければ完全一致 (カタカナの正規化・大小無視なし)。4 列の行が 1 つでもある表は新しい読み方 (`#` と空行を無視、列数・比べ方・かな打鍵行の比べ方を検査) です。`--expect-all` は常に 4 列として読みます。出力 JSON には、これまでの `kind` も残しています。
+- **`nojp` と `full`**: `nojp` の「日本語」は U+3000〜30FF・U+3400〜9FFF・U+FF00〜FFEF (全角記号・半角カナを含む)。期待が打鍵そのものの行 (`mac-terminal.tsv` の 12 行、`mac-device.tsv` の P34 の 7 行) は `full` にしました (`nojp` は `ー` 以外の綴りの崩れを見逃すため)。`ascii` の語は印字可能 ASCII の連続 (`[!-~]+`) で、`gemma4-27b` が `gemma4ー27b` になる崩れも見つけます。`ollama run`→`るん`・`gemma4ー27b` は実機で既知の外れで、Mac 版 Core のテスト用キーボードでは再現しません (`ollama run` は本家の Core でも再現せず、`gemma4ー27b` は本家の Core では再現します)。
+- **未検証・限界**: 実機は関係しません (Core のテスト用キーボードの結果。変換エンジンも Mac の入力欄も通っていません)。`mac-device.tsv` の期待は文書の記録から写したもので、打鍵が書かれていない行は期待から復元しました (出典に明記)。`mac-terminal.tsv` の期待は「望ましい出力」で、実機で確かめたものではありません。`/tmp` のようにシンボリックリンクを通る絶対パスで `dotnet run --project` を呼ぶとビルドが失敗することがあり、スクリプトは相対パスで呼びます。Windows / Linux は対象外です。
+
+## 追加項目 P45 (本家の判定修正の取り込み: broken 40 件)
+
+- **目的**: 計画書 [STRATEGY_2026-10.md](STRATEGY_2026-10.md) の柱 A・E。`eval/cases/upstream-quality.tsv` のうち、本家 Core で当たり、Mac 版で外れる 40 件を、本家の該当コミットを**手で移植**して直す。1 本家コミット = Mac 版の 1 コミット。Mac 版の `CompositionDetector.cs`・`CompositionText.cs` は独自の改変が入っているので、`git apply` は使わず、本家の差分 (`git show <hash>`) を読んで、意図を Mac 版のコードに合わせて書いた (旧ブランチ batch/p45 から取り直す段階で `cherry-pick` した)。本家にあって Mac 版に無い `ScoredSegmentation.cs` への変更は対象外。
+- **進め方 (毎コミット)**: (1) Core のテスト全通過、(2) `--expect-all eval/cases` を回す、(3) 取り込み前の Mac 版の結果 (216/261) と `tools/eval_compare.py` で比べて **broken 0** (取り込み前に当たっていた例を 1 つも壊さない)、(4) 本家の結果との差 (broken の残り) を見る。**broken が 1 件でも出たら、そのコミットは取り消して見送る。条件を足して通そうとしない** (同じ種類の回帰が繰り返し出る修正は撤退する、が方針)。eval に無い既存テストが落ちたときも同じ扱い。
+- **査読 R35 (Opus、敵対的) での差し戻し**: 最初の版は本家 9 コミットを Mac 版 9 コミットで入れていた (直った例 20 件)。R35 が 576 行の前後比較をして、**悪化 7 系統**を見つけた。そのうち `-pedia` (n=8・9) は、`kyouhawikipediadeshirabeta` が `きょうはwikipediaでしらべた` でなく `kyouhawikipediaでしらべた` と、**前の日本語ごと英字になる**悪化だった (eval の 261 件には無い形)。**本家の a4b6f1a も同じ出力になる**。本家への報告は判断待ち。そこで n=8・9 の 2 コミット (2a1ccb9・40bcad9) を外し、3dbc7e9 から新ブランチ batch/p45b を作って 7 コミットを取り直し、守りのコミット 1 つ (P45-12) を足した。
+- **取り込んだもの** (本家 7 コミット → Mac 版 7 コミット、直った例 12 件):
+
+| n | 本家 hash | 内容 | 直った例 | Mac 版のコミット |
+| --- | --- | --- | --- | --- |
+| 1 | ac36ced (#406) | `english-readable.txt` に `overcute` (本家の差分は 1 語。仕様の「3 語」とは違う) | 1 (overcute) | fde8902 (P45-1) |
+| 2 | b2e33ca (#153) | `thin` などが `てぃ` の綴りで続きと読めるなら、カタカナ語の途中にする | 1 (hosuthingu) | 29872b5 (P45-2) |
+| 3 | 82094f0 (#77) | 英単語の最後の t と次の s を、読めない子音が残っていても つ にしない | 1 (reflectsareta) | af19636 (P45-3) |
+| 5 | 9dc873d (#104) | 英単語の最後の l + tu/tsu を っ として読み直す (`RereadSmallTsuAfterEnglishL`) | 3 (moraltute・moraltsute・kyouhamoraltute) | f61cae3 (P45-5) |
+| 7 | d0dca04 (#59) | メールアドレスの @ より前も英字のままにする (`UserNameEnd`) | 4 (tanaka@・yamada.taro@・taro+news@・yamada-taro@) | 1ba9488 (P45-7) |
+| 10 | fb24a53 (#129) | 大文字の略語の後ろのローマ字を日本語に (`IsAcronymWithLowerTail`) | 1 (AIdekiru) | f09e8fb (P45-10) |
+| 11 | 35beb60 の ts の部分だけ | 日本語の途中の英単語で `つ` が崩れるのを直す (`ReadsAsJapaneseWithTsu`) | 1 (teishutsushita) | d507d90 (P45-11) |
+
+  - 守りのコミット: 4534aab (P45-12。回帰の守り。下の「テスト」)。
+  - n=11 は一部だけ取り込んだ (ts の部分)。取り込んだ部分と残した部分を、コミットメッセージにも書いた。
+- **見送ったもの**:
+
+| n | 本家 hash | 見送った理由 (壊れた例) |
+| --- | --- | --- |
+| 4 | c6b281e (#69) | 直る例は `inviteshimashita`・`invitewookutta` の 2 件だが、`githubdevote` (期待 `githubでvote`) が壊れた (eval の broken 1 件) |
+| 6 | b4484c4 | eval は broken 0・3 件直る (`i18n`・`l10n`・`h2o`) が、既存テスト 2 件が落ちた: `video.mp4woMP3ni` が `MP3に` でなく `MP3ni` のまま、`今日は3かける4を` が `今日は3×4を` でなく `きょうは3かけru4wo`。`NumeronymEnd` (英字 1〜2 + 数字 1〜2 + 英字 1〜3) が `MP3|ni`・`3|kakeru|4` に当たる。本家は `ScoredSegmentation.cs` 側にも手を入れていて別の守りがある |
+| 8・9 (`-pedia`) | 3cb0758 の pedia の部分・fd66db0 + f1a190e (#207)。Mac 版は 2a1ccb9・40bcad9 | **一度入れたが、査読 R35 で外した**。直る例 8 件 (pedia・protopedia・conservapedia・worldpedia・wikipedias・protopedias・Protopedia・Protopedias) は直らないまま。`kyouhawikipediadeshirabeta` が `きょうはwikipediaでしらべた` でなく `kyouhawikipediaでしらべた` と、前の日本語ごと英字になる悪化があるため。本家の a4b6f1a も同じ。本家への報告は判断待ち。**`-pedia` を入れ直すなら、前の日本語を巻き込まない条件を先に決める** |
+| 8 の残り | 3cb0758 の `や` の部分 + ffd7e6a | 直るはずだった `githubya`・`yapython`・`yacursor`・`yaslack`・`yastack`・`yaplay`・`yasync` (7 件) は直らないまま。全部入れると eval の broken 3 件 (`delight`・`devote`・`morally`) と既存テスト 4 件 (`Today I go susi` が `とday`、`Xyatte` が `Xやって`、`kaibunsyorta2026kotosimo`、`Please use TanakaMakoto today` が `とday`) が壊れた。ffd7e6a を外して `や` の部分だけ残しても `Xyatte`・`kaibunsyorta2026kotosimo` が壊れた |
+| 11 の残り | 35beb60 の `と` の部分 | `devtoprod`・`edittopub`・`dottonet`・`rdstoredshift`・`uikittoswiftui` (5 件) は、本家 74ca494 (英字のあいだの「と」を助詞にする、#154) が前提。Mac 版にその機能が無い。別項目として 74ca494 から取り込む候補。`delight`・`devote`・`morally` の部分は見送った ffd7e6a の修正 |
+| 12 | 8dfec9d | `sitePR`・`site PR` が直る (eval で 2 件) が、既存の英文 `make sure you have time` が `まけ すれ よう have time` に壊れた (eval の broken 1 件)。`sure` が `すれ` (する活用) と読めるため |
+| 13 | (未特定) | メール 3 件 (`tanaka@example.com` ほか) は n=7 で直った。`my name is taro`・`apinoerror` は、本家で `git log -S taro`・`-S apinoerror` (Core) を調べたが、直した修正は見つからなかった (当たるのは最初の公開コミット・テスターの報告・n=7 の d0dca04 など)。`taro` は辞書にも無い。**未特定** |
+
+- **計測** (`eval/cases`、Mac 版 Core のテスト用キーボード。実機は通っていない):
+
+| ファイル | 取り込み前 | 取り込み後 |
+| --- | --- | --- |
+| upstream-quality.tsv | 163/203 | 175/203 |
+| mac-device.tsv | 37/38 | 40/41 (R35 の 3 件を追加) |
+| mac-terminal.tsv | 16/20 | 16/20 |
+| **合計** | **216/261** | **231/264** |
+
+  - 合計の母数が 261 → 264 なのは、P45-12 で足した新規 3 件 (`mac-device.tsv` の R35 のブロック) の分。3 件とも当たっている (`mac-device.tsv`・`mac-terminal.tsv` は、新規 3 件のほかは変わらない)。
+  - 取り込み前の Mac 版に対する比較: **broken 0 / fixed 12 / added 3**。
+  - 本家に対する比較 (`upstream.json` で当たり、今 Mac 版で外れる): **broken 40 → 28**。残りの 28 件は、見送りの表の例 (`-pedia` 8 件・`i18n`・`l10n`・`h2o`・`inviteshimashita`・`invitewookutta`・`や` 7 件 (`githubya` など)・`と` 5 件・`site PR`) と、`my name is taro`・`apinoerror`。
+  - 途中の版の結果は `scratch/p45-<n>.json` に残してある (見送りの n=4・6・12 は壊れた版の結果)。
+- **テスト**: Core のテストは 617 → **618 件** (`AcronymThenRomaji_IsJapanese` を追加)、全件通過。品質テスト (`Quality`) の行は、各 n で本家のテストの行をそのまま足した。`FeedbackTests` の辞書の語の形の検査 (`Q3_EnglishReadable_Dictionary_EntriesAreWellFormed`) は、`overcute` だけを例外にした (全体ではローマ字として読めないが、`over|cute` と 2 語に割れて `overくて` になるため)。`FeedbackTests` の `taro@gmail.com` の期待は、本家と同じく `たろ@gmail.com` から `taro@gmail.com` に直した。P45-12 で足した**回帰の守り**:
+  - `mac-device.tsv` に R35 のブロック: `kyouhawikipediadeshirabeta` → `きょうはwikipediaでしらべた`、`anowikipedia` → `あのwikipedia`、`ato@hitori` → `ato@hitori` (トレードオフ。本家と同じ)。
+  - `QualityTests.cs` に `kyouhawikipediadeshirabeta` (混在) と、本家 35beb60 の「英語」行 6 件 (`delight`・`devote`・`morally`・`chottodehijacked`・`korekarastories`・`mottopython`。6 件とも通る)。
+  - `FeedbackTests.cs` に `ato@3nin` → `あと@3nin` (P45-7 の `domainStarts` の条件を `IsAsciiLetterOrDigit` に変えると赤になることを確かめて戻した)。
+  - P45-2 の守り: `kyouhathinkdesu` → `きょうはthinkです`、`kyouhathinkpad` → `きょうはthinkpad`。ただし P45-2 の条件 (`AnalyzeFragment(lower + next).IsValid`) を `true` にしても赤にならなかった (`thinly`・`thinner`・`things` も同じ)。**この条件だけで結果が決まる例は見つかっておらず、テストの穴として残る**。なお `kyouhathinkpaddesu` は `きょうはthinkぱっです` になり (本家も同じ)、`thinkpad` は残らない。
+- **ほかの項目との干渉の確認**: n=1 は Q11 の `NotAfterJapanese`・`ContinuesJapaneseWord` に当たらない語 (`umaindesu` → `うまいんです` のまま、`korehaovercutedayo`・`overcutenanda` は英字のまま)。n=7 は P29 の `DotSuffixEnd` と別の関数 (`UserNameEnd`) で、`ato@3nin` は `あと@3nin` のまま。**`ato@hitori` は `ato@hitori` になる**: 日本語の語の後ろの `@` は、メールアドレスの一部と読むトレードオフ (本家と同じ)。数字で始まる `ato@3nin` は `あと@3nin` で守っている (上の守りのテスト)。n=10 は Q9 (`X` の後ろ)・P34 (記号入りの名前) の `Xnotoukouha` → `Xのとうこうは`・`Anisiyouka` → `Aにしようか` が `--repro` で変わらない。
+- **実機で確かめること** (TextEdit で打って Enter。かなは漢字に変換されてよい。**実機は `NSSpellChecker`、eval と `--repro` は同梱の英単語表なので、`IsKnownEnglishWord` を使う n=3・5・10・11 は答えが違うことがある**):
+  1. `overcute` → `overcute` (`overくて` にならない)。あわせて `umaindesu` → `うまいんです` が変わらないこと
+  2. `hosuthingu` → `ほすてぃんぐ` (`ほすthinぐ` にならない)
+  3. `reflectsareta` → `reflectされた`
+  5. `moraltute` → `もらって`、`kyouhamoraltute` → `きょうはもらって`。`hoteltukau` → `hotelつかう` のまま
+  7. `tanaka@gmail.com` → `tanaka@gmail.com`、`yamada.taro@example.co.jp` → **そのまま** (`たなか@…` 系にならない)。`ato@3nin` → `あと@3nin` のまま
+  10. `AIdekiru` → `AIできる`、`AInituite` → `AIについて`。`Xnotoukouha` → `Xのとうこうは` のまま
+  11. `teishutsushita` → `ていしゅつした`。`kyoucommitsuru` → `きょうcommitする`
+  - R35 の形: `kyouhawikipediadeshirabeta` → `きょうはwikipediaでしらべた` (前の日本語が英字にならない)、`ato@hitori` → `ato@hitori` (トレードオフの確認)
+- **限界**: Mac 版 Core のテスト用キーボードの結果で、変換エンジン・Mac の入力欄は通っていない。同梱の英単語表と `NSSpellChecker` の差は未確認 (上の「実機で確かめること」)。取り込んだ修正は eval の 264 件と Core のテスト 618 件では broken 0 だが、取り込み前後の大規模な比較 (P29 のような数万件) は行っていない (R35 の 576 行の比較が唯一の広い比較)。見送りの判断は「eval か既存テストが 1 件でも壊れたら撤退」で機械的に行い、壊れない条件を探すことはしていない。`-pedia` のように eval にも既存テストにも無い形の悪化は、この方針では見つからず、査読で見つかった。
+- **実機確認 (2026-10-14、macOS 26.6.2、JIS、TextEdit、ビルド 08:08 = main 6b0dca9)**: 上の 1〜11・R35 の全項目が期待どおり (`overcute`、`ホスティング`、`reflectされた`、`今日はもらって` / `hotelつかう`、`yamada.taro@example.co.jp` / `あと@3nin`、`AIできる` / `Xの投稿は`、`提出した` / `きょうcommitする`、`今日はwikipediaで調べた` / `ato@hitori`)。`umaindesu` だけ `うmainです` になったが、これはリョウさんの Mac で `main` が英語として学習されているため (Q11 に記録済みの既知のコスト。学習した語から `main` を消せば `うまいんです` に戻る)。P45 の変更とは無関係。→ **完了**。
+- **Windows・Linux は対象外** (Mac 版の Core の変更だが、確かめたのは Mac 版の Core だけ)。
+
+## 追加項目 0-2 (本家追従の半自動化: `tools/upstream_watch.py`)
+
+- **目的**: 計画書 [STRATEGY_2026-10.md](STRATEGY_2026-10.md) の柱 E・施策 0-2。本家 Meltype の新しいコミットを毎回手で読み比べる代わりに、PR 単位の候補表 ([UPSTREAM_WATCH.md](UPSTREAM_WATCH.md)) と、本家の新しい正解ケースの候補ファイル (`eval/candidates/upstream-<日付>-<since の短い hash>.tsv`) を、コマンド 1 つで作る。
+- **自動にしたこと**: (1) 本家の clone の fetch、(2) first-parent の PR 単位の一覧 (`#NNN` は件名から)、(3) 変更ファイルからの分類 (判定・変換 / Windows / 本家 Mac / Linux / 文書。複数に当たれば判定・変換を主にして併記)、(4) Mac 版に取り込み済みか (Mac 版 (HEAD) のコミットの**件名**に `本家 <7 桁 hash>` (後ろに 16 進が続かない) があれば `取り込み済み`、追跡文書 (`UPSTREAM_PR_TRACKER.md`・`UPSTREAM_PR_SURVEY.md`) に hash か `#NNN` があれば `記録あり`、無ければ `未`)、(5) 判定・変換の差分が Mac 版に `git apply --check` で `そのまま` 当たるか `手移植` か、(6) 本家の `QualityTests.cs` に足された `new("カテゴリ", "打鍵", "期待")` の抽出と、Mac 版での当たり/外れの数え (`--expect`)、(7) `UPSTREAM_WATCH.md` の更新 (先頭の `<!-- seen: <hash> -->` と、新しい順の節)。
+- **人が決めること**: どの PR を取り込むか (表は優先順位を付けない)、`手移植` の中身の読み方と移し方 (P45 の方針: 1 コミット = 1 本家コミット、broken が 1 件でも出たら見送る)、候補ファイルの行を正解表 (`eval/cases/upstream-quality.tsv`) に移すか (確かめてから末尾に移す。**自動では足さない**。push すれば公開になる)、`Before:` 付きなど 4 列で表せない行の扱い (件数だけ数える)。
+- **初回の実行** (`--since a4b6f1a`、本家の `origin/main` = `db433da`、2026-10-14): 本家の新コミットは **2 件** — #603 (`c2ed84a`、`fix/533-bio-break`) と #609 (`db433da`、`fix/538-infobesity`)。どちらも判定・変換のみ、Mac 版には未取り込み (記録も無い)、`git apply --check` は `手移植`。`QualityTests.cs` の新しい正解ケースは **0 件** (この 2 件は `dictionaries/english.txt` と `CompositionTests.cs` だけを変えているため) で、候補ファイルは作られない。`seen` は `db433da` になった。続けて `--dry-run` で回すと 0 件で、何も書かない。
+- **動作の確かめ**: 初回は 2 件で、新ケースの抽出と評価を通らないので、`MELTYPE_UPSTREAM=<clone> python3 tools/upstream_watch.py --dry-run --no-fetch --since df7ab39` でも回した (文書・候補ファイルは書かず、標準出力だけ): 本家 40 件 (判定・変換 33 件、未取り込み 39 件)、新ケース 23 件のうち Mac 版で 14 件当たり、外れ 9 件 (`site PR`・`i18n`・`l10n`・`h2o`・`devtoprod` など。P45 で見送った例と一致)。
+- **自己テスト**: `python3 tools/test_upstream_watch.py` (37 件。分類、PR 番号 (Merge → 末尾の `(#N)` → 最初の `#N`)、取り込み状態の判定、`new(...)` 行の抽出 (名前付き引数・エスケープ・`#` 始まり・1 行に 2 つ・`)];`・`/* */`・前後の空白・コメント行・削除行)、文書の節の挿入位置と先頭の `seen` だけを読むこと、表のセルのエスケープ、行ごとの当たりの割り振り)。git・dotnet は使わない。
+- **定期実行は Hermes 側** (リポジトリの外)。スクリプトは 1 回走らせて標準出力に要約 (3〜6 行) を出すだけで、スケジュールの仕組みは持たない。Hermes は `MELTYPE_UPSTREAM=<clone> python3 tools/upstream_watch.py` を回し、要約を読む。終了コードは 0 = 正常 (新コミット 0 件も 0)、2 = 引数・環境の誤り (dotnet の失敗も 2。そのときは文書を更新せず、`seen` も進めない)。
+- **限界**: (1) `手移植` は「`git apply --check` が通らない」だけの意味で、Mac 版が独自に改変した所や、すでに別の形で取り込み済みの修正でも `手移植` になる。`そのまま` でも、取り込んでよいかは別 (P45 のとおり eval を回して broken を見る)。(2) merge コミットの差分は first-parent との差 (`git diff <hash>^1 <hash>`) で見る (仕様の `format-patch -1` は merge コミットだと空になるため)。(3) `取り込み済み` の判定は、Mac 版のコミットの件名に `本家 <7 桁 hash>` があるかだけ。件名に書かずに取り込んだ修正は `未` と出る。(4) 新ケースの抽出は C# の通常の文字列リテラルの `new("…", "…", "…")` の 1 行だけ。複数行・`@"…"` の行・かなで打つ行・`#` で始まる打鍵・Tab や前後の空白を含む行は「4 列で表せない」として件数だけ数える。(5) 実機は関係しない (Core のテスト用キーボードの結果)。**Windows・Linux は対象外** (本家の Windows・Linux の変更は一覧に出すだけで、取り込み・評価はしない)。
+
+## 追加項目 0-4 (Homebrew cask `meltype-for-mac`)
+
+- **目的**: 計画書 [STRATEGY_2026-10.md](STRATEGY_2026-10.md) の柱 D・施策 0-4。`brew install --cask` で入れ・更新できるようにする。名前はリョウさんの決定 (tap `whitewater-png/homebrew-meltype-for-mac`、cask `meltype-for-mac`)。正本は `mac/homebrew/Casks/meltype-for-mac.rb`、手順は [mac/homebrew/README.md](../mac/homebrew/README.md)、版の書き換えは `tools/update-cask.py`。
+- **zip を選んだ理由**: dmg の中は pkg で、Homebrew の `pkg` stanza は `sudo installer -target /` になる。このユーザーだけに入れる pkg と合わず、`brew install` が sudo のパスワードを求める構成にもなるので使わない。zip なら `input_method` stanza が `~/Library/Input Methods/Meltype.app` に置く (zip の展開先は `Meltype-mac/Meltype.app`: `mac/make-zip.sh` で確認)。
+- **postflight / uninstall**: `mac/install.sh` の登録部分に合わせた (動いている Meltype と辞書の管理画面を止める → `Meltype --register` (失敗は無視して caveats で案内) → `imklaunchagent` と `TextInputMenuAgent` を止める)。uninstall の前に `--unregister` と、Meltype・辞書の管理画面を止める (`mac/uninstall.sh` と同じ)。この Homebrew (7.0.8) では `postflight` / `uninstall_preflight` が `brew style` で違反になるため、`postflight_steps` / `uninstall_preflight_steps` (`run`・`terminate_process`) で書いている。`zap` は `~/Library/Application Support/Meltype` と `~/Library/Preferences/io.github.yksr-melt.inputmethod.Meltype.plist` (どちらも実機にあることを確認)。
+- **実機確認 (2026-10-14)**: (1) ローカル tap から `brew install --cask` すると `~/Library/Input Methods/Meltype.app` と中の実行ファイルに `com.apple.quarantine` が付く。その状態で `Meltype --register-check` は **`Killed: 9`** (Gatekeeper が ad-hoc 署名 + quarantine の実行ファイルを起動させない)。IME は imklaunchagent が裏で起動するので「開発元が未確認」も出ず、入力メニューに出ない・何も起きないだけになる。postflight の `--register` も同じ理由で失敗していた (`must_succeed: false` で黙っていた)。(2) `xattr -dr com.apple.quarantine` で外すと `--register-check` rc=0、`--register` rc=0。(3) 既に `~/Library/Input Methods/Meltype.app` がある (zip の install.sh や build.sh で入れた) と、Homebrew が `It seems there is already an Input Method at ...` で止まる (Homebrew の仕様)。
+- **quarantine の扱い (実機確認を受けて変更)**: postflight の最初に `xattr -dr` で外す (`--no-quarantine` の案内はやめた)。`run` の `args` は `base` で解決されない (`base` はコマンドだけ。Homebrew の `install_steps.rb`) うえ、サンドボックスの中では `$HOME` も偽のホーム (`/opt/homebrew/var/homebrew/sandbox/.../home`) を指すので `/bin/sh -c "$HOME/..."` も効かなかった (実機で `xattr: No such file`)。`args` で使える置き換えは `{{user}}` などに限られるため、`/Users/{{user}}/Library/Input Methods/Meltype.app` で本物のホームを指す (ホームが `/Users/<ユーザー名>` でない構成は対象外)。この形で `brew reinstall` 後に quarantine が 0 になることを実機で確認した。得: pkg で入れたときと同じ挙動で、確実に起きる。損: Gatekeeper の確認を飛ばすので、利用者は Release の SHA-256 が cask に書かれていることを信頼する形になる (sha256 は Homebrew が検証する)。既に Meltype.app がある場合の案内は caveats・README・DEVELOPMENT に書いた。**実機 (2026-10-14、macOS 26.6.2) の結果**: `brew reinstall` 直後、入力メニューに Meltype は出たが**入力できず、日本語モードも出なかった** (英数のみ)。同じ日に監督者が確認用に `Meltype --unregister` を手で実行し、その後の postflight の `--register` がサンドボックス内で効かなかった (ログに `com.apple.hiservices-xpcservice` への `Connection Invalid`) ことが重なっている。`brew uninstall` → 元の開発版を戻して手で `--register` → `build.sh` で入れ直し、のどれでも直らず、**ログアウト・ログインで直った**。結論: (1) Homebrew のサンドボックス内では入力ソースの登録ができないので、cask の postflight で登録を済ませることはできない。利用者にはログアウト・ログイン (または `~/Library/Input Methods/Meltype.app/Contents/MacOS/Meltype --register` を手で実行) が要る。(2) 入力ソースの登録状態が崩れると、正しいファイルを置き直しても `build.sh` でも戻らない。`--register-check` は `--unregister` の後も 0 を返すので、登録の有無の確認には使えない。
+- **確かめたこと (ローカル tap `whitewater-png/meltype-for-mac`)**: `brew audit --cask --strict --online` は指摘なし、`brew style` は指摘なし、`brew fetch --cask` は sha256 が一致。`python3 tools/test_update_cask.py` は OK。
+- **確認済み (上の実機の結果)**: quarantine を外す postflight での再インストール (quarantine 0、codesign OK、版 1.1.7)、`brew uninstall` (`~/Library/Input Methods/Meltype.app` が消え、`~/Library/Application Support/Meltype` は残る)。**未確認**: cask で入れた直後にログアウト・ログインすれば使えるようになるか (今回は開発版に戻してからログアウトしたので、cask 版そのものでは確かめていない)、きれいな Mac (Gatekeeper の判定が記憶されていない) での初回。
+- **決定: (a)**。caveats に「インストール後にログアウト・ログイン」を明記して公開 tap へ進んだ。公開 tap を作成済み (2026-10-14): https://github.com/whitewater-png/homebrew-meltype-for-mac (public、`Casks/meltype-for-mac.rb` と README、commit 29b083a)。`brew tap whitewater-png/meltype-for-mac` → `brew audit --cask --strict --online`・`brew fetch` が通る。入れ方は `brew install --cask whitewater-png/meltype-for-mac/meltype-for-mac`。
+- **実機 (2026-10-14、公開 tap から)**: cask だけで 1.1.7 を入れ (quarantine 0、codesign OK)、**ログアウト・ログイン後に入力メニューに Meltype が出て入力できた**。ログアウト前は、入力メニューに出ても入力できない (上の記録どおり)。未確認: きれいな Mac での初回 (Gatekeeper の判定が記憶されていない)。
+- **その後の開発機の事情**: 開発版 (main 446dd48) を `build.sh` で同じ場所に上書きして戻した (brew の記録上は cask が入ったまま)。開発機だけの事情で、利用者には関係ない。
+- **tap の履歴**: 最初の `brew tap-new` の自動コミットに個人のメールアドレスが入っていたので、履歴を書き換えて noreply にして force push した (新規リポジトリで、取得者はいない)。今後 tap で commit するときは `git config user.email` を本体リポジトリと同じ noreply にする。
+- **README・リリース手順**: README の「インストール」の先頭に Homebrew の節を足した。リリースごとの cask の更新 (`tools/update-cask.py` → tap へ写して push。push は Release の公開と同時) は `docs/RELEASE.md`。`tools/check-release.py` が cask の `version` (built app と) と `sha256` (`mac/dist` の zip と) を照合する。
+- **Windows・Linux は対象外** (Mac 版だけ。配布 zip は Apple シリコン・macOS 13 以降のみ)。
+
+## 追加項目 0-5 (既知の制限の仕分けと README の制限節)
+
+- **目的**: [STRATEGY_2026-10.md](STRATEGY_2026-10.md) の施策 0-5。計画書の各節に散らばった「既知の制限」を 1 か所に集め、「仕様 / 直す予定 / 直った / 未確認」に仕分けて、利用者向けの README に短い「制限」節として載せる (「翌日アンインストール」型の失望を減らす)。
+- **作ったもの**: [KNOWN_LIMITS.md](KNOWN_LIMITS.md) (開発者向けの正本。50 行)。README に「## 制限 (知っておいてほしいこと)」(8 行) と、「よくある質問」に 3 問 (ライブ変換との違い・かな入力・明示的な切り替え)。Core・Swift のコードは変えていない。
+- **仕分けの件数** (査読 R37 の反映後): 仕様 28 / 直す予定 10 / 直った 4 / 未確認 8 (計 50)。「直った」の hash は、作業中に `git log` が承認待ちで止まったため、`a490a09` (Q7・Q8) 以外は未取得。
+- **番号待ちの `候補`**: K02・K03 小文字の人名・名字 (専門用語集に「人名」分野を足すか。Phase 1-1 Zenzai・本家 #487 の経過を見て)、K16 本家の判定修正の残り 28 件 (`-pedia` は前の日本語を巻き込まない条件が先)、K20 空白の無い 1 語の英単語の再変換 (リョウさんの判断待ち、HANDOFF:76)、K33 英単語の前後の空白設定を ON にしたときの二重空白、K40 全角スペースを打つ手段。
+- **全角スペース (K40) の確認**: 入力中でないときの Space は `StartWith` → `ReplayDown` でアプリに渡り、半角スペースが入る。Shift+Space は、選択があれば再変換、無ければ同じく素通し (読み直せない選択では飲み込んで何も起きない)。全角スペースを出す設定・候補は無い。本家 #310 (Shift+Space の全角スペース) はリョウさんが却下済みなので、Shift+Space には割り当てない。**実機では確かめていない** (コードを読んだ範囲)。
+- **半角スペースの再変換 (K41・K42)**: スペースを含むローマ字の文の再変換は P36 で直っている (TextEdit で実機確認済み、2026-10-12)。日本語の確定済みの文字の途中に半角スペースがある場合は、コードを読むと読みに戻せない可能性があるが、再現は取っていない (未確認)。
+- **`--repro` で確かめた打鍵と結果** (2026-10-14、変換エンジンは偽物。Enter で確定した結果):
+  | 打鍵 | 結果 |
+  | --- | --- |
+  | `thanks, yui!` | `thanks, ゆい！` |
+  | `Kyou wa genki desu` | `Kyou わげんきです` |
+  | `tanaka san ni aimasu` | `たなかさんにあいます` |
+  | `Yamada san to hanashimashita` / `yamada san to hanashimashita` | `Yamada さんとはなしました` / `やまださんとはなしました` |
+  | `Node de deploy shimasu` / `Frobnitz de deploy shimasu` | `Node でdeploy します` / `Frobnitz でdeploy します` (HANDOFF:71 の `Node` は再現しない) |
+  | `kyou wa Frobnitz wo tsukatta` / `kyou wa frobnitz wo tsukatta` | `今日わFrobnitz をつかった` / `今日わfrobにtzをつかった` |
+  | `kyou wa mp3 kakeru 5` | `今日わmp3駆ける` |
+  | `ollama run llama3` / `gpt-oss` / `gemma4-27b` | `ollama るんllama3` / `gpt-おっs` / `gemma4-27b` (HANDOFF:72 のうち `gemma4-27b` は直っている) |
+  | `10-ji ni kaigi desu` / `- kyou wa` | `10-じにかいぎです` / `- 今日わ` (Q7 で直っている) |
+  | `maindo` / `pushoyobi` | `まいんど` (途中は `まindo`、Q12) / `ぷしょよび` |
+  | 100 文字超のかな文 | 判定は崩れない (外れるのは 50 文字の区切りをまたぐ文脈だけ) |
+- **README の文言について**: 「語の頭を大文字で打つと英字のまま」は、上の `Yamada`・`Frobnitz`・`Node` で確かめた範囲だけを書いた。本家 USAGE の「Shift を押しながら打てば英語」がそのまま成り立つかは、Shift を押したまま続けた場合を確かめていないので、README には Shift のことを書いていない。
+- **実機について**: 実機・brew・`/Users/ryo/Meltype` には触っていない。
+- **査読 R37 の反映** (2026-10-14): 事実の誤り 4 件を直した。(1) 学習の条件: 語だけを打って直すと次から直した方になる。日本語としてよく使う語を英字にするときは 2 回 (`LanguageMemory.NeedsTwice`)。(2) 「50 文字」は漢字変換の区切り (`ConvertChunkLength`) で、日英判定ではない。またげないのは `ContextRules` の同音語の選び分け。(3) 例を `thanks, yui` に替え、名前のすぐ後ろに `!` `,` が付くと大文字でも日本語になることを足した。(4) ライブ変換 (下記)。推奨・任意: LibreOffice・Google ドキュメントの文、Homebrew「入力できないことがある」、Intel (ソースからビルド)、Shift+Space「など」、FAQ の US 配列の切り替えキーとかな入力、K33 を `you  want` と `Let  It Go` (K37、未確認) に分割、K40 をリョウさんが決める事項と明記、K26 を K25 にまとめた。ユーザー辞書に全角スペースを登録する手段は、`UserDictionary` が語を `Trim()` するので使えない (コードを読んだ範囲。K40)。
+- **ライブ変換は既にあった (実機確認) → 戦略計画 2-3 を訂正**: 2026-10-14、TextEdit で `kyouhaiitenkidesune` を Space なしで打つと漢字で表示された。`Settings.LiveConversion` は既定 ON で、設定タブで OFF にできる。0-5 の最初の版は「ライブ変換が無い」と書いていたので、README の FAQ・K28・K51 を直し、[STRATEGY_2026-10.md](STRATEGY_2026-10.md) の Phase 2 の 2-3 と §1.3 を訂正した (2-3 は「ライブ変換の精度向上 (Zenzai 前提) と、ライブ変換の存在を README で前面に出す」に読み替え)。
+- **Windows・Linux は対象外** (Mac 版だけ)。
+
+## 追加項目 0-3 (ホストアプリ互換マトリクス)
+
+- **目的**: [STRATEGY_2026-10.md](STRATEGY_2026-10.md) の施策 0-3。どのアプリの入力欄で何が効くかを、実機で同じ 8 項目 (ライブ変換・日英の混在・確定し直し・再変換・F10 と学習・二重空白・アポストロフィ・英数/かなの切り替え) を打って確かめ、[HOST_COMPAT.md](HOST_COMPAT.md) に一覧にした。コードは変えていない。
+- **実機の結果** (2026-10-14、リョウさん、macOS 26.6.2、JIS、main 446dd48 のビルド): TextEdit・Hermes のチャット欄 (Electron)・LibreOffice Writer・Chrome の Google 検索欄・Discord は 8 項目すべて OK。Google ドキュメントは再変換 (4) だけ NG (Shift+Space で何も起きない。文字は壊れない)。ターミナル (Terminal.app) は再変換 (4) だけ NG (変換ボックスが出ず、選択の先頭に半角スペースが入った)。VS Code・Slack は未確認。英数/かなの切り替え (8) は全アプリで期待どおり。
+- **K30 の食い違い**: 2026-10-12 の記録 (計画書 :1814「LibreOffice は `selectedRange` が `{0,0}` で確定し直しが効かない」) と違い、2026-10-14 の実機では LibreOffice で確定し直し (3) が効いた。当時の確認はローマ字の文の再変換 (P36) で、確定し直しは別経路。条件によるのかもしれないので、K30 は「仕様」から「未確認」に移した (以前の記録は要再確認)。K31 (Google ドキュメントで確定し直しが飛ばされる) も今回は出ず、確定し直しは OK、再変換が NG に更新した。K32 (Hermes の `We'うぇへれすし`) は再現せず、未確認のまま。K34 (表示と動きのずれ) はターミナルで出ず、VS Code が残る。
+- **新規 K66 と候補**: ターミナルで再変換が効かず、Shift+Space の半角スペースが入る。アプリが選択範囲を IME に返さない (`selectedRange` 経由) ためと推測 (確かめていない。Google ドキュメントも同種と推測)。再変換できないこと自体は仕様。**候補**: 「選択が取れないときは Shift+Space を素通ししない」。得: 選択の先頭に勝手にスペースが入らない。損: 選択が無いふつうの Shift+Space の半角スペースも打てなくなるおそれがある。選択の有無を区別する手段があるかを先に調べる。着手はリョウさんの判断待ち。
+- **README**: 制限節の LibreOffice の行を、「再変換 (選んで Shift + Space) は、Google ドキュメントとターミナルでは効きません (何も起きないか、スペースが入ります)。アプリごとの一覧は docs/HOST_COMPAT.md」に書き換えた。確定し直しが効かないという記述は外した。
+- **件数** (KNOWN_LIMITS.md): 仕様 27 / 直す予定 11 / 直った 4 / 未確認 9 (計 51)。
+- **実機について**: 実機の確認はリョウさんが行った。この作業では実機・`/Users/ryo/Meltype` には触っていない。
+- **Windows・Linux は対象外** (Mac 版だけ)。
+
+## 追加項目 0-6 (アイコン)
+
+- 入力メニューの氷の M・氷の A は `1188c89` で既に入っていた (16/32px の tiff)。残っていたのは辞書アプリ「Meltype 辞書」と Meltype.app 本体の Finder・Dock・⌘Tab 用のアイコンだけだったので、それを足した。
+- 元絵は氷の M の横長画像 (1536×1024、リョウさんが用意)。`tools/make_icon.py` で正方形に整え、macOS 風の角丸 (半径 22.37%) にして `mac/Resources/icon-1024.png` と `Meltype.icns` を作る。`build.sh` が Meltype.app と MeltypeDictionary.app の両方の Resources に写し、両方の Info.plist に `CFBundleIconFile` = `Meltype` を入れた。
+- 実機 (2026-10-14): Finder・Dock・⌘Tab で氷の M が出ることをリョウさんが確認。Finder はアイコンのキャッシュが残ることがある (ウインドウを開き直す)。
+- 注意: `plutil -insert` は Info.plist のコメントを消して並べ替えるので、plist は手で編集する。
+- 残り: 入力メニュー用の 16/32px tiff は別の元絵なので、絵柄を揃えるなら同じ元絵から tiff も作り直す (今は保留。小さいサイズでは今の tiff のほうが見やすい)。
+
+## 追加項目 1-1 (Zenzai)
+
+- **設計・実験**: 設計は [ZENZAI_DESIGN_1-1.md](ZENZAI_DESIGN_1-1.md) (§3 が製品の形)、実験の結果は [ZENZAI_EXPERIMENT_2026-10.md](ZENZAI_EXPERIMENT_2026-10.md) (212 文で第一候補の一致 +17〜22 ポイント、1 キーの p95 61 ms、メモリ +30〜100 MB。CPU 版)。決定: go。既定 OFF、推論の上限 3、左文脈あり、CPU 版、重みは ON にしたときだけ取得。
+- **実装の要点**:
+  - `mac/Package.swift` を swift-tools-version 6.1、azooKey に trait `ZenzaiCPU`、`.interoperabilityMode(.Cxx)` に。GPU 版 (`Zenzai`) は llama.cpp b4846 の Metal 初期化で落ちるので使わない。
+  - B1: `build.sh` が `otool -L` に出るフレームワークだけを同梱し (`llama.framework` は `lipo -thin` で自分の CPU の分だけに)、`tools/check-release.py` が `Contents/Frameworks` と一致するかを検査する。ビルド機の絶対パスが文字列に残らないよう、`swift build` に `-ffile-prefix-map` を渡す。
+  - 設定 `Settings.Zenzai` (既定 false)・設定タブの項目・IME 用の getter `meltype_get_zenzai` (ABI 版数は上げない)。
+  - `ZenzaiModel.swift`: モデル (73,871,968 バイト、SHA-256 固定) を、設定が ON のときだけ IME が取得する (Updater と同じ作法。転送先は `huggingface.co` と `*.cdn.hf.co`)。状態は `zenzai.json` で辞書アプリの設定タブに出す。失敗したら設定を OFF に戻す。
+  - `Converter.swift`: 要求ごとに `zenzaiMode` (`.on(… .v3(.init(profile: "", leftSideContext: context)))`) を決め、結果キャッシュの鍵に左文脈を足す。モデルを読めない・1 キーが 300 ms 超を 3 キー続けて、はそのプロセスだけ OFF。
+- **実機で確かめること** (リョウさん): ① 設定タブで ON → 状態が「ダウンロード中 (xx%)」→「準備できました」になり、そのあと変換が変わる (同音異義語・文脈で漢字が選ばれる) ② OFF に戻すと今までの変換に戻る ③ 機内モード (ネットワーク無し) で ON → 「失敗: …」が出て、スイッチが OFF に戻る ④ パスワード欄 (秘匿入力) では Meltype がキーを触らないので変換は起きない (左文脈も渡らない) ⑤ M1 級の Mac が有れば、打ち心地 (K67) ⑥ `~/Library/Application Support/Meltype/models/` を消してから ON → 取り直す。
+- **未確認 (この作業では確かめていない)**: 実機の IME での操作 (①〜⑥)。macOS 13.0〜13.2 での起動 (llama.framework の minos が 13.3 で、`LSMinimumSystemVersion` (13.0) より新しい。`tools/check-release.py` の minos の検査が FAIL する。13.3 に上げるかはリョウさんが決める)。llama.framework に残る上流の作者のパス (`/Users/miwa/` 55 件、`tools/check-release.py` のビルド機のパスの検査が FAIL する)。llama.cpp の MIT ライセンス全文を Meltype.app の `Licenses/` に入れること (今は THIRD-PARTY-NOTICES に表記だけ)。
+
+### 1-1 の実機確認 (2026-10-14、macOS 26.6.2、JIS、feat/zenzai 51767c3)
+- OFF のままの変換は従来どおり。設定タブで ON → 「ダウンロード中」→「準備できました」。左文脈で「講演」「公園」が切り替わり、日英混在 (`kyouhameetingdesu`) も従来どおり。OFF に戻すと状態文が OFF になり変換が元に戻る。リョウさん「きちんと動作しました」。
+- 通信を切った状態での失敗表示は実機では未確認 (自己テスト `--zenzai-self-test` の取得元なし・SHA 不一致・転送先拒否の経路で代替)。
+- 査読: R39 (実験の計測と結果)、R40 (製品実装、セキュリティ重視: 必須 0、推奨 9 を反映)。
 
 ## 追加項目 A1 (ATOK の 1 音確定: 入力中の Shift+↓ で、先頭の 1 音だけ確定する)
 

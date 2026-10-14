@@ -197,6 +197,10 @@ public sealed class Settings
      Description("Keyboard モードで、Space を押さなくても打ったそばから漢字に変換して表示します。")]
     public bool LiveConversion { get; set; } = true;
 
+    [Category("1. 全般"), DisplayName("Zenzai (ニューラル変換、実験的)"),
+     Description("文脈に合う漢字が先頭に来やすくなります。ON にすると変換モデル (約 74 MB) を 1 回だけダウンロードします。ダウンロードが終わるまでは今までどおりの変換です。")]
+    public bool Zenzai { get; set; }
+
     [Category("1. 全般"), DisplayName("変換後も続けて入力できる"),
      Description("Space で変換したあと、続けて文字を打っても確定せず、打った文字を含めて編集・変換を続ける。OFF のときは、今までどおり変換した結果を確定して新しい入力を始めます。現在は Mac 版だけで動きます (入力メニューの「変換後も続けて入力できる」で切り替え)。")]
     public bool ContinueAfterConversion { get; set; }
@@ -208,6 +212,10 @@ public sealed class Settings
     [Category("1. 全般"), DisplayName("Shift+Enter で確定して改行"),
      Description("変換中に Shift+Enter を押すと、確定したうえで Shift+Enter をアプリに渡します (チャットや Web アプリでは改行)。OFF のときは Enter と同じく確定だけします。Mac 版は入力メニューの「Shift+Enter で確定して改行」で切り替え。")]
     public bool ShiftEnterNewline { get; set; } = true;
+
+    [Category("1. 全般"), DisplayName("ATOK スタイルのキー操作"),
+     Description("変換中のキー操作を ATOK と同じにします。← で文節を縮め、→ で文節を伸ばす (区切りを前 / うしろへ)。↓ で選んでいる文節までを確定 (部分確定)。Shift+← → で文節を移り、Ctrl+← → で先頭 / 最後の文節へ。次の候補は Space、前の候補は ↑。OFF のときは、今までどおり ← → で文節を選び、↓ で次の候補、Shift+← → で区切りを変えます。")]
+    public bool TokMode { get; set; }
 
     [Category("1. 全般"), DisplayName("変換エンジン"),
      Description("かな漢字変換に使うエンジン。「両方」は Mozc (Google 日本語入力のオープンソース版) で変換し、Mozc が使えないときは Microsoft IME で変換します。候補には両方の候補が出ます。")]
