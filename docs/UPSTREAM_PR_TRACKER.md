@@ -40,6 +40,7 @@
 | 0-4 | #229 (本家 Mac 版への要望: Homebrew で入れたい) | Homebrew cask `meltype-for-mac` (自前 tap https://github.com/whitewater-png/homebrew-meltype-for-mac)。zip を `input_method` で入れ、postflight で quarantine を外す。入力ソースの登録はサンドボックス内でできないので、インストール後にログアウト・ログイン (caveats・README に記載)。計画書 0-4 | 中 | 完了 (2026-10-14 実機確認) | 295f07b | きれいな Mac での初回 (Gatekeeper の判定が記憶されていない状態) は未確認 |
 | 0-5 | - (戦略計画 0-5) | 既知の制限の仕分け表 `docs/KNOWN_LIMITS.md` (50 件: 仕様 28 / 直す予定 10 / 直った 4 / 未確認 8) と README の「制限 (知っておいてほしいこと)」節・よくある質問 3 問。査読 R37 でライブ変換が既にあることが分かり (実機確認)、戦略計画 2-3 を訂正。番号待ちの候補: K02/K03 (人名分野)・K16 (-pedia の残り)・K20 (1 語英単語の再変換)・K33 (二重空白)・K40 (全角スペースの手段、リョウさん判断) | 低 | 完了 (2026-10-14) | c60b4f4 | 実機は関係しない (文書のみ) |
 | 0-3 | - (戦略計画 0-3) | ホストアプリ互換マトリクス `docs/HOST_COMPAT.md` (TextEdit・Hermes・LibreOffice・Chrome・Google ドキュメント・Discord・ターミナル × 8 項目)。再変換が効かないのは Google ドキュメント (何も起きない) とターミナル (スペースが入る → K66 候補) のみ。LibreOffice の確定し直しは効いた (K30 を未確認に) | 低 | 完了 (2026-10-14 実機確認) | f2af372 | VS Code・Slack は未確認 |
+| 0-6 | #222 (本家: アイコンの要望) | 辞書アプリと Meltype.app に氷の M の `.icns` (入力メニューの氷の M/A は 1188c89 で済み)。`tools/make_icon.py` で元絵から生成 | 低 | 完了 (2026-10-14 実機確認) | ac3ff1c | Finder・Dock・⌘Tab で確認済み |
 
 ## 2. 本家 PR に由来しない項目
 
@@ -76,6 +77,7 @@
 | 日付 | 内容 |
 | --- | --- |
 | 2026-10-11 | 調査結果の文書と、この管理表を作成。P30〜P33 を並列で作業開始 |
+| 2026-10-14 | 0-6 (アイコン): 辞書アプリ・本体に氷の M の .icns。これで Phase 0 (0-1〜0-6・P45) は全部完了。 |
 | 2026-10-14 | 0-3 (ホスト互換): 7 アプリ × 8 項目を実機で確認。再変換 NG は Google ドキュメントとターミナルだけ、確定し直しは全アプリで効いた (LibreOffice の以前の記録と食い違い → K30 未確認)。`docs/HOST_COMPAT.md` 新規、README 制限節の LibreOffice の行を訂正。 |
 | 2026-10-14 | 0-5 (既知の制限の仕分け): `docs/KNOWN_LIMITS.md` 50 件、README に制限節と FAQ 3 問。ライブ変換は Mac 版に既にあり既定 ON (実機確認) → 戦略計画 2-3 と調査レポートの前提を訂正。全角スペースの手段 (K40) はリョウさんの判断待ち。 |
 | 2026-10-14 | 0-4 (Homebrew cask): 公開 tap whitewater-png/homebrew-meltype-for-mac を作成 (29b083a)。実機で cask のみ 1.1.7 を入れ、ログアウト・ログイン後に入力できた。quarantine 付きだと Gatekeeper が IME を黙って止める、サンドボックス内では `--register` が効かない、既存の Meltype.app があると入らない、を計画書 0-4 に記録。README・RELEASE.md・check-release.py を更新。 |
