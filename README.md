@@ -48,6 +48,15 @@ Mac の標準的な IME の仕組み (Input Method Kit) で動く Meltype です
 
 ## インストール
 
+### Homebrew
+```
+brew install --cask whitewater-png/meltype-for-mac/meltype-for-mac
+```
+- **インストール後は、いったんログアウトしてログインし直してください** (Homebrew の処理の中では入力ソースの登録を済ませられません。ログアウトしないと、入力メニューに Meltype が出ても入力できないことがあります)
+- `~/Library/Input Methods/Meltype.app` が既にある (zip や dmg で入れた) ときは、Homebrew は入れません。先に「Uninstall Meltype.command」などで外してください
+- 更新は `brew upgrade --cask meltype-for-mac`、外すときは `brew uninstall --cask meltype-for-mac` です
+- これは本家 Meltype (Windows 版・本家の Mac 版) とは別の、この Mac 版リポジトリの配布です。tap は [whitewater-png/homebrew-meltype-for-mac](https://github.com/whitewater-png/homebrew-meltype-for-mac) です
+
 ### 配布版 (dmg・ダブルクリックのインストーラー)
 1. [Releases](https://github.com/whitewater-png/Meltype-for-Mac/releases) から `Meltype-mac-<version>.dmg` をダウンロードして、ダブルクリックで開く (開いたウインドウの背景に、開き方の図が出ます)
 2. 中の `Meltype-mac-<version>.pkg` をダブルクリックする

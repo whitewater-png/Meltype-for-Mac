@@ -13,6 +13,17 @@
 リポジトリ側の検査 (postinstall・pkg の Resources・Distribution・版・案内文) は、作業ツリーではなく `--ref` (既定は HEAD) の**コミットの内容**と比べる。**コミットしてから実行する** (未コミットの変更は見ない)。公開済みの版と比べるときは `--ref v<版>-mac`。`--ref` に存在しない名前を渡すと、検査を始めずに終了コード 2 で止まる。
 pkg は、Scripts が postinstall の 1 つだけであること (root で走る)、Resources が `mac/pkg/resources` とバイト一致であること、Payload の生のモード (setuid など) も見る。Payload を読む `bsdtar` などが無い環境では、その 1 項目だけ SKIP になる。
 
+## Mac 版: cask の更新 (Homebrew)
+
+`make-zip.sh` で zip を作ったあと、リリースを公開する前後で行う (cask は zip の URL と SHA-256 を指すので、zip が決まってからでないと書けない)。
+
+1. `python3 tools/update-cask.py <版> <zip の sha256>` (`shasum -a 256 mac/dist/Meltype-mac-<版>.zip`)。`mac/homebrew/Casks/meltype-for-mac.rb` の `version` と `sha256` が変わる
+2. 本体リポジトリにコミットする。`python3 tools/check-release.py` が、cask の `version` と `sha256` が built app・zip と一致するかを見る
+3. tap リポジトリ (`/opt/homebrew/Library/Taps/whitewater-png/homebrew-meltype-for-mac`、または clone) の `Casks/` に同じファイルを写してコミットし、push する。tap で commit するときの `git config user.email` は本体リポジトリと同じ noreply にする
+4. **この push は公開行為で、Release の公開と同時に行う。** Release を公開する前に push すると、cask の URL が 404 になる (逆に Release だけ公開して push しなければ、`brew upgrade` は古い版のまま)
+
+`scripts/release_build.sh` は skill 側のスクリプトなので、ここでは触らない。
+
 ## 版を出す (テスト版・公開版共通)
 
 1. 版を上げる: `src/Meltype/Meltype.csproj`・`src/Meltype.Core/Meltype.Core.csproj` の `<Version>`、

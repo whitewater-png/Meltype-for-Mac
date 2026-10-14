@@ -23,6 +23,7 @@
 #   pkg ........................ §7-1 digest、§7-2 署名・Installer への問い合わせ、§7-3 展開、§7-4 Distribution・PackageInfo・Scripts が postinstall の 1 つだけ、
 #                                §7-5 postinstall・Resources・Distribution がリポジトリと同じか、§7-6 ペイロード (生のモードで setuid なども見る)
 #   版 ......................... §7-8 Info.plist・Core の csproj・Converter.swift・zip/pkg の名前と中身・(任意で) --expect-version
+#   cask ....................... mac/homebrew/Casks/meltype-for-mac.rb の version が built app と、sha256 が mac/dist/Meltype-mac-<版>.zip と一致するか
 #   案内文 ..................... §7-9 「右クリック → 開く」の近くに「このまま開く」があるか
 #   導入済みの Meltype ......... §7-10 (--compare-installed。参考の表示だけで、失敗にはしない)
 # 終了コード: 0 = FAIL なし、1 = FAIL あり、2 = 使い方の誤り (明示した --ref が読めない場合や、想定外の例外で検査を続けられない場合を含む)。SKIP (検査できなかった) と INFO (参考) は失敗にしない。
@@ -59,6 +60,7 @@ PKG_TOP_EXPECTED = {"Distribution", "Resources", "Meltype-component.pkg"}
 PKG_COMP_EXPECTED = {"Bom", "PackageInfo", "Payload", "Scripts"}
 REPO_PKG_RESOURCES = "mac/pkg/resources"
 REPO_PKG_SCRIPTS = "mac/pkg/scripts"
+REPO_CASK = "mac/homebrew/Casks/meltype-for-mac.rb"
 MAIN_MACHOS = [  # app の中に必ず要る Mach-O (件数ではなく名前で見る。Swift の互換 dylib などは、ツールチェーンによって有無が変わる)
     "Contents/MacOS/Meltype",
     "Contents/Helpers/MeltypeDictionary.app/Contents/MacOS/MeltypeDictionary",
@@ -856,6 +858,33 @@ def check_versions(sources, expect):
             fail("CFBundleVersion (ビルド番号)", "食い違い: " + " / ".join("%s = %s" % (v, ", ".join(ks)) for v, ks in sorted(by.items())))
 
 
+def check_cask(ref, app_versions):
+    """Homebrew cask の version が built app の CFBundleShortVersionString と、sha256 が mac/dist の zip と一致するか。cask は --ref のコミットから読む。"""
+    R.section("Homebrew cask (%s)" % REPO_CASK)
+    src = git_show(ref, REPO_CASK)
+    if src is None:
+        ref_unreadable("cask の version と sha256", "git で %s の %s を読めない" % (ref, REPO_CASK))
+        return
+    body = text(src)
+    mv = re.search(r'(?m)^\s*version\s+"([^"]+)"', body)
+    ms = re.search(r'(?m)^\s*sha256\s+"([0-9a-fA-F]{64})"', body)
+    if not mv or not ms:
+        fail("cask に version と sha256 (64 桁) がある", "読めない")
+        return
+    cask_ver, cask_sha = mv.group(1), ms.group(1).lower()
+    shorts = sorted({v[0] for v in app_versions if v and v[0]})
+    if not shorts:
+        skip("cask の version が built app と同じ", "built app の版を読めていない (app の検査を省いた)")
+    else:
+        check(shorts == [cask_ver], "cask の version が built app の CFBundleShortVersionString と同じ", cask_ver, "cask は %s、app は %s" % (cask_ver, ", ".join(shorts)))
+    zpath = os.path.join(REPO, "mac", "dist", "Meltype-mac-%s.zip" % cask_ver)
+    if not os.path.isfile(zpath):
+        skip("cask の sha256 が mac/dist/Meltype-mac-%s.zip と同じ" % cask_ver, "zip が無い (make-zip.sh のあとに実行する)")
+    else:
+        h = sha256(zpath)
+        check(h == cask_sha, "cask の sha256 が mac/dist/Meltype-mac-%s.zip と同じ" % cask_ver, "一致", "cask は %s…、zip は %s… (python3 tools/update-cask.py <版> <zip の sha256> で直す)" % (cask_sha[:12], h[:12]))
+
+
 def check_open_text(ref):
     R.section("案内文の整合 (§7-9)")
     rc, out, _ = git("grep", "-n", "-E", OPEN_RE, ref, "--", "README.md", "mac")
@@ -1008,6 +1037,7 @@ def main():
         sources.update(rv)
         check_versions(sources, args.expect_version)
         check_open_text(args.ref)
+        check_cask(args.ref, [res["version"] for _l, res in results if res and _l not in ("zip", "pkg")])
     if rv is None and sources:
         check_versions(sources, args.expect_version)
 

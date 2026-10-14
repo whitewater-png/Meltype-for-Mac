@@ -15,6 +15,10 @@
 2. 「Install Meltype.command」をダブルクリック (「開発元が未確認のため開けません」と出たら、下の「開けないとき」の手順で開きます)
 3. 入力メニューで Meltype を選ぶ
 
+### Homebrew
+`brew install --cask whitewater-png/meltype-for-mac/meltype-for-mac` (更新は `brew upgrade --cask meltype-for-mac`)。**入れたあとはログアウトしてログインし直す**。
+`~/Library/Input Methods/Meltype.app` が既にあるときは、先に外してから入れる (Homebrew は上書きしない)。
+
 アンインストールは「Uninstall Meltype.command」です。詳しくは同梱の INSTALL.txt とリポジトリの README を見てください。
 
 ### 開けないとき (dmg・zip 共通)
