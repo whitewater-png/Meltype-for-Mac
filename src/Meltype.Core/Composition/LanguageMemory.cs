@@ -254,6 +254,26 @@ public sealed class LanguageMemory
         }
     }
 
+    /// <summary>
+    /// 覚えている内容の写し (ファイルに結び付かない)。exclude が true を返す語は入れない。「判定を調べる」画面が、
+    /// 学習した語を 1 つだけ外した場合の判定を、languages.json に触れずに試すのに使う
+    /// (このクラスは封印されていて Get も仮想ではないので、包みではなく写しにする)。写しには Remember・Set・Remove を呼ばない。
+    /// </summary>
+    internal LanguageMemory CopyWithout(Func<string, bool> exclude)
+    {
+        var copy = new LanguageMemory(null) { IsCommonJapanese = IsCommonJapanese, IsReadableRomaji = IsReadableRomaji };
+        lock (_gate)
+        {
+            // 写す前に読み直す (画面が Entries で見た内容と、判定に使う内容を揃える)。Get と同じく読むだけでファイルは変えない。
+            RefreshCore();
+            foreach (var (word, entry) in _entries)
+            {
+                if (!exclude(word)) copy._entries[word] = Copy(entry);
+            }
+        }
+        return copy;
+    }
+
     private static Entry Copy(Entry entry) => new() { English = entry.English, Used = entry.Used, Count = entry.Count, Explicit = entry.Explicit, Reverse = entry.Reverse, ReverseAt = entry.ReverseAt };
 
     public int Count { get { lock (_gate) return _entries.Count; } }

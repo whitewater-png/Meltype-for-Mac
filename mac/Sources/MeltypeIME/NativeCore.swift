@@ -89,6 +89,8 @@ private func reading(of text: String) -> String? {
 }
 
 /// 英単語として正しい綴りか (macOS のスペルチェッカー、英語で調べる)。
+/// 「Meltype 辞書」の「判定を調べる」(mac/Sources/MeltypeDictionary/WordChecker.swift の isEnglishWordCallback) と同じ判定にしておくこと
+/// (違うと、画面の答えが IME とずれる)。
 private let isWordCallback: IsWordCallback = { word in
     guard let word else { return 0 }
     let text = String(cString: word)

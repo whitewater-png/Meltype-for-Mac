@@ -51,7 +51,7 @@ public static unsafe class Exports
     /// 7: 設定タブの関数 (meltype_settings_get / meltype_settings_set / meltype_settings_reset) を足した。
     /// 8: 自作の専門用語集の関数 (meltype_term_create ほか) を足し、meltype_term_domains の各行に 5 つ目の欄 (自作なら 1) を足した。
     /// 9: 学習した語の関数 (meltype_learned_words / _version / _check / _set / _remove) を足した。
-    /// 10: (別ブランチ feat/judge-tab の 1-3 が使う。こちらは 11 から数える)
+    /// 10: 判定を調べる (meltype_explain_detection と、画面のプロセスで英単語を調べる関数を登録する meltype_set_word_checker) を足した。
     /// 11: 確定した直後の語の F10 / F6 の取消 (meltype_cancel_toggle) を足し、結果の JSON にトグル由来の印 (toggle) を足した。
     /// </summary>
     public const int AbiVersion = 11;
@@ -726,6 +726,34 @@ public static unsafe class Exports
         }
     }
 
+    /// <summary>
+    /// 英単語かを調べる Swift 側の関数 (meltype_init の isWord と同じ引数: 小文字の英単語 → 英語として正しい綴りなら 1・違えば 0・分からなければ -1) を登録する。
+    /// 「Meltype 辞書」の画面は meltype_init を呼ばないので、「判定を調べる」の答えを IME (NSSpellChecker) と揃えるのに使う (最初に 1 回)。
+    /// NULL を渡すと外す (同梱の英単語表に戻る)。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_set_word_checker")]
+    public static void SetWordChecker(delegate* unmanaged<byte*, int> isWord)
+    {
+        s_isWord = isWord;
+        DictionaryManagement.ExternalWordChecker = isWord == null ? null : new CallbackWordChecker();
+    }
+
+    /// <summary>
+    /// 打ったローマ字 (typed) の区間分けと、条件を 1 つだけ変えたときに変わるかを返す (形は DictionaryManagement.ExplainDetection)。
+    /// before・after はキャレットの前後の文字 (NULL 可。20 文字で切る)、level は判定の強さ (0 積極的・1 標準・2 慎重・3 手動)。
+    /// ローマ字入力としてだけ調べる (かな入力の判定は調べられない)。学習 (languages.json) は読むだけで変えない。取れなければ NULL。meltype_free で解放する。
+    /// 登録したスペルチェッカー (NSSpellChecker) を呼ぶので、メインスレッドから呼ぶこと (それ以外では登録した関数が -1 =「分からない」を返し、同梱の英単語表で答える)。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_explain_detection")]
+    public static byte* ExplainDetection(byte* typed, byte* before, byte* after, int level)
+    {
+        var typedText = FromUtf8(typed) ?? "";
+        var beforeText = FromUtf8(before) ?? "";
+        var afterText = FromUtf8(after) ?? "";
+        var detectionLevel = Enum.IsDefined((Config.DetectionLevel)level) ? (Config.DetectionLevel)level : Config.DetectionLevel.Balanced;
+        return Text("判定の調べもの", () => DictionaryManagement.ExplainDetection(typedText, beforeText, afterText, detectionLevel));
+    }
+
     /// <summary>理由 (null なら成功) を返り値にする: 成功なら NULL、理由があればその文字列。</summary>
     private static byte* ReasonText(string? reason) => reason is null ? null : ToUtf8(reason);
 
@@ -1131,18 +1159,21 @@ public static unsafe class Exports
         {
             if (s_isWord == null || lower.Length < 2) return false;
             if (_cache.TryGetValue(lower, out var known)) return known;
-            var result = Ask(lower);
+            var answer = Ask(lower);
+            // 負の値は「分からない」(Swift 側が呼ばれてはいけないスレッドだったとき)。0 (違う) とは別にして、覚えずに同梱の英単語表で答える。
+            if (answer < 0) return BuiltInWordChecker.Shared.IsWord(lower);
+            var result = answer != 0;
             if (_cache.Count > 20000) _cache.Clear();
             _cache[lower] = result;
             return result;
         }
 
-        private static bool Ask(string lower)
+        private static int Ask(string lower)
         {
             var pointer = ToUtf8(lower, out var buffer);
             try
             {
-                return s_isWord(pointer) != 0;
+                return s_isWord(pointer);
             }
             finally
             {
