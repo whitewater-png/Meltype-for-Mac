@@ -37,6 +37,7 @@
 | P43 | #335 | 直した誤判定をその場で報告にする | 低 | 未着手 | - | Mac 版リポジトリに誤判定の報告テンプレートを作ってから |
 | P44 | #292 | コード系アプリの一覧に WezTerm・Rio・Hyper を足す | 低 | 未着手 | - | bundle ID を実機で確かめる |
 | P45 | #406 #153 #77 #104 #59 #129 ほか (本家の判定修正 7 コミット) | 本家の判定修正を手で移植し、`eval/` の回帰ゲートの broken 40 件を 28 件に (取り込み前 216/261 → 231/264、取り込み前の Mac 版に対する broken 0 / fixed 12)。取り込み: overcute・hosuthingu・reflectsareta・moraltute・メールの @ より前・AIdekiru・teishutsushita。見送り: 4 (githubdevote)・6 (MP3ni・3かける4)・8 の や・11 の と・12 (make sure you have time)・13 の 2 件 (未特定)・**8・9 の -pedia (一度入れたが、査読 R35 で `kyouhawikipediadeshirabeta` が前の日本語ごと英字になる悪化が見つかり外した。本家 a4b6f1a も同じ。本家への報告は判断待ち)** | 中 | 完了 (2026-10-14 実機確認) | 4534aab (P45-12 = batch/p45b の最後のコード変更。文書コミットは自分の hash を書けないので、この欄は文書の前の hash) | TextEdit で `overcute`・`hosuthingu`・`reflectsareta`・`moraltute`・`tanaka@gmail.com`・`yamada.taro@example.co.jp` (→ そのまま)・`AIdekiru`・`teishutsushita`、`kyouhawikipediadeshirabeta` (→ きょうはwikipediaでしらべた)、`ato@hitori` (→ ato@hitori、トレードオフの確認)。変わらないこと: `umaindesu`・`ato@3nin`・`Xnotoukouha`。実機は NSSpellChecker なので答えが違うことがある。詳細は計画書 P45 |
+| 0-4 | #229 (本家 Mac 版への要望: Homebrew で入れたい) | Homebrew cask `meltype-for-mac` (自前 tap https://github.com/whitewater-png/homebrew-meltype-for-mac)。zip を `input_method` で入れ、postflight で quarantine を外す。入力ソースの登録はサンドボックス内でできないので、インストール後にログアウト・ログイン (caveats・README に記載)。計画書 0-4 | 中 | 完了 (2026-10-14 実機確認) | 295f07b | きれいな Mac での初回 (Gatekeeper の判定が記憶されていない状態) は未確認 |
 
 ## 2. 本家 PR に由来しない項目
 
@@ -73,6 +74,7 @@
 | 日付 | 内容 |
 | --- | --- |
 | 2026-10-11 | 調査結果の文書と、この管理表を作成。P30〜P33 を並列で作業開始 |
+| 2026-10-14 | 0-4 (Homebrew cask): 公開 tap whitewater-png/homebrew-meltype-for-mac を作成 (29b083a)。実機で cask のみ 1.1.7 を入れ、ログアウト・ログイン後に入力できた。quarantine 付きだと Gatekeeper が IME を黙って止める、サンドボックス内では `--register` が効かない、既存の Meltype.app があると入らない、を計画書 0-4 に記録。README・RELEASE.md・check-release.py を更新。 |
 | 2026-10-13 | P45 (本家の判定修正の取り込み): 本家 7 コミット → Mac 7 コミット + 守り 1 (P45-12)、-pedia 2 件は査読 R35 で外した。eval 216/261 → 231/264、取り込み前の Mac 版に対する broken 0 / fixed 12、本家に対する broken 40 → 28、テスト 617 → 618 件。見送り: c6b281e (githubdevote)・b4484c4 (MP3ni・3かける4)・3cb0758 の や と ffd7e6a・35beb60 の と (前提の 74ca494 が無い)・8dfec9d (make sure you have time)・-pedia (2a1ccb9・40bcad9 は一度入れて外した。本家 a4b6f1a も `kyouhawikipedia…` で前の日本語ごと英字になる。報告は判断待ち)。`my name is taro`・`apinoerror` は未特定。実機確認待ち |
 | 2026-10-13 | Q13 (アプリ内の更新のあとも古い IME が動き続ける) の原因を調査して修正: `install.sh` の `pkill -x Meltype` が、IME が起動した `install.sh` からは祖先として対象から外されていた。`killall Meltype` に変更し、`tools/check-install-stop-ime.py` を追加 (公開前の検査にも載せた)。独立査読 R34 を 4 回 (P0 なし、P1 は直した)。実機未確認 (公開した版での更新が最初の確認)。1.1.7 として公開した (タグ `v1.1.7-mac`) |
 | 2026-10-13 | 1.1.6 の準備: Q7・Q8 を完了に (計画書の 10-12 の実機確認に合わせた)。配布物に古い `llama.framework` が混ざる問題を B1 として記録 (1.1.6 はきれいな worktree から作り直して配布前チェック FAIL 0) |
