@@ -2585,3 +2585,4 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **go** (新しい外れ 0 件、実機に近い前後比較で変更前が正しいものを壊していない)。push はしていない。
 - **残る限界** (KNOWN_LIMITS の K81): `devote`・`devise` のように「助詞 + 同梱の英単語」とも読める v を含む英単語は、続けて打つと日本語側になる (`devotewo` → `でゔぉてを`、`devisewo` → `でゔぃせを`、`deriveyadevise` → `deriveやでゔぃせ`)。`ya devote` を空白なしで続けた `yadevote` も `やでvote`。日本語の後ろの `derive` (`kyouhaderive` → `きょうはでりゔぇ`、`konoderive` → `このでりゔぇ`) は、実機に近い表では前後とも日本語 (同梱の一覧では `きょうはderive`。別の経路でもスペルチェッカーの `rive` が効いていると推測。調べていない)。
 - **未確認**: 実機 (変更後のビルドは入れていない。`build.sh --no-install` も回していない)。実機の 5 行目の打鍵 (`deriveyadevote` は推測)。打ったアプリ (TextEdit かどうか)。
+- **実機確認 (2026-10-16 06:11 のビルド = main `1052f6c`、リョウさん)**: `deriveyadevote` → deriveやでvote、`derivewo` → deriveを、`githubdevote` → githubでvote、`inviteshimashita` → inviteしました、`kyouhaderive` → きょうはでりゔぇ (K82 のとおり) の 5 件すべて期待どおりと報告 (「期待通りの結果でした」。行ごとの出力の貼り付けは無い)。打ったアプリは未確認。上の「未確認」のうち、実機と 5 行目の打鍵の件はこれで済み。
