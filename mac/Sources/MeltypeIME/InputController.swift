@@ -666,7 +666,11 @@ final class MeltypeInputController: IMKInputController {
     }
 
     /// 候補で少し (1.5 秒) 止まったら、その候補の意味を候補ウィンドウの注釈に出す (Windows 版と同じ)。
-    private var meaningKey: String?
+    private var meaningKey: String? {
+        didSet { if shownDictionaryMeaning?.key != meaningKey { shownDictionaryMeaning = nil } }
+    }
+    /// 出した辞書の意味。同じ候補のまま showModeAnnotation が「あ」で上書きするので、そこで出し直す。候補が変われば捨てる。
+    private var shownDictionaryMeaning: (key: String, text: String)?
 
     private func scheduleMeaning(_ view: CompositionView) {
         // Core の意味が無く、選んでいる候補が英字の語なら、macOS の辞書で引く (端末内・通信なし)。
@@ -684,6 +688,7 @@ final class MeltypeInputController: IMKInputController {
                 // 辞書は別のキューで引く。戻ってきたとき候補が変わっていなければ (meaningKey が同じ) 出す。
                 CandidateDictionary.lookup(dictionaryWord) { [weak self] summary in
                     guard let self, self.meaningKey == key, let summary, let window = candidatesWindow, window.isVisible() else { return }
+                    self.shownDictionaryMeaning = (key, summary)
                     window.showAnnotation(NSAttributedString(string: summary))
                 }
             }
@@ -694,6 +699,10 @@ final class MeltypeInputController: IMKInputController {
     /// 変換中は日本語入力なので「あ」、「コード」のアプリでは「あ (コード)」。英数のときは候補ウィンドウが出ないのでここには出ない。
     private func showModeAnnotation(_ view: CompositionView, window: IMKCandidates) {
         guard view.meaning == nil else { return }
+        if let shown = shownDictionaryMeaning, shown.key == meaningKey {
+            window.showAnnotation(NSAttributedString(string: shown.text))
+            return
+        }
         window.showAnnotation(NSAttributedString(string: appKind == .code ? "あ (コード)" : "あ"))
     }
 
