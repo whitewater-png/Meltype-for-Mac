@@ -15,8 +15,11 @@ public enum DisplayMode { Auto, Hiragana, Katakana, HalfWidthKatakana, FullWidth
 /// </summary>
 public readonly record struct CompositionUnit(string Kana, string Raw);
 
-/// <summary>表示上のひとまとまり。英語と判定した区間は英字のまま、それ以外は日本語 (かな/漢字)。</summary>
-public readonly record struct CompositionSegment(bool IsEnglish, string Kana, string Raw);
+/// <summary>
+/// 表示上のひとまとまり。英語と判定した区間は英字のまま、それ以外は日本語 (かな/漢字)。
+/// Protected は、パス・オプション・変数 (1-4a の保護区間) で英字にした区間。打ち間違いの直しの対象にしない。
+/// </summary>
+public readonly record struct CompositionSegment(bool IsEnglish, string Kana, string Raw, bool Protected = false);
 
 /// <summary>
 /// 未確定の入力。打ったそばからローマ字をかな 1 音ずつの単位にしていき、まだ音にならない子音
@@ -808,7 +811,7 @@ public sealed class CompositionText
             // 同じ言語が続くなら 1 つの区間にする (変換で 1 つの読みとして扱うため)。英語の区間の Kana は空のまま。
             if (result.Count > 0 && result[^1].IsEnglish == segment.IsEnglish)
             {
-                result[^1] = new CompositionSegment(segment.IsEnglish, result[^1].Kana + segment.Kana, result[^1].Raw + segment.Raw);
+                result[^1] = new CompositionSegment(segment.IsEnglish, result[^1].Kana + segment.Kana, result[^1].Raw + segment.Raw, result[^1].Protected && segment.Protected);
             }
             else result.Add(segment);
         }
@@ -1219,7 +1222,7 @@ public sealed class CompositionText
             // 5 文字以上の知っている語 (meeting) か、同梱の英語の辞書の 2〜4 文字の語 (user・rta・av)
             // 4 文字の知っている語で、ローマ字として読めないもの (help・milk) も英語 (help|pe-ji → へおっぺーじ にしない)
             var lower = segment.Raw.ToLowerInvariant();
-            var word = segment.IsEnglish && (segment.Raw.Length >= 5 && _detector.IsKnownEnglishWord(segment.Raw) || segment.Raw.Length is >= 2 and <= 4 && _detector.IsListedEnglishWord(lower) ||
+            var word = segment.IsEnglish && (segment.Protected || segment.Raw.Length >= 5 && _detector.IsKnownEnglishWord(segment.Raw) || segment.Raw.Length is >= 2 and <= 4 && _detector.IsListedEnglishWord(lower) ||
                 segment.Raw.Length == 4 && _detector.IsKnownEnglishWord(lower) && !_detector.Romaji.Analyze(lower).IsValid);
             for (var i = 0; i < segment.Raw.Length; i++) mask.Add(word);
         }
