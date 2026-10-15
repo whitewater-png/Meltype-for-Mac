@@ -101,7 +101,7 @@ Meltype for Mac を、本家 (Windows 版 `yksr-melt/Meltype` の main) と並�
 | `inviteshimashita`・`invitewookutta` (本家 `c6b281e`、#69) | **取り込み** | 本家のままだと `githubdevote` (期待 `githubでvote`) が今も壊れるので、「助詞で始まり、残り 3 文字以上が英単語の語 (`de|vote`)」には新しい規則を使わない守りを足した。損: `devotewo` は今までどおり `でゔぉてを` |
 | `site PR` (本家 `8dfec9d`) | **見送り** | 本家のままだと英文の `site` が壊れる (`make sure you have time` → `まけ すれ よう have time`、前後比較で 525 件)。3 つの条件 (本家が後で直した語の一覧に限る・今の語が大文字で始まる・前が空白で区切った英単語でない) を足すと実装者の前後比較では悪化 0 だったが、独立した査読の自作入力で、名詞の site + 大文字の略語が壊れた: `kono site URL wo oshiete` → `このして URL をおしえて`、`sono site API` → `そのして API`、`site ID wo kakunin`・`web no site URL` なども同じ。`e.g. site PR` も「して」になる。直るのは `site PR` の 1 件だけで、技術系の文でよく打つ形を壊すので見送った (リョウさんの判断)。条件をさらに足す案は特定の例合わせになるので採らない。実験のコミットは `exp/p3-3-2-small` の `169b8bc` に残す |
 
-- 取り込み後の数字 (変更前 → 後): テスト 777 → 778 (全件通過)、品質テスト 1266/1268 → 1269/1271、正解表 276/310 → 278/310 (broken 0 / fixed 2: `inviteshimashita`・`invitewookutta`)。本家に対する broken は 28 → 26 (推定: 実験ブランチで A だけを入れた段階の値)。
+- 取り込み後の数字 (変更前 → 後): テスト 777 → 778 (全件通過)、品質テスト 1266/1268 → 1269/1271、正解表 276/310 → 278/310 (broken 0 / fixed 2: `inviteshimashita`・`invitewookutta`)。本家 (`45e14f8`、266/310) に対する broken は 28 → 26、fixed 38 (このブランチで `tools/eval-compare.sh` を実行して確認)。
 - 独立した査読: 自作の入力 79 件 (v を含む語・助詞 + 英単語・文頭・句読点など) で、この型による悪化は 0 件、`derive` も直った。
 - 本家も同じ: 本家 `45e14f8` は `the site is down` → `the して is down`、`site map` → `して map`。本家への連絡は戦略書 §8 の決定 (現時点では行わない) に従い、ここに記録だけ残す。
 - 未確認: 実機。Mac は macOS のスペルチェッカー (NSSpellChecker) を使うので、v の規則はテストより多くの語に効く。`devote` のように頭が助詞に見える英単語で確かめる。
