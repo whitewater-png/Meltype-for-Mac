@@ -2421,3 +2421,17 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **実機で確かめること** (リョウさん): ① 「設定・辞書…」の ⌘5 のタブで `kyouhasushidesu` を打つと区間と「条件を変えた場合」が出る ② 「学習した語」に sushi (英字) を足すと「学習した語「sushi」を外す → …」と「この語を消す」が出て、確認のあと消せる (languages.json は調べるだけでは変わらない) ③ 判定の強さ・かな入力の既定が設定タブの今の値になる ④ IME での実際の判定と、画面の区間が一致する (NSSpellChecker 登録の効果。特に `zh` のような語) ⑤ english.txt に語を足したあとの反映の時期が案内文のとおり。
 - **未確認**: 画面 (AppKit) の見た目と操作は自動テストが無く、実機で見ていない。IME の判定との一致 (④) は実機未確認。
 
+## 追加項目 1-7 (候補の意味に macOS の辞書を補いとして使う)
+
+- **経緯**: 変換中に約 1.5 秒止まると、選んでいる候補の意味を候補ウィンドウの注釈に出す (`ShowCandidateMeanings`、既定 ON)。意味は Core の `meanings.txt` (ウィクショナリー)、無ければ JMdict の英訳だが、英字の候補 (`meeting` など) には何も出なかった。リョウさんの決定 5 (2026-10-15): macOS の辞書を意味の補いに使う (綴りの警告は入れない)。
+- **実装の要点** (Swift のみ。Core・FFI は変えない):
+  - `mac/Sources/MeltypeIME/CandidateDictionary.swift` を新設。選んでいる候補が ASCII の英字で始まり、英字・`-`・`'` だけの 2 文字以上で、Core の `view.meaning` が空のとき、`DCSCopyTextDefinition` で引く。
+  - 呼び方: 専用の直列キュー (`qos: .utility`) で引き、結果をメインに戻して、そのときの `meaningKey` が同じ (候補が変わっていない) ときだけ `showAnnotation`。メインスレッドでは引かない。
+  - 語ごとのキャッシュ (プロセス内・200 件・古いものから捨てる・「定義なし」も覚える)。表示は先頭の 1 文 (最初の改行・`。`・`. ` まで) を空白をつめて 80 文字ほどで切る。
+  - `InputController.scheduleMeaning` の今の 1.5 秒の中だけで動く (新しいタイマー・設定は無し)。`ShowCandidateMeanings` が OFF だと Core の意味が空になるだけで Swift からは見えないので、既存の `meltype_settings_get` を `NativeCore.showCandidateMeanings` で読み、OFF なら引かない (config.json を読むので辞書のキューの中で読む。読めなければ既定の ON)。
+  - 守り: 辞書が無い・定義が無い・空文字は何も出さない (`isLookupWord` が 2 文字未満・対象外の文字を先に落とし、`DCSCopyTextDefinition` の nil は「定義なし」)。
+- **プライバシー**: DCS は端末内の辞書を引くだけで通信しない。`Self.trace` / NSLog には語も定義も書いていない。
+- **検証**: `cd mac && swift build -c release` が通った。
+- **得と損**: 得: 英単語の意味 (`meeting` など) が分かる。損: 端末の辞書 (設定で変わる) の最初の 1 文なので、発音記号・品詞が先頭に来る辞書では読みにくいことがある。初めての語は引くのに少し時間がかかる (別のキューなので入力は止まらない)。
+- **未確認**: 実機の注釈の見え方。`kyouhameetingdesu` → 変換 → `meeting` の文節を選んで 1.5 秒 → 辞書の 1 文。`ringo` → 変換 → `apple` を選んで 1.5 秒 → Core の意味が出て、辞書は引かない。設定の「候補の意味を表示」を OFF にすると両方出ない。辞書アプリで英語の辞書を外しても落ちないこと。
+

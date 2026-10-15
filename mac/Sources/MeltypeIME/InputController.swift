@@ -669,13 +669,24 @@ final class MeltypeInputController: IMKInputController {
     private var meaningKey: String?
 
     private func scheduleMeaning(_ view: CompositionView) {
-        let key = view.meaning.map { "\(view.selectedIndex):\($0)" }
+        // Core の意味が無く、選んでいる候補が英字の語なら、macOS の辞書で引く (端末内・通信なし)。
+        let word = view.meaning == nil && view.candidates.indices.contains(view.selectedIndex) ? view.candidates[view.selectedIndex] : nil
+        let dictionaryWord = word.flatMap { CandidateDictionary.isLookupWord($0) ? $0 : nil }
+        let key = view.meaning.map { "\(view.selectedIndex):\($0)" } ?? dictionaryWord.map { "\(view.selectedIndex):dict:\($0)" }
         guard key != meaningKey else { return }
         meaningKey = key
-        guard let key, let meaning = view.meaning else { return }
+        guard let key else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self, self.meaningKey == key, let window = candidatesWindow, window.isVisible() else { return }
-            window.showAnnotation(NSAttributedString(string: meaning))
+            if let meaning = view.meaning {
+                window.showAnnotation(NSAttributedString(string: meaning))
+            } else if let dictionaryWord {
+                // 辞書は別のキューで引く。戻ってきたとき候補が変わっていなければ (meaningKey が同じ) 出す。
+                CandidateDictionary.lookup(dictionaryWord) { [weak self] summary in
+                    guard let self, self.meaningKey == key, let summary, let window = candidatesWindow, window.isVisible() else { return }
+                    window.showAnnotation(NSAttributedString(string: summary))
+                }
+            }
         }
     }
 
