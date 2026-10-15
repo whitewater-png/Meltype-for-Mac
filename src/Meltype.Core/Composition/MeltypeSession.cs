@@ -167,6 +167,7 @@ public sealed class MeltypeSession
         detector.SpellChecker = wordChecker is { IsAvailable: true } ? wordChecker : Detection.BuiltInWordChecker.Shared;
         var languages = LanguageMemory.Shared(AppPaths.LanguageMemoryFile);
         detector.Memory = languages;
+        MeltypeSession? session = null; // options は session より先に作るので、CodeApp は作ったあとの session を見る
         var options = new CompositionOptions
         {
             LiveConversion = () => shared.Current.LiveConversion,
@@ -177,6 +178,8 @@ public sealed class MeltypeSession
             // ATOK スタイルのキー操作。config.json の変更 (「Meltype 辞書」の「設定」タブ) がすぐ効くよう、共有の値を毎回見る。
             TokMode = () => shared.Current.TokMode,
             TabConversion = () => shared.Current.TabConversion,
+            // コード系アプリ (ターミナルなど) の行頭では、コマンド名 (cd・ls・make) を確定で英字にする。設定ではなくアプリの種類で決まる。
+            CodeApp = () => session?.AppProfile == AppProfile.Code,
             // 確定した直後の語を直す Ctrl+' / Ctrl+J。既定は OFF (Ctrl+J はターミナルの改行と重なる)。
             ToggleLastWordCtrlKeys = () => shared.Current.ToggleLastWordCtrlKeys,
             AutoCorrect = () => shared.Current is { AutoCorrectAfterCommit: true, DetectionLevel: not DetectionLevel.Manual },
@@ -209,7 +212,7 @@ public sealed class MeltypeSession
             Braces = () => shared.Current.Braces,
             TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
-        return new MeltypeSession(detector, converter, options, () => shared.Current) { ReadingProvider = reader };
+        return session = new MeltypeSession(detector, converter, options, () => shared.Current) { ReadingProvider = reader };
     }
 
     /// <summary>英数 (直接入力) か。true の間はキーをすべてアプリに渡す (Mac の「英数」キー、「かな」キーで戻す)。</summary>

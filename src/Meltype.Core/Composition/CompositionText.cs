@@ -804,6 +804,13 @@ public sealed class CompositionText
     {
         var frozen = FrozenCount(units);
         var pendingFrozen = PendingFrozen(frozen, units.Count);
+        // コード系アプリの行頭で、打った英字まるごとがコマンド名 (cd・ls・make) なら、打ち終わり (確定・Space・Tab・Enter) だけ英字にする (K79)。
+        // 打っている間は今までの見え方。判定の強さ「手動」・かな入力・語の頭でない (日本語を確定した直後) ときは何も変えない。
+        if (final && frozen == 0 && !pendingFrozen && !KanaInput && EffectiveLevel != DetectionLevel.Manual && PrecedingWordStart && CodeApp() &&
+            string.Concat(units.Select(u => u.Raw)) + Pending is var command && CompositionDetector.CommandNames.Contains(command))
+        {
+            return [new CompositionSegment(true, "", command)];
+        }
         if (frozen == 0 && !pendingFrozen) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final, PrecedingWordStart, PrecedingOpener, CompositionDetector.IsNewlineAfter(PrecedingTail));
         var result = new List<CompositionSegment>();
         void Add(CompositionSegment segment)
@@ -902,6 +909,9 @@ public sealed class CompositionText
     /// 入力欄・自分の確定の記録から Controller が決める。
     /// </summary>
     public string? PrecedingTail { get; set; }
+
+    /// <summary>今のアプリがコード系か (<see cref="CompositionOptions.CodeApp"/>)。Controller が渡す。既定は false (一般アプリ)。</summary>
+    public Func<bool> CodeApp { get; set; } = () => false;
 
     /// <summary>
     /// 先頭が語の頭か: キャレットの前の文字が無い・分からない・空白・開きの記号なら true (<see cref="CompositionDetector.IsWordStartAfter"/>)。

@@ -103,6 +103,12 @@ public sealed class CompositionOptions
     public Func<bool> TabConversion { get; init; } = () => false;
 
     /// <summary>
+    /// 今のアプリがコード系 (ターミナル・エディタ。AppProfile.Code) か。コード系の行頭では、コマンド名 (cd・ls・make) を確定で英字にする (K79)。
+    /// 既定は false (一般アプリでは何も変えない。Windows 側は渡さない)。
+    /// </summary>
+    public Func<bool> CodeApp { get; init; } = () => false;
+
+    /// <summary>
     /// 確定した直後の語を直す Ctrl+' (英字) / Ctrl+J (かな) を、F10 / F6 と同じに読み替えるか (MeltypeSession)。
     /// 既定は false: Ctrl+J はターミナルの改行と重なり、Ctrl は変換ボックスが空ならアプリの操作なので、利用者が選んだときだけ。
     /// </summary>
@@ -330,6 +336,7 @@ public sealed class CompositionController
         _converter = converter;
         _host = host;
         _options = options ?? new CompositionOptions();
+        _text.CodeApp = () => _options.CodeApp();
         _text.Level = () => _options.Level();
         _text.TypoCorrector = _options.RomajiTypos;
         // よく使う日本語の読み (kyouha = 今日は) は、一度英字にして確定しただけでは英語として覚えない。

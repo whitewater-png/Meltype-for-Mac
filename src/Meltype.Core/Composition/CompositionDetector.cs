@@ -965,6 +965,18 @@ public sealed class CompositionDetector
         return false;
     }
 
+    /// <summary>
+    /// コード系アプリの行頭で、打ち終わりに英字のままにするコマンド名 (K79。小文字・完全一致)。今の判定で、Space で変換が始まる・確定で日本語になるものだけを入れる。
+    /// </summary>
+    public static readonly HashSet<string> CommandNames = new(StringComparer.Ordinal)
+    {
+        // 英語と判定されず、Space で変換が始まる (cd・ls・rm・cp・df・sh・gh・rg・fd・jq・wc)・確定で日本語になる (ln → lん、du → づ、vi → ゔぃ、su → す、man → まん、make → まけ、
+        // sudo → すど、open → おぺん、node → ので、go → ご、bun → ぶん、nano → なの、more → もれ、uv → うv、eza → えざ、env → えんv、unalias → うなぃas)
+        "cd", "ls", "rm", "cp", "ln", "du", "df", "vi", "su", "sh", "man", "make", "sudo", "open", "node", "go", "bun", "nano", "more", "gh", "uv", "rg", "fd", "jq", "eza", "wc", "env", "unalias",
+        // 今のテストの英単語の一覧 (同梱) では英語だが、macOS のスペルチェッカーでは日本語になることがある (echo → えちょ、code → こで。実機のトレース)
+        "echo", "code",
+    };
+
     /// <summary>キャレットの前の文字が開きの記号 (`「『(（"'[) ならその記号。無ければ null (保護区間の範囲を閉じの記号までにするため)。</summary>
     public static string? OpenerBefore(string? preceding) =>
         !string.IsNullOrEmpty(preceding) && WordOpeners.ContainsKey(preceding[^1].ToString()) ? preceding[^1].ToString() : null;

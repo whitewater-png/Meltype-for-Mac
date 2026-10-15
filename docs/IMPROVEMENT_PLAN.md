@@ -2504,3 +2504,26 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **検証** (r2): `swift build -c release` 通過、`./build.sh --no-install` 通過、Core 758/758。
 - **実機で確かめること** (リョウさん): ① `hashi` を Space で変換して 1.5 秒 → 候補ウィンドウの右隣に意味 ② Esc・Enter・候補のクリック・Cmd+Tab・入力ソースの切り替えで消える ③ マウスで選択を動かすと消え、また出てこない ④ 画面の右端では左隣に出る ⑤ ダーク・ライト・フルスクリーン・別のディスプレイ ⑥ 設定「候補の意味を表示」を OFF にすると出ない ⑦ `kyouhameetingdesu` → `meeting` の文節で辞書の意味が出る ⑧ 意味が出たまま 5 秒ほど置いても消えない ⑨ 候補が 10 個以上ある語で次のページに送り、1.5 秒待つと出て、すぐには消えない ⑩ 候補ウィンドウが閉じたら、0.3 秒ほどで意味も消える。
 - **未確認**: ダークモード・複数ディスプレイ・フルスクリーン。絵文字・発音記号など高い行があると「2 行 + … + 下に空き」になるかもしれない (査読 R71 任意 2)。右隣に出ること・ライトモード・3 行への折り返しは確認済み。
+
+
+
+## 追加項目 1-5 の代わり (コード系アプリのコマンド名。K79)
+
+- **経緯** (リョウさんの決定、2026-10-15): 1-5「英数モードのままローマ字を見つけて日本語にする」は作らない。実機のトレース (Terminal.app) で分かった 3 点: (1) 変換中の文字が無いとき、Enter・Ctrl+C・F10 は IME に回ってこない。(2) 送った文字も、入力側から置き換えられない。(3) 確定後の F10 / F6 はそもそも効かない (変換中の F10 は届く。K69 を訂正した)。代わりに、1-4c (アプリごとに日本語モードを覚える) と 1-4a (保護区間) で「ターミナルを日本語モードのまま使う」形を良くする。残る大きな穴が K79 (`cd ~/Downloads` で `cd` が英語と判定されず、Space で変換が始まって空白が消える・`make` → まけ)。
+- **実装の要点** (Core のみ。Swift・設定・FFI は変えない):
+  - `CompositionOptions.CodeApp` (`Func<bool>`、既定 false) を足し、`MeltypeSession.CreateDefault` で `AppProfile == AppProfile.Code` を返す (`TokMode`・`TabConversion` と同じ形。設定ではなくアプリの種類)。Windows 側は渡さない (既定 false)。
+  - `CompositionDetector.CommandNames` (小文字・完全一致の `HashSet<string>`)。`CompositionText.SegmentUnits` の先頭で、コード系アプリ・打ち終わり (final: 確定・Space・Tab・Enter)・語の頭 (`PrecedingWordStart`)・かな入力でない・判定の強さが「手動」でない・打った英字まるごと (単位の Raw + 入力途中の子音) が一覧の語、のすべてが揃ったとき、全体を 1 つの英語の区間にする。`SegmentsKey` に `CodeApp` も入れた。打っている間 (final でない) は今までの見え方で、確定で英字になる (1-4a の `--no-edit` と同じ考え方)。
+- **一覧の語と理由** (`--repro` で語 + Space・語 + Enter を試した結果。同梱の英単語の一覧を使った今の判定):
+
+  | 語 | 今の判定 (Space / Enter) |
+  | --- | --- |
+  | `cd` `ls` `rm` `cp` `df` `sh` `gh` `rg` `fd` `jq` `wc` | 英語と判定されず、Space で変換が始まり空白が消える (Enter は英字のまま) |
+  | `ln` `du` `vi` `su` `env` `uv` | lん・づ・ゔぃ・す・えんv・うv (Space で変換が始まり、Enter で日本語) |
+  | `man` `make` `sudo` `open` `node` `go` `bun` `nano` `more` `eza` `unalias` | まん・まけ・すど・おぺん・ので・ご・ぶん・なの・もれ・えざ・うなぃas (Space で変換が始まり、Enter で日本語) |
+  | `echo` `code` | 同梱の一覧では英語 (崩れない) だが、macOS のスペルチェッカーでは えちょ・こで になると実機のトレースで分かったので入れた |
+  | 入れなかった (今の判定でも崩れない) | `mv` `ps` `ip` `deno` `less` `kill` `top` `cat` `tar` `zip` `pip` `npm` `npx` `git` `bat` `brew` `curl` `ssh` `scp` `sed` `awk` `head` `tail` `sort` `find` `grep` `diff` `touch` `chmod` `chown` `which` `where` `export` `source` `exit` `clear` `history` `alias` |
+
+- **検証**: `CommandNameTests` 10 件を足した (一覧を空にした状態で、6 件落ちることを確認: `CodeApp_CommandThenSpace_CommitsEnglishWithSpace`・`CodeApp_CommandThenEnter_CommitsEnglish`・`CodeApp_CommandThenTab_CommitsEnglish`・`CodeApp_TypingCommands_FullLine`・`CodeApp_NotAtWordStart_IsUnchanged`・`CommandNames_AreLowerCaseWordsOnly`。ほかは一般アプリ・打っている途中・一覧と完全一致しない (`makeru` → まける)・手動で今までどおり)。Core 全件 768/768。`eval-compare` は broken 0 / fixed 0 (eval は CodeApp を渡せないので、`mac-terminal.tsv` の `cd ~/Documents/Meltype`・`mac-protected-spans.tsv` の `cd ~/Downloads` は既知の外れのまま。コード系アプリでは `CodeApp_TypingCommands_FullLine` で直っている)。
+- **得と損**: 得: ターミナルを日本語モードのままコマンドが打てる (`cd`・`ls`・`make`・`sudo` が英字で確定し、Space は空白つきの英字で確定)。損: コード系アプリの行頭で一覧の語を日本語として打つ (`make` で「負け」) ときは、F6 などで日本語にする。打っている間は日本語に見えて、確定で英字になる。一般アプリでは何も変わらない。
+- **実機で確かめること** (リョウさん): Terminal.app で日本語モードのまま `cd ~/Downloads`・`ls -la`・`make`・`sudo ls`・`git status`・`kono bagu wo naoshite`。
+- **未確認**: 実機 (Terminal.app・iTerm2・VS Code のターミナル)。macOS のスペルチェッカーでの `echo`・`code` ほか一覧外の語の判定。
