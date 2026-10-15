@@ -942,6 +942,59 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void LearnWhileTyping_F6_LearnsTheEnglishWordNotTheWholeInput()
+    {
+        // 入力中の F6 は、打った英字まるごと (kyouhamergedesu) ではなく、英語だった区間の語 (merge) を日本語として覚える
+        var memory = new LanguageMemory(null);
+        Detector.Memory = memory;
+        try
+        {
+            var k = new Keyboard(languages: memory);
+            k.Type("kyouhamergedesu");
+            Assert.Equal("きょうはmergeです", k.Showing, "前提: 自動で merge が英語の区間");
+            k.Press(VirtualKeys.F6);
+            k.Press(VirtualKeys.Return);
+            Assert.True(memory.Get("merge") == false, "merge を日本語として覚える");
+            Assert.True(memory.Get("kyouhamergedesu") is null, "打った英字まるごとは覚えない");
+            var next = new Keyboard(languages: memory);
+            next.Type("kyouhamergedesu");
+            Assert.True(!(next.Showing ?? "").Contains("merge", StringComparison.Ordinal), "次は merge の区間が日本語: " + next.Showing);
+        }
+        finally
+        {
+            Detector.Memory = null;
+        }
+    }
+
+    [Test]
+    public static void LearnWhileTyping_F10_MixedLearnsNothing_SingleJapaneseLearns()
+    {
+        var memory = new LanguageMemory(null);
+        Detector.Memory = memory;
+        try
+        {
+            var mixed = new Keyboard(languages: memory);
+            mixed.Type("kyouhamergedesu");
+            Assert.Equal("きょうはmergeです", mixed.Showing, "前提: 英語と日本語が混ざる");
+            mixed.Press(VirtualKeys.F10);
+            mixed.Press(VirtualKeys.Return);
+            Assert.Equal(0, memory.Count, "混ざった入力は、どの語を英語にしたいか決められないので覚えない: " + string.Join(",", memory.Entries().Select(e => e.Word)));
+
+            var single = new Keyboard(languages: memory);
+            single.Type("nihongo");
+            Assert.Equal("にほんご", single.Showing, "前提: 日本語 1 区間");
+            single.Press(VirtualKeys.F10);
+            single.Press(VirtualKeys.Return);
+            var learned = memory.Entries().FirstOrDefault(e => e.Word == "nihongo");
+            Assert.True(learned is not null && learned.English, "nihongo を英語として覚える (2 回ルールで有効になるのは 2 回目から)");
+        }
+        finally
+        {
+            Detector.Memory = null;
+        }
+    }
+
+    [Test]
     public static void CommaAfterDigit_IsTouten_UnlessDigitFollows()
     {
         // x64,arm64 の , は読点 (x64、arm64)。1,000 の , は桁区切りのまま。
