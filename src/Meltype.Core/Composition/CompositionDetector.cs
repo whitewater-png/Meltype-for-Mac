@@ -667,8 +667,14 @@ public sealed class CompositionDetector
         }
         // 日本語のすぐ後ろで、助詞 + 英単語 (dochira|mo|user の mouser) は、スペルチェッカーが 1 語と言っても 助詞 + 英単語
         // (同梱の英語の辞書の語は除く)。後ろの英単語の区間は、この後で別に見る。
-        if (before < 0 && Detection.DictionaryDetector.StartsWithParticle(lower) is { } leading && lower.Length - leading.Length >= 3 &&
-            !_english.Words.ContainsWord(lower) && IsKnownEnglishWord(lower[leading.Length..]))
+        // 残りが英単語かは、まず同梱の表だけで見る (#69 の守りと同じ)。スペルチェッカーにも聞くのは、区間全体が同梱の英単語の一覧
+        // (english-words.txt) に無いときだけ (decarbonize のように 助詞 + 語 とも読める珍しい語は、今までどおり分ける)。
+        // 実機の NSSpellChecker は rive・livery・pics を英単語と答えるので、いつも聞くと kyouhaderive が きょうはでりゔぇ、
+        // kyounotopics が きょうのとpics になっていた (K82)。
+        if (before < 0 && !_english.Words.ContainsWord(lower) &&
+            (StartsWithParticleThenEnglishWord(lower) ||
+             (!Detection.BuiltInWordChecker.Shared.IsWord(lower) && Detection.DictionaryDetector.StartsWithParticle(lower) is { } leading &&
+              lower.Length - leading.Length >= 3 && IsKnownEnglishWord(lower[leading.Length..]))))
         {
             return false;
         }

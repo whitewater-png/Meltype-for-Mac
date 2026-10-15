@@ -1351,4 +1351,43 @@ internal static class RomajiTypoTests
             CompositionTests.Detector.SpellChecker = null;
         }
     }
+
+    /// <summary>
+    /// 実機の NSSpellChecker のように、英単語の後ろの断片 (rive・livery・pics・ments) や mouser も英単語と答えるスペルチェッカー
+    /// (同梱の一覧 BuiltIn はどれも答えない)。
+    /// </summary>
+    private sealed class FragmentsAreWordsChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) => lower is "rive" or "livery" or "pics" or "ments" or "mouser" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void K82_ParticlePlusWordGuardAfterJapanese_DoesNotAskTheSpellChecker()
+    {
+        // 実機 (2026-10-16、K82): kyouhaderive が きょうはでりゔぇ になった。日本語のすぐ後ろの 助詞 + 英単語 の守り
+        // (dochira|mo|user) が残りの rive をスペルチェッカーに聞き、実機の NSSpellChecker は rive を英単語と答えるので、
+        // derive が de|rive として分かれていた。守りは同梱の表だけで見る (#69 の守りと同じ)。
+        CompositionTests.Detector.SpellChecker = new FragmentsAreWordsChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("kyouhaderive", "きょうはderive"), ("konoderive", "このderive"), ("kyouhadelivery", "きょうはdelivery"),
+                ("kyounotopics", "きょうのtopics"), ("kyouhamoments", "きょうはmoments"),
+                // 今までどおり分ける: 同梱の表の語 (user・vice・vote) が残りになる 助詞 + 英単語
+                ("dochiramouserga", "どちらもuserが"), ("kyouhanovice", "きょうはのゔぃせ"), ("githubdevote", "githubでvote"),
+                ("derive", "derive"), ("derivewo", "deriveを"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
 }
