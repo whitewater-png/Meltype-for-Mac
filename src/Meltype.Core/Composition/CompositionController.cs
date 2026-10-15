@@ -2455,17 +2455,23 @@ public sealed class CompositionController
         var raw = _text.Raw;
         if (raw.Length < 2 || !raw.All(char.IsAsciiLetter)) return;
         var automatic = _text.Segments(final: true);
+        // 学習の単位は、判定と同じ区間の語 (sushi)。打った英字まるごと (kyouhasushidesu) では、判定で引かれず効かない
+        void RememberWord(string word, bool english)
+        {
+            if (word.Length >= 2) memory.Remember(word, english, explicitChoice: true);
+        }
         switch (_text.Mode)
         {
             case DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric when !automatic.All(s => s.IsEnglish):
-                memory.Remember(raw, english: true, explicitChoice: true);
+                // 日本語の区間が 1 つだけ (英語の区間なし) のときだけ。混ざっていると、どの語を英語にしたいか決められない
+                if (automatic.Count == 1) RememberWord(raw, english: true);
                 break;
             case DisplayMode.Hiragana or DisplayMode.Katakana or DisplayMode.HalfWidthKatakana when automatic.Any(s => s.IsEnglish):
-                memory.Remember(raw, english: false, explicitChoice: true);
+                foreach (var segment in automatic.Where(s => s.IsEnglish)) RememberWord(segment.Raw, english: false);
                 break;
             case DisplayMode.Auto when _text.LevelOverride is not null && automatic.All(s => s.IsEnglish):
                 // 判定の強さが手動で、Tab で提案どおり英字にした。
-                memory.Remember(raw, english: true, explicitChoice: true);
+                foreach (var segment in automatic) RememberWord(segment.Raw, english: true);
                 break;
         }
     }
