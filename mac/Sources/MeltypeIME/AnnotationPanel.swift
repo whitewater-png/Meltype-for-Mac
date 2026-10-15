@@ -27,7 +27,7 @@ final class AnnotationPanel {
     private let maskImage = AnnotationPanel.roundedMask()
 
     /// show が出せなかった理由 (トレース用。語・意味は含めない)。
-    enum Result { case shown, empty, noCandidateWindow, noRoom }
+    enum ShowResult { case shown, empty, noCandidateWindow, noRoom }
 
     private init() {
         label = NSTextField(wrappingLabelWithString: "")
@@ -69,7 +69,7 @@ final class AnnotationPanel {
 
     /// 出せなかったときは隠して、理由を返す。
     @discardableResult
-    func show(_ text: String) -> Result {
+    func show(_ text: String) -> ShowResult {
         guard !text.isEmpty else { hide(); return .empty }
         guard let host = Self.candidateWindow() else { hide(); return .noCandidateWindow }
         label.stringValue = text
