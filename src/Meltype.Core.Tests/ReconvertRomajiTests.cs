@@ -218,8 +218,8 @@ internal static class ReconvertRomajiTests
                 foreach (var selected in new[]
                 {
                     "this is a pen", "I want to go home", "See you tomorrow", "Thank you so much", "He said no to me", "Do you want to go", "Please let me know", "Go to the next page", "no no no", "to go", "me too",
-                    "https://github.com/yksr-melt/Meltype/pull/332", "http://localhost:8080/search?q=hello+world", "/Users/ryo/Downloads/report.pdf", "~/Documents/notes.txt", "C:\\Users\\ryo\\memo.txt", "src/main.rs",
-                    "ryo@example.com", "git commit -m fix", "git push origin main", "npm install -g typescript", "ls -la /tmp", "export PATH=$HOME/bin:$PATH", "const x = 42;", "SELECT * FROM users WHERE id = 1",
+                    "https://github.com/yksr-melt/Meltype/pull/332", "http://localhost:8080/search?q=hello+world", "/Users/bob/Downloads/report.pdf", "~/Documents/notes.txt", "C:\\Users\\bob\\memo.txt", "src/main.rs",
+                    "bob@example.com", "git commit -m fix", "git push origin main", "npm install -g typescript", "ls -la /tmp", "export PATH=$HOME/bin:$PATH", "const x = 42;", "SELECT * FROM users WHERE id = 1",
                     "README.md", ".gitignore", "v1.2.3", "a3f9c1d", "azooKey", "iPhone", "GitHub", "TanakaMakoto", "OK", "WIFI", "123", "3.14", "a+b", "...", "!!!", "   ",
                     // 英単語の端が 1 音だけかなに読める (Take|shi、by|F|ri|day): かなが 2 つ以上読めるものだけを日本語の証拠にする
                     "I met Takeshi yesterday", "Tell Takeshi about the plan", "I will send the report by Friday.", "abc",
@@ -796,7 +796,7 @@ internal static class ReconvertRomajiTests
                 foreach (var body in new[]
                 {
                     "Thanks, Kenji!", "this is a pen", "I want to go home", "See you tomorrow", "Hello, my name is Ryo.", "I met Takeshi yesterday", "Tanaka Makoto",
-                    "git commit -m fix", "export PATH=$HOME/bin:$PATH", "const x = 42;", "ls -la /tmp", "SELECT * FROM users WHERE id = 1", "C:\\Users\\ryo\\memo.txt report.pdf",
+                    "git commit -m fix", "export PATH=$HOME/bin:$PATH", "const x = 42;", "ls -la /tmp", "SELECT * FROM users WHERE id = 1", "C:\\Users\\bob\\memo.txt report.pdf",
                 })
                 {
                     foreach (var (lead, trail) in new[] { ("", "\n"), ("\n", ""), ("", "\r\n"), ("", "\t"), ("\n", "\n"), (" ", " \n ") })
@@ -823,7 +823,7 @@ internal static class ReconvertRomajiTests
             CompositionTests.Detector.SpellChecker = checker;
             try
             {
-                foreach (var body in new[] { "Takeshi", "GitHub", "README.md", "ryo@example.com", "https://github.com/yksr-melt/Meltype/pull/332", "/Users/ryo/Downloads/report.pdf", "kyou", "sdkto", "Kyouha", "OK" })
+                foreach (var body in new[] { "Takeshi", "GitHub", "README.md", "bob@example.com", "https://github.com/yksr-melt/Meltype/pull/332", "/Users/bob/Downloads/report.pdf", "kyou", "sdkto", "Kyouha", "OK" })
                 {
                     var plain = CreateWithOsReading();
                     plain.ReadingProvider = text => text.Trim() is "Takeshi" ? "たけし" : null;

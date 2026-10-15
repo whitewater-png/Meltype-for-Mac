@@ -99,7 +99,7 @@ class Report:
                 text = text.replace(m, "<path>")
         # 念のため: ホームフォルダー・一時フォルダー配下とみられる絶対パスは伏せる
         text = re.sub(r"/(?:Users|private|var|Volumes|tmp)/[^\s'\"),;]+", "<path>", text)
-        text = re.sub(r"<path>(?:/[A-Za-z0-9._@%+=~-]+)+", "<path>", text)  # 置き換えたパスの続き (/.hermes/... など。ASCII のところまで) も伏せる
+        text = re.sub(r"<path>(?:/[A-Za-z0-9._@%+=~-]+)+", "<path>", text)  # 置き換えたパスの続き (/<フォルダー>/... など。ASCII のところまで) も伏せる
         return text
 
     def section(self, title):
