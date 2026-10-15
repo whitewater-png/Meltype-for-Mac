@@ -238,6 +238,7 @@ final class MeltypeInputController: IMKInputController {
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
         if tag == kTextServiceInputModePropertyTag, let mode = value as? String {
             let changed = mode != currentMode
+            Self.trace("setValue mode=\(mode) changed=\(changed) acted=\(userActedSinceActivation) bundle=\(bundleID ?? "nil")")
             applyMode(mode, client: (sender as? IMKTextInput) ?? (self.client() as? IMKTextInput))
             // 覚えるのは、この入力欄でキーを打ったあとに、モードが実際に変わったときだけ。入力欄・アプリの切り替えでシステムが呼ぶ setValue
             // (今のモードの合わせ直し) を、利用者の選択として覚えない (R51-M1)。損: 入力欄に来てすぐ、何も打たずに入力メニューで選んだときは覚えない。
@@ -271,7 +272,12 @@ final class MeltypeInputController: IMKInputController {
         if appKind == .code, let bundleID, let mode = Self.rememberedModes[bundleID] {
             applyMode(mode, client: nil)
             (sender as? IMKTextInput)?.selectMode(mode)
+        } else if appKind == .code {
+            // 覚えた記録の無いコード系アプリは、本体 (setApp) が英数にしている。currentMode もそれに合わせ、入力メニューで「Meltype」を
+            // 選び直したとき (表示は Meltype・動きは英数の状態) に、モードが変わったとして覚えられるようにする (R53 推奨 1)。selectMode は呼ばない。
+            currentMode = Self.romanModeID
         }
+        Self.trace("activateServer bundle=\(bundleID ?? "nil") kind=\(appKind) mode=\(currentMode ?? "nil")")
         super.activateServer(sender)
     }
 
@@ -283,6 +289,10 @@ final class MeltypeInputController: IMKInputController {
     }
 
     override func deactivateServer(_ sender: Any!) {
+        // 入力欄を離れたら、利用者の操作の印も戻す。戻ってきたとき activateServer より前に来る setValue (システムの合わせ直し) を、
+        // 前の入力欄で打ったキーのせいで利用者の選択と取り違えないため (R53 必須 1)。
+        userActedSinceActivation = false
+        Self.trace("deactivateServer bundle=\(bundleID ?? "nil")")
         commitComposition(sender)
         candidatesWindow?.hide()
         super.deactivateServer(sender)

@@ -116,7 +116,7 @@ Meltype キーボードの使用中は Windows の IME を OFF にしている�
 - 「コード」のアプリでも、チャット・AI への入力欄 (VS Code の Copilot Chat、Claude Code の画面など。UI Automation の名前に chat / copilot / claude / prompt / message などが入るもの) は一般として扱う。VS Code・Cursor などの Electron 製のエディターは入力欄の種類が多いので、エディター・ターミナル・検索と分かるものだけをコードとする
 - ターミナルで動く AI の入力行 (Claude Code・Gemini CLI の「> 」、Codex の「› 」) は日本語を判定する。ターミナルでは改行のたびにプロンプト (出力) を読み直す。ターミナルで 半角/全角 を押して日本語にしたら、別の場所に移るまで日本語のまま
 - IME 自動切替モードでも、コードの中では判定しない
-- Mac: コード系アプリ (Terminal・iTerm2・WezTerm・VS Code・VSCodium・Xcode・IntelliJ IDEA・PyCharm・WebStorm・PhpStorm・RubyMine・DataGrip・CLion・GoLand・Rider・Android Studio など。RustRover・Fleet・EAP 版は入っていない) は英数から始まる。英数キー・かなキー・入力メニュー・Caps Lock でモードを変えると、そのアプリの分を覚え、ほかのアプリから戻ったときもそのモードのまま (覚えるのは Meltype が動いている間だけ。再起動すると英数から)
+- Mac: コード系アプリ (Terminal・iTerm2・WezTerm・VS Code・VSCodium・Xcode・IntelliJ IDEA・PyCharm・WebStorm・PhpStorm・RubyMine・DataGrip・CLion・GoLand・Rider・Android Studio など。RustRover・Fleet・EAP 版は入っていない) は英数から始まる。その入力欄でキーを打ったあとに、英数・かなキー・入力メニュー・Caps Lock でモードを変えると、そのアプリの分を覚え、ほかのアプリから戻ったときもそのモードのまま (覚えるのは Meltype が動いている間だけ。再起動すると英数から)。ターミナルでは「セキュアキーボード入力」(Terminal・iTerm2 のメニュー) を ON にするか、パスワードの前に英数キーを押す
 
 ### 絵文字・顔文字
 
