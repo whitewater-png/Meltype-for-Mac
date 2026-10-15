@@ -195,8 +195,10 @@ public sealed class CompositionDetector
     /// <param name="level">判定の強さ。手動 (Manual) では Shift で打った大文字始まりの語だけを英語にする。</param>
     /// <param name="englishSentence">キャレットの前が英文 (空白で区切った英単語が 2 語以上続いて空白で終わる: "I want ")。
     /// 日本語の文の中の英単語 (GitHub の) より強い英語の根拠として扱う。</param>
+    /// <param name="startsWord">先頭の単位が語の頭か (キャレットの前が無い・分からない・空白・開きの記号)。保護区間 (/tmp/foo・--no-install) は語の頭からだけ守る。
+    /// 日本語を確定した直後の /fuka は語の頭ではない。<see cref="IsWordStartAfter"/> で決める。</param>
     public IReadOnlyList<CompositionSegment> Segment(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish = null, bool? followingEnglish = null,
-        DetectionLevel level = DetectionLevel.Balanced, bool englishSentence = false, bool kanaInput = false, bool final = false)
+        DetectionLevel level = DetectionLevel.Balanced, bool englishSentence = false, bool kanaInput = false, bool final = false, bool startsWord = true)
     {
         // 先頭の z + h/j/k/l の矢印 (zh = ←) は、英語かどうかを判定せず日本語の区間にする。
         // (macOS のスペルチェッカーは zh を英単語と答えるので、判定に回すと矢印が元の綴りに戻る。先頭の zhang・zlib は CompositionText が矢印を取り消して英字に戻す)
@@ -206,7 +208,8 @@ public sealed class CompositionDetector
         {
             var arrowSegment = Japanese(units, 0, arrows, "");
             if (arrows == units.Count && pending.Length == 0) return [arrowSegment];
-            return [arrowSegment, .. Segment([.. units.Skip(arrows)], pending, precedingEnglish, followingEnglish, level, englishSentence, kanaInput, final)];
+            // 矢印のあとは語の頭ではない (直前の単位が空白ではない)
+            return [arrowSegment, .. Segment([.. units.Skip(arrows)], pending, precedingEnglish, followingEnglish, level, englishSentence, kanaInput, final, startsWord: false)];
         }
         // 記号を混ぜて書く名前・略語 (B.o.B、U.S.A.、Chri$tian、Ke$ha) は、入力全体がその形のときだけ英字のまま 1 語にする (本家 #303・PR #315)。
         // 英単語に見えないので、FindSpans (日本語の打ちかけとして B.お。B などに区切る) や P29 の DotSuffixEnd には回さない。
@@ -214,12 +217,12 @@ public sealed class CompositionDetector
         {
             return [new CompositionSegment(true, "", stylized)];
         }
-        var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final);
+        var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, startsWord: startsWord);
         if (kanaInput) return segments;
         // 英語の後ろの , . は半角にしたが、すぐ後ろに日本語が続いた (Ok,konnna → Ok、こんな) なら、日本語の文の句読点にして分け直す。
         if (PunctuationBeforeJapanese(units, segments) is { } japanesePunctuation)
         {
-            segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation);
+            segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation, startsWord);
         }
         // 辞書にない英単語 (stackoverflow など) を最初から打っているなら全体を英語にする。
         // 途中の区間 (… flow) だけを英語にすると「sたcこvえrflow」のようになってしまう。
@@ -293,7 +296,7 @@ public sealed class CompositionDetector
     }
 
     private List<CompositionSegment> FindSpans(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish, bool? followingEnglish, DetectionLevel level, bool englishSentence, bool kanaInput, bool final,
-        HashSet<int>? japanesePunctuation = null)
+        HashSet<int>? japanesePunctuation = null, bool startsWord = true)
     {
         var n = units.Count;
         var segments = new List<CompositionSegment>();
@@ -307,18 +310,24 @@ public sealed class CompositionDetector
         bool EnglishWordBefore(int start) => start == 0 ? precedingEnglish == true
             : segments.Count > 0 && segments[^1].IsEnglish && Enumerable.Range(japaneseStart, start - japaneseStart).All(k => IsAsciiSymbol(units[k]) || units[k].Raw.All(char.IsWhiteSpace));
         var i = 0;
+        var bracketCloser = -1;
         while (i < n)
         {
             var found = -1;
             // 保護区間 (パス・オプション・変数) は、語の頭から空白まで英字のまま (1-4a)。以下の判定より先に決める。
-            var protectedEnd = !kanaInput && level != DetectionLevel.Manual ? ProtectedEnd(units, i, pending, final, EnglishWordBefore) : -1;
-            if (protectedEnd >= 0) found = protectedEnd;
+            var protectedEnd = !kanaInput && level != DetectionLevel.Manual ? ProtectedEnd(units, i, pending, final, startsWord, EnglishWordBefore) : -1;
+            if (protectedEnd >= 0)
+            {
+                found = protectedEnd;
+                // [~/Documents] の ] は範囲に入れず、日本語の 」 のまま (下の「英語の後ろの記号は半角」に回さない)
+                if (i > 0 && units[i - 1].Raw == "[" && protectedEnd < n && units[protectedEnd].Raw == "]") bracketCloser = protectedEnd;
+            }
             // ドメイン・拡張子の . の後ろは、ローマ字として読めても英字のままにする (tetr.io、Wakatte.TV、MeltypeTip.dll)。
             // (本家 yksr-melt/Meltype の PR #267 / issue #260・#254 と同じ変更)
             if (found < 0 && !kanaInput && level != DetectionLevel.Manual && i > 0 && units[i - 1].Raw == "." && PrecededByEnglish(i) == true) found = DotSuffixEnd(units, i, pending, final);
             // 英文の中の記号 (, . ! ? -) は読点・句点にせず半角のまま。日本語の文の中の英単語の後 (今日はgoogle、) は日本語の記号。
             // (かな入力では 、。 も かなのキーなので対象外)
-            if (found < 0 && !kanaInput && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&
+            if (found < 0 && !kanaInput && i != bracketCloser && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&
                 japanesePunctuation?.Contains(i) != true) found = i + 1;
             if (!kanaInput && found < 0) found = UserNameEnd(units, i, pending);
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = CapitalizedWordEnd(units, i, pending, final);
@@ -925,22 +934,56 @@ public sealed class CompositionDetector
         return HyphenPrefixes.Contains(lower[..dash]) && rest.Length >= 3 && rest.All(char.IsAsciiLetterLower) && IsKnownEnglishWord(rest);
     }
 
+    /// <summary>語の頭になる開きの記号 (`「『(（"'[) と、対応する閉じの記号。</summary>
+    private static readonly Dictionary<string, string> WordOpeners = new()
+    {
+        ["`"] = "`", ["「"] = "」", ["『"] = "』", ["("] = ")", ["（"] = "）", ["\""] = "\"", ["'"] = "'", ["["] = "]",
+    };
+
+    /// <summary>打った 1 単位が空白か開きの記号なら、その次は語の頭。</summary>
+    internal static bool IsWordBoundaryRaw(string raw) => raw.Length > 0 && (raw.All(char.IsWhiteSpace) || WordOpeners.ContainsKey(raw));
+
     /// <summary>
-    /// 保護区間 (1-4a): 語の頭 (入力の先頭か空白の後) から始まる パス・オプション・変数 の終わり (単位の位置)。無ければ -1。
+    /// キャレットの前の確定済みの文字列の次が語の頭か (保護区間を始めてよいか)。
+    /// 前の文字が無い・分からない (null・空)・空白・開きの記号なら語の頭。それ以外 (日本語を確定した直後の /fuka) は語の途中。
+    /// </summary>
+    public static bool IsWordStartAfter(string? preceding) =>
+        string.IsNullOrEmpty(preceding) || char.IsWhiteSpace(preceding[^1]) || WordOpeners.ContainsKey(preceding[^1].ToString());
+
+    /// <summary>
+    /// 保護区間 (1-4a): 語の頭 (入力の先頭か空白・開きの記号の後) から始まる パス・オプション・変数 の終わり (単位の位置)。無ければ -1。
+    /// 入力の先頭 (start == 0) が語の頭かは startsWord で決める (直前に日本語を確定した直後の /fuka・/iie を守らないため)。
     /// ・パス: ./ ../ ~/ のあとか、/ のあとにパスの要素が続く (a/b・1/2・/// は守らない)。パスの判定は本家 1.2.1 の ProtectedSpanScanner.TryPosixPath
-    ///   (GPL-3.0、Copyright (C) 2026 0924haruto12) と同じ規則。範囲は本家と違い、空白まで。
-    /// ・オプション (Mac 独自): -- + 英字は常に。- + 英字は、ローマ字として読めない (-xzvf)・大文字を含む (-Wall)・1〜2 文字で終わる (-la)・直前が英語 (find . -name) のとき。
+    ///   (GPL-3.0-or-later、Copyright (C) 2026 0924haruto12) と同じ規則。範囲は本家と違い、空白まで。
+    /// ・オプション (Mac 独自): - + 英字は、ローマ字として読めない (-xzvf)・大文字を含む (-Wall)・1〜2 文字で終わる (-la)・直前が英語 (find . -name) のとき。
+    ///   -- + 英字 (小説・台詞の「ーー」と同じ打ち方) も同じく絞る: 後ろに - か = を含む (--no-install・--color=auto)・ローマ字として読めない (--help・--force)・
+    ///   大文字を含む・直前が英語のときだけ。--sorekara・--sate は守らない。
     /// ・変数 (Mac 独自): $ のあとが英字か { ($HOME、${PATH}。$100 は守らない)。
-    /// 範囲は空白か入力の終わりまで。ただしパス・変数の最後の要素が拡張子付きなら、<see cref="DotSuffixEnd"/> の終わりで止める
+    /// 範囲は空白か入力の終わりまで。開きの記号の直後から始まったときは、対応する閉じの記号まで (`./build.sh` wo → `./build.sh` を)。
+    /// ただしパス・変数の最後の要素が拡張子付きなら、<see cref="DotSuffixEnd"/> の終わりで止める
     /// (./build.shde → ./build.sh|で)。拡張子が無ければ空白まで英字のまま (/tmp/fooni)。
     /// </summary>
-    private int ProtectedEnd(IReadOnlyList<CompositionUnit> units, int start, string pending, bool final, Func<int, bool> englishWordBefore)
+    private int ProtectedEnd(IReadOnlyList<CompositionUnit> units, int start, string pending, bool final, bool startsWord, Func<int, bool> englishWordBefore)
     {
         static bool IsSpace(CompositionUnit unit) => unit.Raw.Length > 0 && unit.Raw.All(char.IsWhiteSpace);
         var n = units.Count;
-        if (units[start].Raw.Length == 0 || IsSpace(units[start]) || start > 0 && !IsSpace(units[start - 1])) return -1;
+        if (units[start].Raw.Length == 0 || IsSpace(units[start]) || !(start == 0 ? startsWord : IsWordBoundaryRaw(units[start - 1].Raw))) return -1;
         var wordEnd = start;
         while (wordEnd < n && !IsSpace(units[wordEnd])) wordEnd++;
+        // 開きの記号の直後なら、範囲は対応する閉じの記号まで (閉じの記号も含める)。閉じが無ければ空白まで。
+        var closeAt = -1;
+        if (start > 0 && WordOpeners.TryGetValue(units[start - 1].Raw, out var closer))
+        {
+            for (var k = start; k < wordEnd; k++)
+            {
+                if (units[k].Raw != closer) continue;
+                closeAt = k;
+                wordEnd = k;
+                break;
+            }
+        }
+        // [ ] は日本語の入力では「」になるので、閉じの ] は範囲に入れず、日本語の区間に残す (「~/Documents」を)。ほかの閉じの記号は半角のまま範囲に入れる
+        int Finish(int end) => closeAt >= 0 && end == closeAt && units[start - 1].Raw != "[" ? closeAt + 1 : end;
         var word = Raw(units, start, wordEnd) + (wordEnd == n ? pending : "");
         if (word.Length < 2) return -1;
         static bool ElementStart(char c) => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '~';
@@ -952,32 +995,38 @@ public sealed class CompositionDetector
         var isOption = false;
         if (word[0] == '-' && char.IsAsciiLetter(word[1]) || word.StartsWith("--", StringComparison.Ordinal) && word.Length >= 3 && char.IsAsciiLetter(word[2]))
         {
-            if (word[1] == '-') isOption = true;
+            var dashes = word[1] == '-' ? 2 : 1;
+            var letters = new string(word.Skip(dashes).TakeWhile(char.IsAsciiLetter).ToArray());
+            var unreadable = !_romaji.AnalyzeFragment(letters.ToLowerInvariant()).IsValid;
+            if (dashes == 2)
+            {
+                // -- は小説・台詞の「ーー」(--sorekara) にも使うので、- と同じく絞る。--name のようなローマ字として読めるオプションは英語の後ろでだけ守る
+                isOption = word.IndexOfAny(['-', '='], 2) >= 0 || unreadable || letters.Any(char.IsAsciiLetterUpper) || englishWordBefore(start);
+            }
             else
             {
-                var letters = new string(word.Skip(1).TakeWhile(char.IsAsciiLetter).ToArray());
-                isOption = !_romaji.AnalyzeFragment(letters.ToLowerInvariant()).IsValid || letters.Any(char.IsAsciiLetterUpper)
+                isOption = unreadable || letters.Any(char.IsAsciiLetterUpper)
                     || letters.Length <= 2 && letters.Length == word.Length - 1 || englishWordBefore(start);
             }
         }
         if (!isPath && !isVariable && !isOption) return -1;
-        if (isOption) return wordEnd;
+        if (isOption) return Finish(wordEnd);
         // 最後の要素が拡張子付き (最初の . が要素の先頭ではない) なら、拡張子の終わりまで。後ろの助詞は今までどおり判定する。
         var elementStart = word.LastIndexOf('/') + 1;
-        if (elementStart + 1 >= word.Length) return wordEnd;
+        if (elementStart + 1 >= word.Length) return Finish(wordEnd);
         var dot = word.IndexOf('.', elementStart + 1);
-        if (dot < 0 || dot + 1 >= word.Length) return wordEnd;
+        if (dot < 0 || dot + 1 >= word.Length) return Finish(wordEnd);
         var offset = 0;
         for (var k = start; k < wordEnd; k++)
         {
             if (offset == dot && units[k].Raw == ".")
             {
                 var end = k + 1 < n ? DotSuffixEnd(units, k + 1, pending, final) : -1;
-                return end > k + 1 && end <= wordEnd ? end : wordEnd;
+                return Finish(end > k + 1 && end <= wordEnd ? end : wordEnd);
             }
             offset += units[k].Raw.Length;
         }
-        return wordEnd;
+        return Finish(wordEnd);
     }
 
     /// <summary>

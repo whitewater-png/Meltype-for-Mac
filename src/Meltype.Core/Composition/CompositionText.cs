@@ -788,7 +788,7 @@ public sealed class CompositionText
         key.Append('\u0003').Append(_pending).Append('\u0003')
             .Append(PrecedingEnglish switch { true => 'E', false => 'J', null => '-' })
             .Append(FollowingEnglish switch { true => 'E', false => 'J', null => '-' })
-            .Append(PrecedingEnglishSentence ? 'S' : '-').Append(KanaInput ? 'K' : '-').Append(final ? 'F' : '-')
+            .Append(PrecedingEnglishSentence ? 'S' : '-').Append(PrecedingWordStart ? 'W' : '-').Append(KanaInput ? 'K' : '-').Append(final ? 'F' : '-')
             .Append((int)EffectiveLevel).Append(':').Append(_detector.Memory?.Version ?? -1);
         return key.ToString();
     }
@@ -804,7 +804,7 @@ public sealed class CompositionText
     {
         var frozen = FrozenCount(units);
         var pendingFrozen = PendingFrozen(frozen, units.Count);
-        if (frozen == 0 && !pendingFrozen) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final);
+        if (frozen == 0 && !pendingFrozen) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final, PrecedingWordStart);
         var result = new List<CompositionSegment>();
         void Add(CompositionSegment segment)
         {
@@ -821,7 +821,9 @@ public sealed class CompositionText
         {
             var precedingEnglish = result[^1].IsEnglish;
             foreach (var segment in _detector.Segment([.. units.Skip(frozen)], Pending, precedingEnglish, FollowingEnglish, EffectiveLevel,
-                         PrecedingEnglishSentence && precedingEnglish, KanaInput, final)) Add(segment);
+                         PrecedingEnglishSentence && precedingEnglish, KanaInput, final,
+                         // 1 音確定のあとの続きは、直前の単位が空白・開きの記号のときだけ語の頭 (確定した 1 音の直後の /ashita は守らない)
+                         CompositionDetector.IsWordBoundaryRaw(units[frozen - 1].Raw))) Add(segment);
         }
         return result;
     }
@@ -881,7 +883,7 @@ public sealed class CompositionText
     public string? Suggestion()
     {
         if (Mode != DisplayMode.Auto || EffectiveLevel != DetectionLevel.Manual || IsNumeric) return null;
-        var suggested = _detector.Segment(_units, Pending, PrecedingEnglish, FollowingEnglish, DetectionLevel.Balanced, PrecedingEnglishSentence, KanaInput);
+        var suggested = _detector.Segment(_units, Pending, PrecedingEnglish, FollowingEnglish, DetectionLevel.Balanced, PrecedingEnglishSentence, KanaInput, startsWord: PrecedingWordStart);
         if (!suggested.Any(s => s.IsEnglish) || suggested.SequenceEqual(Segments())) return null;
         return string.Join(" ", suggested.Where(s => s.IsEnglish).Select(s => s.Raw));
     }
@@ -894,6 +896,12 @@ public sealed class CompositionText
 
     /// <summary>キャレットの前が英文の途中 ("I want ") か。日本語の文の中の英単語 (GitHub の) より強い英語の根拠。</summary>
     public bool PrecedingEnglishSentence { get; set; }
+
+    /// <summary>
+    /// 先頭が語の頭か: キャレットの前の文字が無い・分からない・空白・開きの記号なら true (<see cref="CompositionDetector.IsWordStartAfter"/>)。
+    /// 保護区間 (パス・オプション・変数) は語の頭からだけ守る。日本語を確定した直後の /fuka は守らない。
+    /// </summary>
+    public bool PrecedingWordStart { get; set; } = true;
 
     /// <summary>キャレットの後ろの文字が英語なら true、日本語なら false、分からなければ null。</summary>
     public bool? FollowingEnglish { get; set; }
