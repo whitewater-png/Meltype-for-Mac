@@ -149,21 +149,48 @@ internal static class TabConversionTests
     }
 
     [Test]
+    public static void BackspaceBackToSpaceConversion_TabCommitsAndPassesTab()
+    {
+        // Tab で始めた変換を BackSpace で戻していき、Space で始めた変換に戻ったあとの Tab は、確定して Tab を渡す (次の候補にはならない)
+        var k = new CompositionTests.Keyboard { TabConversion = true, Continue = true };
+        k.Type("kana ");
+        k.Type("ha");
+        k.Press(VirtualKeys.Tab);
+        Assert.True(k.Host.View?.Converting == true, "前提: Tab で変換が始まる");
+        k.Press(VirtualKeys.Back);
+        k.Press(VirtualKeys.Back);
+        Assert.True(k.Host.View?.Converting == true, "前提: かなの文節が変換中に戻る");
+        Assert.True(!k.Host.Events.Any(e => e == "down:09"), string.Join("|", k.Host.Events));
+        k.Press(VirtualKeys.Tab);
+        Assert.True(k.Host.Events.Contains("down:09"), "Tab がアプリに渡る: " + string.Join("|", k.Host.Events));
+        Assert.True(k.Host.View?.Converting != true, "確定している");
+    }
+
+    [Test]
     public static void WithTokMode_OneSoundCommitThenTabStillConverts()
     {
-        // 1 音確定 (Shift+↓) のあとの残りも、Tab で変換を始められ、続けて Tab で次の候補になる
-        var k = new CompositionTests.Keyboard { TabConversion = true, TokMode = true };
-        k.Type("kyouha");
-        k.Key(VirtualKeys.LShift);
-        k.Press(VirtualKeys.Down);
-        k.Key(VirtualKeys.LShift, up: true);
-        Assert.Equal("きょ", k.Host.Document, "前提: 1 音確定");
-        k.Press(VirtualKeys.Tab);
-        Assert.True(k.Host.View?.Converting == true, "残りの変換が始まる");
+        // 1 音確定 (Shift+↓) のあとの残りも、Tab で変換を始められ、続けて Tab で次の候補になる (候補が 2 つ以上出る入力)
+        static CompositionTests.Keyboard Start(int startKey)
+        {
+            var k = new CompositionTests.Keyboard { TabConversion = true, TokMode = true };
+            k.Type("kihashi");
+            k.Key(VirtualKeys.LShift);
+            k.Press(VirtualKeys.Down);
+            k.Key(VirtualKeys.LShift, up: true);
+            Assert.Equal("き", k.Host.Document, "前提: 1 音確定");
+            k.Press(startKey);
+            Assert.True(k.Host.View?.Converting == true, "残りの変換が始まる");
+            return k;
+        }
+        var k = Start(VirtualKeys.Tab);
+        Assert.True(k.Host.View!.Candidates.Count >= 2, "前提: 候補が 2 つ以上: " + string.Join(",", k.Host.View.Candidates));
         var first = k.Showing;
         k.Press(VirtualKeys.Tab);
-        Assert.True(k.Showing != first || k.Host.View?.Converting == true, "Tab は次の候補");
+        Assert.True(k.Showing != first, "Tab は次の候補");
         Assert.True(!k.Host.Events.Any(e => e == "down:09"), string.Join("|", k.Host.Events));
+        var bySpace = Start(VirtualKeys.Space);
+        bySpace.Press(VirtualKeys.Space);
+        Assert.Equal(bySpace.Showing, k.Showing, "Space 2 回と同じ候補");
     }
 
     [Test]

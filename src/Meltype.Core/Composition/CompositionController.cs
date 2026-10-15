@@ -1151,6 +1151,7 @@ public sealed class CompositionController
         _reconvertOriginal = null;
         _reconvertRomaji = false;
         _firstSoundCommitted = false;
+        _tabStartedConversion = false;
         _toggleBox = null;
         var id = ++_compositionId;
         // 自分が確定した直後は、アプリ側のテキストがまだ更新されていないかもしれないので自分の記録を信じる。
@@ -1431,6 +1432,7 @@ public sealed class CompositionController
                 return true;
             case VirtualKeys.Back:
             case VirtualKeys.Escape:
+                _tabStartedConversion = false;
                 if (_headCount > 0)
                 {
                     // 未変換の文節の変換だけを取り消す (Backspace)。Esc、または未変換の文節が無いときは、固定した文節も変換前の読みに戻す。
@@ -3171,7 +3173,7 @@ public sealed class CompositionController
         }
         else
         {
-            var hint = _text.IsAlphanumeric ? "Enter 確定　Space 確定+空白　Shift+Space 日本語で変換　半角/全角 日本語に" : "Space 変換　←→ 文節　Enter 確定　F7 カタカナ　F8 半角カナ　F10 英字";
+            var hint = _text.IsAlphanumeric ? "Enter 確定　Space 確定+空白　Shift+Space 日本語で変換　半角/全角 日本語に" : (_options.TabConversion() ? "Space/Tab 変換" : "Space 変換") + "　←→ 文節　Enter 確定　F7 カタカナ　F8 半角カナ　F10 英字";
             if (_options.TokMode() && _headCount == 0) hint += "　Shift+↓ 1音確定";
             if (_text.Suggestion() is { } suggestion) hint = $"Tab → {suggestion} (英字に)　" + hint;
             RefreshPredictions();
