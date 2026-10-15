@@ -1040,9 +1040,9 @@ public sealed class CompositionController
             case VirtualKeys.F8: SetMode(DisplayMode.HalfWidthKatakana); return;
             case VirtualKeys.F9: SetMode(DisplayMode.FullWidthAlphanumeric); return;
             case VirtualKeys.F10: SetMode(DisplayMode.HalfWidthAlphanumeric); return;
-            case VirtualKeys.Down when _options.TokMode() && _headCount == 0 && (_swallowedShift.Count > 0 || _host.IsShiftDown()):
+            case VirtualKeys.Down when _options.TokMode() && _headCount == 0 && _toggleBox is null && (_swallowedShift.Count > 0 || _host.IsShiftDown()):
                 // ATOK スタイル (TokMode) の Shift+↓: 先頭の 1 音だけ確定し、残りは入力のまま (1 音確定)。
-                // OFF のとき・変換中・固定した文節があるときは今までどおり。
+                // OFF のとき・変換中・固定した文節があるとき・確定後の F6 で開いた変換ボックスの中 (F10 / Esc で元の語に戻すので、一部だけ確定すると二重になる。R47-1) は今までどおり。
                 CommitFirstSound();
                 return;
             case VirtualKeys.Left or VirtualKeys.Right or VirtualKeys.Up or VirtualKeys.Down when !_text.IsAlphanumeric:

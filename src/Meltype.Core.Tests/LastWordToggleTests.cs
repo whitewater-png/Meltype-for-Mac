@@ -665,4 +665,21 @@ internal static class LastWordToggleTests
         Assert.Equal("ははは", e.Doc);
         Assert.True(e.Memory.Get("haha") is null, "haha を覚えない");
     }
+
+    [Test]
+    public static void ToggleBox_ShiftDown_DoesNotCommitTheFirstSound()
+    {
+        // R47-1: 確定後の F6 で開いた変換ボックスでは、Shift+↓ で 1 音確定しない (F10 / Esc で元の語に戻すので、一部だけ確定すると あamazon のように二重になる)
+        var e = new Editor(tokMode: true);
+        e.Type("amazon\n");
+        Assert.Equal("amazon", e.Doc, "前提: 自動で英語として確定");
+        Assert.True(e.F6().Consumed && e.Session.IsComposing, "前提: 確定後の F6 で変換ボックス");
+        e.Key(VirtualKeys.Back);
+        e.Key(VirtualKeys.Down, null, shift: true);
+        Assert.Equal("", e.Doc, "変換ボックスの中では 1 音確定しない (入力欄は空のまま): " + e.Doc);
+        e.F10();
+        e.Enter();
+        Assert.True(!e.Doc.Contains("あ", StringComparison.Ordinal) && e.Doc.Contains("amazon", StringComparison.Ordinal), "二重にならない: " + e.Doc);
+        Assert.True(e.Memory.Get("amazon") is not false, "日本語として覚えない");
+    }
 }
