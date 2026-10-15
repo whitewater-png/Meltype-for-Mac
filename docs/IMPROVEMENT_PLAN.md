@@ -1977,7 +1977,7 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
   1. `showModeAnnotation` は `view.meaning != nil` のとき何も書かない。注釈付きの候補 (学習で 2 番目に来た英訳、末尾の全角) から意味付きの候補 (先頭候補は 3,000 読みの 25% に意味がある) へ動くと、「あ ・ 英訳」が最大 1.5 秒残るおそれがある (IMK が選択の変更で注釈を消すかは未確認)。学習後・折り返しで起きる。
   2. そもそも今の「あ」の注釈が実機で見えるか自体が未検証 (`IMPROVEMENT_PLAN` にも「注釈の表示が出るか」は未検証と記載)。見えなければ Swift の数行は効果が無い。
   3. マウスで候補を選んだときは `candidateSelectionChanged` が番号だけ覚えて注釈を更新しない。
-  - 保留した Swift 案は **`scratch/p39v2/P39-swift-held.patch`** (HEAD 基準、41 行、当てていない。将来の再開用)。再開するときは、先に下の「再開手順」の 1 を実機で確かめる。
+  - 保留した Swift 案は **作者の手元のパッチ (非公開、P39 の Swift 案)** (HEAD 基準、41 行、当てていない。将来の再開用)。再開するときは、先に下の「再開手順」の 1 を実機で確かめる。
 - **案の比較** (採用は B):
 
   | 案 | 得 | 損 |
@@ -1989,7 +1989,7 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
   | E `NSAttributedString` の候補で行ごとに注釈を描く | 全行に出る | IMKCandidates がどこまで描くか未調査・変更が大きい。不採用 |
 
 - **実測** (v1 の調査。Mac の本番に近い配線。変換エンジンは偽物 = 「読み → 1 文節」で、azooKey ではない。3,000 組、候補の枠は合計 25,158 個): 英訳が付いた候補は 6,723 個 (26.7%)、全角 3,006 個 (11.9%)、半角 2,987 個 (11.9%)。「全角」「半角」はほぼすべての変換で出る (変換の候補の末尾に、打った英字 `kawa` とその全角が必ず足されるため)。この割合は英訳のある語に偏った上限の目安で、実際の azooKey は漢字の候補をもっと並べるので英訳の割合は下がる。
-- **独立査読 R26 の結果** (別の査読者が実行。`scratch/review18/p39-notes.md`): **P0 なし**。
+- **独立査読 R26 の結果** (別の査読者が実行。記録は手元のメモ (非公開)): **P0 なし**。
   - JSON と候補の対応: 5,040 行 × 4 設定 (通常 / MoreCandidates 46 個 / 英訳 OFF / 両方)、各約 11 万キーで、notes の長さが候補と合わない 0、全部 null なのにキーがある 0、対があるのに null の欠け 0、意味と注釈の同居 0。再変換 (かな・漢字・複数文節)・学習 4 周・記号も長さ一致。追加キー (Shift+←→ で区切り変更、F6–F10、BackSpace、`SelectCandidate`(マウス)、Esc) 約 8 万キーでも 長さ不一致 0 / 欠け 0 / 余計 0。実データ (3,000 組 × 3 周、学習で順が変わる 3,019 回) も長さ不一致 0。
   - 互換性: 変更前後で同じ入力 43.6 万 JSON を比べ、`notes` を除くと完全一致 (差 0)。Swift のデコード (査読者が `swiftc` で): notes 無し / null 混じり / 全部 null / `[]` / `null` / 未知キーの 6 形がすべて読めた。
   - 性能: 1 キーあたり 通常 5.1 → 5.1 µs、MoreCandidates 46 個 6.5 → 6.5 µs (5 回の中央値、変更前後)。**差なし**。`CandidateNotes` 自体は変更前から毎 `UpdateView` で計算していた。
@@ -2000,11 +2000,11 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
   - **足した 2 件** (どちらも注釈を位置ではなく候補の文字から決める `Expected` で比べる。位置のずれを検出するため):
     - `Session_NotesStayAlignedWhenThereAreMoreThanEightCandidates`: `MoreCandidates` で候補が 46 個になるとき、notes の長さが候補と一致し、9 個目より後ろの `river`・`stream` が「英訳」、`kawa` が「半角」、`ｋａｗａ` が「全角」で、日本語の候補は null。
     - `Session_NotesFollowTheSelectedClauseNotTheFirstOne`: 4 文節 (川|橋|雨|雲。英訳が 2 個・1 個・3 個・0 個) を → で 1 つずつ選び (`selectedClause` = 0–3、偶数・奇数)、各文節で notes が「この文節の」候補の位置と合う。
-  - **変異 13 通りすべて赤** (`scratch/p39v2/mutate.log`、作業コピーで 1 つずつ): 実装者の M1–M8 (`Take(count)` を外す / 長さを notes に合わせる / 全部 null でも出す / null の項目を飛ばす / 呼び出しを消す / 位置を 1 つずらす / Core の「英訳」判定を外す / 「全角」「半角」の入れ替え) と、R26 の N1–N5。**生き残っていた N2 は新しい 2 件が、N4 は文節のテストだけが赤にする**。変異を戻すたびに `touch` し、最後に全体を 1 回通した (568/568)。
+  - **変異 13 通りすべて赤** (記録は手元のログ (非公開)、作業コピーで 1 つずつ): 実装者の M1–M8 (`Take(count)` を外す / 長さを notes に合わせる / 全部 null でも出す / null の項目を飛ばす / 呼び出しを消す / 位置を 1 つずらす / Core の「英訳」判定を外す / 「全角」「半角」の入れ替え) と、R26 の N1–N5。**生き残っていた N2 は新しい 2 件が、N4 は文節のテストだけが赤にする**。変異を戻すたびに `touch` し、最後に全体を 1 回通した (568/568)。
 - **確認** (作業コピー内。インストールはしていない):
   - `./build.sh --no-install` 成功、`MeltypeNative.dylib` の更新時刻は `MeltypeSession.cs` より後、`codesign --verify --deep --strict` 成功、`python3 tools/check-mac-aot-settings.py` は PASS 4 件。Swift は HEAD のまま (`git diff HEAD -- mac` は空)。
   - **AOT の dylib を直接叩いた確認** (ctypes。IME としての動作ではない): `meltype_abi_version` = 8。`kawa` Space → 候補 `川 かわ カワ ｶﾜ river stream River kawa ｋａｗａ` (9 個)、`notes` = `[null,null,null,null,"英訳","英訳","英訳","半角","全角"]`。`@` Space → 候補 5 個、`notes` = `["半角","全角",null,null,null]`。変換前の `kyou` → `notes` のキーが無い。
-  - **HEAD の Swift の型でデコード** (`scratch/p39v2/headdecode.swift`・`headdecode2.swift`。HEAD の `NativeCore.swift` から `SessionResult`・`TextEdit`・`CompositionView` を機械的に抜き出して `swiftc` したもの。v1 の確認は新しい型だった): (1) notes 無し、(2) 候補と同じ長さ・null 混じり、(3) 全部 null、(4) `[]`、(5) `null`、(6) 引用符・改行のエスケープ入り、の 6 形が読めた。さらに上の dylib が実際に返した JSON 3 本 (`kawa `・`@ `・`kyou`) も読めた。
+  - **HEAD の Swift の型でデコード** (手元の一時的な Swift のスクリプト 2 本 (非公開)。HEAD の `NativeCore.swift` から `SessionResult`・`TextEdit`・`CompositionView` を機械的に抜き出して `swiftc` したもの。v1 の確認は新しい型だった): (1) notes 無し、(2) 候補と同じ長さ・null 混じり、(3) 全部 null、(4) `[]`、(5) `null`、(6) 引用符・改行のエスケープ入り、の 6 形が読めた。さらに上の dylib が実際に返した JSON 3 本 (`kawa `・`@ `・`kyou`) も読めた。
 - **得と損**:
   - 得: Core の JSON が #86 と同じ形になる (注釈が無いときは今までと完全に同じ形)。FFI の版数を上げずに済む。Swift は何も変わらないので、実機でのリスクは増えない。将来 Swift が使う足場ができる。
   - 損: 画面には何も出ない (価値は足場だけ)。`notes` が全部 null のときはキーごと出さないので、Swift 側は「無い」と「全部 null」を区別できない (区別が要るものは無い)。
@@ -2069,7 +2069,7 @@ R25 の結論は P0 なし。読み取り専用・ネットワーク不使用・
 | P1-5 | `--ref typo` が全部 SKIP で rc=0 | rc=0 | `--ref` を明示したときは、最初に `rev-parse` で確かめ、読めなければ stderr に一文を出して終了コード 2 (先頭が `-` の値も拒否)。コミットは読めるがファイルが無いときは FAIL (既定の HEAD のときだけ SKIP) | rc=2 |
 | P1-6 | `len(machos) >= 4` が脆い | Swift の互換 dylib が無い app で偽 FAIL | 件数条件を外し、必須 3 本 (Meltype・MeltypeDictionary・libMeltypeNative.dylib) を名前で確認 | 偽 FAIL が消え、`libMeltypeNative.dylib` を消した変異は FAIL |
 
-P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に直した。`vtuple` は末尾の 0 を無視する ("13" = "13.0" = "13.0.0"。単体テストで旧 NG 2 → 新 OK)。`docs/RELEASE.md` に「リポジトリ側の検査は HEAD (`--ref`) のコミットの内容と比べる。コミットしてから実行する」と、pkg の追加検査・`--ref` の誤りが rc 2 になることを追記。timeout=600・auth=root は「pkgbuild の既定値で make-pkg.sh に明示は無い」とコメント。追加で見つけて直したもの: エラー文に出た `$HOME` 配下のパスの**後ろの部分** (`/.hermes/...` など) が残る漏れ (マスクを長い順にし、続きも伏せる)。
+P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に直した。`vtuple` は末尾の 0 を無視する ("13" = "13.0" = "13.0.0"。単体テストで旧 NG 2 → 新 OK)。`docs/RELEASE.md` に「リポジトリ側の検査は HEAD (`--ref`) のコミットの内容と比べる。コミットしてから実行する」と、pkg の追加検査・`--ref` の誤りが rc 2 になることを追記。timeout=600・auth=root は「pkgbuild の既定値で make-pkg.sh に明示は無い」とコメント。追加で見つけて直したもの: エラー文に出た `$HOME` 配下のパスの**後ろの部分** (`/<フォルダー>/...` など) が残る漏れ (マスクを長い順にし、続きも伏せる)。
 
 追加した検査項目は 6 つ (pkg 最上位・component の構成・Scripts・PackageInfo の scripts・Resources・Payload の生のモード)、置き換えた項目は 1 つ (Mach-O の件数 → 必須 3 本)。正常な pkg の件数は 43/0/1 → 49/0/1。
 
@@ -2101,7 +2101,7 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
   - **ただし、日本語入力のまま (Direct でない状態で) 学習ファイルに残る経路は、別にある** (M5 の「中」は変えない): (a) 英字のみ 2 文字以上の語を、自動判定と逆の表示モード (F6〜F10) にして確定したとき languages.json に残る (判定の強さが標準 (Balanced) のとき。Manual では基準が変わり、Tab も残る)。(e) 変換で候補を選び直して確定すると、conversions.json・suggest.json・languages.json に書かれる (FakeConverter での実測。数字を含む語でも残る)。(d) `FileLog` と `LogTypedText` が両方 ON のときだけ、meltype.log に語全体が残る (どちらも既定 OFF)。F6〜F10・Tab・候補の選び直しをしない Enter・Space だけの確定では増えない。
 - **査読の経緯 (誤りを直した記録)**: 調査員の初版の訂正案は、「F6/F10 をしなければ、Enter・Space で確定しても学習ファイルは増えない」と書いていた。R28 (P0) が、候補の選び直しで 3 つのファイルに書かれることを実測して指摘し、「FakeConverter では候補を選び直せない (未確認)」という記述も誤りだった。v2 で直し、R30 が再実測した。R30 の P1 4 件 (`DetectionLevel` に `Auto` は無い、F6〜F8 のあとの Space だけでは残らない、表 M5 の「問題」「影響」欄と本文の食い違い) を直した。
 - **文書の変更** (`docs/SECURITY_REVIEW_2026-10.md` だけ。取り消し線 `<del>` と `[見直し 2026-10-12: …]` の形は、既存の `[訂正]` の前例に沿った): M-1 の 225 行目の主張を取り消し線にして見直しを足した。本文の「影響」の条件を実測に合わせて書き直した。修正案 2 に補足を足した。総括を本文と揃えた。表 M5 の旧行番号に注記を足した。重大度の数字 (中 10 件) は変えていない。
-- **見送り (適用していない)**: 調査員が作った任意の M3 の訂正パッチ (M3 は S1 (`9084282`) で対応済み。M-3 の経路は Windows 専用で、HEAD では `DescribeKind` の分類だけをログに出している)。R30 が、同じコミットが M8 (postinstall に `codesign --verify` を足し、失敗なら `exit 1`)・M7・M2(b) も直していることを指摘した。M3 だけ「対応済み」にすると、冒頭の「今すぐ…M8」と表 M8 の「常に `exit 0`」が現状と食い違ったまま残るので、まとめて直すときに一緒に扱う (`scratch/sec225v2/SECURITY_REVIEW-m3.patch` は 24 時間で消える)。
+- **見送り (適用していない)**: 調査員が作った任意の M3 の訂正パッチ (M3 は S1 (`9084282`) で対応済み。M-3 の経路は Windows 専用で、HEAD では `DescribeKind` の分類だけをログに出している)。R30 が、同じコミットが M8 (postinstall に `codesign --verify` を足し、失敗なら `exit 1`)・M7・M2(b) も直していることを指摘した。M3 だけ「対応済み」にすると、冒頭の「今すぐ…M8」と表 M8 の「常に `exit 0`」が現状と食い違ったまま残るので、まとめて直すときに一緒に扱う (調査員のパッチは手元の一時ファイル (非公開) で、24 時間で消える)。
 - **未確認**: azooKey を通した学習 (`learnCallback`)。Swift・IMK の実機での動作。Windows 実機。2 文字の語で languages.json に残る条件。F7・F8・F9 のすべての組み合わせ (代表だけ測った)。F6〜F8 のあとの Space だけでは残らず、F6 → Space → Esc では残る違いの経路。
 - **前提の変化**: Mac で Direct が学習しない・`Hold` が通らないという前提は、英数状態の自動判定を Mac に入れる (P11) と変わる。そのときは、`SwitchHeldToJapanese` の作り直し (P37 の節) と、この M5 の見直しを合わせて見直す。
 
@@ -2272,7 +2272,7 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
   - 合計の母数が 261 → 264 なのは、P45-12 で足した新規 3 件 (`mac-device.tsv` の R35 のブロック) の分。3 件とも当たっている (`mac-device.tsv`・`mac-terminal.tsv` は、新規 3 件のほかは変わらない)。
   - 取り込み前の Mac 版に対する比較: **broken 0 / fixed 12 / added 3**。
   - 本家に対する比較 (`upstream.json` で当たり、今 Mac 版で外れる): **broken 40 → 28**。残りの 28 件は、見送りの表の例 (`-pedia` 8 件・`i18n`・`l10n`・`h2o`・`inviteshimashita`・`invitewookutta`・`や` 7 件 (`githubya` など)・`と` 5 件・`site PR`) と、`my name is taro`・`apinoerror`。
-  - 途中の版の結果は `scratch/p45-<n>.json` に残してある (見送りの n=4・6・12 は壊れた版の結果)。
+  - 途中の版の結果は手元の一時ファイル (非公開、版ごとの JSON) に残してある (見送りの n=4・6・12 は壊れた版の結果)。
 - **テスト**: Core のテストは 617 → **618 件** (`AcronymThenRomaji_IsJapanese` を追加)、全件通過。品質テスト (`Quality`) の行は、各 n で本家のテストの行をそのまま足した。`FeedbackTests` の辞書の語の形の検査 (`Q3_EnglishReadable_Dictionary_EntriesAreWellFormed`) は、`overcute` だけを例外にした (全体ではローマ字として読めないが、`over|cute` と 2 語に割れて `overくて` になるため)。`FeedbackTests` の `taro@gmail.com` の期待は、本家と同じく `たろ@gmail.com` から `taro@gmail.com` に直した。P45-12 で足した**回帰の守り**:
   - `mac-device.tsv` に R35 のブロック: `kyouhawikipediadeshirabeta` → `きょうはwikipediaでしらべた`、`anowikipedia` → `あのwikipedia`、`ato@hitori` → `ato@hitori` (トレードオフ。本家と同じ)。
   - `QualityTests.cs` に `kyouhawikipediadeshirabeta` (混在) と、本家 35beb60 の「英語」行 6 件 (`delight`・`devote`・`morally`・`chottodehijacked`・`korekarastories`・`mottopython`。6 件とも通る)。

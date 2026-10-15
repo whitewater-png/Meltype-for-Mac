@@ -16,7 +16,7 @@
 - 取り消せない操作 (削除・上書き・公開・送信) は、先に懸念と代替案を出して判断を仰ぐ。
 - **提出前に、実装者とは別の査読員 (別エージェント) が確認する。** 指摘がなくなってから提出。複数の独立した査読を並行して頼んでよい。
 - 実機で確かめていないことは「未確認」と書く。実行していないことを実行したと書かない。
-- トレースログ (`MeltypeTraceIMK`) は打った文字が残る。**取る前に毎回リョウさんの同意**を得る。終わったら `defaults delete ... MeltypeTraceIMK` → `pkill -x Meltype` → `~/Library/Application Support/Meltype/imk-trace.log` を削除。**`scratch/trace-backup` は別セッションのもの。触らない。**
+- トレースログ (`MeltypeTraceIMK`) は打った文字が残る。**取る前に毎回リョウさんの同意**を得る。終わったら `defaults delete ... MeltypeTraceIMK` → `pkill -x Meltype` → `~/Library/Application Support/Meltype/imk-trace.log` を削除。**手元の一時の作業用フォルダーにあるトレースの退避 (非公開) は別セッションのもの。触らない。**
 - コミットは 1 項目 1 コミットで、変更したファイルを明示して `git add` (`-A` 禁止)。Windows・Linux は「対象外」と書く (未検証にしない)。
 - ビルド・テストは `bash --noprofile --norc -c 'export PATH=$HOME/.dotnet:$PATH; ...'` で行う (`~/.zshrc` の対話プロンプトが混ざるため)。
 - 作業は作者の作業ツリーの**複製** (`rsync -a --exclude bin --exclude obj --exclude mac/build --exclude mac/.build`、そのあと `git checkout -- . && git clean -fdq docs`) で行い、査読済みの差分だけを本体へ当てる。複雑な Python は `write_file` でファイルにして `python3 -c "exec(compile(open(f,encoding='utf-8').read(),'t','exec'))"` で実行 (インラインの heredoc は止められることがある)。
