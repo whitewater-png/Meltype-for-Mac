@@ -7,6 +7,8 @@
 
 ## Mac 版: 公開前の検査 (読み取り専用・Mac 専用)
 
+リリースの前に、`docs/COMPARISON_UPSTREAM.md` (本家 main との比較表) を更新する (手順は同文書の §3。数字が下がっていてもそのまま書く)。
+
 `mac/build.sh --no-install` → `make-zip.sh` → `make-pkg.sh` のあと、`gh release create` の前に `python3 tools/check-release.py mac/dist/Meltype-mac-<版>.zip mac/dist/Meltype-mac-<版>.pkg --expect-version <版>` を実行する (署名・ビルド時の絶対パス・arch・版の一致・zip と pkg の中身。何も書き換えず、ネットワークも使わない)。FAIL が 1 つでもあれば公開しない。
 `mac/install.sh` を触ったときと公開の前には `python3 tools/check-install-stop-ime.py` も実行する (この 1 つだけは読み取り専用ではない: 更新機能から起動された `install.sh` が、動いている IME を止められるかを、一時フォルダーに作る身代わりのプロセスで確かめる。C のコンパイラ (Command Line Tools) が要る。本物の Meltype・リポジトリ・成果物には触らない。終了コードが 0 以外 (FAIL=1、確かめられなかった=2) なら公開しない。zip を作ったあとで `install.sh` を直したときは、展開した zip の `Meltype-mac/install.sh` を引数に渡す。経緯は計画書の Q13)。
 公開したあとは、`gh release view v<版>-mac --json assets` の digest を `--zip-digest`・`--pkg-digest` に渡して、配った zip と pkg が手元と同じか確かめる。通っても実機での確認の代わりにはならない。項目は `docs/PKG_REVIEW_2026-10.md` の §7、`--help` で選択肢が見られる。
