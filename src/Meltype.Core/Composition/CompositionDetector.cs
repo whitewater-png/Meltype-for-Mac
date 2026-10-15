@@ -952,8 +952,18 @@ public sealed class CompositionDetector
     public static bool IsWordStartAfter(string? preceding) =>
         string.IsNullOrEmpty(preceding) || char.IsWhiteSpace(preceding[^1]) || WordOpeners.ContainsKey(preceding[^1].ToString());
 
-    /// <summary>キャレットの前の文字が改行 (\n・\r) か。オプション (-name) の「直前が英語」は同じ行の英語だけ。</summary>
-    public static bool IsNewlineAfter(string? preceding) => !string.IsNullOrEmpty(preceding) && preceding[^1] is '\n' or '\r';
+    /// <summary>キャレットの前が改行のあとか (最後の改行 \n・\r・U+2028・U+2029・U+0085 より後ろが空白 (半角・タブ・全角) だけ。空も含む)。オプション (-name) の「直前が英語」は同じ行の英語だけ。</summary>
+    public static bool IsNewlineAfter(string? preceding)
+    {
+        if (string.IsNullOrEmpty(preceding)) return false;
+        for (var i = preceding.Length - 1; i >= 0; i--)
+        {
+            var c = preceding[i];
+            if (c is '\n' or '\r' or '\u2028' or '\u2029' or '\u0085') return true;
+            if (!char.IsWhiteSpace(c)) return false;
+        }
+        return false;
+    }
 
     /// <summary>キャレットの前の文字が開きの記号 (`「『(（"'[) ならその記号。無ければ null (保護区間の範囲を閉じの記号までにするため)。</summary>
     public static string? OpenerBefore(string? preceding) =>

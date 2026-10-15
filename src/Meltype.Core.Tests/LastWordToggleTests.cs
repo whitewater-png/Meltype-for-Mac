@@ -801,4 +801,30 @@ internal static class LastWordToggleTests
             Assert.Equal("/tmp/foo\n--no-install", unreadable.Doc, "読めない部分があるオプションは改行のあとも守る");
         });
     }
+
+    [Test]
+    public static void Option_AfterANewlineAndIndent_IsTreatedAsTheStartOfALine()
+    {
+        // 査読 R66: 改行のあとの字下げ (半角空白・タブ・全角空白) だけの行頭も、行頭とみなす。同じ行の英語の後ろは今までどおり
+        WithSpellChecker(() =>
+        {
+            foreach (var (before, label) in new[] { ("/tmp/foo\n　", "全角空白"), ("/tmp/foo\n  ", "半角空白 2 つ"), ("/tmp/foo\n\t", "タブ"), ("/tmp/foo\r\n  ", "CRLF のあと") })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Host.PrecedingText = before;
+                k.Type("--sorekara\n");
+                Assert.Equal("ーーそれから", k.Host.Document, $"改行 + {label} のあとは行頭");
+            }
+
+            var sameLine = new CompositionTests.Keyboard();
+            sameLine.Host.PrecedingText = "git ";
+            sameLine.Type("--name\n");
+            Assert.Equal("--name", sameLine.Host.Document, "同じ行の英語の後ろは今までどおり守る");
+
+            var noNewline = new CompositionTests.Keyboard();
+            noNewline.Host.PrecedingText = "/tmp/foo  ";
+            noNewline.Type("--sorekara\n");
+            Assert.Equal("--sorekara", noNewline.Host.Document, "改行が無ければ空白だけでも行頭ではない");
+        });
+    }
 }

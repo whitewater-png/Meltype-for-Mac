@@ -143,6 +143,19 @@ internal static class TabConversionTests
     }
 
     [Test]
+    public static void PredictionTab_SingleCandidate_TogglesSelectedAndNotSelected()
+    {
+        var k = new CompositionTests.Keyboard(predictions: CompositionTests.OsewaPredictions);
+        k.Type("osewa");
+        k.Press(VirtualKeys.Tab);
+        Assert.Equal(0, k.Host.View!.SelectedPrediction, "Tab で選ぶ");
+        k.Press(VirtualKeys.Tab);
+        Assert.Equal(-1, k.Host.View!.SelectedPrediction, "もう一度 Tab で選ばない状態");
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("おせわ", k.Host.Document, "Enter で打った文字を確定する");
+    }
+
+    [Test]
     public static void ShiftTabWithPrediction_EntersAtLast()
     {
         var k = new CompositionTests.Keyboard(predictions: ThreePredictions);
