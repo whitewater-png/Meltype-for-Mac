@@ -37,6 +37,19 @@ final class MeltypeInputController: IMKInputController {
     /// 今のアプリの種類 (activateServer で bundle ID から決める)。候補ウィンドウの注釈に出す。
     private var appKind: AppKind = .general
 
+    /// 今のアプリの bundle ID (activateServer で決める)。
+    private var bundleID: String?
+
+    /// コード系アプリで利用者が最後に選んだモードのモード ID (bundle ID ごと)。IME のプロセスが動いている間だけ覚える (保存しない)。
+    /// 入力欄ごとのコントローラーをまたぐので static。覚えるのは利用者の操作 (英数/かなキー・入力メニュー・Caps Lock) だけ。
+    private static var rememberedModes: [String: String] = [:]
+
+    /// 利用者がモードを選んだとき、コード系アプリならそのアプリの分として覚える。
+    private func rememberMode(_ mode: String) {
+        guard appKind == .code, let bundleID else { return }
+        Self.rememberedModes[bundleID] = mode
+    }
+
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
         session = NativeCore.shared.createSession()
@@ -146,11 +159,13 @@ final class MeltypeInputController: IMKInputController {
             // 入力メニューの表示を追従させる。selectInputMode のあとに setValue が呼ばれるかは未確認なので、setDirect も呼んだままにする
             client.selectMode(Self.romanModeID)
             currentMode = Self.romanModeID
+            rememberMode(Self.romanModeID)
             return true
         case kVK_JIS_Kana:
             NativeCore.shared.setDirect(session, false)
             client.selectMode(Self.japaneseModeID)
             currentMode = Self.japaneseModeID
+            rememberMode(Self.japaneseModeID)
             return true
         default:
             break
@@ -217,6 +232,7 @@ final class MeltypeInputController: IMKInputController {
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
         if tag == kTextServiceInputModePropertyTag, let mode = value as? String {
             applyMode(mode, client: (sender as? IMKTextInput) ?? (self.client() as? IMKTextInput))
+            rememberMode(mode)
         }
         super.setValue(value, forTag: tag, client: sender)
     }
@@ -237,8 +253,14 @@ final class MeltypeInputController: IMKInputController {
         let mode = currentMode ?? currentInputSourceID()
         if let mode { applyMode(mode, client: nil) }
         // アプリ別設定を当てる。「コード」のアプリは英数から始まるので、入力メニューのモードに合わせたあとで呼ぶ。
-        let bundleID = (sender as? IMKTextInput)?.bundleIdentifier()
+        bundleID = (sender as? IMKTextInput)?.bundleIdentifier()
         appKind = NativeCore.shared.setApp(session, bundleIdentifier: bundleID)
+        // コード系アプリで前に利用者が選んだモードがあれば、英数から始める既定より優先する。
+        // 秘匿入力・アプリ別 OFF・ゲーム (.disabled) は .code ではないのでここに来ず、handle で全キー素通しのまま。
+        if appKind == .code, let bundleID, let mode = Self.rememberedModes[bundleID] {
+            applyMode(mode, client: nil)
+            (sender as? IMKTextInput)?.selectMode(mode)
+        }
         super.activateServer(sender)
     }
 

@@ -691,6 +691,23 @@ internal static class SessionFacadeTests
     }
 
     [Test]
+    public static void SetApp_AddedMacCodeAppsAreCode()
+    {
+        string[] added =
+        [
+            "com.github.wez.wezterm", "com.raphaelamorim.rio", "co.zeit.hyper", "com.jetbrains.PhpStorm", "com.jetbrains.rubymine",
+            "com.jetbrains.datagrip", "com.google.android.studio", "com.jetbrains.intellij.ce", "com.jetbrains.pycharm.ce", "com.vscodium",
+        ];
+        foreach (var id in added)
+        {
+            var session = CreateWith(new Settings { AppRules = [] });
+            session.SetApp(id);
+            Assert.Equal(AppProfile.Code, session.AppProfile);
+            Assert.True(session.Direct, id + ": 行が無くてもコードで英数から");
+        }
+    }
+
+    [Test]
     public static void SetApp_DisabledAppPassesKeys()
     {
         var settings = new Settings { AppRules = [new AppRule { Process = "com.example.Remote", Enabled = false }] };

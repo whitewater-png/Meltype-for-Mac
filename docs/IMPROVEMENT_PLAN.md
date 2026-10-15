@@ -2421,3 +2421,13 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **実機で確かめること** (リョウさん): ① 「設定・辞書…」の ⌘5 のタブで `kyouhasushidesu` を打つと区間と「条件を変えた場合」が出る ② 「学習した語」に sushi (英字) を足すと「学習した語「sushi」を外す → …」と「この語を消す」が出て、確認のあと消せる (languages.json は調べるだけでは変わらない) ③ 判定の強さ・かな入力の既定が設定タブの今の値になる ④ IME での実際の判定と、画面の区間が一致する (NSSpellChecker 登録の効果。特に `zh` のような語) ⑤ english.txt に語を足したあとの反映の時期が案内文のとおり。
 - **未確認**: 画面 (AppKit) の見た目と操作は自動テストが無く、実機で見ていない。IME の判定との一致 (④) は実機未確認。
 
+## 追加項目 1-4b / 1-4c (コード系アプリの追加・アプリごとに最後のモードを覚える)
+
+- **1-4b**: `MeltypeSession.MacCodeApps` に WezTerm `com.github.wez.wezterm`・Rio `com.raphaelamorim.rio`・Hyper `co.zeit.hyper`・PhpStorm `com.jetbrains.PhpStorm`・RubyMine `com.jetbrains.rubymine`・DataGrip `com.jetbrains.datagrip`・Android Studio `com.google.android.studio`・IntelliJ IDEA CE `com.jetbrains.intellij.ce`・PyCharm CE `com.jetbrains.pycharm.ce`・VSCodium `com.vscodium` を足した。出典は Homebrew cask (`Casks/{w/wezterm,r/rio,h/hyper,p/phpstorm,r/rubymine,d/datagrip,a/android-studio,i/intellij-idea-ce,p/pycharm-ce,v/vscodium}.rb`) の `uninstall quit:` / `zap` の記述。JetBrains の ID は大文字小文字が製品ごとに違う (PhpStorm だけ大文字) ので cask のとおりに書いた (比較は大文字小文字を区別しない)。テスト `SetApp_AddedMacCodeAppsAreCode`。
+- **1-4c**: Swift の `InputController` に static の `rememberedModes` (bundle ID → モード ID) を置いた。英数/かなキー・`setValue` (入力メニュー・Caps Lock) のときに `rememberMode` で覚え、`activateServer` の `setApp` のあとで、覚えたモードがあれば `applyMode` と `selectMode` で上書きする。保存はしない。
+- **Swift に置いた理由**: Core の `Direct` の setter は `meltype_set_direct` を通り、`activateServer` が入力メニューに合わせる `applyMode` も同じ経路なので、Core では「利用者の操作」と「起動時の合わせ直し」を区別できない (しかもその時点の `AppName` は前のアプリ)。区別するには FFI を足して ABI を上げるしかなく、Swift 側なら ABI は 11 のまま。損: Core のテストが書けない (`swift build` と実機確認のみ)。
+- **範囲**: `setApp` が `.code` を返すアプリだけ覚える・適用する。`.disabled` (アプリ別 OFF・ゲーム) と秘匿入力は今までどおり素通し (`handle` の前半で返る)。一般アプリは今までどおり。独自の種類の「最初は英数」(`StartInEnglish`) は Swift から見分けられないので覚えない (損)。
+- **検証**: Core のテスト 720/720、`swift build -c release` 成功、eval-compare は broken 0 (231/264 で変化なし)。
+- **実機で確かめること** (リョウさん): ① Terminal でかなキー → 別のアプリ → Terminal に戻って日本語のまま ② 覚えていないコード系アプリは英数から ③ 英数に戻して別のアプリ→戻ると英数 ④ 入力メニューの表示が食い違わない ⑤ Meltype を再起動すると英数から ⑥ 一般アプリは変わらない。
+- **未確認**: 上の実機の動き。`setValue` が利用者の操作以外 (入力ソース切替の自動呼び出しなど) でも呼ばれると、その値を覚えてしまう可能性 (未検証)。
+

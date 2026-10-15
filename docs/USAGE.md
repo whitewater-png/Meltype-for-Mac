@@ -116,6 +116,7 @@ Meltype キーボードの使用中は Windows の IME を OFF にしている�
 - 「コード」のアプリでも、チャット・AI への入力欄 (VS Code の Copilot Chat、Claude Code の画面など。UI Automation の名前に chat / copilot / claude / prompt / message などが入るもの) は一般として扱う。VS Code・Cursor などの Electron 製のエディターは入力欄の種類が多いので、エディター・ターミナル・検索と分かるものだけをコードとする
 - ターミナルで動く AI の入力行 (Claude Code・Gemini CLI の「> 」、Codex の「› 」) は日本語を判定する。ターミナルでは改行のたびにプロンプト (出力) を読み直す。ターミナルで 半角/全角 を押して日本語にしたら、別の場所に移るまで日本語のまま
 - IME 自動切替モードでも、コードの中では判定しない
+- Mac: コード系アプリ (Terminal・iTerm2・WezTerm・VS Code・JetBrains の IDE など) は英数から始まる。英数キー・かなキー・入力メニューでモードを選ぶと、そのアプリの分を覚え、ほかのアプリから戻ったときもそのモードのまま (覚えるのは Meltype が動いている間だけ。再起動すると英数から)
 
 ### 絵文字・顔文字
 

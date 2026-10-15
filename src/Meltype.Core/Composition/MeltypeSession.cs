@@ -224,6 +224,9 @@ public sealed class MeltypeSession
         "com.apple.dt.Xcode", "com.sublimetext.4", "com.sublimetext.3",
         "com.apple.Terminal", "com.googlecode.iterm2", "dev.warp.Warp-Stable", "com.mitchellh.ghostty", "net.kovidgoyal.kitty", "org.alacritty",
         "com.jetbrains.intellij", "com.jetbrains.pycharm", "com.jetbrains.WebStorm", "com.jetbrains.rider", "com.jetbrains.CLion", "com.jetbrains.goland",
+        "com.github.wez.wezterm", "com.raphaelamorim.rio", "co.zeit.hyper",
+        "com.jetbrains.PhpStorm", "com.jetbrains.rubymine", "com.jetbrains.datagrip", "com.jetbrains.intellij.ce", "com.jetbrains.pycharm.ce",
+        "com.google.android.studio", "com.vscodium",
     ];
 
     /// <summary>今のアプリ (bundle ID)。分からなければ null。</summary>
