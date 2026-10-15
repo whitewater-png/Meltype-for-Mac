@@ -115,6 +115,42 @@ internal static class TabConversionTests
         Assert.Equal(0, k.Host.View!.SelectedPrediction, "予測を選ぶ");
     }
 
+    private static readonly Func<string, IReadOnlyList<string>> ThreePredictions =
+        r => r.StartsWith("おせ", StringComparison.Ordinal) ? ["お世話", "お世話になります", "お世話になりました"] : [];
+
+    [Test]
+    public static void PredictionTab_NextPreviousAndWrap_SameForTabConversionOnOff()
+    {
+        foreach (var tabConversion in new[] { true, false })
+        {
+            var k = new CompositionTests.Keyboard(predictions: ThreePredictions) { TabConversion = tabConversion };
+            k.Type("osewa");
+            k.Press(VirtualKeys.Tab);
+            Assert.Equal(0, k.Host.View!.SelectedPrediction, $"Tab で 1 番目 (Tab で変換 {tabConversion})");
+            k.Press(VirtualKeys.Tab);
+            Assert.Equal(1, k.Host.View!.SelectedPrediction, "Tab, Tab で 2 番目");
+            ShiftTab(k);
+            Assert.Equal(0, k.Host.View!.SelectedPrediction, "Shift+Tab で 1 番目に戻る");
+            ShiftTab(k);
+            Assert.Equal(-1, k.Host.View!.SelectedPrediction, "先頭の前は選ばない状態");
+            ShiftTab(k);
+            Assert.Equal(2, k.Host.View!.SelectedPrediction, "選ばない状態からの Shift+Tab は最後");
+            k.Press(VirtualKeys.Tab);
+            Assert.Equal(-1, k.Host.View!.SelectedPrediction, "最後の次は選ばない状態");
+            k.Press(VirtualKeys.Tab);
+            Assert.Equal(0, k.Host.View!.SelectedPrediction, "選ばない状態からの Tab は 1 番目");
+        }
+    }
+
+    [Test]
+    public static void ShiftTabWithPrediction_EntersAtLast()
+    {
+        var k = new CompositionTests.Keyboard(predictions: ThreePredictions);
+        k.Type("osewa");
+        ShiftTab(k);
+        Assert.Equal(2, k.Host.View!.SelectedPrediction, "入力中の Shift+Tab は最後の候補");
+    }
+
     [Test]
     public static void MisspellingTakesTabFirst()
     {

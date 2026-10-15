@@ -1038,8 +1038,9 @@ public sealed class CompositionController
                 return;
             case VirtualKeys.Tab when !_converting && _predictions.Count > 0:
                 // 予測変換: 候補に入る (もしかして・英字への提案が優先)。
+                // 本家と同じ: Shift+Tab は選ばない状態から最後の候補へ。
                 _predicting = true;
-                _predictionIndex = 0;
+                _predictionIndex = _swallowedShift.Count > 0 || _host.IsShiftDown() ? _predictions.Count - 1 : 0;
                 return;
             case VirtualKeys.Tab when !_converting && _swallowedShift.Count == 0 && !_host.IsShiftDown() && _options.TabConversion() && TabStartsConversion():
                 // Space なら変換を始める場面の Tab は、Space と同じく変換を始める (Microsoft IME と同じ。空白を打とうとした意味ではない: issue #219)。
@@ -3275,14 +3276,21 @@ public sealed class CompositionController
     internal const int MaxPredictionReadingLength = 40;
 
     /// <summary>
-    /// Tab で予測候補に入っている間のキー。処理したら true。↓ Tab で次、↑ で前 (先頭から上は入力に戻る)、Enter で確定、
+    /// Tab で予測候補に入っている間のキー。処理したら true。↓ で次、↑ で前 (先頭から上は入力に戻る)、Tab で次・Shift+Tab で前 (一巡して入力に戻る)、Enter で確定、
     /// Esc で入力に戻る。それ以外のキーは予測から抜けて、入力として普通に処理する (Space は今までどおり変換)。
     /// </summary>
     private bool HandlePredictionKey(int vk)
     {
         switch (vk)
         {
-            case VirtualKeys.Down or VirtualKeys.Tab:
+            case VirtualKeys.Tab:
+                // 本家と同じ: Tab で次、Shift+Tab で前。最後の次・先頭の前は選ばない状態に戻る (一巡)。
+                var step = _swallowedShift.Count > 0 || _host.IsShiftDown() ? -1 : 1;
+                var next = (_predictionIndex + 1 + step + _predictions.Count + 1) % (_predictions.Count + 1) - 1;
+                if (next < 0) _predicting = false;
+                else _predictionIndex = next;
+                return true;
+            case VirtualKeys.Down:
                 _predictionIndex = Math.Min(_predictionIndex + 1, _predictions.Count - 1);
                 return true;
             case VirtualKeys.Up:
