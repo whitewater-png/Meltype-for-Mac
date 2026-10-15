@@ -292,6 +292,8 @@ final class MeltypeInputController: IMKInputController {
         // 入力欄を離れたら、利用者の操作の印も戻す。戻ってきたとき activateServer より前に来る setValue (システムの合わせ直し) を、
         // 前の入力欄で打ったキーのせいで利用者の選択と取り違えないため (R53 必須 1)。
         userActedSinceActivation = false
+        // 候補の意味の待ちと出した意味も捨てる。commit が表示を返さない・client が取れないときは hideComposition を通らないため (R61 任意 1)。
+        meaningKey = nil
         Self.trace("deactivateServer bundle=\(bundleID ?? "nil")")
         commitComposition(sender)
         candidatesWindow?.hide()
