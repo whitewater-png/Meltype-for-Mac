@@ -97,6 +97,12 @@ public sealed class CompositionOptions
     public Func<bool> TokMode { get; init; } = () => false;
 
     /// <summary>
+    /// 入力中の Tab で、Space と同じく変換を始めるか (本家の「Tab で変換」。issue #219)。もしかして・手動の提案・予測候補が出ているときは今までどおりそちらに使う。
+    /// 既定は false (今までどおり、確定して Tab をアプリに渡す)。
+    /// </summary>
+    public Func<bool> TabConversion { get; init; } = () => false;
+
+    /// <summary>
     /// 確定した直後の語を直す Ctrl+' (英字) / Ctrl+J (かな) を、F10 / F6 と同じに読み替えるか (MeltypeSession)。
     /// 既定は false: Ctrl+J はターミナルの改行と重なり、Ctrl は変換ボックスが空ならアプリの操作なので、利用者が選んだときだけ。
     /// </summary>
@@ -549,6 +555,7 @@ public sealed class CompositionController
         }
         _reconvertOriginal = text;
         _reconvertRomaji = true;
+        _tabStartedConversion = false;
         foreach (var c in converted) _text.AppendKana(c, c);
         _text.Mode = DisplayMode.Hiragana;
         // 候補を開くだけなので、Expanded にして変換エンジンの追加候補 (読み = 日本語にした文) を引かない
@@ -830,6 +837,7 @@ public sealed class CompositionController
         _toggleUndo = null;
         _lastWord = null;
         _converting = false;
+        _tabStartedConversion = false;
         _clauses = [];
         _headCount = 0;
         _fixedUnits = [];
@@ -1030,6 +1038,11 @@ public sealed class CompositionController
                 // 予測変換: 候補に入る (もしかして・英字への提案が優先)。
                 _predicting = true;
                 _predictionIndex = 0;
+                return;
+            case VirtualKeys.Tab when !_converting && _swallowedShift.Count == 0 && !_host.IsShiftDown() && _options.TabConversion() && TabStartsConversion():
+                // Space なら変換を始める場面の Tab は、Space と同じく変換を始める (Microsoft IME と同じ。空白を打とうとした意味ではない: issue #219)。
+                StartConversion();
+                _tabStartedConversion = _converting;
                 return;
             case VirtualKeys.F10 when _toggleBox is not null && _headCount == 0:
                 // 確定後の F6 で開いた変換ボックスで F10: 打った英字どおりに戻す (F10 → F6 → F10 の往復)
@@ -1408,6 +1421,10 @@ public sealed class CompositionController
                 FixMisspelling(typo);
                 StartConversion();
                 return true;
+            case VirtualKeys.Tab when _tabStartedConversion:
+                // Tab で始めた変換の中では、Tab が次の候補、Shift+Tab が前の候補 (issue #219)。Space で始めた変換の中の Tab は今までどおり (確定して Tab を渡す)。
+                NextCandidate(shift || _host.IsShiftDown() ? -1 : +1);
+                return true;
             case VirtualKeys.Escape when _toggleBox is { } toggleBox && _headCount == 0:
                 // 確定後の F6 で開いた変換ボックス: Esc 1 回で元の語を書き戻す
                 CancelToggleBoxToOriginal(toggleBox);
@@ -1444,6 +1461,18 @@ public sealed class CompositionController
 
     /// <summary>「もしかして」の案内。変換ボックスの、打った文字のすぐ下に出す (書き間違いが無ければ null)。</summary>
     private string? MisspellingSuggestion() => FindMisspelling() is { } typo ? $"もしかして: {typo.Misspelling.Right}　<Tab>で修正" : null;
+
+    /// <summary>
+    /// Space の分岐で変換を始める (StartConversion に行く) 場面か。Tab で始めるときも同じ場面に限る (issue #219)。
+    /// Space と同じ順で判定するため、英語かを見る前に打ち間違いを直す (Enter で確定するときと同じ直し)。
+    /// </summary>
+    private bool TabStartsConversion()
+    {
+        if (_headCount == 0 && _text.Mode == DisplayMode.Auto && _text.KeepLoneHyphen()) return false;
+        _text.FixTypos();
+        var commitsAlphanumeric = _text.IsAlphanumericAt(final: true) && !(_text.Mode == DisplayMode.Auto && _text.IsNumeric && _text.Raw.All(char.IsAsciiDigit) && _text.PrecedingEnglish != true);
+        return !commitsAlphanumeric && !EndsWithEnglish(final: true) && !(_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level()));
+    }
 
     /// <summary>変換前に矢印キーを押したとき: 文節に区切って、← なら最後の文節、→ なら最初の文節を選ぶ。</summary>
     private void EnterClauseSelection(int vk)
@@ -1554,6 +1583,7 @@ public sealed class CompositionController
     /// </summary>
     private void StartConversion(bool preferJapanese = false)
     {
+        _tabStartedConversion = false;
         // 固定した文節があるときは、未変換の文節だけを変換して、固定した文節の後ろにつなぐ。
         TrimToFixedClauses();
         var clauses = new List<Clause>();
@@ -2542,6 +2572,9 @@ public sealed class CompositionController
     private const int MaxCorrectable = 4;
     private bool _spaceStartedConversion;
 
+    /// <summary>今の変換を Tab で始めたか (変換中の Tab で候補を送るため。issue #219)。</summary>
+    private bool _tabStartedConversion;
+
     /// <summary>変換を始めてから、候補を動かす操作 (Space・↓・↑・PageUp/Down・← →) をしたか。TypeDigitsAfterConversion が ON のとき、動かす前の数字は入力になる。</summary>
     private bool _candidatesMoved;
 
@@ -2995,6 +3028,7 @@ public sealed class CompositionController
     {
         var spaceIntended = _spaceStartedConversion;
         _spaceStartedConversion = false;
+        _tabStartedConversion = false;
         // 固定した文節を含む確定は、語の単位の判定 (英語とも日本語とも読める語の確定し直し) の対象にしない。
         var hadFixed = _headCount > 0;
         // 確定後の F6 で開いた変換ボックスの確定は、手で直した語。自動の確定し直しの対象にも、確定し直しの元にもしない (R41-2)。

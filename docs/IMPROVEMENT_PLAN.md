@@ -2421,3 +2421,15 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **実機で確かめること** (リョウさん): ① 「設定・辞書…」の ⌘5 のタブで `kyouhasushidesu` を打つと区間と「条件を変えた場合」が出る ② 「学習した語」に sushi (英字) を足すと「学習した語「sushi」を外す → …」と「この語を消す」が出て、確認のあと消せる (languages.json は調べるだけでは変わらない) ③ 判定の強さ・かな入力の既定が設定タブの今の値になる ④ IME での実際の判定と、画面の区間が一致する (NSSpellChecker 登録の効果。特に `zh` のような語) ⑤ english.txt に語を足したあとの反映の時期が案内文のとおり。
 - **未確認**: 画面 (AppKit) の見た目と操作は自動テストが無く、実機で見ていない。IME の判定との一致 (④) は実機未確認。
 
+## 追加項目 1-8 (Tab で変換。P41)
+
+- **経緯**: 本家 1.2.1 の設定「Tab で変換」(`TabConversion`、コード上の issue 番号は #219。トラッカーの #299 とは別) を Mac 版に入れた。リョウさんの決定 4: 本家と同じ動きで、**Mac は既定 OFF** (本家は ON。フォームで日本語を打って Tab で次の欄へ移る操作を変えないため)。
+- **実装の要点** (`CompositionController.cs`): 入力中の Tab の優先順は 本家と同じ — もしかして → 手動の提案 (英字にする) → 予測候補 → (設定 ON なら) 変換を始める。`TabStartsConversion()` は Space が変換を始める場面だけ true (打ち間違いを直してから、英語で終わっていれば false = 確定して Tab を渡す。箇条書きの - も Space と同じ)。変換中の Tab は `HandleConversionKey` に枝を足し、**Tab で始めた変換の中だけ** Tab = 次の候補・Shift+Tab = 前の候補 (`_tabStartedConversion`)。Space で始めた変換の中・Shift+Tab での開始は、今までどおり確定して Tab を渡す。Esc で戻ったあとの Tab はもう一度変換を始める。旗は `StartConversion`・`CommitText`・ローマ字の再変換・`Reset` で下ろす。
+- **本家との差**: 本家の `TabStartsConversion` が見る「保護区間」(`ProtectedSpans`)・`PreviewCandidates` は Mac 版に無いので入れていない (Space と同じ条件に揃えた)。予測候補の Tab (`HandlePredictionKey`) は今のまま (Shift+Tab で戻る・一巡はしない)。
+- **設定の配線**: `Settings.TabConversion` (既定 false)、`MacSettingsCatalog` の「入力」に項目 (説明は本家と同じ文 + Mac の既定 OFF の注)、`MeltypeSession.CreateDefault` で `shared.Current.TabConversion` (config.json の変更が 0.5 秒で効く)。**FFI は変えていない** (ABI 11 のまま。設定タブの JSON の仕組みで渡る)。`tools/check-mac-aot-settings.py` に、一覧に出る・既定 OFF・保存できる・既定に戻る、を足した。
+- **1 音確定・確定後の F6 ボックスとの組み合わせ**: 1 音確定 (TokMode の Shift+↓) の残りも Tab で変換を始められ、Tab で次の候補になる。確定後の F6 で開いた変換ボックスは最初から変換中なので Space で始めた変換と同じ扱いで、設定 ON でも Tab は今までどおり (確定して Tab を渡す)。Esc 1 回で元の語に戻る動きも変わらない (どちらもテストあり)。
+- **検証**: Core 732/732 (Tab で変換のテスト 13 件: 本家の `TabConversion_*` 9 件を写したもの + 既定 OFF + OFF のとき今までどおり + 1 音確定との組み合わせ + F6 ボックス)、eval-compare broken 0 (231/264 同じ)、`swift build -c release` 通過、`build.sh --no-install` と `check-mac-aot-settings.py` 全 PASS。
+- **得と損**: 得: Microsoft IME と同じ「Tab で変換」が使える (設定 ON)。損: ON にすると、フォームで日本語を打ってから Tab で次の欄へ移る操作が、確定ではなく変換開始になる (もう一度 Tab は次の候補、Enter で確定してから Tab)。そのため既定は OFF。
+- **実機で確かめること** (リョウさん): 設定「Tab で変換」を ON にして、① `kana` → Tab で変換が始まり、候補ウィンドウが出ているとき、もう一度 Tab で次の候補・Shift+Tab で前の候補になるか (候補ウィンドウは `IMKCandidatesSendServerKeyEventFirst` が変換中で候補が 2 つ以上のときだけ ON になる (`InputController.swift:697` 付近)。**候補が 1 つだけのときや、変換を始めた直後に候補ウィンドウが出る前の Tab が IME に届くか**は実機でないと分からない) ② `hello` → Tab で確定して Tab がアプリに届く ③ 予測候補・「もしかして」が出ているとき Tab が今までどおり ④ OFF (既定) で今までどおり ⑤ 1 音確定 (ATOK スタイル ON) の残りで Tab。
+- **未確認**: 実機の IME での操作 (上の ①〜⑤)。候補ウィンドウと Tab の関係 (Swift 側は変えていない)。
+
