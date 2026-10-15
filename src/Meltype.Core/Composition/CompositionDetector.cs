@@ -558,6 +558,10 @@ public sealed class CompositionDetector
     /// <summary>スペルチェッカーが正しいと言う英単語か、よくある打ち間違い (teh、recieve) か。</summary>
     private bool IsSpellWord(string lower) => SpellChecker is { } checker && (checker.IsWord(lower) || checker.AutoCorrection(lower) is not null);
 
+    /// <summary>助詞 (de・ni・no…) で始まり、残り 3 文字以上が英単語の語 (de|vote = devote、no|vice = novice)。</summary>
+    private bool StartsWithParticleThenEnglishWord(string lower) =>
+        Detection.DictionaryDetector.StartsWithParticle(lower) is { } particle && lower.Length - particle.Length >= 3 && IsKnownEnglishWord(lower[particle.Length..]);
+
     internal bool IsJapaneseWordOrPrefix(string kana) => _kana?.IsJapaneseWordOrPrefix(kana) == true;
 
     /// <summary>よくある英語の打ち間違いなら正しい綴り (teh → the)。大文字で始まる語は大文字で始める。</summary>
@@ -712,7 +716,10 @@ public sealed class CompositionDetector
         {
             if (lower.Contains('c') && _romaji.Analyze(RomajiDetector.ReadCRow(lower)) is { IsValid: true, Partial: "" or "n" }) return false;
             // v 行 (va = ゔぁ): 辞書の英単語 (video) でなければ日本語 (vanpaia → ゔぁんぱいあ → ヴァンパイア)。
+            // スペルチェッカーの 5 文字以上の英単語 (invite、private) は、ゔぃ と読める綴りでも英語 (いんviteしました になっていた: 本家 c6b281e、issue #69)。
+            // ただし 助詞 + 英単語 とも読める語 (de|vote = devote) は今までどおり (githubdevote → githubでvote。本家の c6b281e はここを壊す)。
             if (lower.Contains('v') && !lower.Contains('l') && !lower.Contains('x') && !inDictionary && !_proper.Contains(lower) &&
+                !(lower.Length >= 5 && IsSpellWord(lower) && IsCommonJapanese?.Invoke(lower) != true && !StartsWithParticleThenEnglishWord(lower)) &&
                 _romaji.AnalyzeFragment(lower) is { IsValid: true, Partial: "" or "n" })
             {
                 return false;

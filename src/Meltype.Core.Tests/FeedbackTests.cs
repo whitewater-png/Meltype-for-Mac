@@ -1288,4 +1288,32 @@ internal static class RomajiTypoTests
             Assert.Equal(expected, k.Host.Document, typed);
         }
     }
+
+    [Test]
+    public static void Upstream69_SpellWordWithV_IsEnglish_ButParticlePlusWordKeepsSplit()
+    {
+        // 本家 c6b281e (#69): v を含むスペルチェッカーの 5 文字以上の英単語は、ゔぃ と読める綴りでも英語 (いんviteしました になっていた)。
+        // 本家のままだと de|vote (= devote) も 1 語の英語になり、githubdevote が githubでvote でなく githubdevote になる。
+        // 助詞 + 英単語 とも読める語は今までどおり (devotewo = でゔぉてを も変わらない。既知の限界として固定する)。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("inviteshimashita", "inviteしました"), ("invitewookutta", "inviteをおくった"), ("kyouhainvite", "きょうはinvite"), ("invitewo", "inviteを"),
+                ("githubdevote", "githubでvote"), ("slackdevote", "slackでvote"), ("kyoudevote", "きょうでvote"),
+                ("devotewo", "でゔぉてを"), ("githubdevise", "githubでゔぃせ"), ("kyouhanovice", "きょうはのゔぃせ"),
+                ("vanpaia", "ゔぁんぱいあ"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
 }
