@@ -277,7 +277,7 @@ public sealed class CompositionController
     // 固定する前の、_text の前の文字の英語/日本語の手がかり (読みに戻すときに戻す)。
     private bool? _basePrecedingEnglish;
     private bool _basePrecedingSentence;
-    private bool _basePrecedingWordStart = true;
+    private string? _basePrecedingTail;
     // 予測変換: 候補の一覧と、Tab で候補に入っているか・選んでいる位置。
     private bool _predicting;
     private int _predictionIndex;
@@ -399,7 +399,7 @@ public sealed class CompositionController
         // 確定した分は、残りの変換と学習の文脈 (キャレットの前) になる
         _precedingText = (_precedingText ?? "") + text;
         _text.PrecedingEnglish = english;
-        _text.PrecedingWordStart = CompositionDetector.IsWordStartAfter(_precedingText);
+        _text.PrecedingTail = _precedingText;
     }
 
     /// <summary>
@@ -1149,7 +1149,7 @@ public sealed class CompositionController
         _text.PrecedingEnglish = _lastCommitEnglish;
         _text.PrecedingEnglishSentence = _lastCommitEnglish == true && IsEnglishSentence(_lastCommitText);
         // 保護区間 (/tmp/foo) を始めてよいか: 自分の確定の末尾で決める (日本語を確定した直後の /fuka は守らない)。確定が無い・分からなければ語の頭
-        _text.PrecedingWordStart = CompositionDetector.IsWordStartAfter(_precedingText);
+        _text.PrecedingTail = _precedingText;
         _text.FollowingEnglish = null;
         _host.RequestSurroundingText((before, after) =>
         {
@@ -1160,7 +1160,7 @@ public sealed class CompositionController
                 _precedingText = before;
                 if (LanguageOf(before) is { } english) _text.PrecedingEnglish = english;
                 _text.PrecedingEnglishSentence = IsEnglishSentence(before);
-                _text.PrecedingWordStart = CompositionDetector.IsWordStartAfter(before);
+                _text.PrecedingTail = before;
             }
             _followingText = after;
             _text.FollowingEnglish = LanguageOfStart(after);
@@ -1501,7 +1501,7 @@ public sealed class CompositionController
         {
             _basePrecedingEnglish = _text.PrecedingEnglish;
             _basePrecedingSentence = _text.PrecedingEnglishSentence;
-            _basePrecedingWordStart = _text.PrecedingWordStart;
+            _basePrecedingTail = _text.PrecedingTail;
         }
         _headCount = _clauses.Count;
         _converting = false;
@@ -1513,7 +1513,7 @@ public sealed class CompositionController
         _text.KanaInput = _options.KanaInput();
         if (LanguageOf(FixedText) is { } english) _text.PrecedingEnglish = english;
         _text.PrecedingEnglishSentence = IsEnglishSentence(PrecedingForConversion);
-        _text.PrecedingWordStart = CompositionDetector.IsWordStartAfter(FixedText);
+        _text.PrecedingTail = FixedText;
     }
 
     /// <summary>固定した文節の最後を選んだ変換中の状態にする (未変換の文節を消し切ったとき)。</summary>
@@ -1536,7 +1536,7 @@ public sealed class CompositionController
         _text.Mode = DisplayMode.Auto;
         _text.PrecedingEnglish = _basePrecedingEnglish;
         _text.PrecedingEnglishSentence = _basePrecedingSentence;
-        _text.PrecedingWordStart = _basePrecedingWordStart;
+        _text.PrecedingTail = _basePrecedingTail;
         _headCount = 0;
         _clauses = [];
         _converting = false;
@@ -2448,7 +2448,7 @@ public sealed class CompositionController
         // 残りの入力の文脈 (変換・英語の判定) は、確定した 1 音の後ろとして続ける。
         _precedingText = (_precedingText ?? "") + text;
         _text.PrecedingEnglish = first.English;
-        _text.PrecedingWordStart = CompositionDetector.IsWordStartAfter(_precedingText);
+        _text.PrecedingTail = _precedingText;
         _host.CommitText(text);
         Committed?.Invoke(text);
     }
@@ -2643,7 +2643,7 @@ public sealed class CompositionController
         _precedingText = beforeBody;
         _text.PrecedingEnglish = LanguageOf(beforeBody);
         _text.PrecedingEnglishSentence = IsEnglishSentence(beforeBody);
-        _text.PrecedingWordStart = CompositionDetector.IsWordStartAfter(beforeBody);
+        _text.PrecedingTail = beforeBody;
         _reconvertOriginal = body;
         _text.SetKana(kana);
         StartConversion();
@@ -2760,17 +2760,18 @@ public sealed class CompositionController
     /// <summary>
     /// 変換中でない Enter・Tab をアプリに渡した。アプリの入力欄には改行・タブが入るので、自分の確定の記録 (直後の 1.5 秒は入力欄より優先して使う) にも入れる。
     /// 入れないと、2 行目の文頭の語が直前の行の最後の文字につながって見え (Hi therePlease)、英文と読めない (実機のトレースで見つかった)。
+    /// Space (修飾キーなし) も同じ: 日本語を確定してから Space で空白を入れ、/tmp/foo を打つとき、空白の後を語の頭と読めず、パスを守れない (査読 R57 必須 A)。
     /// </summary>
     public void NoteBreakKeyPassedToApp(int vk, bool shift = false)
     {
         if (_lastCommitText is null) return;
-        // BackSpace で、記録の最後の改行・タブが消える (I want ⏎⌫to go)
+        // BackSpace で、記録の最後の改行・タブ・空白が消える (I want ⏎⌫to go)
         if (vk == VirtualKeys.Back)
         {
-            if (_lastCommitText.EndsWith('\n') || _lastCommitText.EndsWith('\t')) _lastCommitText = _lastCommitText[..^1];
+            if (_lastCommitText.EndsWith('\n') || _lastCommitText.EndsWith('\t') || _lastCommitText.EndsWith(' ')) _lastCommitText = _lastCommitText[..^1];
             return;
         }
-        var joined = _lastCommitText + (vk == VirtualKeys.Return ? "\n" : vk == VirtualKeys.Tab && !shift ? "\t" : "");
+        var joined = _lastCommitText + (vk == VirtualKeys.Return ? "\n" : vk == VirtualKeys.Tab && !shift ? "\t" : vk == VirtualKeys.Space && !shift ? " " : "");
         _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
     }
 
@@ -3016,9 +3017,6 @@ public sealed class CompositionController
         // 再変換 (選択 + Shift+Space) で入れ替えた文字は、打った英字ではないので、確定後の F10 / F6 の対象にしない。
         var reconverted = (_reconvertOriginal is not null && !fromToggle) || _reconvertRomaji;
         _toggleBox = null;
-        // 保護区間 (パス・オプション・変数) を含む確定は、「英語の前後に空白を入れる」を効かせない (./build.sh を → ./build.shを の空白が入って、パスが崩れるため。本家 Protected_CommitsIgnoreAutomaticEnglishSpacing と同じ)。
-        // 同じ確定の中のほかの英単語も空白を入れなくなる (割り切り)
-        var hasProtected = _options.SpaceAroundEnglish() && _text.Mode == DisplayMode.Auto && _text.Segments(final: true).Any(s => s.Protected);
         // 誤変換の報告を調べられるように、打った英字・読み・文節の区切りもログに残す (ログはファイルに書く設定のときだけ保存される)。
         if (!_text.IsEmpty)
         {
@@ -3035,7 +3033,8 @@ public sealed class CompositionController
         _fixedUnits = [];
         ResetPrediction();
         if (text.Length == 0) return;
-        if (_options.SpaceAroundEnglish() && !hasProtected) text = AddSpacesAroundEnglish(text, _precedingText, _followingText);
+        // 保護区間を含む確定も、設定どおり空白を入れる (./build.sh を。本家は末尾が保護区間のときは入れないが、Mac 版は設定どおり。パスそのものは崩れない)
+        if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, _followingText);
         if (!hadFixed && !fromToggle) CorrectPreviousCommit(raw, english);
         // 英語とも日本語とも読める語を、文脈を決めずに (選び直さずに) 確定したときだけ、後で確定し直せるようにしておく。
         if (!hadFixed && !fromToggle && !chosen && !afterFirstSound && _detector.IsAmbiguousWord(raw))

@@ -21,6 +21,9 @@ internal static class LastWordToggleTests
         public string Doc { get; private set; } = "";
         public SessionResult? Last { get; private set; }
 
+        /// <summary>アプリに渡ったキー (Space・Enter・BackSpace) の文字を入力欄にも反映する (実際のアプリの入力欄と同じ。既定は反映しない)。</summary>
+        public bool EchoPassedKeys { get; init; }
+
         public Editor(bool ctrlKeys = false, Func<string, bool>? commonJapanese = null, bool continueAfterConversion = false, bool tokMode = false)
         {
             Memory = new LanguageMemory(null) { IsCommonJapanese = commonJapanese };
@@ -44,8 +47,17 @@ internal static class LastWordToggleTests
             return Last = result;
         }
 
-        public SessionResult Key(int vk, char? ch = null, bool shift = false, bool control = false) =>
-            Apply(Session.HandleKey(vk, ch, shift, control, false, false, Before));
+        public SessionResult Key(int vk, char? ch = null, bool shift = false, bool control = false)
+        {
+            var result = Apply(Session.HandleKey(vk, ch, shift, control, false, false, Before));
+            if (EchoPassedKeys && !result.Consumed && !shift && !control)
+            {
+                if (vk == VirtualKeys.Space) Doc += " ";
+                else if (vk == VirtualKeys.Return) Doc += "\n";
+                else if (vk == VirtualKeys.Back && Doc.Length > 0) Doc = Doc[..^1];
+            }
+            return result;
+        }
 
         public void Type(string text)
         {
@@ -53,6 +65,8 @@ internal static class LastWordToggleTests
             {
                 if (c == '\n') Key(VirtualKeys.Return);
                 else if (c == ' ') Key(VirtualKeys.Space);
+                else if (c == '\b') Key(VirtualKeys.Back);
+                else if (!char.IsAsciiLetterOrDigit(c) && CompositionTests.FakeHost.JisKeys.TryGetValue(c, out var jis)) Key(jis.Vk, c, jis.Shift);
                 else Key(char.IsAsciiLetter(c) ? char.ToUpperInvariant(c) : c, c, char.IsAsciiLetterUpper(c));
             }
         }
@@ -682,5 +696,67 @@ internal static class LastWordToggleTests
         e.Enter();
         Assert.Equal("amazon", e.Doc, "二重にならない");
         Assert.True(e.Memory.Get("amazon") is not false, "日本語として覚えない");
+    }
+
+    /// <summary>製品と同じく、英単語の判定にスペルチェッカーを使う。終わったら元に戻す (ほかのテストに漏らさない)。</summary>
+    private static void WithSpellChecker(Action body)
+    {
+        var previous = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try { body(); }
+        finally { CompositionTests.Detector.SpellChecker = previous; }
+    }
+
+    [Test]
+    public static void ProtectedSpan_AfterCommit_F6_DoesNotLearn()
+    {
+        // 査読 R57 推奨 B: 確定後の F6 (TryToggleLastWord) は MeltypeSession からだけ呼ばれる。経路に届いたこと (Consumed・Toggle) を確かめてから、学習しないことを確かめる
+        WithSpellChecker(() =>
+        {
+            foreach (var typed in new[] { "--Sushi", "~/Sushi", "$SUSHI" })
+            {
+                var e = new Editor();
+                e.Type(typed + "\n");
+                var f6 = e.F6();
+                Assert.True(f6.Consumed && f6.Toggle, $"前提: 確定後の F6 が経路に届いた ({typed}): " + f6.ToJson());
+                e.Enter();
+                Assert.True(e.Memory.Get(typed) is null && e.Memory.Get("Sushi") is null && e.Memory.Get("sushi") is null && e.Memory.Get("SUSHI") is null, $"確定後の F6 → Enter で学習しない ({typed})");
+            }
+        });
+    }
+
+    [Test]
+    public static void ProtectedSpan_AfterASpaceThePassedToTheApp_IsStillProtected()
+    {
+        // 査読 R57 必須 A: 日本語を確定してから、入力していない状態で Space (アプリに渡る) → /tmp/foo。
+        // アプリに渡した Space を自分の確定の記録が知らないと、空白の後なのに語の頭と読めず、守れない
+        WithSpellChecker(() =>
+        {
+            var spaced = new Editor { EchoPassedKeys = true };
+            spaced.Type("fairuha");
+            spaced.Key(VirtualKeys.Space);
+            spaced.Enter();
+            spaced.Key(VirtualKeys.Space);
+            var before = spaced.Doc;
+            Assert.True(before.EndsWith(' '), "前提: 確定のあと、アプリに渡した Space が入力欄に入っている: " + before);
+            spaced.Type("/tmp/foo\n");
+            Assert.Equal(before + "/tmp/foo", spaced.Doc, "空白の後の /tmp/foo は崩れない");
+
+            // 空白が無ければ守らない (日本語の打ちかけ)
+            var plain = new Editor { EchoPassedKeys = true };
+            plain.Type("fairuha\n");
+            plain.Type("/fuka\n");
+            Assert.True(plain.Doc.EndsWith("ふか") && !plain.Doc.Contains("fuka"), "確定の直後の /fuka は守らない: " + plain.Doc);
+
+            // アプリに渡した Space を BackSpace で消したら、記録からも消える
+            var erased = new Editor { EchoPassedKeys = true };
+            erased.Type("fairuha");
+            erased.Key(VirtualKeys.Space);
+            erased.Enter();
+            erased.Key(VirtualKeys.Space);
+            erased.Key(VirtualKeys.Back);
+            erased.Type("/fuka\n");
+            Assert.True(erased.Doc.EndsWith("ふか") && !erased.Doc.Contains("fuka"), "消した空白は記録から戻す: " + erased.Doc);
+        });
     }
 }

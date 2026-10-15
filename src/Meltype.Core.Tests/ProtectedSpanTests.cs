@@ -67,9 +67,9 @@ internal static class ProtectedSpanTests
             ["--no-install"] = "--no-install", ["mac/build.sh --no-install wo jikkou"] = "mac/build.sh --no-install をじっこう",
             ["-la"] = "-la", ["-m"] = "-m", ["tar -xzvf a.tar.gz"] = "tar -xzvf a.tar.gz", ["gcc -Wall"] = "gcc -Wall", ["find . -name"] = "find . -name",
             ["-rn"] = "-rn", ["-Wall"] = "-Wall", ["-xzvf"] = "-xzvf",
-            // -- のオプションも、後ろに - か = を含む・ローマ字として読めない・大文字を含む・直前が英語のときは守る
+            // -- のオプションも、= を含む・- で区切った部分にローマ字として読めないものがある・ローマ字として読めない・大文字を含む・直前が英語のときは守る
             ["--color=auto"] = "--color=auto", ["--help"] = "--help", ["--force"] = "--force", ["--version"] = "--version", ["--Werror"] = "--Werror",
-            ["git --name"] = "git --name",
+            ["git --name"] = "git --name", ["--dry-run"] = "--dry-run",
         };
         foreach (var (typed, expected) in cases) Assert.Equal(expected, Commit(typed), $"「{typed}」");
     }
@@ -78,7 +78,11 @@ internal static class ProtectedSpanTests
     public static void DoubleDash_ReadableAsRomaji_IsJapaneseDash()
     {
         // 小説・台詞の「ーー」を -- で打つ書き方 (--sorekara) は守らない。ローマ字として読めるオプション (--name) は、英語の後ろでないと守らない (抜け道: F10 で英字に)
-        var cases = new Dictionary<string, string> { ["--sorekara"] = "ーーそれから", ["--sate"] = "ーーさて" };
+        // 長音の - を含むローマ字 (--ko-hi-wo・--ra-men・--no-sushi) も、- で区切った部分が全部ローマ字として読めるので守らない (査読 R57 C)。--no-install・--dry-run は読めない部分があるので守る (Options_StayHalfWidthEnglish)
+        var cases = new Dictionary<string, string>
+        {
+            ["--sorekara"] = "ーーそれから", ["--sate"] = "ーーさて", ["--ko-hi-wo"] = "ーーこーひーを", ["--ra-men"] = "ーーらーめん", ["--no-sushi"] = "ーーのーすし",
+        };
         foreach (var (typed, expected) in cases)
         {
             Assert.Equal(expected, Commit(typed), $"「{typed}」");
@@ -102,6 +106,30 @@ internal static class ProtectedSpanTests
             ["`--no-install` wo"] = "`--no-install` を",
         };
         foreach (var (typed, expected) in cases) Assert.Equal(expected, Commit(typed), $"「{typed}」");
+    }
+
+    [Test]
+    public static void SquareBracket_FollowsTheWidthOfTheOpener()
+    {
+        // 打った [ ] は、英語の後ろでも日本語の入力では 「」 (bot「Thinking」。IsAsciiSymbol が [ ] を除く)。保護区間の ] も 」 で、対にそろう (査読 R57 D)
+        Assert.Equal("Hello「~/Documents」を", Commit("Hello[~/Documents]wo"), "英語の後ろでも [ ] は 「」 の対");
+        Assert.Equal("「~/Documents」を", Commit("[~/Documents]wo"), "日本語の [ ] は 「」");
+
+        // 開きの記号が確定済みの文字の側にあるとき (査読 R57 E): 確定済みの 「 に対応する ] は 」、半角の [ に対応する ] は半角
+        var closed = new CompositionTests.Keyboard();
+        closed.Host.PrecedingText = "ファイルは「";
+        closed.Type("~/Documents]wo\n");
+        Assert.Equal("~/Documents」を", closed.Host.Document, "確定済みの 「 に対応する ] は 」");
+
+        var half = new CompositionTests.Keyboard();
+        half.Host.PrecedingText = "see [";
+        half.Type("~/Documents]wo\n");
+        Assert.Equal("~/Documents]を", half.Host.Document, "確定済みの半角の [ に対応する ] は半角");
+
+        var paren = new CompositionTests.Keyboard();
+        paren.Host.PrecedingText = "ファイルは(";
+        paren.Type("~/Documents)wo\n");
+        Assert.Equal("~/Documents)を", paren.Host.Document, "確定済みの ( に対応する ) は半角で範囲に入る");
     }
 
     [Test]
@@ -169,6 +197,14 @@ internal static class ProtectedSpanTests
             firstSound.Type("/ashita\n");
             Assert.True(firstSound.Host.Document.EndsWith("あした") && !firstSound.Host.Document.Contains("ashita"), "1 音確定のあと → /ashita: " + firstSound.Host.Document);
 
+            // 1 音だけ確定して残りがある (kyou → きょ + う)。続きの /ashita は固定した単位のあとから呼び直す道 (units[frozen - 1]) を通る (査読 R57 任意 F)
+            var partial = new CompositionTests.Keyboard { TokMode = true };
+            partial.Type("kyou");
+            ShiftDown(partial);
+            Assert.True(partial.Host.Document.Length > 0, "前提: 1 音だけ確定した: " + partial.Host.Document);
+            partial.Type("/ashita\n");
+            Assert.True(partial.Host.Document.EndsWith("あした") && !partial.Host.Document.Contains("ashita"), "1 音確定で残りがある → /ashita: " + partial.Host.Document);
+
             // キャレットの前が日本語 (空白なし) の入力欄
             var afterJapanese = new CompositionTests.Keyboard();
             afterJapanese.Host.PrecedingText = "ファイルは";
@@ -202,10 +238,11 @@ internal static class ProtectedSpanTests
     }
 
     [Test]
-    public static void SpaceAroundEnglish_DoesNotBreakProtectedSpans()
+    public static void SpaceAroundEnglish_KeepsProtectedSpansIntact()
     {
-        // 「英語の前後に空白を入れる」が ON でも、守った区間の前後に空白を入れない (./build.sh を → ./build.shを の空白で、パスが崩れる)。本家 Protected_CommitsIgnoreAutomaticEnglishSpacing と同じ
-        Assert.Equal("./build.shを", Commit("./build.shwo", k => k.SpaceAroundEnglish = true), "守った区間の後ろに空白を入れない");
+        // 「英語の前後に空白を入れる」が ON なら、設定どおり守った区間の後ろにも空白が入る (本家は末尾が保護区間のとき入れないが、Mac 版は設定どおり)。パスそのものは崩れない (査読 R57 A2)
+        Assert.Equal("./build.sh を", Commit("./build.shwo", k => k.SpaceAroundEnglish = true), "守った区間の後ろにも設定どおり空白が入る (パスは崩れない)");
+        Assert.Equal("~/Documents を", Commit("~/Documents wo", k => k.SpaceAroundEnglish = true), "打った空白のまま、二重にならない");
         Assert.Equal("~/.config/nvim を", Commit("~/.config/nvim wo", k => k.SpaceAroundEnglish = true), "空白は打ったとおり");
     }
 
@@ -213,7 +250,7 @@ internal static class ProtectedSpanTests
     public static void Protected_IsNotLearnedOrCorrected()
     {
         // 打ち間違いの直し・もしかして・学習の対象にしない (本家 ProtectionTests の MixedProtectedSpans_DoNotAutocorrectRomajiTypos / Protected_IsNotLearnedOrCorrected を参考にした)
-        foreach (var raw in new[] { "./onegaishimsu", "/tmp/buresureddo", "~/shumire-shon", "--shumire-shon" })
+        foreach (var raw in new[] { "./onegaishimsu", "/tmp/buresureddo", "~/shumire-shon", "--onegaishimsu" })
         {
             var k = new CompositionTests.Keyboard();
             k.Type(raw);
@@ -221,27 +258,16 @@ internal static class ProtectedSpanTests
             k.Type("\n");
             Assert.Equal(raw, k.Host.Document, raw);
         }
-        // 確定後の F6 で、保護区間を日本語として学習しない (./build.sh はかなに直せず F6 が何もしないので、かなに直せる --no-sushi でも試す)
-        var languages = new LanguageMemory(null);
-        var memory = new CompositionTests.Keyboard(languages: languages);
-        memory.Type("./build.sh\n");
-        memory.Press(VirtualKeys.F6);
-        Assert.True(languages.Get("./build.sh") is null && languages.Get("build") is null && languages.Get("sh") is null, "保護区間は学習しない");
-
-        var afterCommit = new LanguageMemory(null);
-        var committed = new CompositionTests.Keyboard(languages: afterCommit);
-        committed.Type("--no-sushi\n");
-        committed.Press(VirtualKeys.F6);
-        committed.Press(VirtualKeys.Return);
-        Assert.True(afterCommit.Get("--no-sushi") is null && afterCommit.Get("no-sushi") is null, "確定後の F6 → Enter で学習しない");
+        // 確定後の F6 → Enter は、MeltypeSession を通さないと経路に届かない (Keyboard は届かない)。LastWordToggleTests.ProtectedSpan_AfterCommit_F6_DoesNotLearn で確かめる
 
         // 入力中の F6 (ひらがな) → Enter が LearnLanguage を通っても学習しない
         var whileTyping = new LanguageMemory(null);
         var typing = new CompositionTests.Keyboard(languages: whileTyping);
-        typing.Type("--no-sushi");
+        typing.Type("--Sushi");
+        Assert.True(HasProtected("--Sushi"), "前提: --Sushi は保護区間");
         typing.Press(VirtualKeys.F6);
         typing.Press(VirtualKeys.Return);
-        Assert.True(whileTyping.Get("--no-sushi") is null && whileTyping.Get("no-sushi") is null, "入力中の F6 → Enter で学習しない");
+        Assert.True(whileTyping.Get("--Sushi") is null && whileTyping.Get("Sushi") is null && whileTyping.Get("sushi") is null, "入力中の F6 → Enter で学習しない");
     }
 
     [Test]

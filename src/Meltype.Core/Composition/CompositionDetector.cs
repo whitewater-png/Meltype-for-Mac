@@ -197,8 +197,9 @@ public sealed class CompositionDetector
     /// 日本語の文の中の英単語 (GitHub の) より強い英語の根拠として扱う。</param>
     /// <param name="startsWord">先頭の単位が語の頭か (キャレットの前が無い・分からない・空白・開きの記号)。保護区間 (/tmp/foo・--no-install) は語の頭からだけ守る。
     /// 日本語を確定した直後の /fuka は語の頭ではない。<see cref="IsWordStartAfter"/> で決める。</param>
+    /// <param name="precedingOpener">キャレットの前の文字が開きの記号ならその記号 (<see cref="OpenerBefore"/>)。保護区間の範囲を、対応する閉じの記号までにする。</param>
     public IReadOnlyList<CompositionSegment> Segment(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish = null, bool? followingEnglish = null,
-        DetectionLevel level = DetectionLevel.Balanced, bool englishSentence = false, bool kanaInput = false, bool final = false, bool startsWord = true)
+        DetectionLevel level = DetectionLevel.Balanced, bool englishSentence = false, bool kanaInput = false, bool final = false, bool startsWord = true, string? precedingOpener = null)
     {
         // 先頭の z + h/j/k/l の矢印 (zh = ←) は、英語かどうかを判定せず日本語の区間にする。
         // (macOS のスペルチェッカーは zh を英単語と答えるので、判定に回すと矢印が元の綴りに戻る。先頭の zhang・zlib は CompositionText が矢印を取り消して英字に戻す)
@@ -217,12 +218,12 @@ public sealed class CompositionDetector
         {
             return [new CompositionSegment(true, "", stylized)];
         }
-        var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, startsWord: startsWord);
+        var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, startsWord: startsWord, precedingOpener: precedingOpener);
         if (kanaInput) return segments;
         // 英語の後ろの , . は半角にしたが、すぐ後ろに日本語が続いた (Ok,konnna → Ok、こんな) なら、日本語の文の句読点にして分け直す。
         if (PunctuationBeforeJapanese(units, segments) is { } japanesePunctuation)
         {
-            segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation, startsWord);
+            segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation, startsWord, precedingOpener);
         }
         // 辞書にない英単語 (stackoverflow など) を最初から打っているなら全体を英語にする。
         // 途中の区間 (… flow) だけを英語にすると「sたcこvえrflow」のようになってしまう。
@@ -296,7 +297,7 @@ public sealed class CompositionDetector
     }
 
     private List<CompositionSegment> FindSpans(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish, bool? followingEnglish, DetectionLevel level, bool englishSentence, bool kanaInput, bool final,
-        HashSet<int>? japanesePunctuation = null, bool startsWord = true)
+        HashSet<int>? japanesePunctuation = null, bool startsWord = true, string? precedingOpener = null)
     {
         var n = units.Count;
         var segments = new List<CompositionSegment>();
@@ -315,12 +316,12 @@ public sealed class CompositionDetector
         {
             var found = -1;
             // 保護区間 (パス・オプション・変数) は、語の頭から空白まで英字のまま (1-4a)。以下の判定より先に決める。
-            var protectedEnd = !kanaInput && level != DetectionLevel.Manual ? ProtectedEnd(units, i, pending, final, startsWord, EnglishWordBefore) : -1;
+            var protectedEnd = !kanaInput && level != DetectionLevel.Manual ? ProtectedEnd(units, i, pending, final, startsWord, EnglishWordBefore, precedingOpener, PrecededByEnglish(i) == true) : -1;
             if (protectedEnd >= 0)
             {
                 found = protectedEnd;
-                // [~/Documents] の ] は範囲に入れず、日本語の 」 のまま (下の「英語の後ろの記号は半角」に回さない)
-                if (i > 0 && units[i - 1].Raw == "[" && protectedEnd < n && units[protectedEnd].Raw == "]") bracketCloser = protectedEnd;
+                // 日本語の 「 (確定済みの 「 も) に対応する ] は範囲に入れず、日本語の 」 のまま (下の「英語の後ろの記号は半角」に回さない)
+                if (protectedEnd < n && units[protectedEnd].Raw == "]" && (i > 0 ? units[i - 1].Raw == "[" && PrecededByEnglish(i) != true : precedingOpener == "「")) bracketCloser = protectedEnd;
             }
             // ドメイン・拡張子の . の後ろは、ローマ字として読めても英字のままにする (tetr.io、Wakatte.TV、MeltypeTip.dll)。
             // (本家 yksr-melt/Meltype の PR #267 / issue #260・#254 と同じ変更)
@@ -950,20 +951,24 @@ public sealed class CompositionDetector
     public static bool IsWordStartAfter(string? preceding) =>
         string.IsNullOrEmpty(preceding) || char.IsWhiteSpace(preceding[^1]) || WordOpeners.ContainsKey(preceding[^1].ToString());
 
+    /// <summary>キャレットの前の文字が開きの記号 (`「『(（"'[) ならその記号。無ければ null (保護区間の範囲を閉じの記号までにするため)。</summary>
+    public static string? OpenerBefore(string? preceding) =>
+        !string.IsNullOrEmpty(preceding) && WordOpeners.ContainsKey(preceding[^1].ToString()) ? preceding[^1].ToString() : null;
+
     /// <summary>
     /// 保護区間 (1-4a): 語の頭 (入力の先頭か空白・開きの記号の後) から始まる パス・オプション・変数 の終わり (単位の位置)。無ければ -1。
     /// 入力の先頭 (start == 0) が語の頭かは startsWord で決める (直前に日本語を確定した直後の /fuka・/iie を守らないため)。
     /// ・パス: ./ ../ ~/ のあとか、/ のあとにパスの要素が続く (a/b・1/2・/// は守らない)。パスの判定は本家 1.2.1 の ProtectedSpanScanner.TryPosixPath
     ///   (GPL-3.0-or-later、Copyright (C) 2026 0924haruto12) と同じ規則。範囲は本家と違い、空白まで。
     /// ・オプション (Mac 独自): - + 英字は、ローマ字として読めない (-xzvf)・大文字を含む (-Wall)・1〜2 文字で終わる (-la)・直前が英語 (find . -name) のとき。
-    ///   -- + 英字 (小説・台詞の「ーー」と同じ打ち方) も同じく絞る: 後ろに - か = を含む (--no-install・--color=auto)・ローマ字として読めない (--help・--force)・
-    ///   大文字を含む・直前が英語のときだけ。--sorekara・--sate は守らない。
+    ///   -- + 英字 (小説・台詞の「ーー」と同じ打ち方) も同じく絞る: = を含む (--color=auto)・- で区切った部分のどれかがローマ字として最後まで読めない (--no-install・--dry-run)・
+    ///   最初の英字がローマ字として読めない (--help・--force)・大文字を含む・直前が英語のときだけ。--sorekara・--sate・--ko-hi-wo (長音の -) は守らない。
     /// ・変数 (Mac 独自): $ のあとが英字か { ($HOME、${PATH}。$100 は守らない)。
     /// 範囲は空白か入力の終わりまで。開きの記号の直後から始まったときは、対応する閉じの記号まで (`./build.sh` wo → `./build.sh` を)。
     /// ただしパス・変数の最後の要素が拡張子付きなら、<see cref="DotSuffixEnd"/> の終わりで止める
     /// (./build.shde → ./build.sh|で)。拡張子が無ければ空白まで英字のまま (/tmp/fooni)。
     /// </summary>
-    private int ProtectedEnd(IReadOnlyList<CompositionUnit> units, int start, string pending, bool final, bool startsWord, Func<int, bool> englishWordBefore)
+    private int ProtectedEnd(IReadOnlyList<CompositionUnit> units, int start, string pending, bool final, bool startsWord, Func<int, bool> englishWordBefore, string? precedingOpener, bool precededByEnglish)
     {
         static bool IsSpace(CompositionUnit unit) => unit.Raw.Length > 0 && unit.Raw.All(char.IsWhiteSpace);
         var n = units.Count;
@@ -971,8 +976,12 @@ public sealed class CompositionDetector
         var wordEnd = start;
         while (wordEnd < n && !IsSpace(units[wordEnd])) wordEnd++;
         // 開きの記号の直後なら、範囲は対応する閉じの記号まで (閉じの記号も含める)。閉じが無ければ空白まで。
+        // 開きの記号が確定済みの文字の側にあるとき (start == 0) は、キャレットの前の文字から決める。確定済みの 「 に対応するのは、打った ] (日本語の 」)
         var closeAt = -1;
-        if (start > 0 && WordOpeners.TryGetValue(units[start - 1].Raw, out var closer))
+        var opener = start > 0 ? units[start - 1].Raw : precedingOpener;
+        var closer = "";
+        var hasCloser = opener is not null && (start == 0 && opener == "「" ? (closer = "]") is not null : WordOpeners.TryGetValue(opener, out closer!));
+        if (hasCloser)
         {
             for (var k = start; k < wordEnd; k++)
             {
@@ -982,8 +991,10 @@ public sealed class CompositionDetector
                 break;
             }
         }
-        // [ ] は日本語の入力では「」になるので、閉じの ] は範囲に入れず、日本語の区間に残す (「~/Documents」を)。ほかの閉じの記号は半角のまま範囲に入れる
-        int Finish(int end) => closeAt >= 0 && end == closeAt && units[start - 1].Raw != "[" ? closeAt + 1 : end;
+        // [ ] は、[ が日本語の区間にあれば「」になるので、閉じの ] は範囲に入れず、日本語の区間に残す (「~/Documents」を)。
+        // [ が英語の後ろで半角のままなら、] も半角で範囲に入れる (see [~/Documents]を)。ほかの閉じの記号は半角のまま範囲に入れる
+        var closerStaysJapanese = start == 0 ? opener == "「" : opener == "[" && !precededByEnglish;
+        int Finish(int end) => closeAt >= 0 && end == closeAt && !closerStaysJapanese ? closeAt + 1 : end;
         var word = Raw(units, start, wordEnd) + (wordEnd == n ? pending : "");
         if (word.Length < 2) return -1;
         static bool ElementStart(char c) => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '~';
@@ -1000,8 +1011,11 @@ public sealed class CompositionDetector
             var unreadable = !_romaji.AnalyzeFragment(letters.ToLowerInvariant()).IsValid;
             if (dashes == 2)
             {
-                // -- は小説・台詞の「ーー」(--sorekara) にも使うので、- と同じく絞る。--name のようなローマ字として読めるオプションは英語の後ろでだけ守る
-                isOption = word.IndexOfAny(['-', '='], 2) >= 0 || unreadable || letters.Any(char.IsAsciiLetterUpper) || englishWordBefore(start);
+                // -- は小説・台詞の「ーー」(--sorekara) にも使うので、- と同じく絞る。--name のようなローマ字として読めるオプションは英語の後ろでだけ守る。
+                // 長音の - (--ko-hi-wo・--ra-men) は日本語なので、- で区切った部分が全部ローマ字として読めるなら守らない (--no-install・--dry-run は読めない部分があるので守る)。= を含むものは守る
+                var parts = word[2..].Split('-', StringSplitOptions.RemoveEmptyEntries);
+                var hasUnreadablePart = word.Length > 3 && word.IndexOf('-', 2) >= 0 && parts.Any(part => !_romaji.AnalyzeFragment(part.ToLowerInvariant()).IsValid);
+                isOption = word.IndexOf('=', 2) >= 0 || hasUnreadablePart || unreadable || letters.Any(char.IsAsciiLetterUpper) || englishWordBefore(start);
             }
             else
             {

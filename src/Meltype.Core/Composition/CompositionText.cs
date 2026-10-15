@@ -788,7 +788,7 @@ public sealed class CompositionText
         key.Append('\u0003').Append(_pending).Append('\u0003')
             .Append(PrecedingEnglish switch { true => 'E', false => 'J', null => '-' })
             .Append(FollowingEnglish switch { true => 'E', false => 'J', null => '-' })
-            .Append(PrecedingEnglishSentence ? 'S' : '-').Append(PrecedingWordStart ? 'W' : '-').Append(KanaInput ? 'K' : '-').Append(final ? 'F' : '-')
+            .Append(PrecedingEnglishSentence ? 'S' : '-').Append(PrecedingWordStart ? 'W' : '-').Append(PrecedingOpener ?? "-").Append(KanaInput ? 'K' : '-').Append(final ? 'F' : '-')
             .Append((int)EffectiveLevel).Append(':').Append(_detector.Memory?.Version ?? -1);
         return key.ToString();
     }
@@ -804,7 +804,7 @@ public sealed class CompositionText
     {
         var frozen = FrozenCount(units);
         var pendingFrozen = PendingFrozen(frozen, units.Count);
-        if (frozen == 0 && !pendingFrozen) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final, PrecedingWordStart);
+        if (frozen == 0 && !pendingFrozen) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final, PrecedingWordStart, PrecedingOpener);
         var result = new List<CompositionSegment>();
         void Add(CompositionSegment segment)
         {
@@ -883,7 +883,7 @@ public sealed class CompositionText
     public string? Suggestion()
     {
         if (Mode != DisplayMode.Auto || EffectiveLevel != DetectionLevel.Manual || IsNumeric) return null;
-        var suggested = _detector.Segment(_units, Pending, PrecedingEnglish, FollowingEnglish, DetectionLevel.Balanced, PrecedingEnglishSentence, KanaInput, startsWord: PrecedingWordStart);
+        var suggested = _detector.Segment(_units, Pending, PrecedingEnglish, FollowingEnglish, DetectionLevel.Balanced, PrecedingEnglishSentence, KanaInput, startsWord: PrecedingWordStart, precedingOpener: PrecedingOpener);
         if (!suggested.Any(s => s.IsEnglish) || suggested.SequenceEqual(Segments())) return null;
         return string.Join(" ", suggested.Where(s => s.IsEnglish).Select(s => s.Raw));
     }
@@ -898,10 +898,19 @@ public sealed class CompositionText
     public bool PrecedingEnglishSentence { get; set; }
 
     /// <summary>
+    /// キャレットの前の確定済みの文字列 (語の頭と開きの記号を決めるのに、末尾の 1 文字だけ使う)。無い・分からないなら null。
+    /// 入力欄・自分の確定の記録から Controller が決める。
+    /// </summary>
+    public string? PrecedingTail { get; set; }
+
+    /// <summary>
     /// 先頭が語の頭か: キャレットの前の文字が無い・分からない・空白・開きの記号なら true (<see cref="CompositionDetector.IsWordStartAfter"/>)。
     /// 保護区間 (パス・オプション・変数) は語の頭からだけ守る。日本語を確定した直後の /fuka は守らない。
     /// </summary>
-    public bool PrecedingWordStart { get; set; } = true;
+    public bool PrecedingWordStart => CompositionDetector.IsWordStartAfter(PrecedingTail);
+
+    /// <summary>キャレットの前の文字が開きの記号なら、その記号 (保護区間の範囲を、対応する閉じの記号までにする)。無ければ null。</summary>
+    public string? PrecedingOpener => CompositionDetector.OpenerBefore(PrecedingTail);
 
     /// <summary>キャレットの後ろの文字が英語なら true、日本語なら false、分からなければ null。</summary>
     public bool? FollowingEnglish { get; set; }

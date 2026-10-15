@@ -22,6 +22,7 @@ cd ~/Downloads	cd ~/Downloads	full	計画書 1-4a (保護区間 P42) / 査読 R5
 [~/Documents]wo	「~/Documents」を	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 3 ([ ] は日本語の入力では 「」)
 --color=auto	--color=auto	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2
 --help	--help	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2
+--dry-run	--dry-run	full	計画書 1-4a (保護区間 P42) / 査読 R57 推奨 C (- で区切った dry がローマ字として読めないので守る)
 git --name	git --name	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2 (直前が英語ならローマ字として読めても守る)
 $HOME/.zshrc	$HOME/.zshrc	full	計画書 1-4a (保護区間 P42)
 -la	-la	full	計画書 1-4a (保護区間 P42)
@@ -32,6 +33,9 @@ find . -name	find . -name	full	計画書 1-4a (保護区間 P42)
 -kyou	ーきょう	full	計画書 1-4a (保護区間 P42)
 --sorekara	ーーそれから	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2 (小説・台詞の「ーー」。守らない)
 --sate	ーーさて	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2 (守らない)
+--ko-hi-wo	ーーこーひーを	full	計画書 1-4a (保護区間 P42) / 査読 R57 推奨 C (長音の - を含む。全部の部分がローマ字として読めるので守らない)
+--ra-men	ーーらーめん	full	計画書 1-4a (保護区間 P42) / 査読 R57 推奨 C (守らない)
+--no-sushi	ーーのーすし	full	計画書 1-4a (保護区間 P42) / 査読 R57 推奨 C (守らない)
 1~2ko	1～2こ	full	計画書 1-4a (保護区間 P42)
 aka/ao	あか/あお	full	計画書 1-4a (保護区間 P42)
 $100	＄100	full	計画書 1-4a (保護区間 P42)
