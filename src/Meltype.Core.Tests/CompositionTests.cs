@@ -967,6 +967,28 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void LearnWhileTyping_F6_WithPunctuation_StillLearnsTheEnglishWord()
+    {
+        // 入力に「、」が混ざっていても、英語だった区間の語 (merge) は覚える (語として覚えられるかは Remember が確かめる。R46-4)
+        var memory = new LanguageMemory(null);
+        Detector.Memory = memory;
+        try
+        {
+            var k = new Keyboard(languages: memory);
+            k.Type("kyouha,mergedesu");
+            Assert.True((k.Showing ?? "").Contains("merge", StringComparison.Ordinal), "前提: 自動で merge が英語の区間: " + k.Showing);
+            k.Press(VirtualKeys.F6);
+            k.Press(VirtualKeys.Return);
+            Assert.True(memory.Get("merge") == false, "merge を日本語として覚える");
+            Assert.True(memory.Entries().All(e => e.Word == "merge"), "ほかの語は覚えない: " + string.Join(",", memory.Entries().Select(e => e.Word)));
+        }
+        finally
+        {
+            Detector.Memory = null;
+        }
+    }
+
+    [Test]
     public static void LearnWhileTyping_F10_MixedLearnsNothing_SingleJapaneseLearns()
     {
         var memory = new LanguageMemory(null);

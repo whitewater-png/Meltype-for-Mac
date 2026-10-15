@@ -2386,9 +2386,19 @@ public sealed class CompositionController
         }
         if (_text.Mode != DisplayMode.Auto)
         {
-            // F6〜F10 で表示を決めた: 全体が 1 区間 (英字にしたなら英語、かな・カタカナなら日本語)
-            if (_text.IsAlphanumericAt(final: true)) english.Add(_text.Raw);
-            else japanese.Add(_text.Raw);
+            // F6〜F10 で表示を決めた: 確定した文字は全体が 1 つの言語。ただし学習の単位は、入力中の F10 / F6 の学習 (LearnLanguage) とそろえて自動の区間から作る
+            // (確定後のトグルで、打った英字まるごと kyouhasushidesu を覚えない。R46-3)
+            var automatic = _text.Segments(final: true);
+            if (_text.IsAlphanumericAt(final: true))
+            {
+                // 英字にした: 確定後の F6 で日本語として覚え直すのは、自動でも英語だった区間と、入力中の F10 で英語として覚えた日本語 1 区間 (TryToggleLastWord の英字にする側と同じ形)
+                english.AddRange(automatic.Where(s => s.IsEnglish).Select(s => s.Raw));
+                if (automatic.Count == 1 && !automatic[0].IsEnglish) english.Add(automatic[0].Raw);
+                return new SegmentRawSet(english, japanese, JapaneseWord: false);
+            }
+            // かな・カタカナにした: 自動の区間が 1 つだったときだけ 1 語 (英語と日本語が混ざっていたら、確定後の F10 で文まるごとを英語として覚えない)
+            japanese.Add(_text.Raw);
+            return new SegmentRawSet(english, japanese, JapaneseWord: automatic.Count == 1);
         }
         else
         {
@@ -2453,13 +2463,10 @@ public sealed class CompositionController
         if (_firstSoundCommitted) return;
         if (_options.Languages is not { } memory) return;
         var raw = _text.Raw;
-        if (raw.Length < 2 || !raw.All(char.IsAsciiLetter)) return;
         var automatic = _text.Segments(final: true);
-        // 学習の単位は、判定と同じ区間の語 (sushi)。打った英字まるごと (kyouhasushidesu) では、判定で引かれず効かない
-        void RememberWord(string word, bool english)
-        {
-            if (word.Length >= 2) memory.Remember(word, english, explicitChoice: true);
-        }
+        // 学習の単位は、判定と同じ区間の語 (sushi)。打った英字まるごと (kyouhasushidesu) では、判定で引かれず効かない。
+        // 語として覚えられるか (2 文字以上の英字だけ) は Remember が確かめる (入力に「、」や数字が混ざっても、英語の区間 sushi は覚える。R46-4)
+        void RememberWord(string word, bool english) => memory.Remember(word, english, explicitChoice: true);
         switch (_text.Mode)
         {
             case DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric when !automatic.All(s => s.IsEnglish):

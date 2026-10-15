@@ -59,6 +59,7 @@ internal static class LastWordToggleTests
 
         public SessionResult F10() => Key(VirtualKeys.F10);
         public SessionResult F6() => Key(VirtualKeys.F6);
+        public SessionResult F7() => Key(VirtualKeys.F7);
         public SessionResult Enter() => Key(VirtualKeys.Return);
         public SessionResult Esc() => Key(VirtualKeys.Escape);
 
@@ -606,5 +607,36 @@ internal static class LastWordToggleTests
         Assert.True(!result.Consumed, "残りの確定は確定後の F10 の対象にしない (キーはアプリへ)");
         Assert.Equal("きょうは", e.Doc);
         Assert.True(e.Memory.Get("uha") is null, "語の途中 (uha) を英語として覚えない");
+    }
+
+    [Test]
+    public static void WhileTypingChoice_ThenAfterCommitToggle_DoesNotLearnTheWholeTyping()
+    {
+        // 入力中の F6 / F10 で決めて確定 → 確定後の F10 / F6 でも、打った英字まるごと (kyouhaamazondesu) を覚えない (R46-3)
+        var kana = new Editor();
+        kana.Type("kyouhaamazondesu");
+        kana.F6();
+        kana.Enter();
+        Assert.True(!kana.Doc.Contains("amazon", StringComparison.Ordinal), "前提: 入力中の F6 でかなにして確定: " + kana.Doc);
+        Assert.True(kana.F10().Toggle, "前提: 確定後の F10 そのものは効く");
+        Assert.Equal("kyouhaamazondesu", kana.Doc);
+        Assert.True(kana.Memory.Get("kyouhaamazondesu") is null && kana.Memory.Entries().All(e => e.Word != "kyouhaamazondesu"), "英語と日本語が混ざっていた入力は、確定後の F10 で文まるごとを英語として覚えない");
+
+        var single = new Editor();
+        single.Type("nihongo");
+        single.F7();
+        single.Enter();
+        Assert.True(single.F10().Toggle, "前提: 確定後の F10 そのものは効く");
+        Assert.True(single.Memory.Entries().Any(e => e.Word == "nihongo" && e.English), "自動の区間が 1 つなら、確定後の F10 で英語として覚える");
+
+        var alpha = new Editor();
+        alpha.Type("kyouhaamazondesu");
+        alpha.F10();
+        alpha.Enter();
+        Assert.Equal("kyouhaamazondesu", alpha.Doc, "前提: 入力中の F10 で英字のまま確定");
+        Assert.True(alpha.F6().Consumed, "前提: 確定後の F6 で変換ボックス");
+        alpha.Enter();
+        Assert.True(alpha.Memory.Entries().All(e => e.Word != "kyouhaamazondesu"), "確定後の F6 → Enter でも、打った英字まるごとを日本語として覚えない");
+        Assert.True(alpha.Memory.Get("amazon") == false, "自動でも英語だった amazon は、日本語として覚える");
     }
 }
