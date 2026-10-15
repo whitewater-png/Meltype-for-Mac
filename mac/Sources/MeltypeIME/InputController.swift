@@ -328,12 +328,13 @@ final class MeltypeInputController: IMKInputController {
         }
     }
 
-    /// 候補ウィンドウの中で選択が動いた (クリックなど)。青いバーの位置だけを覚えておく。
+    /// 候補ウィンドウの中で選択が動いた (クリックなど)。青いバーの位置を覚え、Core の選択と食い違ったら意味を止める。
     override func candidateSelectionChanged(_ candidateString: NSAttributedString!) {
         guard !isSelectingProgrammatically,
               let string = candidateString?.string,
               let index = candidateList.firstIndex(of: string) else { return }
         shownIndex = index
+        Self.trace("candidateSelectionChanged: index=\(index) core=\(lastView?.selectedIndex.description ?? "nil")")
         // 利用者が選択を動かして Core の選択と食い違ったら、出している意味・待っているタイマー・辞書の completion を止める。
         // 同じなら何もしない (プログラムで動かした通知が遅れて届いても、正しいタイマーを消さない)。
         if index != lastView?.selectedIndex { meaningKey = nil }
@@ -686,8 +687,8 @@ final class MeltypeInputController: IMKInputController {
     }
 
     private func hideComposition(client: IMKTextInput) {
-        // 変換が終わったら、候補の意味の待ち (1.5 秒のタイマー・辞書の completion) と出した辞書の意味を捨てる。別の入力欄の候補ウィンドウに
-        // 前の語の意味が出る・同じ語を再変換したときに待たずに出る、を防ぐ (R55 推奨 1。deactivateServer も commitComposition でここを通る)。
+        // 変換が終わったら、候補の意味の待ち (1.5 秒のタイマー・辞書の completion) を止め、出している意味のパネルも隠す (meaningKey の didSet)。
+        // 別の入力欄の候補ウィンドウに前の語の意味が出る・同じ語を再変換したときに待たずに出る、を防ぐ (R55 推奨 1。deactivateServer も commitComposition でここを通る)。
         meaningKey = nil
         if hasMarkedText {
             Self.trace("hideComposition: setMarkedText(\"\") 直前 \(Self.ranges(client))")
@@ -757,7 +758,12 @@ final class MeltypeInputController: IMKInputController {
     /// 何も出ない (実機のトレースで確認) ので使わない。入力モード (「あ」) の表示もやめた。語・意味はログに書かない。
     private func presentMeaning(_ text: String) {
         guard !IsSecureEventInputEnabled() else { return }
-        if !AnnotationPanel.shared.show(text) { Self.trace("候補ウィンドウが見つからない") }
+        switch AnnotationPanel.shared.show(text) {
+        case .shown: break
+        case .empty: Self.trace("意味のパネル: 文字が空")
+        case .noCandidateWindow: Self.trace("意味のパネル: 候補ウィンドウが見つからない")
+        case .noRoom: Self.trace("意味のパネル: 候補ウィンドウの左右どちらにも置けない")
+        }
     }
 
     private func updateCandidates(_ view: CompositionView) {

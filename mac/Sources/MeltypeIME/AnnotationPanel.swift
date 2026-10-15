@@ -15,7 +15,6 @@ final class AnnotationPanel {
     private static let padding: CGFloat = 8
     private static let gap: CGFloat = 4
     private static let cornerRadius: CGFloat = 6
-    private static let maxLines: CGFloat = 3
 
     private let panel: NSPanel
     private let label: NSTextField
@@ -23,6 +22,12 @@ final class AnnotationPanel {
     /// 出したときの候補ウィンドウの frame と、見張りのタイマー。
     private var hostFrame: NSRect?
     private var watchTimer: Timer?
+    /// 3 行ぶんの高さ (同じラベル・同じ幅で "あ\nあ\nあ" を 1 回だけ測る)。これを超える分は切る。
+    private let maxTextHeight: CGFloat
+    private let maskImage = AnnotationPanel.roundedMask()
+
+    /// show が出せなかった理由 (トレース用。語・意味は含めない)。
+    enum Result { case shown, empty, noCandidateWindow, noRoom }
 
     private init() {
         label = NSTextField(wrappingLabelWithString: "")
@@ -39,6 +44,10 @@ final class AnnotationPanel {
         effect.state = .active
         effect.addSubview(label)
 
+        label.stringValue = "あ\nあ\nあ"
+        maxTextHeight = ceil(label.sizeThatFits(NSSize(width: Self.maxWidth - Self.padding * 2, height: .greatestFiniteMagnitude)).height)
+        label.stringValue = ""
+
         panel = AnnotationNSPanel(contentRect: NSRect(x: 0, y: 0, width: 100, height: 30),
                                   styleMask: [.borderless, .nonactivatingPanel],
                                   backing: .buffered, defer: true)
@@ -50,6 +59,7 @@ final class AnnotationPanel {
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.contentView = effect
+        effect.maskImage = maskImage
     }
 
     /// 表示中の候補ウィンドウ (IMKUIPanel)。見つからなければ nil。
@@ -57,14 +67,14 @@ final class AnnotationPanel {
         NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).contains("IMKUIPanel") }
     }
 
-    /// 出せたら true。候補ウィンドウが見つからない・横に置く場所が無いときは隠して false。
+    /// 出せなかったときは隠して、理由を返す。
     @discardableResult
-    func show(_ text: String) -> Bool {
-        guard !text.isEmpty, let host = Self.candidateWindow() else { hide(); return false }
+    func show(_ text: String) -> Result {
+        guard !text.isEmpty else { hide(); return .empty }
+        guard let host = Self.candidateWindow() else { hide(); return .noCandidateWindow }
         label.stringValue = text
-        let lineHeight = ceil(label.font?.boundingRectForFont.height ?? 15)
         let textSize = label.sizeThatFits(NSSize(width: Self.maxWidth - Self.padding * 2, height: .greatestFiniteMagnitude))
-        let textHeight = min(ceil(textSize.height), lineHeight * Self.maxLines)
+        let textHeight = min(ceil(textSize.height), maxTextHeight)
         let size = NSSize(width: ceil(textSize.width) + Self.padding * 2, height: textHeight + Self.padding)
         label.frame = NSRect(x: Self.padding, y: Self.padding / 2, width: ceil(textSize.width), height: textHeight)
 
@@ -77,19 +87,18 @@ final class AnnotationPanel {
         var x = frame.maxX + Self.gap
         if x + size.width > area.maxX {
             x = frame.minX - size.width - Self.gap
-            if x < area.minX { hide(); return false }
+            if x < area.minX { hide(); return .noRoom }
         }
         var y = frame.maxY - size.height   // 上端をそろえる
         y = min(max(y, area.minY), area.maxY - size.height)
 
         panel.level = NSWindow.Level(rawValue: host.level.rawValue + 1)
         panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: true)
-        effect.maskImage = Self.roundedMask()
         panel.invalidateShadow()
         panel.orderFrontRegardless()
         hostFrame = frame
         startWatching()
-        return true
+        return .shown
     }
 
     func hide() {
@@ -106,6 +115,7 @@ final class AnnotationPanel {
             guard let self else { return }
             guard let host = Self.candidateWindow(), host.frame == self.hostFrame else { self.hide(); return }
         }
+        timer.tolerance = 0.1
         RunLoop.main.add(timer, forMode: .common)
         watchTimer = timer
     }
