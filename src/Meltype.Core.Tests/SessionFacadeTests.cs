@@ -705,6 +705,11 @@ internal static class SessionFacadeTests
             Assert.Equal(AppProfile.Code, session.AppProfile);
             Assert.True(session.Direct, id + ": 行が無くてもコードで英数から");
         }
+
+        var lower = CreateWith(new Settings { AppRules = [] });
+        lower.SetApp("com.jetbrains.phpstorm");
+        Assert.Equal(AppProfile.Code, lower.AppProfile);
+        Assert.True(lower.Direct, "小文字の com.jetbrains.phpstorm でもコードで英数から (大文字小文字は区別しない)");
     }
 
     [Test]
