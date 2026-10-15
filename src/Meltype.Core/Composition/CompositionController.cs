@@ -2410,13 +2410,11 @@ public sealed class CompositionController
     {
         if (_options.Languages is not { } memory) return;
         var raw = _text.Raw;
-        if (raw.Length < 2 || !raw.All(char.IsAsciiLetter)) return;
         var automatic = _text.Segments(final: true);
-        // 学習の単位は、判定と同じ区間の語 (sushi)。打った英字まるごと (kyouhasushidesu) では、判定で引かれず効かない
-        void RememberWord(string word, bool english)
-        {
-            if (word.Length >= 2) memory.Remember(word, english, explicitChoice: true);
-        }
+        // 学習の単位は、判定と同じ区間の語 (sushi)。打った英字まるごと (kyouhasushidesu) では、判定で引かれず効かない。
+        // 語として覚えられるか (2 文字以上の英字だけ) は Remember が確かめる (入力に「、」や数字が混ざっても、英語の区間 sushi は覚える。R46-4)
+        void RememberWord(string word, bool english) => memory.Remember(word, english, explicitChoice: true);
+
         switch (_text.Mode)
         {
             case DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric when !automatic.All(s => s.IsEnglish):
