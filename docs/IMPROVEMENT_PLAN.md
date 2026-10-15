@@ -2487,3 +2487,14 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **得と損 (追記・査読 R66)**: 前の行が英語でも、改行のあとの行頭の `->`・`-` だけ・`-10%` は、入力欄の先頭と同じく全角 (`ー＞`・`ー`・`ー10％`) になる (以前は半角)。改行のあとの字下げ (空白・タブ・全角空白だけ) も行頭とみなす。字下げが 20 文字以上で改行が見えない (前の文字は 20 文字までしか読まない) ときは同じ行とみなし、最後の確定が英語なら英字のまま守る (安全側)。損: エディタで字下げした続きの行 (シェルの `\` の次の行・YAML・Dockerfile) の `--name`・`--save` は「ーーなめ」になる (以前は字下げのおかげで英字。F10 で英字に戻せる。ターミナルの続きの行は前に `> ` があるので今までどおり守る。査読 R67)。
 - **未確認**: 実機 (Mac の IME としての動き) は未確認。今回は直していない別件: `cd`・`ls` のような 2 文字の英字は英語と判定されず、Space で変換が始まって空白が消える (`cd ~/Downloads` → `cd~/Downloads`、`ls -la` → `ls-la`)。`mac-terminal.tsv` の既知の外れ (`cd ~/Documents/Meltype`) と同じ原因で、保護区間とは別。
 
+
+## 追加項目 1-7 の続き (候補の意味を自前の小さなパネルで出す。K47)
+
+- **経緯・実機で分かったこと** (2026-10-15、macOS 26.6.2、TextEdit、試験用ビルドのトレース): (1) `IMKCandidates.showAnnotation` は画面に何も出さない。公式の呼び元 (`candidateSelectionChanged`) で固定の文字を出しても、1 周遅らせて文字色・背景色を付けても見えない。(2) 自プロセスの窓は候補ウィンドウ (`IMKUIPanel`、level 20) だけで、注釈用の窓は作られていない。(3) `candidatesWindow.candidateFrame()` は大きさだけ正しく位置は (0, 0)。`NSApp.windows` の可視の `IMKUIPanel` の `frame` (画面座標) は正しい。
+- **実装の要点** (Swift のみ):
+  - `mac/Sources/MeltypeIME/AnnotationPanel.swift` を新設。枠なし・`.nonactivatingPanel`・クリック透過・影あり・角丸の `NSPanel` (key/main にならない)。背景は `NSVisualEffectView` (`.popover`)、文字は `labelColor` の折り返すラベル (12pt・最大幅 300pt・最大 3 行・末尾 `…`)。level は候補ウィンドウの 1 つ上。
+  - 位置は表示のたびに `NSApp.windows` から可視の `IMKUIPanel` を探し、右隣 (x = maxX + 4、上端をそろえる)。画面の `visibleFrame` をはみ出すなら左隣、上下も収める。見つからなければ出さない。
+  - `InputController`: 出す所を `presentMeaning` に集め (秘匿入力の間は出さない。`ShowCandidateMeanings` OFF は今までどおり意味が空になる)、IMK の `showAnnotation` の呼び出しは全部やめた (入力モードの「あ」「あ (コード)」の表示も無くなり、`showModeAnnotation`・`shownDictionaryMeaning` は削除)。隠す所: `meaningKey` の didSet、`updateCandidates` の else、`hideComposition`、`deactivateServer`、利用者が候補ウィンドウの選択を動かしたとき (`candidateSelectionChanged` で `isSelectingProgrammatically` が false)。語・意味はログに書かない。
+- **得と損**: 得: 意味が実際に見える。損: 標準の見た目と少し違う。候補ウィンドウの位置を IMK の非公開のクラス名 `IMKUIPanel` で探すので、macOS の更新で見つからなくなったら出ないだけ (安全側)。入力モードの「あ」の表示は無くなった。候補ごとの注釈 (`notes`) は出さず、意味だけ。
+- **検証**: `swift build -c release` と `./build.sh --no-install` の結果は最終回答を参照。
+- **未確認**: 実機の見え方 (位置・色・ダーク/ライト・複数ディスプレイ・フルスクリーン)。

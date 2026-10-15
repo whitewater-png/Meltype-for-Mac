@@ -297,6 +297,7 @@ final class MeltypeInputController: IMKInputController {
         Self.trace("deactivateServer bundle=\(bundleID ?? "nil")")
         commitComposition(sender)
         candidatesWindow?.hide()
+        AnnotationPanel.shared.hide()
         super.deactivateServer(sender)
     }
 
@@ -333,6 +334,8 @@ final class MeltypeInputController: IMKInputController {
               let string = candidateString?.string,
               let index = candidateList.firstIndex(of: string) else { return }
         shownIndex = index
+        // 利用者が選択を動かした: 出している意味は古くなる (Core の選択と食い違う) ので隠す
+        AnnotationPanel.shared.hide()
     }
 
     // ---- メニュー (メニューバーの入力メニュー) ----
@@ -696,6 +699,7 @@ final class MeltypeInputController: IMKInputController {
         candidateList = []
         shownIndex = 0
         lastView = nil
+        AnnotationPanel.shared.hide()
         candidatesWindow?.hide()
     }
 
@@ -717,14 +721,12 @@ final class MeltypeInputController: IMKInputController {
     private var meaningKey: String? {
         didSet {
             meaningGeneration &+= 1
-            if shownDictionaryMeaning?.key != meaningKey { shownDictionaryMeaning = nil }
+            AnnotationPanel.shared.hide()
         }
     }
     /// meaningKey を書くたびに進める番号。タイマーと辞書の completion はこれで比べる。確定 (nil) → 同じ語の再変換で key が
     /// 同じに戻っても、確定前に仕掛けたタイマーが 1.5 秒を待たずに意味を出さないため (R56 任意 2)。
     private var meaningGeneration = 0
-    /// 出した辞書の意味。同じ候補のまま showModeAnnotation が「あ」で上書きするので、そこで出し直す。候補が変われば捨てる。
-    private var shownDictionaryMeaning: (key: String, text: String)?
 
     private func scheduleMeaning(_ view: CompositionView) {
         // Core の意味が無く、選んでいる候補が英字の語なら、macOS の辞書で引く (端末内・通信なし)。
@@ -733,32 +735,27 @@ final class MeltypeInputController: IMKInputController {
         let key = view.meaning.map { "\(view.selectedIndex):\($0)" } ?? dictionaryWord.map { "\(view.selectedIndex):dict:\($0)" }
         guard key != meaningKey else { return }
         meaningKey = key
-        guard let key else { return }
+        guard key != nil else { return }
         let generation = meaningGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self, self.meaningGeneration == generation, let window = candidatesWindow, window.isVisible() else { return }
             if let meaning = view.meaning {
-                window.showAnnotation(NSAttributedString(string: meaning))
+                self.presentMeaning(meaning)
             } else if let dictionaryWord {
                 // 辞書は別のキューで引く。戻ってきたとき候補が変わっていなければ (meaningGeneration が同じ) 出す。
                 CandidateDictionary.lookup(dictionaryWord) { [weak self] summary in
                     guard let self, self.meaningGeneration == generation, let summary, let window = candidatesWindow, window.isVisible() else { return }
-                    self.shownDictionaryMeaning = (key, summary)
-                    window.showAnnotation(NSAttributedString(string: summary))
+                    self.presentMeaning(summary)
                 }
             }
         }
     }
 
-    /// 候補ウィンドウの注釈に入力モードを出す (最小限の表示)。意味が出るまでの間だけで、意味が出たらそちらに替わる。
-    /// 変換中は日本語入力なので「あ」、「コード」のアプリでは「あ (コード)」。英数のときは候補ウィンドウが出ないのでここには出ない。
-    private func showModeAnnotation(_ view: CompositionView, window: IMKCandidates) {
-        guard view.meaning == nil else { return }
-        if let shown = shownDictionaryMeaning, shown.key == meaningKey {
-            window.showAnnotation(NSAttributedString(string: shown.text))
-            return
-        }
-        window.showAnnotation(NSAttributedString(string: appKind == .code ? "あ (コード)" : "あ"))
+    /// 候補の意味を、候補ウィンドウの横の自前のパネルに出す。IMKCandidates.showAnnotation は macOS 26 で注釈の窓が作られず
+    /// 何も出ない (実機のトレースで確認) ので使わない。入力モード (「あ」) の表示もやめた。語・意味はログに書かない。
+    private func presentMeaning(_ text: String) {
+        guard !IsSecureEventInputEnabled() else { return }
+        AnnotationPanel.shared.show(text)
     }
 
     private func updateCandidates(_ view: CompositionView) {
@@ -791,11 +788,11 @@ final class MeltypeInputController: IMKInputController {
             while shownIndex < target { window.moveDown(nil); shownIndex += 1 }
             while shownIndex > target { window.moveUp(nil); shownIndex -= 1 }
             scheduleMeaning(view)
-            showModeAnnotation(view, window: window)
         } else {
             meaningKey = nil
             candidateList = []
             shownIndex = 0
+            AnnotationPanel.shared.hide()
             window.hide()
         }
     }
