@@ -36,8 +36,8 @@ final class AnnotationPanel {
         label.isSelectable = false
         label.maximumNumberOfLines = 3
         // 折り返して 3 行まで、最後の行の末尾に「…」。.byTruncatingTail だと NSTextField は 1 行にしてしまう (実機で 1 行で切れていた)。
-        // 日本語は語の切れ目が無いので文字単位で折り返す。
-        label.lineBreakMode = .byCharWrapping
+        // .byWordWrapping でも日本語は文字の間で折り返される。英単語を途中で割らない・「。」を行頭に置かないため、文字単位 (.byCharWrapping) にはしない (査読 R71)。
+        label.lineBreakMode = .byWordWrapping
         label.cell?.truncatesLastVisibleLine = true
         label.preferredMaxLayoutWidth = Self.maxWidth - Self.padding * 2
 
