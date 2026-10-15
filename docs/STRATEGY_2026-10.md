@@ -134,6 +134,8 @@ Star 数で本家全体を超えるのは、利用者の大半が Windows であ
 
 [訂正 2026-10-14: 2-3 の「ライブ変換 (Space を押さずに第一候補を表示、設定で ON)」は、ライブ変換が Mac 版に既にあり既定 ON だったので誤り (`Settings.LiveConversion`、4 文字以上で Space なしに漢字を表示、設定タブで OFF 可。実機の TextEdit で `kyouhaiitenkidesune` を Space なしで打つと漢字で表示されることを確認)。2-3 は「ライブ変換の精度向上 (Zenzai 前提) と、ライブ変換の存在を README で前面に出す」に読み替える。得: 「ライブ変換と何が違うの」に「違いは英数/かなの切り替えが要らず英単語が英字のまま残ること」と答えられる / 損: 精度向上は Zenzai の計測待ち]
 
+[決定 2026-10-15: Phase 2 の 5 項目を実験し、成果は文書と表だけを main に入れる。コード (実験フラグ・測定ツール・使い捨て IME) は入れない (実験ブランチ `exp/p2-2-1`〜`exp/p2-2-5` は手元のみで公開していない)。2-1 は no-go (zenz の尤度で比べると英字のままの候補が有利になる。門付き τ=8 でも新 main の 310 件で直した 8 / 壊した 3、遅延の p95 が 40 ms を超える測定がある。[EXPERIMENT_2-1_RESULT.md](EXPERIMENT_2-1_RESULT.md))。2-2 は no-go (前 20 文字の英日比率は「英語の名詞句で始まる日本語の文」の直後を 12 件中 6 件壊し、閾値・片側の調整でも直らない。実機のホスト別の取得率 (実験 A) は未実施。[EXPERIMENT_2-2_RESULT.md](EXPERIMENT_2-2_RESULT.md)・[EXPERIMENT_2-2_HOST_CONTEXT.md](EXPERIMENT_2-2_HOST_CONTEXT.md))。2-3 は README の前面化だけ go (実機確認 1 は 2026-10-15 に合格し、README の「できること」にライブ変換の行と Zenzai の「既定 OFF」を反映した。Zenzai の既定 ON・4 文字のしきい値の引き下げはしない。[EXPERIMENT_2-3_LIVE_CONVERSION.md](EXPERIMENT_2-3_LIVE_CONVERSION.md))。2-4 は「英語部分の自動整形」が no-go (20 文中 6 文で日本語・英文を壊す)、「選択範囲の英訳/和訳」は保留 (意味の誤り 3/10)、IME の中から呼べるかを確かめる実験 0b は今は見送り ([EXPERIMENT_2-4_RESULT.md](EXPERIMENT_2-4_RESULT.md))。2-5 は条件 0 (学習ファイルの件数の見積り) と段階 0 (決まった文の書き写し) だけ go、コード変更なし。§5.6 の判断事項 3 つは条件 0 の前に決める ([EXPERIMENT_2-5_DESIGN.md](EXPERIMENT_2-5_DESIGN.md))]
+
 ### Phase 3: 仕組みの固定化 (3 か月以降)
 
 | ID | 施策 | 利用者に見える変化 | 得 / 損・リスク | 難 |

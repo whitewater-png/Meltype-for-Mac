@@ -1,0 +1,62 @@
+# 査読 R-P2-2 (2026-10-15) で査読者が足した前文脈つきの例 56 件。期待は査読者の判断で、実機の記録ではない (実機で確かめていない)。作例なので、各種類の件数は実際の利用の頻度ではない。列: 前の文字<Tab>打鍵<Tab>期待<Tab>種類<Tab>メモ
+# 種類 R1: 日本語が多く末尾が英語 + 複数語の英語の固有名・用語の続き (日本語の技術文でよくある)
+先週から使い始めた Visual 	Studio	Studio	R1 JA多数-EN尾 英語の続き
+先週から使い始めた Visual Studio 	Code	Code	R1 JA多数-EN尾 英語の続き
+このリポジトリでは GitHub 	Actions	Actions	R1 JA多数-EN尾 英語の続き
+このリポジトリでは GitHub 	actions	actions	R1 JA多数-EN尾 英語の続き
+昨日の打ち合わせで出た pull 	request	request	R1 JA多数-EN尾 英語の続き
+資料を共有するために Google 	Drive	Drive	R1 JA多数-EN尾 英語の続き
+新しく買ったのは Mac 	mini	mini	R1 JA多数-EN尾 英語の続き	mini はみにとも読める
+次のリリースでは Dark 	mode	mode	R1 JA多数-EN尾 英語の続き	mode はもでとも読める
+私の好きな曲は Let it 	be	be	R1 JA多数-EN尾 英語の続き	be はべとも読める
+今日の勉強会のテーマは machine 	learning	learning	R1 JA多数-EN尾 英語の続き
+担当してもらうのは product 	manager	manager	R1 JA多数-EN尾 英語の続き
+使っているのは Ruby on 	Rails	Rails	R1 JA多数-EN尾 英語の続き
+昨日届いたのは Nintendo 	Switch	Switch	R1 JA多数-EN尾 英語の続き
+今日見た映画は Top 	Gun	Gun	R1 JA多数-EN尾 英語の続き
+次の作業は code 	review	review	R1 JA多数-EN尾 英語の続き
+最近よく聞くのは Taylor 	Swift	Swift	R1 JA多数-EN尾 英語の続き
+彼の口ぐせは take it 	easy	easy	R1 JA多数-EN尾 英語の続き
+社内で使っているのは Microsoft 	Teams	Teams	R1 JA多数-EN尾 英語の続き
+旅行で行きたいのは New 	York	York	R1 JA多数-EN尾 英語の続き
+今日のランチは Uber 	Eats	Eats	R1 JA多数-EN尾 英語の続き
+# 種類 R2: 日本語が多く末尾が英語 + 日本語 (助詞・語)
+新しい企画の資料を作った Notion 	to	と	R2 JA多数-EN尾 日本語
+新しい企画の資料を作った Notion 	mo	も	R2 JA多数-EN尾 日本語
+新しい企画の資料を作った Notion 	ya	や	R2 JA多数-EN尾 日本語
+ずっと気になっていた MacBook 	made	まで	R2 JA多数-EN尾 日本語	made は英語でもある
+今週中に終わらせたい task 	ga	が	R2 JA多数-EN尾 日本語
+最近話題になっている ChatGPT 	ha	は	R2 JA多数-EN尾 日本語
+これから導入する Docker 	de	で	R2 JA多数-EN尾 日本語
+先方から届いた PDF 	kara	から	R2 JA多数-EN尾 日本語
+日本語の長い文章をここまで書いて最後に PR 	kakunin	かくにん	R2 JA多数-EN尾 日本語
+新しいプロジェクトの名前は Meltype 	desu	です	R2 JA多数-EN尾 日本語
+# 種類 R3: 長い英語の名詞句で始まる日本語の文 (英語が多く、末尾が日本語の助詞) + 日本語の語
+Visual Studio Code の	tame	ため	R3 EN多数-JA尾 日本語文	tame は英語でもある
+Pull Request を	mite	みて	R3 EN多数-JA尾 日本語文	mite は英語でもある
+Google Drive に	age	あげ	R3 EN多数-JA尾 日本語文	age は英語でもある
+Microsoft Teams の	kanji	かんじ	R3 EN多数-JA尾 日本語文
+Amazon Prime Video で	mite	みて	R3 EN多数-JA尾 日本語文
+GitHub Copilot を	tsukau	つかう	R3 EN多数-JA尾 日本語文
+Google Calendar に	ireta	いれた	R3 EN多数-JA尾 日本語文
+Apple Music で	kiku	きく	R3 EN多数-JA尾 日本語文
+Docker Compose の	settei	せってい	R3 EN多数-JA尾 日本語文
+README.md の	same	さめ	R3 EN多数-JA尾 日本語文	不自然だが same の向きを見る
+Pull Request を	made	まで	R3 EN多数-JA尾 日本語文	made は英語でもある
+Pull Request は	mine	みね	R3 EN多数-JA尾 日本語文	不自然だが mine の向きを見る
+# 種類 R4: 英文の中に日本語の名前 (英語が多く、末尾が日本語) + 英語の続き
+Please send the report to 佐藤さん 	by	by	R4 EN多数-JA尾 英文
+I had lunch with 田中さん 	and	and	R4 EN多数-JA尾 英文
+Let me ask 鈴木さん 	about	about	R4 EN多数-JA尾 英文
+Thanks 田中さん 	for	for	R4 EN多数-JA尾 英文
+We visited 京都 	last	last	R4 EN多数-JA尾 英文
+The meeting with 佐藤 	is	is	R4 EN多数-JA尾 英文
+Notes from 田中さん 	he	he	R4 EN多数-JA尾 英文	he はへとも読める
+Feedback from 山田さん 	was	was	R4 EN多数-JA尾 英文
+I will meet 鈴木さん 	at	at	R4 EN多数-JA尾 英文
+The 寿司 	was	was	R4 EN多数-JA尾 英文
+# 種類 R5: 記号
+今日はとても良い天気だったので GitHub 	?	？	R5 JA多数-EN尾 記号	判断が割れる
+日本語の長い文章をここまで書いて最後に PR 	!	！	R5 JA多数-EN尾 記号	判断が割れる
+We should ask 田中さん 	?	?	R5 EN多数-JA尾 記号
+I will send it to 山田さん 	!	!	R5 EN多数-JA尾 記号

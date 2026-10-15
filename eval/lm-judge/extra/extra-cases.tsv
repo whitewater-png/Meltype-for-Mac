@@ -1,0 +1,19 @@
+# 実験 2-1 の補足ケース (公開してよい架空の例。本リポジトリの eval/cases には入れない)。作者が作った探索用で、実機で確かめた値ではない
+# 打鍵<Tab>期待<Tab>比べ方<Tab>出典
+# --- 小文字の人名 ---
+john san ni aini iku	john さんに会いに行く	ascii	補足 2-1 (作例)
+mark san to hanasu	mark さんと話す	ascii	補足 2-1 (作例)
+tom to jerry wo miru	tom と jerry を見る	ascii	補足 2-1 (作例)
+kate san ha nihonjin	kate さんは日本人	ascii	補足 2-1 (作例)
+emi to mark ga kita	えみと mark が来た	ascii	補足 2-1 (作例)
+my name is yuki	my name is yuki	ascii	補足 2-1 (作例)
+# --- pro|to 型 ---
+prototoshite tsukau	proto として使う	ascii	補足 2-1 (作例)
+protodeshita	proto でした	ascii	補足 2-1 (作例)
+protopedia wo miru	protopedia を見る	ascii	補足 2-1 (作例)
+# --- 長めの日英混在文 ---
+kyou ha github de pull request wo tsukutta	今日は github で pull request を作った	ascii	補足 2-1 (作例)
+raishuu no miitingu de api no sekkei wo kimeru	来週のミーティングで api の設計を決める	ascii	補足 2-1 (作例)
+docker compose up de kidou suru to error ga deta	docker compose up で起動すると error が出た	ascii	補足 2-1 (作例)
+sono apuri ha swiftui de kakareteiru	そのアプリは swiftui で書かれている	ascii	補足 2-1 (作例)
+claude code ni refakutaringu wo tanomu	claude code にリファクタリングを頼む	ascii	補足 2-1 (作例)
