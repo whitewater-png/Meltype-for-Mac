@@ -2552,4 +2552,36 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **結果**: 本家 `c6b281e` (#69、`inviteshimashita`・`invitewookutta`) を、`githubdevote` を守る条件つきで取り込んだ。本家 `8dfec9d` (`site PR`) は、独立した査読で `kono site URL` → `このして URL` などの悪化が見つかったので見送った (リョウさんの判断)。詳細と数字は [COMPARISON_UPSTREAM.md](COMPARISON_UPSTREAM.md) の小節「小さい 2 型の取り込み実験」。
 - **確認**: テスト 778/778、品質テスト 1269/1271、正解表 278/310 (`main` に対して broken 0 / fixed 2)。独立査読の自作入力 79 件で悪化 0。
 - **実機で確かめること** (リョウさん): `inviteshimashita`・`invitewookutta`・`githubdevote` (`githubでvote`)・`devote` や `derive` を含む文。
+- **実機確認 (2026-10-16 午前、リョウさん。打ったアプリが TextEdit かは未確認)**: 入れてあった本体の更新時刻は 2026-10-16 05:48 (727e486 より後。どのコミットから作ったかは未確認)。報告は `打鍵>結果` の 5 行で、`inviteshimashita>inviteしました`・`invitewookutta>inviteを送った`・`githubdevote>githubでvote`・`devotewo>デヴォテを`・`derive や devote>でリヴェヤでvote`。最後の行の打鍵は `deriveyadevote` と推測した (報告の文面からの推測で、確かめていない)。前の 3 行は狙いどおり、`devotewo` は取り込みのときに既知の限界として固定したとおり。`derive` は直っていなかった。
+- **原因**: #69 の守り `StartsWithParticleThenEnglishWord` (助詞で始まり、残り 3 文字以上が英単語の語には新しい規則を使わない) が、残りを `IsKnownEnglishWord` で見ていた。これは 4 文字以上ならスペルチェッカーにも聞く。実機の NSSpellChecker は `rive` を英単語と答える (下の Swift の表で確認) ので、`derive` が `de|rive` として守り側に入り、v 行の規則で日本語に戻っていた。テストと `--repro` が使う同梱の一覧 (`english-words.txt`) には `rive` が無いので、そこでは `deriveやでvote` になり、取り込みのときの査読の「`derive` も直った」はテストでだけ成り立っていた (COMPARISON_UPSTREAM の該当の行に [訂正 2026-10-16] を付けた)。
+- **今回の変更** (`feat/p3-3-2-derive` の `809548c`。Core のみ): 守りの残りの判定を、覚えた語 → `english.txt`・固有名詞 → 4 文字以上なら `english-words.txt` (`BuiltInWordChecker.Shared`) だけにして、スペルチェッカーには聞かない。`_english.Words` が読むのは `english.txt` (+ 固有名詞・ユーザー辞書。217 行) で、`english-words.txt` ではない。`vote` は `english.txt` に無いので、`english-words.txt` を見ないと `githubdevote` が `githubdevote` に壊れる。そのため `english-words.txt` も見る。`vote`・`vise`・`vice` は `english-words.txt` にあり、`rive` は無いことを確かめた。
+  - 同梱の一覧を使うテスト・`--repro`・`--eval` では、式の上で変更前と答えが変わらない (スペルチェッカーが同梱の一覧のときは前と同じ式になる。スペルチェッカーが無いときは、外側の `IsSpellWord` が false なので守りまで来ない)。
+  - 実機でも、新しい辞書は足していない (`english-words.txt` は、`CallbackWordChecker` が「分からない」を返したときの代わりに使う同梱の表。今回の変更で、守りを見るときにも最初に使う時点で読み込まれる。約 3.9 万語)。
+- **実機に近い比較**: Mac 版と同じ呼び方 (`NSSpellChecker.shared.checkSpelling(of:startingAt:0,language:"en",…)`、2 文字未満は語でない) の答えを Swift のスクリプトで JSON の表に書き出し、それを読む使い捨ての入口 (テストのプロジェクトの `--nsprobe`。コミットしていない) で、変更前 (60534b0) と変更後を同じ `Keyboard` に打って比べた。表に無い語を聞かれたら書き足して打ち直したが、最後の回は表に無い語は 0 件。実機が 4 行を同じ形で出しているので、この表で実機の判定が再現できていると見た (`devotewo`・`deriveyadevote` は漢字・カタカナを除いて一致。変換エンジンは偽物なのでかなまで)。
+  - 入力 (重なりを除いて 814 件): 指定の 14 件 + `devote`・`yadevote`・`deriveyadevise`。`english-words.txt` から機械的に取り出した「v を含み、Core の `StartsWithParticle` の助詞 (no ga wo ni de to ha mo wa he) で始まり、残りが 3 文字以上の語」206 語の、単独・`github` + 語・語 + `wo`。`/usr/share/dict/words` も合わせて、守りの答えが変更前後で変わる語 (NSSpellChecker が語と答え、l・x を含まない 5 文字以上) を数えると 26 語あり、その単独・`github` + 語・語 + `wo`・`kyouha` + 語 + `desu`。`derive`・`devote`・`devise`・`novice`・`invite` ほか 9 語に `suru`・`shita`・助詞・`kyouha`・`kono`・`yadevote` などを付けたもの。
+  - 結果: **変更前が正しく変更後が違うもの 0 件**。変わったのは 24 件 (Enter・Space・入力中の表示のどれか)。そのうち 23 件は、語が英語のまま残るようになった (`derive` を含む 15 件と、`github` + 語・語 + `wo` の `degenerative`・`denotative`・`novena`・`novitiate` 8 件)。残る 1 件の `derivedyadevote` は、`でりゔぇぢゃでvote` → `deriveぢゃでvote` で、前後とも外れ。守りが新しく効くようになる側の語 (`devised`・`devising`: `vised`・`vising` は同梱の一覧にあり、NSSpellChecker は語でないと答える) も、答えは変わらなかった (前後とも英語のまま)。同梱の一覧での結果は、全入力で前後が同じ。
 
+  | 打鍵 | 実機 (報告) | NS の表・変更前 | NS の表・変更後 | 同梱の一覧 (`--repro` と同じ。前後同じ) |
+  | --- | --- | --- | --- | --- |
+  | `deriveyadevote` | でリヴェヤでvote (打鍵は推測) | でりゔぇやでvote | **deriveやでvote** | deriveやでvote |
+  | `deriveya` | — | でりゔぇや | **deriveや** | deriveや |
+  | `derive` | — | derive | derive | derive |
+  | `derivewo` | — | でりゔぇを | **deriveを** | deriveを |
+  | `githubdevote` | githubでvote | githubでvote | githubでvote | githubでvote |
+  | `devotewo` | デヴォテを | でゔぉてを | でゔぉてを | でゔぉてを |
+  | `devise` | — | devise | devise | devise |
+  | `devisewo` | — | でゔぃせを | でゔぃせを | でゔぃせを |
+  | `githubdevise` | — | githubでゔぃせ | githubでゔぃせ | githubでゔぃせ |
+  | `inviteshimashita` | inviteしました | inviteしました | inviteしました | inviteしました |
+  | `invitewookutta` | inviteを送った | inviteをおくった | inviteをおくった | inviteをおくった |
+  | `kyouhanovice` | — | きょうはのゔぃせ | きょうはのゔぃせ | きょうはのゔぃせ |
+  | `novice` | — | novice | novice | novice |
+  | `vanpaia` | — | ゔぁんぱいあ | ゔぁんぱいあ | ゔぁんぱいあ |
+  | `yadevote` | — | やでvote | やでvote | やでvote |
+  | `kyouhaderive` | — | きょうはでりゔぇ | きょうはでりゔぇ | きょうはderive |
+
+  - 機械的に取り出した 206 語 (NS の表、Enter): 単独で英語のまま 203 → 203、語 + `wo` で `語を` 200 → 201、`github` + 語が 1 語の英字 200 → 201。変更後も外れる語 + `wo` は `devote`・`devise`・`deaves`・`heave`・`waive` の 5 語。`heave`・`waive` は単独でも `へあゔぇ`・`わいゔぇ` で、同梱の一覧でも同じ (この守りとは別の経路。原因は調べていない)。
+- **確認**: テスト 778 → 779 (足したテスト `Upstream69_ParticlePlusWordGuard_DoesNotAskTheSpellChecker`: `rive` を英単語と答えるスペルチェッカーで `deriveyadevote` → `deriveやでvote`・`githubdevote` → `githubでvote`・`derivewo` → `deriveを` ほか。変更前のコードでは `deriveyadevote` が `でりゔぇやでvote` で落ちることを確かめた)。品質テスト 1269/1271 → 1269/1271 (外れの 2 件は前と同じ)。`tools/eval-compare.sh` で main (`/Users/ryo/Meltype`、60534b0) と比べて 278/310 → 278/310、broken 0 / fixed 0。既存のテストの期待値は変えていない。
+- **go** (新しい外れ 0 件、実機に近い前後比較で変更前が正しいものを壊していない)。push はしていない。
+- **残る限界** (KNOWN_LIMITS の K81): `devote`・`devise` のように「助詞 + 同梱の英単語」とも読める v を含む英単語は、続けて打つと日本語側になる (`devotewo` → `でゔぉてを`、`devisewo` → `でゔぃせを`、`deriveyadevise` → `deriveやでゔぃせ`)。`ya devote` を空白なしで続けた `yadevote` も `やでvote`。日本語の後ろの `derive` (`kyouhaderive` → `きょうはでりゔぇ`、`konoderive` → `このでりゔぇ`) は、実機に近い表では前後とも日本語 (同梱の一覧では `きょうはderive`。別の経路でもスペルチェッカーの `rive` が効いていると推測。調べていない)。
+- **未確認**: 実機 (変更後のビルドは入れていない。`build.sh --no-install` も回していない)。実機の 5 行目の打鍵 (`deriveyadevote` は推測)。打ったアプリ (TextEdit かどうか)。
