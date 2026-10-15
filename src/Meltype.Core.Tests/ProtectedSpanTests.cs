@@ -70,8 +70,19 @@ internal static class ProtectedSpanTests
             // -- のオプションも、= を含む・- で区切った部分にローマ字として読めないものがある・ローマ字として読めない・大文字を含む・直前が英語のときは守る
             ["--color=auto"] = "--color=auto", ["--help"] = "--help", ["--force"] = "--force", ["--version"] = "--version", ["--Werror"] = "--Werror",
             ["git --name"] = "git --name", ["--dry-run"] = "--dry-run",
+            // 最後の部分が、語末の n 以外の子音で終わる (edit の t・only の ly・all の l・amend の d) なら日本語ではないので守る (査読 R62 推奨 1)。大文字は、どの部分にあっても守る
+            ["--no-edit"] = "--no-edit", ["--ff-only"] = "--ff-only", ["--all"] = "--all", ["--amend"] = "--amend", ["--no-Sushi"] = "--no-Sushi",
         };
         foreach (var (typed, expected) in cases) Assert.Equal(expected, Commit(typed), $"「{typed}」");
+    }
+
+    [Test]
+    public static void DoubleDash_WhileTyping_StaysJapaneseUntilTheEnd()
+    {
+        // 打っている途中の最後の部分は IsValid だけで見る (「ーー」を打つ途中で子音ごとに英字と日本語が入れ替わらない)。--no-edit は、打っている間は日本語に見え、確定で英字になる (K75)
+        foreach (var typed in new[] { "--no-edi", "--no-ed", "--no-onl" })
+            Assert.True(!HasProtected(typed, final: false), $"「{typed}」は打っている途中なので守らない (日本語のまま)");
+        Assert.True(!HasProtected("--no-edi", final: false) && HasProtected("--no-edit", final: true), "--no-edit は確定で守る");
     }
 
     [Test]
@@ -130,6 +141,12 @@ internal static class ProtectedSpanTests
         paren.Host.PrecedingText = "ファイルは(";
         paren.Type("~/Documents)wo\n");
         Assert.Equal("~/Documents)を", paren.Host.Document, "確定済みの ( に対応する ) は半角で範囲に入る");
+
+        // 査読 R62 任意 2: 確定済みの全角の （ は、打った ) を閉じと読み替える (「 → ] と同じ)
+        var wide = new CompositionTests.Keyboard();
+        wide.Host.PrecedingText = "ファイルは（";
+        wide.Type("~/Documents)wo\n");
+        Assert.Equal("~/Documents)を", wide.Host.Document, "確定済みの全角の （ に対応する ) は閉じ (範囲に入り、後ろの を は日本語)");
     }
 
     [Test]
@@ -291,11 +308,11 @@ internal static class ProtectedSpanTests
         Assert.True(k.Host.Document.StartsWith("/tmp/sushi"), "守った区間は変わらない: " + k.Host.Document);
     }
 
-    private static bool HasProtected(string typed)
+    private static bool HasProtected(string typed, bool final = true)
     {
         var text = new CompositionText(CompositionTests.Detector);
         foreach (var c in typed) text.Append(c);
-        return text.Segments(final: true).Any(s => s.Protected);
+        return text.Segments(final: final).Any(s => s.Protected);
     }
 }
 

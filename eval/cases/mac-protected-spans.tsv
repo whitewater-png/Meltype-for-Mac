@@ -46,3 +46,6 @@ taro.yamada@example.com	taro.yamada@example.com	full	計画書 1-4a (保護区�
 https://example.com wo mite	https://example.com をみて	full	計画書 1-4a (保護区間 P42)
 README.mdwo	README.mdを	full	計画書 1-4a (保護区間 P42)
 localhost:3000	localhost:3000	full	計画書 1-4a (保護区間 P42)
+--no-edit	--no-edit	full	計画書 1-4a (保護区間 P42) / 査読 R62 推奨 1 (最後の部分が語末の n 以外の子音で終わる・大文字を含む)
+--ff-only	--ff-only	full	計画書 1-4a (保護区間 P42) / 査読 R62 推奨 1 (最後の部分が語末の n 以外の子音で終わる・大文字を含む)
+--no-Sushi	--no-Sushi	full	計画書 1-4a (保護区間 P42) / 査読 R62 推奨 1 (最後の部分が語末の n 以外の子音で終わる・大文字を含む)

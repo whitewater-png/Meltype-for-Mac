@@ -2760,7 +2760,7 @@ public sealed class CompositionController
     /// <summary>
     /// 変換中でない Enter・Tab をアプリに渡した。アプリの入力欄には改行・タブが入るので、自分の確定の記録 (直後の 1.5 秒は入力欄より優先して使う) にも入れる。
     /// 入れないと、2 行目の文頭の語が直前の行の最後の文字につながって見え (Hi therePlease)、英文と読めない (実機のトレースで見つかった)。
-    /// Space (修飾キーなし) も同じ: 日本語を確定してから Space で空白を入れ、/tmp/foo を打つとき、空白の後を語の頭と読めず、パスを守れない (査読 R57 必須 A)。
+    /// Space (Shift+Space も。選択が無ければアプリに空白が入る) も同じ: 日本語を確定してから Space で空白を入れ、/tmp/foo を打つとき、空白の後を語の頭と読めず、パスを守れない (査読 R57 必須 A)。
     /// </summary>
     public void NoteBreakKeyPassedToApp(int vk, bool shift = false)
     {
@@ -2771,7 +2771,7 @@ public sealed class CompositionController
             if (_lastCommitText.EndsWith('\n') || _lastCommitText.EndsWith('\t') || _lastCommitText.EndsWith(' ')) _lastCommitText = _lastCommitText[..^1];
             return;
         }
-        var joined = _lastCommitText + (vk == VirtualKeys.Return ? "\n" : vk == VirtualKeys.Tab && !shift ? "\t" : vk == VirtualKeys.Space && !shift ? " " : "");
+        var joined = _lastCommitText + (vk == VirtualKeys.Return ? "\n" : vk == VirtualKeys.Tab && !shift ? "\t" : vk == VirtualKeys.Space ? " " : "");
         _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
     }
 

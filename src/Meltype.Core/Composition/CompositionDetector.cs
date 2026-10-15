@@ -976,11 +976,14 @@ public sealed class CompositionDetector
         var wordEnd = start;
         while (wordEnd < n && !IsSpace(units[wordEnd])) wordEnd++;
         // 開きの記号の直後なら、範囲は対応する閉じの記号まで (閉じの記号も含める)。閉じが無ければ空白まで。
-        // 開きの記号が確定済みの文字の側にあるとき (start == 0) は、キャレットの前の文字から決める。確定済みの 「 に対応するのは、打った ] (日本語の 」)
+        // 開きの記号が確定済みの文字の側にあるとき (start == 0) は、キャレットの前の文字から決める。
+        // 確定済みの 「 に対応するのは、打った ] (日本語の 」)。確定済みの全角の （ に対応するのは、打った ) (全角の ）)
         var closeAt = -1;
         var opener = start > 0 ? units[start - 1].Raw : precedingOpener;
         var closer = "";
-        var hasCloser = opener is not null && (start == 0 && opener == "「" ? (closer = "]") is not null : WordOpeners.TryGetValue(opener, out closer!));
+        var hasCloser = opener is not null && (start == 0 && opener == "「" ? (closer = "]") is not null
+            : start == 0 && opener == "（" ? (closer = ")") is not null
+            : WordOpeners.TryGetValue(opener, out closer!));
         if (hasCloser)
         {
             for (var k = start; k < wordEnd; k++)
@@ -992,7 +995,7 @@ public sealed class CompositionDetector
             }
         }
         // [ ] は、[ が日本語の区間にあれば「」になるので、閉じの ] は範囲に入れず、日本語の区間に残す (「~/Documents」を)。
-        // [ が英語の後ろで半角のままなら、] も半角で範囲に入れる (see [~/Documents]を)。ほかの閉じの記号は半角のまま範囲に入れる
+        // 半角の [ が確定済みの側にあるとき (E の経路。打った [ は英語の後ろでも半角にならない) だけ、] も半角で範囲に入れる (see [~/Documents]を)。ほかの閉じの記号は半角のまま範囲に入れる
         var closerStaysJapanese = start == 0 ? opener == "「" : opener == "[" && !precededByEnglish;
         int Finish(int end) => closeAt >= 0 && end == closeAt && !closerStaysJapanese ? closeAt + 1 : end;
         var word = Raw(units, start, wordEnd) + (wordEnd == n ? pending : "");
@@ -1012,10 +1015,20 @@ public sealed class CompositionDetector
             if (dashes == 2)
             {
                 // -- は小説・台詞の「ーー」(--sorekara) にも使うので、- と同じく絞る。--name のようなローマ字として読めるオプションは英語の後ろでだけ守る。
-                // 長音の - (--ko-hi-wo・--ra-men) は日本語なので、- で区切った部分が全部ローマ字として読めるなら守らない (--no-install・--dry-run は読めない部分があるので守る)。= を含むものは守る
+                // 長音の - (--ko-hi-wo・--ra-men) は日本語なので、- で区切った部分が全部ローマ字として「最後まで」読めるなら守らない。
+                // 最後まで読める = { IsValid, Partial が "" か n (語末の n は ん) }。語末が n 以外の子音 (--no-edit の t・--ff-only の ly・--all の l) で終わる日本語は無いので、守る。
+                // -- の前の部分はいつもこの条件。最後の部分は、打ち終わり (final か後ろが空白) のときだけこの条件にする
+                // (打っている途中は IsValid だけ。「ーー」を打つ途中で子音ごとに英字と日本語が入れ替わらないため。--no-edit は打っている間は日本語に見え、確定で英字になる)。= と大文字を含むものは守る
+                var complete = final || wordEnd < n;
                 var parts = word[2..].Split('-', StringSplitOptions.RemoveEmptyEntries);
-                var hasUnreadablePart = word.Length > 3 && word.IndexOf('-', 2) >= 0 && parts.Any(part => !_romaji.AnalyzeFragment(part.ToLowerInvariant()).IsValid);
-                isOption = word.IndexOf('=', 2) >= 0 || hasUnreadablePart || unreadable || letters.Any(char.IsAsciiLetterUpper) || englishWordBefore(start);
+                bool Unreadable(string part, bool isLast)
+                {
+                    var analysis = _romaji.AnalyzeFragment(part.ToLowerInvariant());
+                    return !analysis.IsValid || (!isLast || complete) && analysis.Partial is { Length: > 0 } and not "n";
+                }
+                var hasUnreadablePart = word.Length > 3 && word.IndexOf('-', 2) >= 0 && parts.Select((part, i) => Unreadable(part, i == parts.Length - 1)).Any(bad => bad);
+                var firstUnreadable = Unreadable(letters, letters.Length == word.Length - 2);
+                isOption = word.IndexOf('=', 2) >= 0 || hasUnreadablePart || firstUnreadable || word.Skip(2).Any(char.IsAsciiLetterUpper) || englishWordBefore(start);
             }
             else
             {

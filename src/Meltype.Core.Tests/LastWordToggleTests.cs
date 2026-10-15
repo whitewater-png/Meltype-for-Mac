@@ -50,9 +50,10 @@ internal static class LastWordToggleTests
         public SessionResult Key(int vk, char? ch = null, bool shift = false, bool control = false)
         {
             var result = Apply(Session.HandleKey(vk, ch, shift, control, false, false, Before));
-            if (EchoPassedKeys && !result.Consumed && !shift && !control)
+            if (EchoPassedKeys && !result.Consumed && !control)
             {
                 if (vk == VirtualKeys.Space) Doc += " ";
+                else if (shift) { }
                 else if (vk == VirtualKeys.Return) Doc += "\n";
                 else if (vk == VirtualKeys.Back && Doc.Length > 0) Doc = Doc[..^1];
             }
@@ -757,6 +758,17 @@ internal static class LastWordToggleTests
             erased.Key(VirtualKeys.Back);
             erased.Type("/fuka\n");
             Assert.True(erased.Doc.EndsWith("ふか") && !erased.Doc.Contains("fuka"), "消した空白は記録から戻す: " + erased.Doc);
+
+            // 査読 R62 任意 1: Shift+Space も選択が無ければアプリに空白が入るので、記録に足す
+            var shifted = new Editor { EchoPassedKeys = true };
+            shifted.Type("fairuha");
+            shifted.Key(VirtualKeys.Space);
+            shifted.Enter();
+            shifted.Key(VirtualKeys.Space, shift: true);
+            var beforeShifted = shifted.Doc;
+            Assert.True(beforeShifted.EndsWith(' '), "前提: Shift+Space の空白が入力欄に入っている: " + beforeShifted);
+            shifted.Type("/tmp/foo\n");
+            Assert.Equal(beforeShifted + "/tmp/foo", shifted.Doc, "Shift+Space の後の /tmp/foo も崩れない");
         });
     }
 }
