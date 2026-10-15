@@ -911,7 +911,13 @@ internal static class LanguageLearningTests
             k.TypeKeys((VirtualKeys.Space, true));
             k.Type("\n");
             Assert.Equal("ご", k.Host.Document, "Shift+Space で日本語の候補が先頭");
-            Assert.Equal(false, memory.Get("go"), "日本語で確定したので、次から日本語");
+            // 候補から選んだだけ (はっきり直していない) の逆向きは、1 回では向きを変えない (1-6)。続けて 2 回で日本語になる
+            Assert.Equal(true, memory.Get("go"), "1 回の例外では、覚えた英語のまま");
+            var again = new CompositionTests.Keyboard(languages: memory);
+            again.Type("go");
+            again.TypeKeys((VirtualKeys.Space, true));
+            again.Type("\n");
+            Assert.Equal(false, memory.Get("go"), "日本語で続けて 2 回確定したので、次から日本語");
         }
         finally
         {

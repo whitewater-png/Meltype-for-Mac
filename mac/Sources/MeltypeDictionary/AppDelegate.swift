@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        // 「判定を調べる」が IME と同じ英単語の判定 (NSSpellChecker) を使えるようにする
+        dictionary.setWordChecker(isEnglishWordCallback)
         let controller = MainWindowController(dictionary: dictionary)
         windowController = controller
         showMainWindow()

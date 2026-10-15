@@ -21,6 +21,7 @@ private typealias CommitFunction = @convention(c) (UnsafeMutableRawPointer?) -> 
 private typealias SelectFunction = @convention(c) (UnsafeMutableRawPointer?, Int32) -> UnsafeMutablePointer<CChar>?
 private typealias SetDirectFunction = @convention(c) (UnsafeMutableRawPointer?, Int32) -> Void
 private typealias ForgetFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
+private typealias CancelToggleFunction = @convention(c) (UnsafeMutableRawPointer?) -> UnsafeMutablePointer<CChar>?
 private typealias ReconvertFunction = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 private typealias SetAppFunction = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> Int32
 private typealias AddUserWordFunction = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
@@ -88,6 +89,8 @@ private func reading(of text: String) -> String? {
 }
 
 /// 英単語として正しい綴りか (macOS のスペルチェッカー、英語で調べる)。
+/// 「Meltype 辞書」の「判定を調べる」(mac/Sources/MeltypeDictionary/WordChecker.swift の isEnglishWordCallback) と同じ判定にしておくこと
+/// (違うと、画面の答えが IME とずれる)。
 private let isWordCallback: IsWordCallback = { word in
     guard let word else { return 0 }
     let text = String(cString: word)
@@ -116,6 +119,8 @@ struct SessionResult: Decodable {
     let consumed: Bool
     let commits: [TextEdit]
     let view: CompositionView?
+    /// 確定した直後の語を F10 / F6 で直した結果なら true (無ければ nil)。入力欄の書き換えを確かめられず飛ばしたら、変換ボックスを出さず meltype_cancel_toggle を呼ぶ。
+    let toggle: Bool?
 }
 
 struct TextEdit: Decodable {
@@ -164,7 +169,7 @@ final class NativeCore {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion と、
     /// 辞書の管理画面の NativeDictionary.expectedAbiVersion (Sources/MeltypeDictionaryKit) と必ず同じにする。
     /// 食い違う dylib (別の版が混ざった) を読むと関数の引数が合わずに落ちるので、食い違ったら初期化を止める。
-    static let expectedAbiVersion: Int32 = 9
+    static let expectedAbiVersion: Int32 = 11
 
     /// dylib の版数が expectedAbiVersion と合っているか (initialize で確かめる)。合わなければ入力を一切扱わない (キーはアプリに渡る)。
     private(set) var isCompatible = false
@@ -181,6 +186,7 @@ final class NativeCore {
     private let setDirectFunction: SetDirectFunction?
     /// 無い (古い dylib) ときは何もしない。ABI 版数は上げない。
     private let forgetLastCommitFunction: ForgetFunction?
+    private let cancelToggleFunction: CancelToggleFunction?
     private let reconvertFunction: ReconvertFunction?
     private let setAppFunction: SetAppFunction?
     private let addUserWordFunction: AddUserWordFunction?
@@ -251,6 +257,7 @@ final class NativeCore {
         selectPredictionFunction = symbol("meltype_select_prediction", as: SelectFunction.self)
         setDirectFunction = symbol("meltype_set_direct", as: SetDirectFunction.self)
         forgetLastCommitFunction = symbol("meltype_forget_last_commit", as: ForgetFunction.self)
+        cancelToggleFunction = symbol("meltype_cancel_toggle", as: CancelToggleFunction.self)
         reconvertFunction = symbol("meltype_reconvert", as: ReconvertFunction.self)
         setAppFunction = symbol("meltype_set_app", as: SetAppFunction.self)
         addUserWordFunction = symbol("meltype_add_user_word", as: AddUserWordFunction.self)
@@ -339,6 +346,13 @@ final class NativeCore {
     func forgetLastCommit(_ session: UnsafeMutableRawPointer?) {
         guard isCompatible else { return }
         forgetLastCommitFunction?(session)
+    }
+
+    /// 確定した直後の語を F10 / F6 で直した結果 (toggle) の、入力欄の書き換えを確かめられず飛ばしたとき。本体の変換ボックス・記録・学習を直前に戻す。
+    @discardableResult
+    func cancelToggle(_ session: UnsafeMutableRawPointer?) -> SessionResult? {
+        guard isCompatible, let cancelToggleFunction else { return nil }
+        return decode(cancelToggleFunction(session))
     }
 
     func setDirect(_ session: UnsafeMutableRawPointer?, _ direct: Bool) {

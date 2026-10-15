@@ -90,6 +90,7 @@ def load(lib_path):
         "meltype_learned_check": ([s, s], p),
         "meltype_learned_set": ([s, i, s], p),
         "meltype_learned_remove": ([s], p),
+        "meltype_cancel_toggle": ([p], p),
     }
     for name, (args, result) in signatures.items():
         function = getattr(lib, name)
@@ -612,6 +613,42 @@ def child_learned_remove(lib):
     return out
 
 
+def key_result(lib, session, vk, ch=0, modifiers=0, before=None):
+    """キーを 1 つ打って、結果の JSON (consumed・commits・view・toggle) を返す。"""
+    return json.loads(text(lib, lib.meltype_handle_key(session, vk, ch, modifiers, u(before), None)))
+
+
+def child_toggle_ops(lib):
+    """確定した直後の語を F10 で直し、取り消す (確定後の 1 キー日英トグル)。AOT でも結果の JSON (toggle)・学習の保存 (Reverse)・取消の入口が動くか。"""
+    out = {}
+    out["data_directory"], out["safe"] = data_directory(lib)
+    if not out["safe"]:
+        return out
+    # 入力欄の前の文字が読めないホスト (before = NULL) では、直せる語があっても飲み込まない (素通しは記録も捨てるので、別のセッションで)
+    unreadable = lib.meltype_create()
+    for ch in "nihongo":
+        key_result(lib, unreadable, ord(ch.upper()), ord(ch))
+    key_result(lib, unreadable, 0x0D)
+    out["f10_unreadable"] = key_result(lib, unreadable, 0x79, before=None)["consumed"]
+    session = lib.meltype_create()
+    out["session"] = bool(session)
+    for ch in "nihongo":
+        key_result(lib, session, ord(ch.upper()), ord(ch))
+    out["enter"] = [c["text"] for c in key_result(lib, session, 0x0D)["commits"]]
+    result = key_result(lib, session, 0x79, before="にほんご")                       # F10
+    out["f10"] = {"consumed": result["consumed"], "toggle": result.get("toggle"), "commits": [(c["deleteBefore"], c.get("original"), c["text"]) for c in result["commits"]]}
+    out["learned_after_f10"] = [row[:2] for row in learned_words(lib) or []]
+    cancel = text(lib, lib.meltype_cancel_toggle(session))
+    out["cancel"] = json.loads(cancel) if cancel else None
+    out["learned_after_cancel"] = [row[:2] for row in learned_words(lib) or []]
+    out["f10_again"] = key_result(lib, session, 0x79, before="にほんご")["consumed"]    # 取り消したあとは記録を捨てるので、もう一度押しても直さない (R43-7)
+    # 逆向きの回数 (Reverse) を languages.json に保存・読み直しできる (ソース生成の JSON)
+    out["set_api"] = text(lib, lib.meltype_learned_set(u("apix"), 1, None))
+    path = os.path.join(out["data_directory"], "languages.json")
+    out["languages_json"] = open(path, encoding="utf-8").read() if os.path.exists(path) else None
+    return out
+
+
 def child(lib_path, step, args):
     lib = load(lib_path)
     if step in ("write", "read"):
@@ -652,6 +689,8 @@ def child(lib_path, step, args):
         out = child_register(lib)
     elif step == "dict-broken":
         out = child_broken(lib)
+    elif step == "toggle-ops":
+        out = child_toggle_ops(lib)
     elif step == "learned-ops":
         out = child_learned_ops(lib)
     elif step == "learned-read":
@@ -729,7 +768,7 @@ def check_settings_tab(lib_path, failures):
         if not ops["safe"]:
             failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
             return
-        expect(ops["abi"] == 9, f"FFI の版数が 9 でない: {ops['abi']}")
+        expect(ops["abi"] == 11, f"FFI の版数が 11 でない: {ops['abi']}")
         expect(len(ops["keys"]) >= 15 and ops["keys"][0] == "LiveConversion" and "DetectionLevel" in ops["keys"], f"設定の一覧が違う: {ops['keys']}")
         expect(not {"Mode", "AutoUpdate", "AppRules", "Profiles"} & set(ops["keys"]), "Mac で効かない設定が一覧にある")
         # 入力方式 (かな入力 JIS) は Mac でも効く設定として一覧に出る。「両方を判定」(Both) は Windows の IME 自動切替用なので選択肢に出さない
@@ -819,7 +858,7 @@ def check_user_terms(lib_path, failures):
             failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
             return
         data = ops["data_directory"]
-        expect(ops["abi"] == 9, f"FFI の版数が 9 でない: {ops['abi']}")
+        expect(ops["abi"] == 11, f"FFI の版数が 11 でない: {ops['abi']}")
         expect(len(ops["user_before"]) == 4, f"前提: ユーザー辞書に 4 語: {ops['user_before']}")
         expect(ops["create_bad"], "空の名前を断らない")
         expect(ops["create"] is None and ops["id"] and ops["id"].startswith("user-") and len(ops["id"]) == 13, f"自作の専門用語集を作れない: {ops['create']} / {ops['id']}")
@@ -1040,6 +1079,27 @@ def check_learned(lib_path, failures):
         expect("kubernetes" in names, f"IME の保存が残っていない: {final}")
 
 
+def check_toggle(lib_path, failures):
+    def expect(condition, message):
+        if not condition:
+            failures.append(message)
+
+    with tempfile.TemporaryDirectory(prefix="meltype-aot-toggle-") as home:
+        ops = run(lib_path, home, "toggle-ops")
+        if not ops["safe"]:
+            failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
+            return
+        expect(ops["session"], "セッションを作れない (確定後の F10)")
+        expect(ops["enter"] == ["にほんご"], f"前提: nihongo はかなで確定する: {ops['enter']}")
+        expect(ops["f10_unreadable"] is False, "入力欄の前の文字が読めないのに、F10 を飲み込んだ")
+        expect(ops["f10"] == {"consumed": True, "toggle": True, "commits": [[4, "にほんご", "nihongo"]]}, f"確定後の F10 の結果が違う: {ops['f10']}")
+        expect(["nihongo", "E"] in ops["learned_after_f10"], f"F10 で直した語を学習していない: {ops['learned_after_f10']}")
+        expect(ops["cancel"] is not None and ops["cancel"]["consumed"] is False, f"取消の結果が違う: {ops['cancel']}")
+        expect(not any(row[0] == "nihongo" for row in ops["learned_after_cancel"]), f"取り消したのに学習が残っている: {ops['learned_after_cancel']}")
+        expect(ops["f10_again"] is False, "取り消した後は記録を捨てるのに、もう一度直した")
+        expect(ops["set_api"] is None and ops["languages_json"] and '"Reverse"' in ops["languages_json"], f"languages.json に Reverse を保存できない: {ops['languages_json']}")
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--child":
         child(sys.argv[3], sys.argv[2], sys.argv[4:])
@@ -1056,6 +1116,7 @@ def main():
     settings_failures = len(failures)
     check_dictionary(lib_path, failures)
     check_learned(lib_path, failures)
+    check_toggle(lib_path, failures)
     for message in failures:
         print("FAIL:", message)
     if not failures:
@@ -1064,6 +1125,7 @@ def main():
         print("PASS: AOT 版で自作の専門用語集の作成・移動・取り消し・書き出し・取り込み・別プロセスへの反映ができた")
         print("PASS: AOT 版で辞書の管理画面の操作・別プロセスへの反映・同時の登録ができた")
         print("PASS: AOT 版で学習した語の追加・編集・削除・別プロセスへの反映 (動いている IME の判定・保存) ができた")
+        print("PASS: AOT 版で確定後の F10 (トグル由来の印・学習・取消・Reverse の保存) ができた")
     else:
         print(f"FAIL (設定 {settings_failures} 件・辞書 {len(failures) - settings_failures} 件)")
     return 1 if failures else 0

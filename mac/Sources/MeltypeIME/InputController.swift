@@ -199,8 +199,9 @@ final class MeltypeInputController: IMKInputController {
             return false
         }
         Self.trace("handleKey consumed=\(result.consumed) commits=\(result.commits.map { "(del=\($0.deleteBefore) orig=\(Self.cut($0.original)) text=\(Self.cut($0.text)))" }.joined()) view=\(result.view.map { "text=\(Self.cut($0.text)) converting=\($0.converting) clauses=\($0.clauses.map { Self.cut($0) }) selectedClause=\($0.selectedClause)" } ?? "nil")")
-        apply(result, to: client)
-        return result.consumed
+        // 確定後の F10 / F6 の書き換えを飛ばして取り消したときは、キーを飲み込まずアプリに渡す
+        let cancelledToggle = apply(result, to: client)
+        return result.consumed && !cancelledToggle
     }
 
     /// フォーカスが外れた・クリックで別の場所に移ったときなど。未確定の内容をそのまま確定する。
@@ -514,9 +515,13 @@ final class MeltypeInputController: IMKInputController {
     }
 
     /// replacing: 再変換のとき、置き換える選択範囲 (確定する文字があればそこに、無ければ変換中の文字の表示に使う)。
-    private func apply(_ result: SessionResult?, to client: IMKTextInput, replacing replacement: NSRange? = nil) {
-        guard let result else { return }
+    /// 戻り値: 確定した直後の語を F10 / F6 で直した結果 (toggle) で、入力欄の書き換えを確かめられず飛ばして取り消したなら true (呼び出し元はキーを通す)。
+    @discardableResult
+    private func apply(_ result: SessionResult?, to client: IMKTextInput, replacing replacement: NSRange? = nil) -> Bool {
+        guard let result else { return false }
         var pendingReplacement = replacement
+        // トグル由来の書き換えを飛ばした (入力欄の中身を確かめられなかった)。変換ボックスを出すと「sushiすし」のように二重になるので、出さずに本体へ取消を伝える。
+        var skippedToggle = false
         for edit in result.commits {
             var range = NSRange(location: NSNotFound, length: NSNotFound)
             let pendingReplacementWasNil = pendingReplacement == nil
@@ -531,6 +536,7 @@ final class MeltypeInputController: IMKInputController {
                 if caret == NSNotFound {
                     Self.trace("apply: 確定し直しを飛ばす (キャレット不明)")
                     NSLog("Meltype: 確定し直しを飛ばしました (キャレットが分からない。消す予定 %d 文字)", edit.deleteBefore)
+                    if result.toggle == true { skippedToggle = true }
                     continue
                 }
                 let length = min(edit.deleteBefore, caret)
@@ -541,6 +547,7 @@ final class MeltypeInputController: IMKInputController {
                 if let original = edit.original, Self.sameText(client.attributedSubstring(from: range)?.string, original) == false {
                     Self.trace("apply: 確定し直しを飛ばす (中身が違う) actual=\(Self.cut(client.attributedSubstring(from: range)?.string)) range=\(NSStringFromRange(range))")
                     NSLog("Meltype: 確定し直しを飛ばしました (入力欄の中身が記録と違う・読めない。消す予定 %d 文字)", original.count)
+                    if result.toggle == true { skippedToggle = true }
                     continue
                 }
             }
@@ -560,7 +567,16 @@ final class MeltypeInputController: IMKInputController {
                     client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
                     Self.trace("apply: 変換中の文字を取り除いた後 \(Self.ranges(client))")
                 } else if marked.location != NSNotFound, marked.length > 0 {
-                    Self.trace("apply: 変換中の文字を取り除かない (中身が違う・読めない) marked=\(NSStringFromRange(marked))")
+                    // 変換中の文字を取り除けないまま範囲つきで置き換えると、アプリは範囲を無視して変換中の範囲に入れ、元の文字が消えずに二重になる
+                    // (実機: 「今日はsushi」の後ろの「です」の確定で、`sushi` の確定し直し `すし` が `sushi` の後ろに入り「今日はsushiすしです」)。なので、この確定を丸ごと飛ばす
+                    // (消す・入れるの両方をしない。確定済みの文字は元のまま残る)。確定し直し (自動) は、これまでの飛ばす経路 (キャレット不明・中身が違う) と同じく Core には伝えない
+                    // (Core の記録は _correctable を空にした直後で、ずれても次の確定し直しの対象にならない)。トグル由来なら取消へ。
+                    // self-test が無いのは、`apply` の確認に IMKTextInput の偽物 (変換中の範囲・置き換え範囲を無視する本物のアプリの動き) が要るため。確かめるのは実機のトレース。
+                    let actual = client.attributedSubstring(from: marked)?.string
+                    Self.trace("apply: 確定し直しを飛ばす (変換中の文字を取り除けない) marked=\(NSStringFromRange(marked)) actual=\(Self.cut(actual)) expected=\(Self.cut(lastView?.text))")
+                    NSLog("Meltype: 確定し直しを飛ばしました (変換中の文字を取り除けない。消す予定 %d 文字)", edit.deleteBefore)
+                    if result.toggle == true { skippedToggle = true }
+                    continue
                 }
             }
             Self.trace("apply: insertText text=\(Self.cut(edit.text)) replacementRange=\(NSStringFromRange(range)) 直前 \(Self.ranges(client))")
@@ -569,7 +585,15 @@ final class MeltypeInputController: IMKInputController {
             if hasMarkedText { MeltypeConverter.shared.endComposition() }
             hasMarkedText = false
         }
+        if skippedToggle {
+            // 本体の変換ボックス・記録・学習を直前に戻す。変換ボックスは出さず、キーはアプリに通す (確かめられなければ何もしない)。
+            Self.trace("apply: トグルの書き換えを飛ばしたので取り消す")
+            NativeCore.shared.cancelToggle(session)
+            hideComposition(client: client)
+            return true
+        }
         // 登録提案ができた直後の確定なら、1 行のヒントを出す (1 日 1 回まで。出すかどうかは本体が決める)。
+        // 確定後の F10 で 1 回目の学習が効かなかったときの案内も、同じ場所に出る (本体が先に返す)。
         if !result.commits.isEmpty, let hint = NativeCore.shared.suggestionHint(session) {
             SuggestionHint.shared.show(hint, near: client)
         }
@@ -578,6 +602,7 @@ final class MeltypeInputController: IMKInputController {
         } else {
             hideComposition(client: client)
         }
+        return false
     }
 
     /// 変換中の文字を入力欄に下線付きで出す (変換中は文節ごと、選んでいる文節は太い下線)。
