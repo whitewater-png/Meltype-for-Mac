@@ -680,6 +680,9 @@ final class MeltypeInputController: IMKInputController {
     }
 
     private func hideComposition(client: IMKTextInput) {
+        // 変換が終わったら、候補の意味の待ち (1.5 秒のタイマー・辞書の completion) と出した辞書の意味を捨てる。別の入力欄の候補ウィンドウに
+        // 前の語の意味が出る・同じ語を再変換したときに待たずに出る、を防ぐ (R55 推奨 1。deactivateServer も commitComposition でここを通る)。
+        meaningKey = nil
         if hasMarkedText {
             Self.trace("hideComposition: setMarkedText(\"\") 直前 \(Self.ranges(client))")
             client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
@@ -709,16 +712,39 @@ final class MeltypeInputController: IMKInputController {
     }
 
     /// 候補で少し (1.5 秒) 止まったら、その候補の意味を候補ウィンドウの注釈に出す (Windows 版と同じ)。
-    private var meaningKey: String?
+    private var meaningKey: String? {
+        didSet {
+            meaningGeneration &+= 1
+            if shownDictionaryMeaning?.key != meaningKey { shownDictionaryMeaning = nil }
+        }
+    }
+    /// meaningKey を書くたびに進める番号。タイマーと辞書の completion はこれで比べる。確定 (nil) → 同じ語の再変換で key が
+    /// 同じに戻っても、確定前に仕掛けたタイマーが 1.5 秒を待たずに意味を出さないため (R56 任意 2)。
+    private var meaningGeneration = 0
+    /// 出した辞書の意味。同じ候補のまま showModeAnnotation が「あ」で上書きするので、そこで出し直す。候補が変われば捨てる。
+    private var shownDictionaryMeaning: (key: String, text: String)?
 
     private func scheduleMeaning(_ view: CompositionView) {
-        let key = view.meaning.map { "\(view.selectedIndex):\($0)" }
+        // Core の意味が無く、選んでいる候補が英字の語なら、macOS の辞書で引く (端末内・通信なし)。
+        let word = view.meaning == nil && view.candidates.indices.contains(view.selectedIndex) ? view.candidates[view.selectedIndex] : nil
+        let dictionaryWord = word.flatMap { CandidateDictionary.isLookupWord($0) ? $0 : nil }
+        let key = view.meaning.map { "\(view.selectedIndex):\($0)" } ?? dictionaryWord.map { "\(view.selectedIndex):dict:\($0)" }
         guard key != meaningKey else { return }
         meaningKey = key
-        guard let key, let meaning = view.meaning else { return }
+        guard let key else { return }
+        let generation = meaningGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            guard let self, self.meaningKey == key, let window = candidatesWindow, window.isVisible() else { return }
-            window.showAnnotation(NSAttributedString(string: meaning))
+            guard let self, self.meaningGeneration == generation, let window = candidatesWindow, window.isVisible() else { return }
+            if let meaning = view.meaning {
+                window.showAnnotation(NSAttributedString(string: meaning))
+            } else if let dictionaryWord {
+                // 辞書は別のキューで引く。戻ってきたとき候補が変わっていなければ (meaningGeneration が同じ) 出す。
+                CandidateDictionary.lookup(dictionaryWord) { [weak self] summary in
+                    guard let self, self.meaningGeneration == generation, let summary, let window = candidatesWindow, window.isVisible() else { return }
+                    self.shownDictionaryMeaning = (key, summary)
+                    window.showAnnotation(NSAttributedString(string: summary))
+                }
+            }
         }
     }
 
@@ -726,6 +752,10 @@ final class MeltypeInputController: IMKInputController {
     /// 変換中は日本語入力なので「あ」、「コード」のアプリでは「あ (コード)」。英数のときは候補ウィンドウが出ないのでここには出ない。
     private func showModeAnnotation(_ view: CompositionView, window: IMKCandidates) {
         guard view.meaning == nil else { return }
+        if let shown = shownDictionaryMeaning, shown.key == meaningKey {
+            window.showAnnotation(NSAttributedString(string: shown.text))
+            return
+        }
         window.showAnnotation(NSAttributedString(string: appKind == .code ? "あ (コード)" : "あ"))
     }
 

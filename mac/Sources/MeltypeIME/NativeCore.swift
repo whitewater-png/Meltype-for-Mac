@@ -35,6 +35,7 @@ private typealias AbiVersionFunction = @convention(c) () -> Int32
 private typealias ClearLearningFunction = @convention(c) () -> Int32
 private typealias GetFlagFunction = @convention(c) () -> Int32
 private typealias SetFlagFunction = @convention(c) (Int32) -> Int32
+private typealias SettingsGetFunction = @convention(c) () -> UnsafeMutablePointer<CChar>?
 private typealias SettingsSetFunction = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 private typealias TermDomainsFunction = @convention(c) () -> UnsafeMutablePointer<CChar>?
 private typealias SetTermDomainFunction = @convention(c) (UnsafePointer<CChar>?, Int32) -> Int32
@@ -207,6 +208,7 @@ final class NativeCore {
     private let getKanaInputFunction: GetFlagFunction?
     /// ABI 版数は上げていない (古い本体には無い)。無ければ Zenzai は使わない。
     private let getZenzaiFunction: GetFlagFunction?
+    private let settingsGetFunction: SettingsGetFunction?
     private let settingsSetFunction: SettingsSetFunction?
     private let termDomainsFunction: TermDomainsFunction?
     private let setTermDomainFunction: SetTermDomainFunction?
@@ -279,6 +281,7 @@ final class NativeCore {
         // これも ABI 版数は上げていない。無ければ (古い本体) かな入力は使わない
         getKanaInputFunction = symbol("meltype_get_kana_input", as: GetFlagFunction.self)
         getZenzaiFunction = symbol("meltype_get_zenzai", as: GetFlagFunction.self)
+        settingsGetFunction = symbol("meltype_settings_get", as: SettingsGetFunction.self)
         settingsSetFunction = symbol("meltype_settings_set", as: SettingsSetFunction.self)
         termDomainsFunction = symbol("meltype_term_domains", as: TermDomainsFunction.self)
         setTermDomainFunction = symbol("meltype_set_term_domain", as: SetTermDomainFunction.self)
@@ -463,6 +466,18 @@ final class NativeCore {
     var zenzaiEnabled: Bool {
         guard isCompatible, let getZenzaiFunction else { return false }
         return getZenzaiFunction() == 1
+    }
+
+    /// 設定の「候補の意味を表示」(ShowCandidateMeanings) が ON か。config.json を読むので、メインスレッドでは呼ばない。
+    /// 読めない・項目が無いときは本体の既定 (ON) と同じ true。
+    var showCandidateMeanings: Bool {
+        guard isCompatible, let settingsGetFunction, let pointer = settingsGetFunction() else { return true }
+        defer { freeFunction?(pointer) }
+        guard let object = try? JSONSerialization.jsonObject(with: Data(String(cString: pointer).utf8)) as? [String: Any],
+              let items = object["items"] as? [[String: Any]],
+              let item = items.first(where: { $0["key"] as? String == "ShowCandidateMeanings" }),
+              let value = item["value"] as? Bool else { return true }
+        return value
     }
 
     /// 設定の Zenzai を切り替えて config.json に保存する (モデルの取得に失敗したとき、OFF に戻すのに使う)。保存できたら true。
