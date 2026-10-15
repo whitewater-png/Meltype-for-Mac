@@ -2531,3 +2531,4 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **実機で確かめること** (リョウさん): Terminal.app で日本語モードのまま `cd ~/Downloads`・`ls -la`・`make`・`sudo ls`・`git status`・`kono bagu wo naoshite`。
   - **まだ直らない場面**: 日本語で終わる行の次の行 (`mkdir 資料`⏎ のあとの `cd 資料`、Claude Code に日本語を送ったあとシェルに戻った直後) は、Terminal.app が入力欄の中身を返さないので、まだ直らない (日本語の後は語の頭にしない)。そのときは Space の前に F10 で英字に。時間で語の頭を決める案は、AI の入力欄で日本語を壊すので採らなかった。数字のあとは、数字をとばしたその前の文字で決める (`予算は10` の `man` は語の頭にしない。`sleep 10`⏎ や `kill 1234`⏎ のあとの `cd` は語の頭)。小数・桁区切り (`予算は1.5`・`予算は1,000`) のあとは `.`・`,` で決まるので語の頭になる (査読 R75 の任意。まれなので文書だけにした)。
 - **未確認**: 実機 (Terminal.app・iTerm2・VS Code のターミナル)。macOS のスペルチェッカーでの `echo`・`code` ほか一覧外の語の判定。
+- **実機確認 (2026-10-15、4712b1f)**: Terminal.app で `cd ~/Downloads`・続けて `ls -la`・`sleep 1`⏎ のあとの `cd ~`・`make`・`date`・`git status` が英字のまま実行された。`make` + Shift+Space で日本語に変換できる。Claude Code の入力欄で `kono bagu wo naoshite` が日本語になる。TextEdit の `make` Space は今までどおり日本語の変換。
