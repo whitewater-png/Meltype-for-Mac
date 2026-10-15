@@ -30,4 +30,4 @@
 6. README: できること 1 行、プライバシーに通信 1 種類、KNOWN_LIMITS に「M1 級未計測・GPU 不使用・長い読みで遅くなる」。
 
 ## 生データ
-`~/.hermes/profiles/henrietta/cache/scratch/meltype-strategy/` の `s2-*`、`zenzai-runs/stage3-*`、`zenzai-notes*.md` (24 時間で消える。要るものは `docs/` へ)。前回 10/12 の復元物: `~/.hermes/profiles/henrietta/meltype-zenzai-recovered/`。
+作者の手元の一時の作業用フォルダーにある `s2-*`、`zenzai-runs/stage3-*`、`zenzai-notes*.md` (公開していない。24 時間で消える。要るものは `docs/` へ)。前回 10/12 の復元物: 作者の手元のフォルダー (非公開)。

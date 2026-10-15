@@ -14,7 +14,7 @@ Mac 版の変換エンジン azooKey には、同じライブラリの 1 オプ�
 - **左文脈の現状**: カーソル前の文字は、キーを押すたびに日英判定用として `InputController.swift` が読んでいます (未確定の文字が無いときだけ、UTF-16 で 20 単位まで)。その文脈は `Converter.clauses(for:context:)` まで届いていますが、**今は使わずに捨てています**。渡すには、変換オプションを要求ごとに作る (今は `let` で 1 つ)・結果キャッシュのキーに文脈を足す (今は読みだけがキー)、の 2 つの変更が要ります。長さは自前で切らず azooKey の `maxLeftSideContextLength` に任せます。
 - 計測の道具: `MeltypeIME --bench` (変換の速度・一致の計測)。精度の正解表はまだ無く、`eval/cases` は日英判定用 (変換エンジンは偽物) なので、**かな → 漢字の正解表を新しく作る必要があります**。
 - 重み: Hugging Face `Miwa-Keita/zenz-v3-small-gguf` (72.3 MB) / `zenz-v3.1-small-gguf` (73.9 MB)。
-- **前回の実験 (10/12、Cline セッション、ブランチ `exp/zenzai-eval`、削除済み) の結果を復元しました** (`~/.hermes/profiles/henrietta/meltype-zenzai-recovered/`: 計測ログ、70 文と 96 文のコーパス、`ZenzaiEval.swift`・`make-corpus.swift` の復元版、重み zenz-v3.1-small Q5_K_M 73.9 MB)。要点:
+- **前回の実験 (10/12、Cline セッション、ブランチ `exp/zenzai-eval`、削除済み) の結果を復元しました** (作者の手元のフォルダー、非公開: 計測ログ、70 文と 96 文のコーパス、`ZenzaiEval.swift`・`make-corpus.swift` の復元版、重み zenz-v3.1-small Q5_K_M 73.9 MB)。要点:
   - CPU 版 (trait `ZenzaiCPU`) は動いた。**GPU 版 (`Zenzai`/Metal) は llama.cpp b4846 の bf16 カーネル読み込みで落ちる** (この Mac、Xcode 無し。原因は推測のまま)。
   - 精度: 手作り 70 文で 47 → 58 (上限 3)、技術文書 96 文で 32 → 42。悪化は 2/70、6/96。**上限 3 で頭打ち** (5 でも増えない)。
   - 遅延 (CPU 版、M4 Max): 1 キー平均 5 ms → 15〜18 ms、95% で 30〜37 ms。メモリは未計測。
