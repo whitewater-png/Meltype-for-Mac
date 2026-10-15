@@ -2535,13 +2535,13 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 
 ## 追加項目 Phase 2 (判定の壁を越える実験: 2-1〜2-5)
 
-- **経緯**: `docs/STRATEGY_2026-10.md` の Phase 2 の 5 項目を、項目ごとの実験ブランチ (`exp/p2-2-1`〜`exp/p2-2-5`。手元のみで公開していない) で測り・設計し、別レーンの査読 (R-P2-1〜R-P2-5、非公開) を受けた。リョウさんの決定 (2026-10-15): **文書と表だけを main に入れ、コード (実験フラグ・測定ツール・使い捨て IME) は入れない**。文書の行番号は 54a2002 時点。
+- **経緯**: [STRATEGY_2026-10.md](STRATEGY_2026-10.md) の Phase 2 の 5 項目を、項目ごとの実験ブランチ (`exp/p2-2-1`〜`exp/p2-2-5`。手元のみで公開していない) で測り・設計し、別レーンの査読 (R-P2-1〜R-P2-5、非公開) を受けた。リョウさんの決定 (2026-10-15): **文書と表だけを main に入れ、コード (実験フラグ・測定ツール・使い捨て IME) は入れない**。文書の行番号は 54a2002 時点。
 - **結論と文書**:
-  - 2-1 Zenzai の言語モデルで「迷ったときの最終判定」: **no-go**。門付き (P-合計・τ=8) でも直るのは `pedia` 系に偏り、τ の選択に使っていない 46 件で直 0 / 壊 2 (310 件で直 8 / 壊 3)。遅延の p95 が 40 ms を超える測定がある。`docs/EXPERIMENT_2-1_RESULT.md`、データ `eval/lm-judge/` (コードは `exp/p2-2-1` の `f923a02`)。
-  - 2-2 キャレット前 20 文字の英日比率: **no-go**。R3 型 (英語の名詞句で始まる日本語の文) を 12 件中 6 件壊し、閾値 0.8・0.9・片側だけでも直らない。`docs/EXPERIMENT_2-2_RESULT.md`・`docs/EXPERIMENT_2-2_HOST_CONTEXT.md` (実験 A の手順書)、表 `eval/context/` (コードは `exp/p2-2-2-on-main` の `3672d5f`)。
-  - 2-3 ライブ変換: **README の前面化だけ go**。実機確認 1 は 2026-10-15 に合格 (`kyouhagoogledekensaku` のライブ表示が「今日はgoogleで検索」。macOS 26.6.2・JIS) し、README の「できること」にライブ変換の 1 行を足し、Zenzai の行に「既定 OFF」を足した (`exp/p2-2-3` の `a30d35a` と同じ差分)。Zenzai の既定 ON・4 文字のしきい値の引き下げはしない。`docs/EXPERIMENT_2-3_LIVE_CONVERSION.md`。
-  - 2-4 Foundation Models: **自動整形は no-go** (20 文中 6 文で破壊)、**選択範囲の訳は保留** (意味の誤り 3/10)、IME の中で確かめる**実験 0b は今は見送り**。`docs/EXPERIMENT_2-4_RESULT.md`、測定データ `eval/p2-4/` (`fmprobe`・0b の手順書は `exp/p2-2-4` の `416819c`)。
-  - 2-5 打鍵の間隔 (本家 #286): **条件 0 と段階 0 だけ go** (Meltype のコード変更なし)。段階 1 (計測コード) はその結果を見てから。`docs/EXPERIMENT_2-5_DESIGN.md`。
+  - 2-1 Zenzai の言語モデルで「迷ったときの最終判定」: **no-go**。門付き (P-合計・τ=8) でも直るのは `pedia` 系に偏り、τ の選択に使っていない 46 件で直 0 / 壊 2 (310 件で直 8 / 壊 3)。遅延の p95 が 40 ms を超える測定がある。[EXPERIMENT_2-1_RESULT.md](EXPERIMENT_2-1_RESULT.md)、データ [eval/lm-judge/](../eval/lm-judge/) (コードは `exp/p2-2-1` の `f923a02`)。
+  - 2-2 キャレット前 20 文字の英日比率: **no-go**。R3 型 (英語の名詞句で始まる日本語の文) を 12 件中 6 件壊し、閾値 0.8・0.9・片側だけでも直らない。[EXPERIMENT_2-2_RESULT.md](EXPERIMENT_2-2_RESULT.md)・[EXPERIMENT_2-2_HOST_CONTEXT.md](EXPERIMENT_2-2_HOST_CONTEXT.md) (実験 A の手順書)、表 [eval/context/](../eval/context/) (コードは `exp/p2-2-2-on-main` の `3672d5f`)。
+  - 2-3 ライブ変換: **README の前面化だけ go**。実機確認 1 は 2026-10-15 に合格 (`kyouhagoogledekensaku` のライブ表示が「今日はgoogleで検索」。macOS 26.6.2・JIS) し、README の「できること」にライブ変換の 1 行を足し、Zenzai の行に「既定 OFF」を足した (`exp/p2-2-3` の `a30d35a` と同じ差分)。Zenzai の既定 ON・4 文字のしきい値の引き下げはしない。[EXPERIMENT_2-3_LIVE_CONVERSION.md](EXPERIMENT_2-3_LIVE_CONVERSION.md)。
+  - 2-4 Foundation Models: **自動整形は no-go** (20 文中 6 文で破壊)、**選択範囲の訳は保留** (意味の誤り 3/10)、IME の中で確かめる**実験 0b は今は見送り**。[EXPERIMENT_2-4_RESULT.md](EXPERIMENT_2-4_RESULT.md)、測定データ [eval/p2-4/](../eval/p2-4/) (`fmprobe`・0b の手順書は `exp/p2-2-4` の `416819c`)。
+  - 2-5 打鍵の間隔 (本家 #286): **条件 0 と段階 0 だけ go** (Meltype のコード変更なし)。段階 1 (計測コード) はその結果を見てから。[EXPERIMENT_2-5_DESIGN.md](EXPERIMENT_2-5_DESIGN.md)。
 - **検証**: Core 777/777 (統合ブランチ `docs/phase2-results`、2026-10-15)。`--expect-all eval/cases` は 310 件・ルール正解 276 で、2-1 の文書の新 main の値と同じ。`src/`・`mac/` は cad2336 から変えていない。足した表は `eval/cases` の外 (`eval/context/`・`eval/lm-judge/`・`eval/p2-4/`) で、`--expect-all eval/cases` は今までどおり 4 つの表だけを読む。
 - **得と損**: 得: 5 項目の go/no-go と根拠の数字が公開の文書で辿れる。前文脈つきの表 (`eval/context/`) は別の案を測るときに使える。損: 文書が指す測定ツール・実験フラグは公開していないので、公開リポジトリだけでは再現できない (再現には手元の実験ブランチが要る)。
 - **未確認**: 2-2 の実験 A (実機のホスト別の取得率)。2-3 の「表示と確定の食い違い」(Space で英語の語で終わる確定だけ `Convert` を通る) の実機確認と、FAQ・K51 の Apple の日本語入力との比較の断定 (直していない)。実機確認 1 はアプリ名が報告に無い (手順は TextEdit の指定)。2-4 で IME のプロセスから呼べるか (0b)。2-5 の 0a (変換中にブラウザーが `keydown` を時刻つきで出すか)。

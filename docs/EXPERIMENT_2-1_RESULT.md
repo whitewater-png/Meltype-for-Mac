@@ -1,5 +1,7 @@
 # 2-1 実験の結果: Zenzai の言語モデルで「迷ったときの最終判定」(2026-10-15、ブランチ `exp/p2-2-1`)
 
+> **決定 2026-10-15: no-go。** 判定には組み込まず、測定ツール (`tools/lm-judge/`) も main には入れない。本文の「no-go 提案」は決定前に書いたときのまま。
+>
 > 行番号は 54a2002 時点 (main に入れたときに書き直していない)。
 
 戦略 §5.1 / Phase 2-1 の仮説: ルールで決められない `pro|to` 型・小文字の人名・長文の判定を、zenz の尤度比較で最終判定すると改善する。
@@ -23,7 +25,7 @@
 1. **重み**: 取得は不要だった。`~/Library/Application Support/Meltype/models/zenz-v3.1-small-Q5_K_M.gguf` が既にあり、SHA-256 が `ZenzaiModel.swift` の固定値 (`4de930c0…14f6c`) と一致することを確認した。ダウンロードはしていない。
 2. **現行ルールの出力**: `dotnet run -c Release -- --expect-all ../../eval/cases out.json` (`669ead5` の `eval/cases` 264 件)。ルールの正解は 231 / 264 (87.5%)、外れは 33 件。`eval/README` の `ascii` と同じ比べ方 (印字可能 ASCII の連続を小文字にした並びが期待と一致) で全件を採点し直した。結果は同じ 231。新 main (`54a2002`) では 310 件・276 (基点の注記を参照)。
 3. **補足 14 件**: eval/ には「小文字の人名」「長文」が少ない (人名は `my name is taro` の 1 件、長文は最長 37 文字) ので、`eval/lm-judge/extra/extra-cases.tsv` に作例 14 件を足した (人名 6・pro|to 型 3・長めの混在文 5)。**作者 (私) が書いた作例で、実機で確かめた値ではない。** ルールの正解は 5 / 14。本体の言い換えを含む (`protopedia wo miru` は本体の `protopedia`、`my name is yuki` は `my name is taro` の言い換え) ので、独立したデータではない。
-4. **採点器**: `tools/lm-judge/lmscore.cpp`。製品に入っている `llama.framework` (b4846、arm64) に直接リンクし、zenz-v3.1-small Q5_K_M で「前置きのあとに続く文字列」の対数尤度を返す。空白は U+3000、BOS あり、EOS なし (`ZenzContext` と同じ)。CPU のみ、スレッド 10 (この Mac の性能コア数)。Homebrew の新しい llama.cpp は zenz の pre-tokenizer (`gpt2-small-japanese-char`) を読めず使えなかった。採点は決定的: 278 件を別の日時に採点し直した `s3-candidates-rerun.jsonl` は、全スコアの差の最大 0、トークン数・G の出力も一致した。
+4. **採点器**: `tools/lm-judge/lmscore.cpp` (実験ブランチ `exp/p2-2-1` (コミット `f923a02`。手元のみで公開していない))。製品に入っている `llama.framework` (b4846、arm64) に直接リンクし、zenz-v3.1-small Q5_K_M で「前置きのあとに続く文字列」の対数尤度を返す。空白は U+3000、BOS あり、EOS なし (`ZenzContext` と同じ)。CPU のみ、スレッド 10 (この Mac の性能コア数)。Homebrew の新しい llama.cpp は zenz の pre-tokenizer (`gpt2-small-japanese-char`) を読めず使えなかった。採点は決定的: 278 件を別の日時に採点し直した `s3-candidates-rerun.jsonl` は、全スコアの差の最大 0、トークン数・G の出力も一致した。
 5. **採点の方式** (候補の文字列 S を次のどれかで採点。漢字変換はしない=かなのまま):
    - U: `<EE00>` の直後に S が続く尤度 / P: 前置きなしで S の尤度 / C: 入力=S、出力=S (写し) の尤度 / G: S を入力にして貪欲復号した出力の確信度
    - 各方式を「合計」と「トークンあたり平均」の 2 通りで比べた (8 通り)。
@@ -87,7 +89,7 @@ G (貪欲復号の確信度) は門を付けると直す数がすぐ 0 になる
 
 ## 遅延・メモリ (実測。注意付き)
 
-条件: M4 Max、CPU のみ (スレッド 10)、製品の `llama.framework` b4846、`tools/lm-judge/lmscore` を単体のプロセスで (azooKey の経路ではない。KV の再利用なし=毎回全文を再計算)。278 件・候補 504 個で採点。所要時間は Python 側の `perf_counter` で測った lmscore とのパイプの往復込みの値 (`s3` が `ms` に記録)。百分位は `lm_judge.py s3lat` で計算する。p95 は線形補間 (`statistics.quantiles(method="inclusive")`、numpy の既定と同じ)。初版の p95 は補間なしの下側 (昇順で `xs[int(0.95n)-1]`) で計算していて、少し小さく出ていた (P 24.9 → 25.0、21 文字以上の P 46.1 → 46.7、G 183.7 → 190.1)。
+条件: M4 Max、CPU のみ (スレッド 10)、製品の `llama.framework` b4846、`tools/lm-judge/lmscore` (実験ブランチ `exp/p2-2-1` (コミット `f923a02`。手元のみで公開していない)) を単体のプロセスで (azooKey の経路ではない。KV の再利用なし=毎回全文を再計算)。278 件・候補 504 個で採点。所要時間は Python 側の `perf_counter` で測った lmscore とのパイプの往復込みの値 (`s3` が `ms` に記録)。百分位は `lm_judge.py s3lat` で計算する。p95 は線形補間 (`statistics.quantiles(method="inclusive")`、numpy の既定と同じ)。初版の p95 は補間なしの下側 (昇順で `xs[int(0.95n)-1]`) で計算していて、少し小さく出ていた (P 24.9 → 25.0、21 文字以上の P 46.1 → 46.7、G 183.7 → 190.1)。
 
 **1 判定** = その件の候補ぜんぶ (1〜3 個) の合計。278 件のうち 72 件は候補が 1 個 (英字のまま = ルールの出力) で、製品なら LM を呼ばない件。そのため「候補 2 個以上」の 206 件の値も並べる。
 
