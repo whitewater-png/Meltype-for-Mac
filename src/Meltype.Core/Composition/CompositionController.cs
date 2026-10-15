@@ -103,7 +103,7 @@ public sealed class CompositionOptions
     public Func<bool> TabConversion { get; init; } = () => false;
 
     /// <summary>
-    /// 今のアプリがコード系 (ターミナル・エディタ。AppProfile.Code) か。コード系の行頭では、コマンド名 (cd・ls・make) を確定で英字にする (K79)。
+    /// 今のアプリがコード系 (ターミナル・エディタ。AppProfile.Code) か。コード系の語の頭では、コマンド名 (cd・ls・make) を確定で英字にする (K79)。
     /// 既定は false (一般アプリでは何も変えない。Windows 側は渡さない)。
     /// </summary>
     public Func<bool> CodeApp { get; init; } = () => false;

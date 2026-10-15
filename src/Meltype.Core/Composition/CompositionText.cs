@@ -788,7 +788,7 @@ public sealed class CompositionText
         key.Append('\u0003').Append(_pending).Append('\u0003')
             .Append(PrecedingEnglish switch { true => 'E', false => 'J', null => '-' })
             .Append(FollowingEnglish switch { true => 'E', false => 'J', null => '-' })
-            .Append(PrecedingEnglishSentence ? 'S' : '-').Append(PrecedingWordStart ? 'W' : '-').Append(CompositionDetector.IsNewlineAfter(PrecedingTail) ? 'N' : '-').Append(PrecedingOpener ?? "-").Append(KanaInput ? 'K' : '-').Append(final ? 'F' : '-')
+            .Append(PrecedingEnglishSentence ? 'S' : '-').Append(PrecedingWordStart ? 'W' : '-').Append(CompositionDetector.IsNewlineAfter(PrecedingTail) ? 'N' : '-').Append(PrecedingOpener ?? "-").Append(KanaInput ? 'K' : '-').Append(CodeApp() ? 'C' : '-').Append(final ? 'F' : '-')
             .Append((int)EffectiveLevel).Append(':').Append(_detector.Memory?.Version ?? -1);
         return key.ToString();
     }
@@ -804,7 +804,7 @@ public sealed class CompositionText
     {
         var frozen = FrozenCount(units);
         var pendingFrozen = PendingFrozen(frozen, units.Count);
-        // コード系アプリの行頭で、打った英字まるごとがコマンド名 (cd・ls・make) なら、打ち終わり (確定・Space・Tab・Enter) だけ英字にする (K79)。
+        // コード系アプリの語の頭で、打った英字まるごとがコマンド名 (cd・ls・make) なら、打ち終わり (確定・Space・Tab・Enter) だけ英字にする (K79)。
         // 打っている間は今までの見え方。判定の強さ「手動」・かな入力・語の頭でない (日本語を確定した直後) ときは何も変えない。
         if (final && CommandNameInput(units, frozen, pendingFrozen) is { } command) return [new CompositionSegment(true, "", command)];
         if (frozen == 0 && !pendingFrozen) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final, PrecedingWordStart, PrecedingOpener, CompositionDetector.IsNewlineAfter(PrecedingTail));
@@ -836,7 +836,7 @@ public sealed class CompositionText
         string.Concat(units.Select(u => u.Raw)) + Pending is var command && CompositionDetector.CommandNames.Contains(command) ? command : null;
 
     /// <summary>打ち終わりの区分が、一覧のコマンド名 1 区間 (コード系アプリで英字に確定する) か。確定し直しの対象から除くために Controller が見る。</summary>
-    public bool IsCommandName => CommandNameInput(_units, FrozenCount(_units), PendingFrozen(FrozenCount(_units), _units.Count)) is not null;
+    public bool IsCommandName => Mode == DisplayMode.Auto && CommandNameInput(_units, FrozenCount(_units), PendingFrozen(FrozenCount(_units), _units.Count)) is not null;
 
     /// <summary>英数字以外の半角の記号 1 文字か (! . , ? など)。</summary>
     private static bool IsAsciiSymbol(string raw) => raw is [var c] && c is >= '!' and <= '~' && !char.IsAsciiLetterOrDigit(c);

@@ -949,9 +949,9 @@ public sealed class CompositionDetector
     /// キャレットの前の確定済みの文字列の次が語の頭か (保護区間を始めてよいか)。
     /// 前の文字が無い・分からない (null・空)・空白・開きの記号なら語の頭。それ以外 (日本語を確定した直後の /fuka) は語の途中。
     /// </summary>
-    /// <param name="codeApp">コード系アプリか。そうなら、前の文字が ASCII (英字・記号) でも語の頭とみなす (日本語に当たる ASCII 以外の文字だけが語の途中)。</param>
+    /// <param name="codeApp">コード系アプリか。そうなら、前の文字が ASCII (英字・記号。数字は除く) でも語の頭とみなす (日本語に当たる ASCII 以外の文字と、数字のあと (予算は10 の man) だけが語の途中)。</param>
     public static bool IsWordStartAfter(string? preceding, bool codeApp = false) =>
-        string.IsNullOrEmpty(preceding) || char.IsWhiteSpace(preceding[^1]) || WordOpeners.ContainsKey(preceding[^1].ToString()) || (codeApp && char.IsAscii(preceding[^1]));
+        string.IsNullOrEmpty(preceding) || char.IsWhiteSpace(preceding[^1]) || WordOpeners.ContainsKey(preceding[^1].ToString()) || (codeApp && char.IsAscii(preceding[^1]) && !char.IsAsciiDigit(preceding[^1]));
 
     /// <summary>キャレットの前が改行のあとか (最後の改行 \n・\r・U+2028・U+2029・U+0085 より後ろが空白 (半角・タブ・全角) だけ。空も含む)。オプション (-name) の「直前が英語」は同じ行の英語だけ。</summary>
     public static bool IsNewlineAfter(string? preceding)
@@ -967,16 +967,16 @@ public sealed class CompositionDetector
     }
 
     /// <summary>
-    /// コード系アプリの行頭で、打ち終わりに英字のままにするコマンド名 (K79。小文字・完全一致)。今の判定で、Space で変換が始まる・確定で日本語になるものだけを入れる。
+    /// コード系アプリの語の頭で、打ち終わりに英字のままにするコマンド名 (K79。小文字・完全一致)。今の判定で、Space で変換が始まる・確定で日本語になるものだけを入れる。
     /// </summary>
     public static readonly HashSet<string> CommandNames = new(StringComparer.Ordinal)
     {
         // 英語と判定されず、Space で変換が始まる (cd・ls・rm・cp・df・sh・gh・rg・fd・jq・wc)・確定で日本語になる (ln → lん、du → づ、vi → ゔぃ、su → す、man → まん、make → まけ、
         // sudo → すど、open → おぺん、node → ので、go → ご、bun → ぶん、nano → なの、more → もれ、uv → うv、eza → えざ、env → えんv、unalias → うなぃas)
         "cd", "ls", "rm", "cp", "ln", "du", "df", "vi", "su", "sh", "man", "make", "sudo", "open", "node", "go", "bun", "nano", "more", "gh", "uv", "rg", "fd", "jq", "eza", "wc", "env", "unalias",
-        // `--repro` で Space・Enter を試して崩れたもの (bg・fg・tr・bc は Space で変換が始まる。dd → っd、nc → んc、uname → うなめ、mise → みせ、nohup → のふp、time → ちめ、date → だて、tee → てえ)
-        "bg", "fg", "tr", "bc", "dd", "nc", "uname", "mise", "nohup", "time", "date", "tee",
-        // 今のテストの英単語の一覧 (同梱) では英語だが、macOS のスペルチェッカーでは日本語になることがある (echo → えちょ、code → こで。実機のトレース)
+        // `--repro` で Space・Enter を試して崩れたもの (bg・fg・tr・bc は Space で変換が始まる。dd → っd、nc → んc、uname → うなめ、nohup → のふp、time → ちめ、date → だて、tee → てえ)
+        "bg", "fg", "tr", "bc", "dd", "nc", "uname", "nohup", "time", "date", "tee",
+        // 指示書で崩れると挙げられた。同梱の英単語の一覧では崩れない。原因は未確認 (echo → えちょ、code → こで。実機のトレース)
         "echo", "code",
     };
 

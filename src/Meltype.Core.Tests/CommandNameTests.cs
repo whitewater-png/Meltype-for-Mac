@@ -3,6 +3,7 @@
 
 using Meltype.Composition;
 using Meltype.Config;
+using Meltype.Input;
 
 namespace Meltype.Tests;
 
@@ -141,6 +142,62 @@ internal static class CommandNameTests
         var (document, composing) = Type("make\t", codeApp: true, predictions: reading => ["まけた", "まけて"]);
         Assert.True(document.StartsWith("make", StringComparison.Ordinal) && !document.Contains('ま'), $"予測が出ていても make + Tab は英字 (実際: {document})");
         Assert.True(string.IsNullOrEmpty(composing), "予測候補に入らない");
+        WithSpellChecker(() =>
+        {
+            var k = new CompositionTests.Keyboard(predictions: reading => ["まけた", "まけて"]) { CodeApp = true };
+            k.Type("make\t");
+            Assert.True(k.Host.Events.Contains("down:09"), "Tab はアプリに渡る: " + string.Join("|", k.Host.Events));
+        });
+    }
+
+    [Test]
+    public static void SegmentsCache_DoesNotReuseAcrossAppKinds()
+    {
+        // 同じ打った内容・同じ前後のまま、アプリの種類だけが変わっても、前の区間分けを使い回さない (SegmentsKey に CodeApp)
+        WithSpellChecker(() =>
+        {
+            foreach (var firstCode in new[] { true, false })
+            {
+                var k = new CompositionTests.Keyboard { CodeApp = firstCode };
+                k.Type("make");
+                string Show() => string.Join("|", k.Controller.AutomaticSegments().Select(s => s.IsEnglish ? "EN:" + s.Raw : "JA:" + s.Kana));
+                var first = Show();
+                k.CodeApp = !firstCode;
+                var second = Show();
+                Assert.Equal(firstCode ? "EN:make" : "JA:まけ", first, "1 回目");
+                Assert.Equal(firstCode ? "JA:まけ" : "EN:make", second, "アプリの種類を切り替えたあと");
+            }
+        });
+    }
+
+    [Test]
+    public static void CodeApp_AfterDigit_IsNotWordStart()
+    {
+        // 数字の後ろ (予算は10 の後ろ) の man は語の頭にしない: 今までどおり「万」側
+        void Before(CompositionTests.Keyboard k) => k.Host.PrecedingText = "予算は10";
+        Assert.Equal(Type("man ", codeApp: false, Before).Document, Type("man ", codeApp: true, Before).Document, "コード系アプリでも、数字の後は一般アプリと同じ");
+        Assert.Equal("man ", Type("man ", codeApp: true, k => k.Host.PrecedingText = "予算は10 ").Document, "数字のあとに空白が入れば語の頭 (英字)");
+    }
+
+    [Test]
+    public static void CodeApp_AfterOwnJapaneseCommit_SlashFukaIsNotProtected()
+    {
+        // 自分の確定の記録の経路: kyou Enter のあとの /fuka は、日本語の直後なので守らない
+        var (document, _) = Type("kyou\n/fuka\n", codeApp: true);
+        Assert.True(!document.EndsWith("/fuka", StringComparison.Ordinal), "/fuka は守らない (実際: " + document + ")");
+    }
+
+    [Test]
+    public static void CodeApp_AfterF6_TabChoosesPrediction()
+    {
+        WithSpellChecker(() =>
+        {
+            var k = new CompositionTests.Keyboard(predictions: reading => ["まけた", "まけて"]) { CodeApp = true };
+            k.Type("make");
+            k.Press(VirtualKeys.F6);
+            k.Press(VirtualKeys.Tab);
+            Assert.True(!k.Host.Events.Contains("down:09"), "F6 でかなにしたあとの Tab は予測の選択に使う (アプリに渡さない): " + string.Join("|", k.Host.Events));
+        });
     }
 
     [Test]
