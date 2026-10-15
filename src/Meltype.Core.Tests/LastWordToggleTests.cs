@@ -677,9 +677,10 @@ internal static class LastWordToggleTests
         e.Key(VirtualKeys.Back);
         e.Key(VirtualKeys.Down, null, shift: true);
         Assert.Equal("", e.Doc, "変換ボックスの中では 1 音確定しない (入力欄は空のまま): " + e.Doc);
+        Assert.True(e.Session.IsComposing, "Shift+↓ は今までどおり文節の選択へ (入力は続く)");
         e.F10();
         e.Enter();
-        Assert.True(!e.Doc.Contains("あ", StringComparison.Ordinal) && e.Doc.Contains("amazon", StringComparison.Ordinal), "二重にならない: " + e.Doc);
+        Assert.Equal("amazon", e.Doc, "二重にならない");
         Assert.True(e.Memory.Get("amazon") is not false, "日本語として覚えない");
     }
 }
