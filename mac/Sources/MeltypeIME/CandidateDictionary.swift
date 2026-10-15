@@ -44,11 +44,15 @@ enum CandidateDictionary {
         return collapsed.count > maxLength ? String(collapsed.prefix(maxLength)) + "…" : collapsed
     }
 
-    /// `word` の直後が英字なら別の語 (running など) なので不一致。
+    /// `word` の直後が英字なら別の語 (running など) なので不一致。`-`・`'` の次が英字のときも別の語 (run-up・don't。R55 任意 1)。
     private static func startsWithWord(_ text: Substring, _ key: String) -> Substring? {
         guard text.lowercased().hasPrefix(key) else { return nil }
         let rest = text.dropFirst(key.count)
-        if let next = rest.unicodeScalars.first, isAsciiLetter(next) { return nil }
+        let scalars = Array(rest.unicodeScalars.prefix(2))
+        if let next = scalars.first {
+            if isAsciiLetter(next) { return nil }
+            if (next == "-" || next == "'"), scalars.count > 1, isAsciiLetter(scalars[1]) { return nil }
+        }
         return rest
     }
 
@@ -58,7 +62,13 @@ enum CandidateDictionary {
         guard !headword.isEmpty else { return nil }
         let afterDigits = text[text.index(after: space)...].drop(while: { $0.isASCII && $0.isNumber })
         guard let rest = startsWithWord(afterDigits, key) else { return nil }
-        let body = rest.trimmingCharacters(in: .whitespacesAndNewlines)
+        var body = rest.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 英英の地名など「Kyoto Kyo·to | kēˈ(y)ōdō | an industrial city…」は、発音 (| … |) の後ろだけを本文にする。
+        if body.hasPrefix("|") {
+            let parts = body.dropFirst().split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2 else { return nil }
+            body = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         return body.isEmpty ? nil : "\(headword)：\(body)"
     }
 
@@ -94,9 +104,10 @@ enum CandidateDictionary {
         return value
     }
 
-    /// キャッシュは小文字の語をキーにする (meeting・Meeting・MEETING を 1 つに)。
+    /// キャッシュは整えた語そのものをキーにする。小文字でまとめると、`it` (イット：性的魅力) を先に引いたあとの `IT` に
+    /// その意味が出てしまう (辞書は IT と it で別の項目を返す。このMacで実測。R55 推奨 2)。
     private static func cachedSummary(_ word: String) -> String? {
-        let key = word.lowercased()
+        let key = word
         if let hit = cache[key] { return hit }
         let summary = define(word).flatMap { summary(of: $0, word: word) }
         cache[key] = .some(summary)

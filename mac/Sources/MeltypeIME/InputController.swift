@@ -637,6 +637,9 @@ final class MeltypeInputController: IMKInputController {
     }
 
     private func hideComposition(client: IMKTextInput) {
+        // 変換が終わったら、候補の意味の待ち (1.5 秒のタイマー・辞書の completion) と出した辞書の意味を捨てる。別の入力欄の候補ウィンドウに
+        // 前の語の意味が出る・同じ語を再変換したときに待たずに出る、を防ぐ (R55 推奨 1。deactivateServer も commitComposition でここを通る)。
+        meaningKey = nil
         if hasMarkedText {
             Self.trace("hideComposition: setMarkedText(\"\") 直前 \(Self.ranges(client))")
             client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
