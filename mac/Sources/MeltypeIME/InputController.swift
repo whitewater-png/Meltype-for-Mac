@@ -670,8 +670,14 @@ final class MeltypeInputController: IMKInputController {
 
     /// 候補で少し (1.5 秒) 止まったら、その候補の意味を候補ウィンドウの注釈に出す (Windows 版と同じ)。
     private var meaningKey: String? {
-        didSet { if shownDictionaryMeaning?.key != meaningKey { shownDictionaryMeaning = nil } }
+        didSet {
+            meaningGeneration &+= 1
+            if shownDictionaryMeaning?.key != meaningKey { shownDictionaryMeaning = nil }
+        }
     }
+    /// meaningKey を書くたびに進める番号。タイマーと辞書の completion はこれで比べる。確定 (nil) → 同じ語の再変換で key が
+    /// 同じに戻っても、確定前に仕掛けたタイマーが 1.5 秒を待たずに意味を出さないため (R56 任意 2)。
+    private var meaningGeneration = 0
     /// 出した辞書の意味。同じ候補のまま showModeAnnotation が「あ」で上書きするので、そこで出し直す。候補が変われば捨てる。
     private var shownDictionaryMeaning: (key: String, text: String)?
 
@@ -683,14 +689,15 @@ final class MeltypeInputController: IMKInputController {
         guard key != meaningKey else { return }
         meaningKey = key
         guard let key else { return }
+        let generation = meaningGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            guard let self, self.meaningKey == key, let window = candidatesWindow, window.isVisible() else { return }
+            guard let self, self.meaningGeneration == generation, let window = candidatesWindow, window.isVisible() else { return }
             if let meaning = view.meaning {
                 window.showAnnotation(NSAttributedString(string: meaning))
             } else if let dictionaryWord {
                 // 辞書は別のキューで引く。戻ってきたとき候補が変わっていなければ (meaningKey が同じ) 出す。
                 CandidateDictionary.lookup(dictionaryWord) { [weak self] summary in
-                    guard let self, self.meaningKey == key, let summary, let window = candidatesWindow, window.isVisible() else { return }
+                    guard let self, self.meaningGeneration == generation, let summary, let window = candidatesWindow, window.isVisible() else { return }
                     self.shownDictionaryMeaning = (key, summary)
                     window.showAnnotation(NSAttributedString(string: summary))
                 }
