@@ -35,7 +35,10 @@ final class AnnotationPanel {
         label.textColor = NSColor.labelColor
         label.isSelectable = false
         label.maximumNumberOfLines = 3
-        label.lineBreakMode = .byTruncatingTail
+        // 折り返して 3 行まで、最後の行の末尾に「…」。.byTruncatingTail だと NSTextField は 1 行にしてしまう (実機で 1 行で切れていた)。
+        // 日本語は語の切れ目が無いので文字単位で折り返す。
+        label.lineBreakMode = .byCharWrapping
+        label.cell?.truncatesLastVisibleLine = true
         label.preferredMaxLayoutWidth = Self.maxWidth - Self.padding * 2
 
         effect = NSVisualEffectView()
