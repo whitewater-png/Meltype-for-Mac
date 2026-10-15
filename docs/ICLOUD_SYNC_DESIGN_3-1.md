@@ -10,14 +10,14 @@
   2. azooKey の学習データ (`Meltype/azooKey`) の場所は `AppPaths` とは別で、Swift 側 (`Converter.swift:54`) に直書きされています。
   3. 今のロック (FileLock) は同じ Mac の中でしか効きません。別の Mac が iCloud 経由でファイルを入れ替えるのは防げません。
 - おすすめは「**最初の段階は、同期する対象を少数のファイルに絞り、競合は『最終更新が勝つ』、切り替えは再起動後に有効、元のファイルは消さずにコピー**」です。
-- 自分の Mac には iCloud Drive の実体 (`~/Library/Mobile Documents/com~apple~CloudDocs`) がありませんでした。**実際の iCloud 同期の動きは、この Mac では一度も確認できていません (未確認)。** 他の Mac も無いので、2台間の同期は未確認です。
+- 自分の Mac には iCloud Drive の実体 (`~/Library/Mobile Documents/com~apple~CloudDocs`) がありませんでした。ただし `~/Library/CloudStorage/` には `iCloudDrive-iCloudDrive (2025-09-04 3:55)` というフォルダーがあります (§2.1。中身は見ていません)。**iCloud 同期の実際の動き (仮ファイル・競合コピー・権限) は、確認できていません (未確認)。** 他の Mac も無いので、2台間の同期は未確認です。
 
 ## 1. 現状 (コードで確認した事実)
 
 ### 1.1 どのファイルがどこにあるか
 
 保存場所は Mac では `~/Library/Application Support/Meltype/` (`AppPaths.DataDirectory`)。環境変数 `MELTYPE_DATA_DIR` があればそこに変わります (動作確認用)。
-手元の Mac の中身 (名前と権限だけ見ました。中身は見ていません): フォルダーは 0700、ファイルは 0600 でした。
+手元の Mac の中身 (名前と権限だけ見ました。中身は見ていません): フォルダー (`Meltype/` 本体) は 0700、直下の主要ファイルは 0600 でした。ただし `azooKey/` 内のファイルや `.DS_Store` は 0644 で、親フォルダーの 0700 で守られている状態です (ファイル単体では守られていません)。
 
 | ファイル | 中身 | 主に書く側 | 自動で書き戻すか |
 | --- | --- | --- | --- |
@@ -46,7 +46,11 @@
 - 各ファイルのプロパティ経由 (`AppPaths.ConfigFile` 10 回、`UserDictionaryDirectory` 5 回、`LanguageMemoryFile` 5 回、…) の参照を足すと、`AppPaths.*` の参照は約 60 行です。ほとんどは `DataDirectory` を元に組み立てているので、**入口は1か所**です。
 - `ConfigFile` は `static` で1度だけ作る値、他は呼ぶたびに組み立てる値。ただしその元の `DataDirectory` が起動時固定です。
 - Mac の辞書アプリは Core の `meltype_data_directory` (`Exports.cs:425`) を通して場所を知ります。つまり場所の決め方は Core の1か所に集約されていて、辞書アプリ側は Core が返した場所を使うだけです (`NativeDictionary.swift:201`)。
-- **Core を通らない場所の指定** (Swift に直書き): `Converter.swift:54` (azooKey の学習)、`Updater.swift:71`、`ZenzaiModel.swift:40`。
+- **Core を通らない場所の指定** (Swift に直書き):
+  - 主: `Converter.swift:54` (azooKey の学習)。`MELTYPE_DATA_DIR` を**無視します**。
+  - `InputController.swift:73` (`imk-trace.log`、同期対象外)。こちらも `MELTYPE_DATA_DIR` を**無視します**。
+  - フォールバック: `Updater.swift:71` と `ZenzaiModel.swift:40` は、Core から場所を取れないときだけ使う代替で、上の2つとは性質が違います。
+  - したがって `MELTYPE_DATA_DIR` を付けて動かしても、azooKey の学習と `imk-trace.log` は通常の場所に書かれます。
 - `DictionaryApp.swift:28-30` は、IME が `MELTYPE_DATA_DIR` で動いているとき辞書アプリ起動時に同じ環境変数を渡します。設定ファイル方式にすれば、この受け渡しは不要になります (辞書アプリも Core も同じ設定ファイルを読むため)。
 
 ### 1.3 セキュリティレビューの該当箇所 (`docs/SECURITY_REVIEW_2026-10.md`)
@@ -59,8 +63,8 @@
 
 ### 2.1 この Mac で確認できたこと / できなかったこと
 
-- 確認できた: `~/Library/Mobile Documents/` が存在しない (iCloud Drive が使われていない、またはこの Mac では未設定)。`~/Library/CloudStorage/` には Google Drive だけがありました。**iCloud Drive の実機の挙動 (未ダウンロードの仮ファイル、競合コピー、権限の扱い) はこの Mac では確かめられません (未確認)。**
-- 確認できた (Meltype の側): 手元のデータフォルダーは 0700 / ファイル 0600 で、`@` (拡張属性 `com.apple.provenance`) が付いています。
+- 確認できた: `~/Library/Mobile Documents/` が存在しない。一方、`~/Library/CloudStorage/` には Google Drive のほかに `iCloudDrive-iCloudDrive (2025-09-04 3:55)` というフォルダーがあります (名前と存在だけ `ls` で確認。**中身は未確認**)。以前の版にあった「Google Drive だけ」「iCloud Drive は使われていない」という記述は誤りで、取り消します。この Mac で iCloud Drive が有効かどうか、`Mobile Documents` が無いのになぜこのフォルダーがあるのかは未確認です。**iCloud Drive の実機の挙動 (未ダウンロードの仮ファイル、競合コピー、権限の扱い) は、まだ確かめていません (未確認)。**
+- 確認できた (Meltype の側): 手元のデータフォルダーは 0700、直下の主要ファイルは 0600 (`azooKey/` 内のファイルと `.DS_Store` は 0644。親の 0700 に守られている) で、`@` (拡張属性 `com.apple.provenance`) が付いています。
 - 他の Mac が無いので、2台の間の同期・競合は未確認です。以下の iCloud の挙動は、Apple の公式文書の記述で、実機では未確認です。
 
 ### 2.2 ロック (FileLock) は別の Mac からの置換を防げない
@@ -80,7 +84,7 @@
 - 古い資料やコミュニティ (信頼度は低い): 旧い macOS では `.名前.icloud` という仮ファイル名になる。
   出典: https://stackoverflow.com/questions/63414653/how-to-prevent-automatic-file-eviction-in-icloud-documents
   新しい macOS では dataless ファイル方式です。この Mac の OS では実際にどちらになるかは未確認。
-- Meltype への影響 (推測): IME が起動時に `File.Exists` や読み込みをして、**仮ファイルのまま空として扱うと、「学習が消えた」ように見え、その後に空から保存して本物を上書きする**恐れがあります。読めない・存在しないときに保存しない、という既存の防御 (`SafeFile` の Blocked) は大きすぎるファイル用で、このケース用ではありません。ダウンロード済みか確認してから読む仕組みが必要です。
+- Meltype への影響 (推測): IME が起動時に `File.Exists` や読み込みをして、**仮ファイルのまま空として扱うと、「学習が消えた」ように見え、その後に空から保存して本物を上書きする**恐れがあります。読めない・存在しないときに保存しない、という既存の防御 (`SafeFile` の Blocked) は大きすぎるファイル用で、このケース用ではありません。dataless ファイルの読み取りが失敗したとき、`SafeFile` が空扱いにするか例外にするかは、コードを追っていません (未確認)。ダウンロード済みか確認してから読む仕組みが必要です。
 - 「Mac のストレージを最適化」がオンだと、使わない学習ファイルが dataless になる可能性があります (推測)。画面に「iCloud Drive の『ダウンロードしたままにする』を選んでください」と案内する選択肢もあります (「ダウンロードしたままにする」の存在は https://support.apple.com/en-ie/guide/mac-help/mchl1a02d711/mac の「Keep items downloaded on your Mac」の節)。
 
 ### 2.4 競合コピー (「ファイル名 2」)
@@ -121,7 +125,7 @@
 - → ローカルの固定位置に、小さな専用ファイルを持たせます。案: `~/Library/Application Support/Meltype/location.json` (0600)。中身は例えば `{"dataDirectory": "/Users/…/Library/Mobile Documents/com~apple~CloudDocs/Meltype"}` (パスは例。実際には書き込む前にチェックします)。
   - 候補2: IME の UserDefaults。辞書アプリは別のバンドルなので共有が面倒で、Core (.NET) からも読めません。ファイルのほうが Core・IME・辞書アプリが同じ場所を読める (推測。UserDefaults 案の実現可能性は調べていません)。
 - このファイルは同期しません。Mac ごとに場所が違うかもしれない (ユーザー名が違うと iCloud のパスも変わる) ためです。
-- 優先順位: `MELTYPE_DATA_DIR` (動作確認用。利用者向けにはしない) → `location.json` → 既定。環境変数が勝つ現状を保つと、既存のテスト (`check-mac-aot-settings.py` `--self-test`) がそのまま動きます。
+- 優先順位: `MELTYPE_DATA_DIR` (動作確認用。利用者向けにはしない) → `location.json` → 既定。環境変数が勝つ現状を保つと、Core 側の保存先 (§1.1 の表のうち Core が書くもの) を対象にした既存のテスト (`check-mac-aot-settings.py` `--self-test`) はそのまま動きます。ただし azooKey の学習と `imk-trace.log` は `MELTYPE_DATA_DIR` を無視する (§1.2) ので、これらを含む確認はテストの範囲外です。azooKey を同期の対象にするなら、Swift 側を Core と同じ場所の取得にそろえる作業が第1段階に必要です (§6)。
 - 「場所がまだ見えない」(iCloud にサインインしていない、外付けのように消えている) とき: 黙って既定の場所に切り替えると、利用者から見て「学習が消えた」ように見えます。→ **指定先が使えないときは、既定の場所で動き、設定画面に警告を出す** (指定先は変更しない)。
 
 ### 4.2 何を同期の対象にするか
@@ -164,7 +168,7 @@
 - 権限: §2.5 のとおり、iCloud 上で 0600/0700 が別の Mac 経由でも保たれるかは未確認。**iCloud 上のフォルダーは Apple ID でサインインした自分の端末だけに同期されるが、共有フォルダー (他人との共有) にしてしまうと他人に学習内容が見える**。設定画面で「共有フォルダーは選ばないでください」と注意し、可能なら共有されているかを検出する (検出方法は未確認)。
 - 低-8 (158行) の指摘: 同期フォルダーは「0700 の自分専用」の前提が変わるので、`update.log` の `O_NOFOLLOW` 追加と、同期フォルダーでの シンボリックリンク追従の防止 (読み書きの前に `lstat` でシンボリックリンクでないことを確認) を、3-1 の実装と同時に入れるのがおすすめ。ただし `update.log` 自体は同期対象外 (§4.2) なので、この指摘が実際に当たるのは同期対象のファイル側です。
 - 「学習を全部消す」 (`LearningData.ClearAll`) は、同期していると**他の Mac の学習も消える**可能性がある (推測)。消す前の確認文に追記が必要。
-- 任意の場所を指定できると、`SafeFile.EnsureDirectory` が `Restrict(directory, 0700)` をその場所に適用する (`SafeFile.cs:32`)。利用者が誤って `~/Documents` のような既存のフォルダーを選ぶと、そのフォルダーの権限を 0700 に変えてしまう。→ 専用のサブフォルダー (`…/Meltype`) を作らせ、既存のフォルダー自体は選ばせない。
+- `SafeFile.cs:32` の 0700 適用は、対象が `DataDirectory` と一致するときだけです。したがって `SyncDirectory` (同期用フォルダー) には自動では 0700 がかからず、別の処理で 0700 を保証する必要があります。逆に、その別処理を「指定された場所に `Restrict(…, 0700)`」で作ると、利用者が誤って `~/Documents` のような既存のフォルダーを選ぶと、そのフォルダーの権限を 0700 に変えてしまう。→ 専用のサブフォルダー (`…/Meltype`) を作らせ、既存のフォルダー自体は選ばせない (0700 を適用する対象は、Meltype が作ったサブフォルダーだけにする)。
 
 ## 6. 段階的な実装案とテスト方針
 
@@ -173,7 +177,8 @@
 1. `AppPaths`: `location.json` を読み、同期対象のファイルだけ `SyncDirectory` に向ける (環境変数が最優先、指定先が使えないときは既定にフォールバック)。切り替えは再起動後。
 2. 競合方針は A (最終更新が勝つ)。`conversions.json` `suggest.json` `translations.json` `model.json` に、`languages.json` と同じ「版が変わったら読み直す」を追加 (別の Mac の更新を IME が拾うため)。ここは Core の変更で、Windows 版にも波及する (戦略書の「Windows は対象外と記録」の方針に従い記録)。
 3. 読み込み前の確認: 存在しない/空/dataless のとき、**空として扱って上書き保存しない**。ダウンロード待ちは次の機会に再試行。
-4. 起動時に、同期対象のファイルの権限を 0600 に直す。
+4. 起動時に、同期対象のファイルの権限を 0600 に、同期用フォルダーを 0700 に直す (後者は `SafeFile.cs:32` では自動でかからないため別処理が要る)。
+4b. azooKey を同期の対象にする場合に限り、Swift 側 (`Converter.swift:54` ほか) を Core と同じ場所の取得 (`meltype_data_directory` 経由) にそろえる。そろえないと azooKey は `MELTYPE_DATA_DIR` や `location.json` を無視し続けます。第1段階では azooKey を同期しない方針 (§4.2) なので、この作業は同期する場合の前提条件です。
 5. 設定画面 (辞書アプリ) の項目: 保存場所の選択、現在の場所、状態の警告、方針文の説明。
 6. 移行 (§4.3) の手順。コピーのみ、元を消さない。バックアップを先に作る。
 7. README の方針文の更新 (§5)。
