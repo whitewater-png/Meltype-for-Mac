@@ -8,7 +8,7 @@ using Meltype.Input;
 namespace Meltype.Tests;
 
 /// <summary>
-/// K79: コード系アプリ (ターミナル) の行頭で、コマンド名 (cd・ls・make・sudo) は、打ち終わり (Space・Enter・Tab) に英字で確定する。
+/// K79: コード系アプリ (ターミナル) の語の頭で、コマンド名 (cd・ls・make・sudo) は、打ち終わり (Space・Enter・Tab) に英字で確定する。
 /// 一般アプリ・語の頭でない・一覧と完全一致しない・判定の強さ「手動」・かな入力では今までどおり。
 /// </summary>
 internal static class CommandNameTests
@@ -177,6 +177,18 @@ internal static class CommandNameTests
         void Before(CompositionTests.Keyboard k) => k.Host.PrecedingText = "予算は10";
         Assert.Equal(Type("man ", codeApp: false, Before).Document, Type("man ", codeApp: true, Before).Document, "コード系アプリでも、数字の後は一般アプリと同じ");
         Assert.Equal("man ", Type("man ", codeApp: true, k => k.Host.PrecedingText = "予算は10 ").Document, "数字のあとに空白が入れば語の頭 (英字)");
+        Assert.Equal("man ", Type("man ", codeApp: true, k => k.Host.PrecedingText = "sleep 10").Document, "ASCII の語のあとの数字は語の頭 (英字)");
+        Assert.True(CompositionDetector.IsWordStartAfter("sleep 10", codeApp: true) && CompositionDetector.IsWordStartAfter("v2", codeApp: true) && CompositionDetector.IsWordStartAfter("10", codeApp: true), "sleep 10・v2・10 は語の頭");
+        Assert.True(!CompositionDetector.IsWordStartAfter("予算は10", codeApp: true) && !CompositionDetector.IsWordStartAfter("第3", codeApp: true), "予算は10・第3 は語の頭ではない");
+        Assert.True(!CompositionDetector.IsWordStartAfter("sleep 10", codeApp: false), "一般アプリは今までどおり");
+    }
+
+    [Test]
+    public static void CodeApp_SecondLineAfterCommandWithTrailingDigits_IsAtWordStart()
+    {
+        // sleep 10⏎ は Enter が IME に渡らず、自分の確定の記録の末尾が数字のまま
+        Assert.Equal("sleep 10cd ~/Downloads", Type("sleep 10\ncd ~/Downloads\n", codeApp: true).Document, "2 行目の cd は語の頭 (英字)・~/Downloads は守る");
+        Assert.Equal("kill 1234./build.sh", Type("kill 1234\n./build.sh\n", codeApp: true).Document, "kill 1234 のあとの ./build.sh は守る");
     }
 
     [Test]
@@ -197,6 +209,7 @@ internal static class CommandNameTests
             k.Press(VirtualKeys.F6);
             k.Press(VirtualKeys.Tab);
             Assert.True(!k.Host.Events.Contains("down:09"), "F6 でかなにしたあとの Tab は予測の選択に使う (アプリに渡さない): " + string.Join("|", k.Host.Events));
+            Assert.Equal(0, k.Host.View!.SelectedPrediction, "予測の選択に入った (最初の予測)");
         });
     }
 
