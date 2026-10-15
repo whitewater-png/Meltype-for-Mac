@@ -806,11 +806,7 @@ public sealed class CompositionText
         var pendingFrozen = PendingFrozen(frozen, units.Count);
         // コード系アプリの行頭で、打った英字まるごとがコマンド名 (cd・ls・make) なら、打ち終わり (確定・Space・Tab・Enter) だけ英字にする (K79)。
         // 打っている間は今までの見え方。判定の強さ「手動」・かな入力・語の頭でない (日本語を確定した直後) ときは何も変えない。
-        if (final && frozen == 0 && !pendingFrozen && !KanaInput && EffectiveLevel != DetectionLevel.Manual && PrecedingWordStart && CodeApp() &&
-            string.Concat(units.Select(u => u.Raw)) + Pending is var command && CompositionDetector.CommandNames.Contains(command))
-        {
-            return [new CompositionSegment(true, "", command)];
-        }
+        if (final && CommandNameInput(units, frozen, pendingFrozen) is { } command) return [new CompositionSegment(true, "", command)];
         if (frozen == 0 && !pendingFrozen) return _detector.Segment(units, Pending, PrecedingEnglish, FollowingEnglish, EffectiveLevel, PrecedingEnglishSentence, KanaInput, final, PrecedingWordStart, PrecedingOpener, CompositionDetector.IsNewlineAfter(PrecedingTail));
         var result = new List<CompositionSegment>();
         void Add(CompositionSegment segment)
@@ -834,6 +830,13 @@ public sealed class CompositionText
         }
         return result;
     }
+
+    private string? CommandNameInput(IReadOnlyList<CompositionUnit> units, int frozen, bool pendingFrozen) =>
+        frozen == 0 && !pendingFrozen && !KanaInput && EffectiveLevel != DetectionLevel.Manual && PrecedingWordStart && CodeApp() &&
+        string.Concat(units.Select(u => u.Raw)) + Pending is var command && CompositionDetector.CommandNames.Contains(command) ? command : null;
+
+    /// <summary>打ち終わりの区分が、一覧のコマンド名 1 区間 (コード系アプリで英字に確定する) か。確定し直しの対象から除くために Controller が見る。</summary>
+    public bool IsCommandName => CommandNameInput(_units, FrozenCount(_units), PendingFrozen(FrozenCount(_units), _units.Count)) is not null;
 
     /// <summary>英数字以外の半角の記号 1 文字か (! . , ? など)。</summary>
     private static bool IsAsciiSymbol(string raw) => raw is [var c] && c is >= '!' and <= '~' && !char.IsAsciiLetterOrDigit(c);
@@ -916,8 +919,9 @@ public sealed class CompositionText
     /// <summary>
     /// 先頭が語の頭か: キャレットの前の文字が無い・分からない・空白・開きの記号なら true (<see cref="CompositionDetector.IsWordStartAfter"/>)。
     /// 保護区間 (パス・オプション・変数) は語の頭からだけ守る。日本語を確定した直後の /fuka は守らない。
+    /// コード系アプリでは、前の文字が日本語 (ASCII 以外) でなければ語の頭 (Terminal.app は Enter を IME に渡さず、ls⏎ のあとも記録の末尾が ls のままなので)。
     /// </summary>
-    public bool PrecedingWordStart => CompositionDetector.IsWordStartAfter(PrecedingTail);
+    public bool PrecedingWordStart => CompositionDetector.IsWordStartAfter(PrecedingTail, CodeApp());
 
     /// <summary>キャレットの前の文字が開きの記号なら、その記号 (保護区間の範囲を、対応する閉じの記号までにする)。無ければ null。</summary>
     public string? PrecedingOpener => CompositionDetector.OpenerBefore(PrecedingTail);

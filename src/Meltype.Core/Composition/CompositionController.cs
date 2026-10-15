@@ -1043,7 +1043,7 @@ public sealed class CompositionController
                 // 判定の強さが手動: 提案どおり英字にする。
                 _text.LevelOverride = DetectionLevel.Balanced;
                 return;
-            case VirtualKeys.Tab when !_converting && _predictions.Count > 0:
+            case VirtualKeys.Tab when !_converting && _predictions.Count > 0 && !_text.IsCommandName:
                 // 予測変換: 候補に入る (もしかして・英字への提案が優先)。
                 // 本家と同じ: Shift+Tab は選ばない状態から最後の候補へ。
                 _predicting = true;
@@ -3070,6 +3070,8 @@ public sealed class CompositionController
             var clauses = _clauses.Count > 0 ? "　文節 " + string.Join(" | ", _clauses.Select(c => $"{c.Reading}→{c.Text}")) : "";
             if (Diagnostics.Log.RecordText) Diagnostics.Log.Info($"確定の内訳: 打った英字「{_text.Raw}」　読み「{_text.AllKana(final: true)}」{clauses}");
         }
+        // コード系アプリで一覧の判定により英字にした確定 (open → open) は、確定し直しの対象にしない (次の「資料」で おぺん に書き戻されない)
+        var commandName = _text.IsCommandName;
         _text.Clear();
         _reconvertOriginal = null;
         _reconvertRomaji = false;
@@ -3084,7 +3086,7 @@ public sealed class CompositionController
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, _followingText);
         if (!hadFixed && !fromToggle) CorrectPreviousCommit(raw, english);
         // 英語とも日本語とも読める語を、文脈を決めずに (選び直さずに) 確定したときだけ、後で確定し直せるようにしておく。
-        if (!hadFixed && !fromToggle && !chosen && !afterFirstSound && _detector.IsAmbiguousWord(raw))
+        if (!hadFixed && !fromToggle && !chosen && !afterFirstSound && !commandName && _detector.IsAmbiguousWord(raw))
         {
             // 前の語の後に Space で区切って続けたときだけつなげる (それ以外は新しい並び)。
             if (_correctable.Count > 0 && !_correctable[^1].SpaceIntended) _correctable.Clear();

@@ -12,7 +12,7 @@ namespace Meltype.Tests;
 /// </summary>
 internal static class CommandNameTests
 {
-    /// <summary>製品と同じく、英単語の判定にスペルチェッカーを使う。終わったら元に戻す。</summary>
+    /// <summary>英単語の判定にスペルチェッカー (同梱の単語表) を使う。Mac の製品は使えれば macOS のスペルチェッカーを使うので、同じ答えとは限らない。終わったら元に戻す。</summary>
     private static void WithSpellChecker(Action body)
     {
         var previous = CompositionTests.Detector.SpellChecker;
@@ -21,12 +21,12 @@ internal static class CommandNameTests
         finally { CompositionTests.Detector.SpellChecker = previous; }
     }
 
-    private static (string Document, string? Composing) Type(string typed, bool codeApp, Action<CompositionTests.Keyboard>? setup = null)
+    private static (string Document, string? Composing) Type(string typed, bool codeApp, Action<CompositionTests.Keyboard>? setup = null, Func<string, IReadOnlyList<string>>? predictions = null)
     {
         var result = ("", (string?)null);
         WithSpellChecker(() =>
         {
-            var k = new CompositionTests.Keyboard { CodeApp = codeApp };
+            var k = new CompositionTests.Keyboard(predictions: predictions) { CodeApp = codeApp };
             setup?.Invoke(k);
             k.Type(typed);
             result = (k.Host.Document, k.Showing);
@@ -114,5 +114,44 @@ internal static class CommandNameTests
     {
         foreach (var name in CompositionDetector.CommandNames)
             Assert.True(name.Length > 0 && name.All(char.IsAsciiLetterLower), $"一覧の語は小文字の英字だけ: {name}");
+    }
+
+    [Test]
+    public static void CodeApp_SecondLineAfterEnterThatNeverReachedTheIme_IsStillAtWordStart()
+    {
+        // Terminal.app は変換中の文字が無いときの Enter を IME に渡さない: 自分の確定の記録の末尾は ls のまま (空白も改行も入らない)
+        Assert.Equal("lscd ~/Downloads", Type("ls\ncd ~/Downloads\n", codeApp: true).Document, "2 行目の cd は語の頭 (英字)・~/Downloads は守る");
+        Assert.Equal("./build.sh--no-install", Type("./build.sh\n--no-install\n", codeApp: true).Document, "2 行目の --no-install は語の頭 (守る)");
+        // 日本語を確定した直後の /fuka・make は今までどおり
+        Assert.Equal("まけ", Type("make\n", codeApp: true, k => k.Host.PrecedingText = "今日は").Document, "日本語の直後の make は日本語");
+        // 一般アプリは今までどおり (語の頭でない)
+        Assert.True(!Type("ls\nmake\n", codeApp: false).Document.EndsWith("make", StringComparison.Ordinal), "一般アプリは緩めない");
+    }
+
+    [Test]
+    public static void CodeApp_CommandCommit_IsNotCorrectedLater()
+    {
+        // open を英字にした確定は、後の「単位」(tanni) で おぺん に書き戻されない
+        Assert.Equal("open 単位", Type("open tanni \n", codeApp: true).Document, "open 単位");
+    }
+
+    [Test]
+    public static void CodeApp_CommandWithPredictions_TabCommitsEnglishAndPassesTab()
+    {
+        var (document, composing) = Type("make\t", codeApp: true, predictions: reading => ["まけた", "まけて"]);
+        Assert.True(document.StartsWith("make", StringComparison.Ordinal) && !document.Contains('ま'), $"予測が出ていても make + Tab は英字 (実際: {document})");
+        Assert.True(string.IsNullOrEmpty(composing), "予測候補に入らない");
+    }
+
+    [Test]
+    public static void CodeApp_EveryCommandName_CommitsEnglishOnSpaceEnterAndTab()
+    {
+        foreach (var name in CompositionDetector.CommandNames)
+        {
+            Assert.True(Type(name + " ", codeApp: true).Document == name + " ", $"{name} + Space");
+            Assert.True(Type(name + "\n", codeApp: true).Document == name, $"{name} + Enter");
+            var tab = Type(name + "\t", codeApp: true).Document;
+            Assert.True(tab.StartsWith(name, StringComparison.Ordinal), $"{name} + Tab (実際: {tab})");
+        }
     }
 }
