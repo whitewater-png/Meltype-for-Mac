@@ -1316,4 +1316,39 @@ internal static class RomajiTypoTests
             CompositionTests.Detector.SpellChecker = null;
         }
     }
+
+    /// <summary>rive を英単語と答えるスペルチェッカー (実機の NSSpellChecker は rive を英単語と答える。同梱の一覧 BuiltIn は答えない)。</summary>
+    private sealed class RiveIsWordChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) => lower is "rive" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void Upstream69_ParticlePlusWordGuard_DoesNotAskTheSpellChecker()
+    {
+        // 実機 (2026-10-16): deriveyadevote が でりゔぇやでvote になった。#69 の守り (助詞 + 英単語) が残りの rive を
+        // スペルチェッカーに聞き、実機の NSSpellChecker は rive を英単語と答えるので、derive が de|rive として日本語に戻っていた。
+        // 守りは同梱の表だけで見る。rive を英単語と答えるスペルチェッカーでも derive は英語のまま、de|vote の守りは今までどおり。
+        CompositionTests.Detector.SpellChecker = new RiveIsWordChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("deriveyadevote", "deriveやでvote"), ("githubdevote", "githubでvote"), ("derivewo", "deriveを"), ("derive", "derive"),
+                ("inviteshimashita", "inviteしました"),
+                // 既知の限界 (KNOWN_LIMITS): 助詞 + 同梱の英単語とも読める語は、続けて打つと日本語側
+                ("devotewo", "でゔぉてを"), ("devisewo", "でゔぃせを"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
 }

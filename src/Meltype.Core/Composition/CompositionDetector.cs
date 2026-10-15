@@ -558,9 +558,20 @@ public sealed class CompositionDetector
     /// <summary>スペルチェッカーが正しいと言う英単語か、よくある打ち間違い (teh、recieve) か。</summary>
     private bool IsSpellWord(string lower) => SpellChecker is { } checker && (checker.IsWord(lower) || checker.AutoCorrection(lower) is not null);
 
-    /// <summary>助詞 (de・ni・no…) で始まり、残り 3 文字以上が英単語の語 (de|vote = devote、no|vice = novice)。</summary>
-    private bool StartsWithParticleThenEnglishWord(string lower) =>
-        Detection.DictionaryDetector.StartsWithParticle(lower) is { } particle && lower.Length - particle.Length >= 3 && IsKnownEnglishWord(lower[particle.Length..]);
+    /// <summary>
+    /// 助詞 (de・ni・no…) で始まり、残り 3 文字以上が英単語の語 (de|vote = devote、no|vice = novice)。
+    /// 残りの判定にスペルチェッカーは使わず、同梱の表 (english.txt・固有名詞・4 文字以上は english-words.txt) と覚えた語だけを見る。
+    /// 実機の NSSpellChecker は rive を英単語と答えるので、スペルチェッカーで見ると derive も de|rive になり、
+    /// deriveyadevote が でりゔぇやでvote になっていた (テストの同梱の表には rive が無いので deriveやでvote)。
+    /// </summary>
+    private bool StartsWithParticleThenEnglishWord(string lower)
+    {
+        if (Detection.DictionaryDetector.StartsWithParticle(lower) is not { } particle || lower.Length - particle.Length < 3) return false;
+        var rest = lower[particle.Length..];
+        if (!rest.All(char.IsAsciiLetterLower)) return false;
+        if (Memory?.Get(rest) is { } learned) return learned;
+        return _english.Words.ContainsWord(rest) || _proper.Contains(rest) || (rest.Length >= 4 && Detection.BuiltInWordChecker.Shared.IsWord(rest));
+    }
 
     internal bool IsJapaneseWordOrPrefix(string kana) => _kana?.IsJapaneseWordOrPrefix(kana) == true;
 
