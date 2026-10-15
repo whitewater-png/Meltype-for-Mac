@@ -1475,6 +1475,9 @@ public sealed class CompositionController
     /// </summary>
     private bool TabStartsConversion()
     {
+        // 保護区間 (パス・オプション・変数。1-4a) を含む入力は Tab で変換を始めない (確定して Tab を渡す)。本家と同じ。保護区間の後ろに日本語が続く
+        // ./build.shde も含む。final: true は、--no-edit が打ち終わったときだけ保護区間になるため (統合の査読 R64 必須 1)
+        if (_text.Mode == DisplayMode.Auto && _text.Segments(final: true).Any(s => s.Protected)) return false;
         if (_headCount == 0 && _text.Mode == DisplayMode.Auto && _text.KeepLoneHyphen()) return false;
         _text.FixTypos();
         var commitsAlphanumeric = _text.IsAlphanumericAt(final: true) && !(_text.Mode == DisplayMode.Auto && _text.IsNumeric && _text.Raw.All(char.IsAsciiDigit) && _text.PrecedingEnglish != true);

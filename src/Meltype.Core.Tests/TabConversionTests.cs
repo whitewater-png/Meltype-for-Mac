@@ -194,6 +194,27 @@ internal static class TabConversionTests
     }
 
     [Test]
+    public static void WithProtectedSpan_TabCommitsAndPassesTab_LikeUpstream()
+    {
+        // 保護区間 (1-4a) を含む入力では Tab で変換を始めない (本家の TabStartsConversion と同じ)。保護区間の後ろに日本語が続く ./build.shde も、
+        // 確定して Tab を渡す (ターミナル・エディタで Tab をアプリに渡したい場面が多い。変換したいときは Space)。統合の査読 R64 必須 1
+        foreach (var (typed, committed) in new[] { ("./build.shde", "./build.shで"), ("/tmp/foo", "/tmp/foo"), ("--no-edit", "--no-edit"), ("$HOME", "$HOME") })
+        {
+            var k = new CompositionTests.Keyboard { TabConversion = true };
+            k.Type(typed);
+            k.Press(VirtualKeys.Tab);
+            Assert.True(k.Host.View?.Converting != true, $"{typed}: 変換にはならない");
+            Assert.Equal(committed, k.Host.Document, $"{typed}: 確定する");
+            Assert.True(k.Host.Events.Contains("down:09"), $"{typed}: Tab は渡す: " + string.Join("|", k.Host.Events));
+        }
+        // 保護区間の無い入力は今までどおり Tab で変換を始める
+        var plain = new CompositionTests.Keyboard { TabConversion = true };
+        plain.Type("kana");
+        plain.Press(VirtualKeys.Tab);
+        Assert.True(plain.Host.View?.Converting == true, "保護区間が無ければ変換が始まる");
+    }
+
+    [Test]
     public static void ToggleBoxFromF6_TabIsUnchanged_AndEscStillRestoresTheOriginalWord()
     {
         // 確定後の F6 で開いた変換ボックスは、最初から変換中 (Space で始めた変換と同じ扱い)。設定 ON でも OFF と同じく、Tab は確定して Tab を渡す。
