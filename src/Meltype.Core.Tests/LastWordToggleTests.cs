@@ -771,4 +771,34 @@ internal static class LastWordToggleTests
             Assert.Equal(beforeShifted + "/tmp/foo", shifted.Doc, "Shift+Space の後の /tmp/foo も崩れない");
         });
     }
+
+    [Test]
+    public static void Option_AfterANewline_DoesNotCountThePreviousLineAsPrecedingEnglish()
+    {
+        // 実機確認 A-5: 前の行が英語 (/tmp/foo) で終わり、改行したあとの --sorekara は「ーー」。同じ行の英語の後ろ (git --name) は今までどおり守る
+        WithSpellChecker(() =>
+        {
+            var newline = new Editor { EchoPassedKeys = true };
+            newline.Type("/tmp/foo\n");
+            newline.Enter();
+            newline.Type("--sorekara\n");
+            Assert.Equal("/tmp/foo\nーーそれから", newline.Doc, "改行のあとは前の行の英語を直前とみなさない");
+
+            var sameLine = new Editor { EchoPassedKeys = true };
+            sameLine.Type("git --name\n");
+            Assert.Equal("git --name", sameLine.Doc, "同じ行の英語の後ろは今までどおり守る");
+
+            var short1 = new Editor { EchoPassedKeys = true };
+            short1.Type("/tmp/foo\n");
+            short1.Enter();
+            short1.Type("-la\n");
+            Assert.Equal("/tmp/foo\n-la", short1.Doc, "1〜2 文字は直前に関係なく守る");
+
+            var unreadable = new Editor { EchoPassedKeys = true };
+            unreadable.Type("/tmp/foo\n");
+            unreadable.Enter();
+            unreadable.Type("--no-install\n");
+            Assert.Equal("/tmp/foo\n--no-install", unreadable.Doc, "読めない部分があるオプションは改行のあとも守る");
+        });
+    }
 }

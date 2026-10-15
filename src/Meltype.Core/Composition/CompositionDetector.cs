@@ -198,8 +198,9 @@ public sealed class CompositionDetector
     /// <param name="startsWord">先頭の単位が語の頭か (キャレットの前が無い・分からない・空白・開きの記号)。保護区間 (/tmp/foo・--no-install) は語の頭からだけ守る。
     /// 日本語を確定した直後の /fuka は語の頭ではない。<see cref="IsWordStartAfter"/> で決める。</param>
     /// <param name="precedingOpener">キャレットの前の文字が開きの記号ならその記号 (<see cref="OpenerBefore"/>)。保護区間の範囲を、対応する閉じの記号までにする。</param>
+    /// <param name="afterNewline">キャレットの前の文字が改行か (<see cref="IsNewlineAfter"/>)。前の行の英語は、オプションの「直前が英語」にしない。</param>
     public IReadOnlyList<CompositionSegment> Segment(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish = null, bool? followingEnglish = null,
-        DetectionLevel level = DetectionLevel.Balanced, bool englishSentence = false, bool kanaInput = false, bool final = false, bool startsWord = true, string? precedingOpener = null)
+        DetectionLevel level = DetectionLevel.Balanced, bool englishSentence = false, bool kanaInput = false, bool final = false, bool startsWord = true, string? precedingOpener = null, bool afterNewline = false)
     {
         // 先頭の z + h/j/k/l の矢印 (zh = ←) は、英語かどうかを判定せず日本語の区間にする。
         // (macOS のスペルチェッカーは zh を英単語と答えるので、判定に回すと矢印が元の綴りに戻る。先頭の zhang・zlib は CompositionText が矢印を取り消して英字に戻す)
@@ -218,12 +219,12 @@ public sealed class CompositionDetector
         {
             return [new CompositionSegment(true, "", stylized)];
         }
-        var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, startsWord: startsWord, precedingOpener: precedingOpener);
+        var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, startsWord: startsWord, precedingOpener: precedingOpener, afterNewline: afterNewline);
         if (kanaInput) return segments;
         // 英語の後ろの , . は半角にしたが、すぐ後ろに日本語が続いた (Ok,konnna → Ok、こんな) なら、日本語の文の句読点にして分け直す。
         if (PunctuationBeforeJapanese(units, segments) is { } japanesePunctuation)
         {
-            segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation, startsWord, precedingOpener);
+            segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation, startsWord, precedingOpener, afterNewline);
         }
         // 辞書にない英単語 (stackoverflow など) を最初から打っているなら全体を英語にする。
         // 途中の区間 (… flow) だけを英語にすると「sたcこvえrflow」のようになってしまう。
@@ -297,7 +298,7 @@ public sealed class CompositionDetector
     }
 
     private List<CompositionSegment> FindSpans(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish, bool? followingEnglish, DetectionLevel level, bool englishSentence, bool kanaInput, bool final,
-        HashSet<int>? japanesePunctuation = null, bool startsWord = true, string? precedingOpener = null)
+        HashSet<int>? japanesePunctuation = null, bool startsWord = true, string? precedingOpener = null, bool afterNewline = false)
     {
         var n = units.Count;
         var segments = new List<CompositionSegment>();
@@ -308,7 +309,7 @@ public sealed class CompositionDetector
         // 前の文脈の点数: 英文の続きなら +2、英語なら +1、日本語なら -1、分からなければ 0。
         int BeforeScore(int start) => start == 0 && englishSentence ? 2 : Score(PrecededByEnglish(start));
         // 語の頭から始まる直前が英語の語 (オプション -name の根拠): 先頭なら入力欄の確定済みの文字、途中なら直前の英語の区間 (間は空白・記号だけ)
-        bool EnglishWordBefore(int start) => start == 0 ? precedingEnglish == true
+        bool EnglishWordBefore(int start) => start == 0 ? precedingEnglish == true && !afterNewline
             : segments.Count > 0 && segments[^1].IsEnglish && Enumerable.Range(japaneseStart, start - japaneseStart).All(k => IsAsciiSymbol(units[k]) || units[k].Raw.All(char.IsWhiteSpace));
         var i = 0;
         var bracketCloser = -1;
@@ -327,8 +328,8 @@ public sealed class CompositionDetector
             // (本家 yksr-melt/Meltype の PR #267 / issue #260・#254 と同じ変更)
             if (found < 0 && !kanaInput && level != DetectionLevel.Manual && i > 0 && units[i - 1].Raw == "." && PrecededByEnglish(i) == true) found = DotSuffixEnd(units, i, pending, final);
             // 英文の中の記号 (, . ! ? -) は読点・句点にせず半角のまま。日本語の文の中の英単語の後 (今日はgoogle、) は日本語の記号。
-            // (かな入力では 、。 も かなのキーなので対象外)
-            if (found < 0 && !kanaInput && i != bracketCloser && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&
+            // (かな入力では 、。 も かなのキーなので対象外。改行の直後の - は前の行の英語の続きではない: --sorekara の「ーー」。A-5)
+            if (found < 0 && !kanaInput && i != bracketCloser && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && !(i == 0 && afterNewline && units[i].Raw == "-") && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&
                 japanesePunctuation?.Contains(i) != true) found = i + 1;
             if (!kanaInput && found < 0) found = UserNameEnd(units, i, pending);
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = CapitalizedWordEnd(units, i, pending, final);
@@ -950,6 +951,9 @@ public sealed class CompositionDetector
     /// </summary>
     public static bool IsWordStartAfter(string? preceding) =>
         string.IsNullOrEmpty(preceding) || char.IsWhiteSpace(preceding[^1]) || WordOpeners.ContainsKey(preceding[^1].ToString());
+
+    /// <summary>キャレットの前の文字が改行 (\n・\r) か。オプション (-name) の「直前が英語」は同じ行の英語だけ。</summary>
+    public static bool IsNewlineAfter(string? preceding) => !string.IsNullOrEmpty(preceding) && preceding[^1] is '\n' or '\r';
 
     /// <summary>キャレットの前の文字が開きの記号 (`「『(（"'[) ならその記号。無ければ null (保護区間の範囲を閉じの記号までにするため)。</summary>
     public static string? OpenerBefore(string? preceding) =>
