@@ -1354,12 +1354,14 @@ internal static class RomajiTypoTests
 
     /// <summary>
     /// 実機の NSSpellChecker のように、英単語の後ろの断片 (rive・livery・pics・ments) や mouser も英単語と答えるスペルチェッカー
-    /// (同梱の一覧 BuiltIn はどれも答えない)。
+    /// (同梱の一覧 BuiltIn はどれも答えない)。逆に、同梱の一覧にある vised・mads・shes は、実機と同じく英単語と答えない。
     /// </summary>
     private sealed class FragmentsAreWordsChecker : Detection.IWordChecker
     {
         public bool IsAvailable => true;
-        public bool IsWord(string lower) => lower is "rive" or "livery" or "pics" or "ments" or "mouser" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+        public bool IsWord(string lower) =>
+            lower is "rive" or "livery" or "pics" or "ments" or "mouser" ||
+            (lower is not ("vised" or "mads" or "shes") && Detection.BuiltInWordChecker.Shared.IsWord(lower));
     }
 
     [Test]
@@ -1367,7 +1369,8 @@ internal static class RomajiTypoTests
     {
         // 実機 (2026-10-16、K82): kyouhaderive が きょうはでりゔぇ になった。日本語のすぐ後ろの 助詞 + 英単語 の守り
         // (dochira|mo|user) が残りの rive をスペルチェッカーに聞き、実機の NSSpellChecker は rive を英単語と答えるので、
-        // derive が de|rive として分かれていた。守りは同梱の表だけで見る (#69 の守りと同じ)。
+        // derive が de|rive として分かれていた。区間全体が同梱の一覧の語なら、守りは残りが同梱の表の語のときだけ分ける
+        // (#69 の守りと同じ表)。
         CompositionTests.Detector.SpellChecker = new FragmentsAreWordsChecker();
         try
         {
@@ -1378,6 +1381,10 @@ internal static class RomajiTypoTests
                 // 今までどおり分ける: 同梱の表の語 (user・vice・vote) が残りになる 助詞 + 英単語
                 ("dochiramouserga", "どちらもuserが"), ("kyouhanovice", "きょうはのゔぃせ"), ("githubdevote", "githubでvote"),
                 ("derive", "derive"), ("derivewo", "deriveを"),
+                // 残り (vised・mads・shes) が同梱の表の語でもスペルチェッカーが語と言わないなら、K82 の前と同じく分けない。
+                // 守りを「同梱の表の語なら分ける」と広げると、きょうはでゔぃsed・きょうはのまds・きょうははしぇあを になっていた
+                ("kyouhadevised", "きょうはdevised"), ("konodevised", "このdevised"), ("kyouhanomads", "きょうはnomads"),
+                ("kyouhahasheswo", "きょうはhashesを"),
             })
             {
                 var k = new CompositionTests.Keyboard();
