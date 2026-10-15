@@ -198,7 +198,7 @@ public sealed class CompositionDetector
     /// <param name="startsWord">先頭の単位が語の頭か (キャレットの前が無い・分からない・空白・開きの記号)。保護区間 (/tmp/foo・--no-install) は語の頭からだけ守る。
     /// 日本語を確定した直後の /fuka は語の頭ではない。<see cref="IsWordStartAfter"/> で決める。</param>
     /// <param name="precedingOpener">キャレットの前の文字が開きの記号ならその記号 (<see cref="OpenerBefore"/>)。保護区間の範囲を、対応する閉じの記号までにする。</param>
-    /// <param name="afterNewline">キャレットの前の文字が改行か (<see cref="IsNewlineAfter"/>)。前の行の英語は、オプションの「直前が英語」にしない。</param>
+    /// <param name="afterNewline">キャレットの前が行頭か (最後の改行の後ろが空白・タブ・全角空白だけ。<see cref="IsNewlineAfter"/>)。前の行の英語は、オプションの「直前が英語」にしない。</param>
     public IReadOnlyList<CompositionSegment> Segment(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish = null, bool? followingEnglish = null,
         DetectionLevel level = DetectionLevel.Balanced, bool englishSentence = false, bool kanaInput = false, bool final = false, bool startsWord = true, string? precedingOpener = null, bool afterNewline = false)
     {
