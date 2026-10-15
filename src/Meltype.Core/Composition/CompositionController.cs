@@ -2320,7 +2320,8 @@ public sealed class CompositionController
         // 日英の学習は、ここで 1 回だけ (Learn・LearnLanguage は、打った英字が無い変換ボックスでは日英を書かないので、二重にならない。R41-6)
         // 暗黙の確定 (フォーカス移動・クリックなど) は、文字は確定するが学習しない
         // 学習の単位は、判定と同じ区間の語 (sushi)。確定 1 回分まるごとの打った英字 (kyouhasushidesu) では、判定で引かれず効かない
-        if (toggle is not null && !implicitly)
+        // 1 音確定 (Shift+↓) をしたあとの残りでは学習しない (LearnLanguage と同じ。R46 任意 1)
+        if (toggle is not null && !implicitly && !_firstSoundCommitted)
         {
             foreach (var word in toggle.Previous.Raws.English) _options.Languages?.Remember(word, english: false, explicitChoice: true);
         }
@@ -2430,6 +2431,8 @@ public sealed class CompositionController
         var text = first.Text;
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, null);
         _correctable.Clear();
+        // 前の確定の、確定後の F10 / F6 の記録も消す (入力欄の末尾が変わった。部分確定 CommitPart と同じ。R46-2)
+        _lastWord = null;
         _lastCommitEnglish = first.English;
         var joined = (_lastCommitText ?? "") + text;
         _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
@@ -3020,7 +3023,7 @@ public sealed class CompositionController
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, _followingText);
         if (!hadFixed && !fromToggle) CorrectPreviousCommit(raw, english);
         // 英語とも日本語とも読める語を、文脈を決めずに (選び直さずに) 確定したときだけ、後で確定し直せるようにしておく。
-        if (!hadFixed && !fromToggle && !chosen && _detector.IsAmbiguousWord(raw))
+        if (!hadFixed && !fromToggle && !chosen && !afterFirstSound && _detector.IsAmbiguousWord(raw))
         {
             // 前の語の後に Space で区切って続けたときだけつなげる (それ以外は新しい並び)。
             if (_correctable.Count > 0 && !_correctable[^1].SpaceIntended) _correctable.Clear();

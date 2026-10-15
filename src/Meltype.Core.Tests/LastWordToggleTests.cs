@@ -639,4 +639,30 @@ internal static class LastWordToggleTests
         Assert.True(alpha.Memory.Entries().All(e => e.Word != "kyouhaamazondesu"), "確定後の F6 → Enter でも、打った英字まるごとを日本語として覚えない");
         Assert.True(alpha.Memory.Get("amazon") == false, "自動でも英語だった amazon は、日本語として覚える");
     }
+
+    [Test]
+    public static void FirstSoundCommit_RestIsNotAutoCorrected_AndForgetsThePreviousRecord()
+    {
+        // R46-1: 1 音確定の残り (kai の i) は語の途中なので、後ろの英語を見て I に直さない
+        var rest = new Editor(tokMode: true);
+        rest.Type("kai");
+        rest.Key(VirtualKeys.Down, null, shift: true);
+        rest.Enter();
+        Assert.Equal("かい", rest.Doc, "前提: か を 1 音確定、残りの い を Enter で確定");
+        rest.Type("want ");
+        Assert.True(rest.Doc.StartsWith("かい", StringComparison.Ordinal), "残りの い を I に書き換えない: " + rest.Doc);
+
+        // R46-2: 1 音確定は、前の確定の記録 (確定後の F10 の対象) を消す。はは → ha の は を 1 音確定すると末尾が「はは」に一致しても直さない
+        var e = new Editor(tokMode: true);
+        e.Type("haha\n");
+        Assert.Equal("はは", e.Doc, "前提");
+        e.Type("ha");
+        e.Key(VirtualKeys.Down, null, shift: true);
+        Assert.Equal("ははは", e.Doc, "前提: 最後の 1 音まで確定して入力は終わった");
+        Assert.True(!e.Session.IsComposing, "前提: 入力中でない");
+        var result = e.F10();
+        Assert.True(!result.Consumed, "前の確定 (はは) の記録は消えているので、F10 はアプリへ");
+        Assert.Equal("ははは", e.Doc);
+        Assert.True(e.Memory.Get("haha") is null, "haha を覚えない");
+    }
 }
