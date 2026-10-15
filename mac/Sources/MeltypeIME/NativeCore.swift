@@ -139,7 +139,7 @@ struct CompositionView: Decodable {
     let hint: String
     let candidates: [String]
     let clauses: [String]
-    /// 選んでいる候補の意味 (無ければ nil)。候補で少し止まったら注釈に出す。
+    /// 選んでいる候補の意味 (無ければ nil)。候補で少し止まったら候補ウィンドウの横のパネルに出す。
     let meaning: String?
     /// 予測変換の候補と、Tab で入って選んでいる位置 (入っていなければ -1)。
     let predictions: [String]

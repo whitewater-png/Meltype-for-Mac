@@ -1,18 +1,28 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
 import AppKit
 import Carbon
 
 /// 候補の意味を、候補ウィンドウ (IMKUIPanel) の横に出す自前の小さなパネル。
 /// IMKCandidates.showAnnotation は macOS 26 で画面に何も出さない (注釈の窓が作られない。実機のトレースで確認) ので、自前で出す。
 /// 候補ウィンドウの位置は IMK の非公開のクラス名 IMKUIPanel で探す。見つからなければ出さない (安全側)。メインスレッドだけで触る。
+/// 出している間は 0.3 秒ごとに候補ウィンドウを見張り、消えた・動いた・大きさが変わったら隠す (IMK から閉じた通知が来ないことがあるため)。
 final class AnnotationPanel {
     static let shared = AnnotationPanel()
 
     private static let maxWidth: CGFloat = 300
     private static let padding: CGFloat = 8
     private static let gap: CGFloat = 4
+    private static let cornerRadius: CGFloat = 6
+    private static let maxLines: CGFloat = 3
 
     private let panel: NSPanel
     private let label: NSTextField
+    private let effect: NSVisualEffectView
+    /// 出したときの候補ウィンドウの frame と、見張りのタイマー。
+    private var hostFrame: NSRect?
+    private var watchTimer: Timer?
 
     private init() {
         label = NSTextField(wrappingLabelWithString: "")
@@ -23,13 +33,10 @@ final class AnnotationPanel {
         label.lineBreakMode = .byTruncatingTail
         label.preferredMaxLayoutWidth = Self.maxWidth - Self.padding * 2
 
-        let effect = NSVisualEffectView()
+        effect = NSVisualEffectView()
         effect.material = .popover
         effect.blendingMode = .behindWindow
         effect.state = .active
-        effect.wantsLayer = true
-        effect.layer?.cornerRadius = 6
-        effect.layer?.masksToBounds = true
         effect.addSubview(label)
 
         panel = AnnotationNSPanel(contentRect: NSRect(x: 0, y: 0, width: 100, height: 30),
@@ -50,31 +57,70 @@ final class AnnotationPanel {
         NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).contains("IMKUIPanel") }
     }
 
-    func show(_ text: String) {
-        guard !text.isEmpty, !IsSecureEventInputEnabled(), let host = Self.candidateWindow() else { hide(); return }
+    /// 出せたら true。候補ウィンドウが見つからない・横に置く場所が無いときは隠して false。
+    @discardableResult
+    func show(_ text: String) -> Bool {
+        guard !text.isEmpty, let host = Self.candidateWindow() else { hide(); return false }
         label.stringValue = text
+        let lineHeight = ceil(label.font?.boundingRectForFont.height ?? 15)
         let textSize = label.sizeThatFits(NSSize(width: Self.maxWidth - Self.padding * 2, height: .greatestFiniteMagnitude))
-        let size = NSSize(width: ceil(textSize.width) + Self.padding * 2, height: ceil(textSize.height) + Self.padding)
-        label.frame = NSRect(x: Self.padding, y: Self.padding / 2, width: ceil(textSize.width), height: ceil(textSize.height))
+        let textHeight = min(ceil(textSize.height), lineHeight * Self.maxLines)
+        let size = NSSize(width: ceil(textSize.width) + Self.padding * 2, height: textHeight + Self.padding)
+        label.frame = NSRect(x: Self.padding, y: Self.padding / 2, width: ceil(textSize.width), height: textHeight)
 
-        let hostFrame = host.frame
-        let center = NSPoint(x: hostFrame.midX, y: hostFrame.midY)
+        let frame = host.frame
+        let center = NSPoint(x: frame.midX, y: frame.midY)
         let screen = NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main
-        let area = screen?.visibleFrame ?? hostFrame
+        let area = screen?.visibleFrame ?? frame
 
-        var x = hostFrame.maxX + Self.gap
-        if x + size.width > area.maxX { x = hostFrame.minX - size.width - Self.gap }
-        x = max(x, area.minX)
-        var y = hostFrame.maxY - size.height   // 上端をそろえる
+        // 右隣に入ればそこ、入らなければ左隣。どちらにも入らない狭い画面では出さない (候補ウィンドウに重ねない)。
+        var x = frame.maxX + Self.gap
+        if x + size.width > area.maxX {
+            x = frame.minX - size.width - Self.gap
+            if x < area.minX { hide(); return false }
+        }
+        var y = frame.maxY - size.height   // 上端をそろえる
         y = min(max(y, area.minY), area.maxY - size.height)
 
         panel.level = NSWindow.Level(rawValue: host.level.rawValue + 1)
         panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: true)
+        effect.maskImage = Self.roundedMask()
+        panel.invalidateShadow()
         panel.orderFrontRegardless()
+        hostFrame = frame
+        startWatching()
+        return true
     }
 
     func hide() {
+        watchTimer?.invalidate()
+        watchTimer = nil
+        hostFrame = nil
         if panel.isVisible { panel.orderOut(nil) }
+    }
+
+    /// 出している間、候補ウィンドウが消えた・動いた・大きさが変わったら隠す。出し直すたびに古いタイマーを止めてから作る。
+    private func startWatching() {
+        watchTimer?.invalidate()
+        let timer = Timer(timeInterval: 0.3, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            guard let host = Self.candidateWindow(), host.frame == self.hostFrame else { self.hide(); return }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        watchTimer = timer
+    }
+
+    /// 角丸の画像 (NSVisualEffectView.maskImage 用。角だけ固定して中は引き伸ばす)。
+    private static func roundedMask() -> NSImage {
+        let edge = cornerRadius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: cornerRadius, left: cornerRadius, bottom: cornerRadius, right: cornerRadius)
+        image.resizingMode = .stretch
+        return image
     }
 }
 

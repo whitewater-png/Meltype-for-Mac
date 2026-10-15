@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
 // 英字の候補の意味を macOS の辞書 (Dictionary Services) から引く。Core に意味が無いときの補い。
 // 辞書は端末内にあり、通信はしない。語も定義も、ログやトレースには書かない。
 import CoreServices

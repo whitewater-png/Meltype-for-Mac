@@ -2496,5 +2496,7 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
   - 位置は表示のたびに `NSApp.windows` から可視の `IMKUIPanel` を探し、右隣 (x = maxX + 4、上端をそろえる)。画面の `visibleFrame` をはみ出すなら左隣、上下も収める。見つからなければ出さない。
   - `InputController`: 出す所を `presentMeaning` に集め (秘匿入力の間は出さない。`ShowCandidateMeanings` OFF は今までどおり意味が空になる)、IMK の `showAnnotation` の呼び出しは全部やめた (入力モードの「あ」「あ (コード)」の表示も無くなり、`showModeAnnotation`・`shownDictionaryMeaning` は削除)。隠す所: `meaningKey` の didSet、`updateCandidates` の else、`hideComposition`、`deactivateServer`、利用者が候補ウィンドウの選択を動かしたとき (`candidateSelectionChanged` で `isSelectingProgrammatically` が false)。語・意味はログに書かない。
 - **得と損**: 得: 意味が実際に見える。損: 標準の見た目と少し違う。候補ウィンドウの位置を IMK の非公開のクラス名 `IMKUIPanel` で探すので、macOS の更新で見つからなくなったら出ないだけ (安全側)。入力モードの「あ」の表示は無くなった。候補ごとの注釈 (`notes`) は出さず、意味だけ。
-- **検証**: `swift build -c release` と `./build.sh --no-install` の結果は最終回答を参照。
-- **未確認**: 実機の見え方 (位置・色・ダーク/ライト・複数ディスプレイ・フルスクリーン)。
+- **査読 R68 の反映 (r2)**: (1) 必須: `candidateSelectionChanged` で、利用者が動かした選択が Core の選択 (`lastView?.selectedIndex`) と違うとき `meaningKey = nil` (世代が進み、隠れ、待っているタイマー・辞書の completion も止まる)。同じなら何もしない。(2) 見張り: パネルが見えている間だけ 0.3 秒ごとのタイマー (`.common`) で候補ウィンドウを探し直し、見つからない・見えない・`frame` が出したときと違うなら隠す。`hide()` で止め、出し直すたびに古いタイマーを止める。候補ウィンドウを出し直す枝でも `meaningKey = nil`。(3) 任意: 高さを行の高さ × 3 で切る・角丸は `maskImage`・どちらの隣にも入らない画面では出さない・見つからないときはトレースに「候補ウィンドウが見つからない」だけ・秘匿入力の確認は `presentMeaning` に 1 か所・古いコメントを直した・SPDX 行を足した。(4) 文書: K47 を「直った (実機未確認)」に、候補ごとの注釈 (`notes`) は新しい K80 (直す予定) に分け、K46 の書き方を直した。
+- **検証** (r2): `swift build -c release` 通過、`./build.sh --no-install` 通過、Core 758/758。
+- **実機で確かめること** (リョウさん): ① `hashi` を Space で変換して 1.5 秒 → 候補ウィンドウの右隣に意味 ② Esc・Enter・候補のクリック・Cmd+Tab・入力ソースの切り替えで消える ③ マウスで選択を動かすと消え、また出てこない ④ 画面の右端では左隣に出る ⑤ ダーク・ライト・フルスクリーン・別のディスプレイ ⑥ 設定「候補の意味を表示」を OFF にすると出ない ⑦ `kyouhameetingdesu` → `meeting` の文節で辞書の意味が出る。
+- **未確認**: 上の実機の見え方 (位置・色・ダーク/ライト・複数ディスプレイ・フルスクリーン)。

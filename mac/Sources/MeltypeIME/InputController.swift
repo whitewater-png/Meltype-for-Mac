@@ -34,7 +34,7 @@ final class MeltypeInputController: IMKInputController {
     /// ユーザー辞書に登録する読み・語の長さの上限 (Core の UserDictionary.MaxLength と同じ値)。
     private static let maxWordLength = 100
 
-    /// 今のアプリの種類 (activateServer で bundle ID から決める)。候補ウィンドウの注釈に出す。
+    /// 今のアプリの種類 (activateServer で bundle ID から決める)。コードエディタ用の入力モードの記憶・無効アプリの判定に使う。
     private var appKind: AppKind = .general
 
     /// 今のアプリの bundle ID (activateServer で決める)。
@@ -334,8 +334,9 @@ final class MeltypeInputController: IMKInputController {
               let string = candidateString?.string,
               let index = candidateList.firstIndex(of: string) else { return }
         shownIndex = index
-        // 利用者が選択を動かした: 出している意味は古くなる (Core の選択と食い違う) ので隠す
-        AnnotationPanel.shared.hide()
+        // 利用者が選択を動かして Core の選択と食い違ったら、出している意味・待っているタイマー・辞書の completion を止める。
+        // 同じなら何もしない (プログラムで動かした通知が遅れて届いても、正しいタイマーを消さない)。
+        if index != lastView?.selectedIndex { meaningKey = nil }
     }
 
     // ---- メニュー (メニューバーの入力メニュー) ----
@@ -717,7 +718,8 @@ final class MeltypeInputController: IMKInputController {
         text.addAttributes(attributes, range: range)
     }
 
-    /// 候補で少し (1.5 秒) 止まったら、その候補の意味を候補ウィンドウの注釈に出す (Windows 版と同じ)。
+    /// 候補で少し (1.5 秒) 止まったら、その候補の意味を候補ウィンドウの横の自前のパネルに出す (Windows 版と同じ)。
+    /// 書き換えるたびに世代を進めて隠す (待っているタイマー・辞書の completion も止まる)。
     private var meaningKey: String? {
         didSet {
             meaningGeneration &+= 1
@@ -755,7 +757,7 @@ final class MeltypeInputController: IMKInputController {
     /// 何も出ない (実機のトレースで確認) ので使わない。入力モード (「あ」) の表示もやめた。語・意味はログに書かない。
     private func presentMeaning(_ text: String) {
         guard !IsSecureEventInputEnabled() else { return }
-        AnnotationPanel.shared.show(text)
+        if !AnnotationPanel.shared.show(text) { Self.trace("候補ウィンドウが見つからない") }
     }
 
     private func updateCandidates(_ view: CompositionView) {
@@ -769,6 +771,8 @@ final class MeltypeInputController: IMKInputController {
             window.setAttributes([IMKCandidatesSendServerKeyEventFirst as String: true])
             if view.candidates != candidateList || !window.isVisible() {
                 // 候補が変わったときだけ、IMKCandidates に候補一覧を再取得させる (選択は先頭に戻る)。
+                // 候補ウィンドウを出し直すので、出していた意味は捨てる。
+                meaningKey = nil
                 candidateList = view.candidates
                 window.update()
                 window.show(kIMKLocateCandidatesBelowHint)

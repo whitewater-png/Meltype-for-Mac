@@ -5,7 +5,7 @@ import Cocoa
 import InputMethodKit
 
 /// ユーザー辞書への登録提案ができたことを知らせる 1 行のヒント。
-/// 候補ウィンドウの注釈 (意味・モード表示) と取り合わないよう、別の小さなパネルを入力位置の下に数秒だけ出す。
+/// 候補ウィンドウの横の意味のパネル (AnnotationPanel) と取り合わないよう、別の小さなパネルを入力位置の下に数秒だけ出す。
 /// フォーカスを奪わず (nonactivating)、クリックも受けない。1 日 1 回までの制限は本体 (Core) が持つ。
 final class SuggestionHint {
     static let shared = SuggestionHint()
