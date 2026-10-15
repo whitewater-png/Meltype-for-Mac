@@ -171,7 +171,7 @@ internal static class CommandNameTests
     }
 
     [Test]
-    public static void CodeApp_AfterDigit_IsNotWordStart()
+    public static void CodeApp_AfterDigit_DecidedByCharBeforeDigits()
     {
         // 数字の後ろ (予算は10 の後ろ) の man は語の頭にしない: 今までどおり「万」側
         void Before(CompositionTests.Keyboard k) => k.Host.PrecedingText = "予算は10";
