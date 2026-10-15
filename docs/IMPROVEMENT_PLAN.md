@@ -2456,3 +2456,15 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **得と損**: 得: 英単語の意味 (`meeting` など) が分かり、別の語の項目 (`river` → R.・`api` → アメリカ石油協会など) は出さない。損: 辞書の並び順で出る辞書が変わる。辞書の最初の項目だけを出すので、ふだんの意味と違うことがある (`it` → イット：性的魅力。`IT` と `it` は辞書が別の項目を返すので、キャッシュも分けた)。形が合わない辞書 (英英を先頭にした環境の一部など) では何も出ない。初めての語は引くのに少し時間がかかる (別のキューなので入力は止まらない)。
 - **未確認**: 実機の注釈の見え方。`kyouhameetingdesu` → 変換 → `meeting` の文節を選んで 1.5 秒 → 辞書の 1 文 (ミーティング：打ち合わせや連絡のための会合)。`ringo` → 変換 → `apple` を選んで 1.5 秒 → 辞書の 1 文 (アップル：りんご)。同じ候補のままでも「あ」に戻らないこと。Core の意味の確認は漢字の候補 (`hashi` → 橋) で行い、そのときは辞書を引かない。設定の「候補の意味を表示」を OFF にすると両方出ない。辞書アプリで英語の辞書を外しても落ちないこと。
 
+## 追加項目 1-8 (Tab で変換。P41)
+
+- **経緯**: 本家 1.2.1 の設定「Tab で変換」(`TabConversion`、本家の PR 一覧では #299、コードのコメントでは issue #219。2 つの関係は未確認) を Mac 版に入れた。リョウさんの決定 4: 本家と同じ動きで、**Mac は既定 OFF** (本家は ON。フォームで日本語を打って Tab で次の欄へ移る操作を変えないため)。
+- **実装の要点** (`CompositionController.cs`): 入力中の Tab の優先順は 本家と同じ — もしかして → 手動の提案 (英字にする) → 予測候補 → (設定 ON なら) 変換を始める。`TabStartsConversion()` は Space が変換を始める場面だけ true (打ち間違いを直してから、英語で終わっていれば false = 確定して Tab を渡す。箇条書きの - も Space と同じ)。変換中の Tab は `HandleConversionKey` に枝を足し、**Tab で始めた変換の中だけ** Tab = 次の候補・Shift+Tab = 前の候補 (`_tabStartedConversion`)。Space で始めた変換の中・Shift+Tab での開始は、今までどおり確定して Tab を渡す。Esc で戻ったあとの Tab はもう一度変換を始める。旗は `StartConversion`・`CommitText`・ローマ字の再変換・`Reset`・`BeginComposition`・変換中の Back / Esc (本家と同じ。査読 R54) で下ろす。
+- **本家との差**: 本家の `TabStartsConversion` が見る「保護区間」(`ProtectedSpans`)・`PreviewCandidates` は Mac 版に無いので入れていない (Space と同じ条件に揃えた)。予測候補の Tab (`HandlePredictionKey`) は今のまま (Shift+Tab で戻る・一巡はしない)。
+- **設定の配線**: `Settings.TabConversion` (既定 false)、`MacSettingsCatalog` の「入力」に項目 (説明は本家と同じ文 + Mac の既定 OFF の注)、`MeltypeSession.CreateDefault` で `shared.Current.TabConversion` (config.json の変更が 0.5 秒で効く)。**FFI は変えていない** (ABI 11 のまま。設定タブの JSON の仕組みで渡る)。`tools/check-mac-aot-settings.py` に、一覧に出る・既定 OFF・保存できる・既定に戻る、を足した。
+- **1 音確定・確定後の F6 ボックスとの組み合わせ**: 1 音確定 (TokMode の Shift+↓) の残りも Tab で変換を始められ、Tab で次の候補になる。確定後の F6 で開いた変換ボックスは最初から変換中なので Space で始めた変換と同じ扱いで、設定 ON でも Tab は今までどおり (確定して Tab を渡す)。Esc 1 回で元の語に戻る動きも変わらない (どちらもテストあり)。
+- **検証**: Core 733/733 (Tab で変換のテスト 14 件: 本家の `TabConversion_*` 9 件を写したもの + 既定 OFF + OFF のとき今までどおり + 1 音確定との組み合わせ + F6 ボックス + BackSpace で戻したあとの Tab)、eval-compare broken 0 (231/264 同じ)、`swift build -c release` 通過、`build.sh --no-install` と `check-mac-aot-settings.py` 全 PASS。
+- **得と損**: 得: Microsoft IME と同じ「Tab で変換」が使える (設定 ON)。損: ON にすると、フォームで日本語を打ってから Tab で次の欄へ移る操作が、確定ではなく変換開始になる (もう一度 Tab は次の候補、Enter で確定してから Tab)。そのため既定は OFF。
+- **実機で確かめること** (リョウさん): 設定「Tab で変換」を ON にして、① Tab で始めた変換 (候補が 2 つ以上) で、Tab / Shift+Tab に候補ウィンドウの選択がついてくるか (候補ウィンドウは `IMKCandidatesSendServerKeyEventFirst` が変換中で候補が 2 つ以上のときだけ ON になる (`InputController.swift:697` 付近)) ② Space で始めた変換の中の Tab で、Tab がアプリに届いて次の欄へ移るか ③ 既定 OFF で今までどおり ④ `hello` → Tab で確定して Tab が届く。
+- **未確認**: 実機の IME での操作 (上の ①〜④)。Windows 側の配線 (`TrayApplicationContext.cs`・`CompositionService.cs` に TokMode と同じ形で 1 行ずつ) はビルド未確認。候補ウィンドウと Tab の関係 (Swift 側は変えていない)。
+

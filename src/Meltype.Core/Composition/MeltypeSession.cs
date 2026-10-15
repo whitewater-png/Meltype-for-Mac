@@ -176,6 +176,7 @@ public sealed class MeltypeSession
             TypeDigitsAfterConversion = () => shared.Current.TypeDigitsAfterConversion,
             // ATOK スタイルのキー操作。config.json の変更 (「Meltype 辞書」の「設定」タブ) がすぐ効くよう、共有の値を毎回見る。
             TokMode = () => shared.Current.TokMode,
+            TabConversion = () => shared.Current.TabConversion,
             // 確定した直後の語を直す Ctrl+' / Ctrl+J。既定は OFF (Ctrl+J はターミナルの改行と重なる)。
             ToggleLastWordCtrlKeys = () => shared.Current.ToggleLastWordCtrlKeys,
             AutoCorrect = () => shared.Current is { AutoCorrectAfterCommit: true, DetectionLevel: not DetectionLevel.Manual },

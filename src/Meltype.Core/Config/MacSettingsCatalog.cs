@@ -76,6 +76,7 @@ internal static class MacSettingsCatalog
         [nameof(Settings.InputStyle)] = "ローマ字入力 / かな入力 (JIS)。かな入力は JIS キーボード専用の実験的な機能です (US 配列では使えません)。JIS かな配列で入力し (Shift+E = ぃ, Shift+Z = っ, Shift+ね = 、、濁点・半濁点は直前のかなに付く)、打ったキーの英字が英単語なら英字で見せます。JIS キーボード以外 (US 配列など) では、かな入力にしてもローマ字入力のまま動きます。変えると、次に打つ文字から効きます。",
         [nameof(Settings.CorrectTypos)] = "Space・Enter で変換・確定するときに打ち間違いを直します。ローマ字: 読めない子音が残ったとき、隣のキーの押し間違い・入れ替わり・抜けを 1 文字だけ直します (onegaishimsu → お願いします、sumimasne → すみません。よく使う語の読みになるときだけ)。英語: 同梱のよくある打ち間違いの一覧にある語を直します (teh → the、recieve → receive)。",
         [nameof(Settings.FileLog)] = "~/Library/Application Support/Meltype/meltype.log にログを書きます (OFF のときは書きません)。判定した語の先頭の数文字・アプリ名・入力欄の名前が含まれます。確定した文字列などは「ログに入力した文字を残す」が ON のときだけ残ります。",
+        [nameof(Settings.TabConversion)] = "打っている途中に Tab を押すと、Space と同じく変換を始めます。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、確定してから Tab をアプリに渡します。OFF のときは、今までどおり確定して Tab をアプリに渡します (フォームで日本語を打って Tab で次の欄へ移る操作が変わらないよう、Mac 版は既定 OFF。本家 Windows 版は既定 ON)。",
     };
 
     private static MacSettingItem WithMac(MacSettingItem item)
@@ -106,6 +107,9 @@ internal static class MacSettingsCatalog
         Bool(nameof(Settings.TokMode), "ATOK スタイルのキー操作",
             "変換中のキー操作を ATOK と同じにします。← で文節を縮め、→ で文節を伸ばす (区切りを前 / うしろへ)。↓ で選んでいる文節までを確定 (部分確定)。Shift+← → で文節を移り、Ctrl+← → で先頭 / 最後の文節へ。次の候補は Space、前の候補は ↑。変換前の入力中は、Shift+↓ で先頭の 1 音だけを確定します (1 音確定)。OFF のときは、今までどおり ← → で文節を選び、↓ で次の候補、Shift+← → で区切りを変えます (Shift+↓ も ↓ と同じ)。",
             InputGroup, s => s.TokMode, (s, v) => s.TokMode = v),
+        Bool(nameof(Settings.TabConversion), "Tab で変換",
+            "打っている途中に Tab を押すと、Space と同じく変換を始めます (Microsoft IME と同じ)。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、今までどおり確定してから Tab をアプリに渡します。",
+            InputGroup, s => s.TabConversion, (s, v) => s.TabConversion = v),
         Bool(nameof(Settings.ToggleLastWordCtrlKeys), "確定した直後の語を Ctrl+' / Ctrl+J で直す",
             "確定した直後の語を Ctrl+' で英字に、Ctrl+J でかなに直します (F10 / F6 と同じ)。ターミナルの Ctrl+J (改行) と重なるので既定は OFF。現在は Mac 版だけで動きます。",
             InputGroup, s => s.ToggleLastWordCtrlKeys, (s, v) => s.ToggleLastWordCtrlKeys = v),

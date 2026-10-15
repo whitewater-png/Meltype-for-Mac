@@ -217,6 +217,10 @@ public sealed class Settings
      Description("変換中のキー操作を ATOK と同じにします。← で文節を縮め、→ で文節を伸ばす (区切りを前 / うしろへ)。↓ で選んでいる文節までを確定 (部分確定)。Shift+← → で文節を移り、Ctrl+← → で先頭 / 最後の文節へ。次の候補は Space、前の候補は ↑。変換前の入力中は、Shift+↓ で先頭の 1 音だけを確定します (1 音確定)。OFF のときは、今までどおり ← → で文節を選び、↓ で次の候補、Shift+← → で区切りを変えます (Shift+↓ も ↓ と同じ)。")]
     public bool TokMode { get; set; }
 
+    [Category("1. 全般"), DisplayName("Tab で変換"),
+     Description("打っている途中に Tab を押すと、Space と同じく変換を始めます (Microsoft IME と同じ)。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、今までどおり確定してから Tab をアプリに渡します。")]
+    public bool TabConversion { get; set; }
+
     [Category("1. 全般"), DisplayName("確定した直後の語を Ctrl+' / Ctrl+J で直す"),
      Description("確定した直後の語を Ctrl+' で英字に、Ctrl+J でかなに直します (F10 / F6 と同じ)。ターミナルの Ctrl+J (改行) と重なるので既定は OFF。現在は Mac 版だけで動きます。")]
     public bool ToggleLastWordCtrlKeys { get; set; }

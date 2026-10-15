@@ -156,6 +156,9 @@ internal static class CompositionTests
         /// <summary>ATOK スタイルのキー操作か (CompositionOptions.TokMode)。既定は OFF (今までの動作)。</summary>
         public bool TokMode { get; set; }
 
+        /// <summary>入力中の Tab で変換を始めるか (CompositionOptions.TabConversion)。既定は OFF (今までの動作)。</summary>
+        public bool TabConversion { get; set; }
+
         /// <summary>変換後も続けて入力できるか (CompositionOptions.ContinueAfterConversion)。既定は OFF (今までの動作)。</summary>
         public bool Continue { get; set; }
 
@@ -206,6 +209,7 @@ internal static class CompositionTests
                 ContinueAfterConversion = () => Continue,
                 ShiftEnterNewline = () => ShiftEnterNewline,
                 TokMode = () => TokMode,
+                TabConversion = () => TabConversion,
                 TypeDigitsAfterConversion = () => TypeDigits,
                 DirectMode = () => Direct,
                 ClassifyDirect = (letters, final) => DirectEngine.Evaluate(new Detection.DetectionInput(letters, letters.Select(c => (int)char.ToUpperInvariant(c)).ToArray(), final)).Verdict,

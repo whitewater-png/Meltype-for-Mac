@@ -205,6 +205,9 @@ def child_settings_ops(lib):
     out["set_int"] = setting(lib, "PredictionMinLength", 4)
     out["set_continue"] = setting(lib, "ContinueAfterConversion", True)
     out["set_shift_enter"] = setting(lib, "ShiftEnterNewline", False)
+    # Tab で変換: 既定 OFF (本家は ON。Mac はフォームの Tab 移動を変えないため)。設定タブからそのまま保存できる
+    out["tab_default"] = items["TabConversion"]["value"] if "TabConversion" in items else None
+    out["set_tab"] = setting(lib, "TabConversion", True)
     out["set_log"] = setting(lib, "LogTypedText", True)
     out["bad_unknown"] = setting(lib, "NoSuchKey", True)
     out["bad_type"] = setting(lib, "LiveConversion", "yes")
@@ -213,7 +216,7 @@ def child_settings_ops(lib):
     out["bad_int_for_enum"] = setting(lib, "DetectionLevel", 2)
     out["bad_json"] = text(lib, lib.meltype_settings_set(u("LiveConversion"), u("{ 壊れた")))
     after = settings_items(lib)
-    out["after"] = {key: after[key]["value"] for key in ("LiveConversion", "DetectionLevel", "Punctuation", "PredictionMinLength", "ContinueAfterConversion", "ShiftEnterNewline", "LogTypedText")}
+    out["after"] = {key: after[key]["value"] for key in ("LiveConversion", "DetectionLevel", "Punctuation", "PredictionMinLength", "ContinueAfterConversion", "ShiftEnterNewline", "TabConversion", "LogTypedText")}
     # 入力メニュー用の getter (ConfigFlag) にも、設定タブの変更が見える
     out["flag_continue"] = lib.meltype_get_continue_after_conversion()
     out["flag_shift_enter"] = lib.meltype_get_shift_enter_newline()
@@ -778,17 +781,18 @@ def check_settings_tab(lib_path, failures):
         expect(ops["detection"]["label"] == "自動判定の強さ" and ops["detection"]["group"] == "入力" and ops["detection"]["description"], "名前・グループ・説明が違う")
         expect(ops["min_length"]["kind"] == "int" and (ops["min_length"]["min"], ops["min_length"]["max"]) == (1, 5) and ops["min_length"]["value"] == 2, f"数の項目が違う: {ops['min_length']}")
         expect(ops["live_default"] is True, "ライブ変換が既定で ON でない")
+        expect(ops["tab_default"] is False, f"Tab で変換が一覧に無い、または既定で OFF でない: {ops['tab_default']}")
         expect("Zenzai" in ops["keys"] and ops["zenzai_default"] is False and ops["flag_zenzai_default"] == 0, "Zenzai が一覧に無い、または既定で OFF でない")
         expect(ops["set_zenzai"] is None and ops["flag_zenzai_on"] == 1, "Zenzai を ON にしても、IME 用の getter (meltype_get_zenzai) に見えない")
         expect(ops["set_zenzai_off"] is None and ops["flag_zenzai_off"] == 0, "Zenzai を OFF に戻しても、IME 用の getter に見えない")
-        for name in ("set_bool", "set_enum", "set_punct", "set_int", "set_continue", "set_shift_enter", "set_log"):
+        for name in ("set_bool", "set_enum", "set_punct", "set_int", "set_continue", "set_shift_enter", "set_tab", "set_log"):
             expect(ops[name] is None, f"設定を保存できない ({name}): {ops[name]}")
         expect(ops["bad_unknown"] and "NoSuchKey" in ops["bad_unknown"], f"未知の項目を断らない: {ops['bad_unknown']}")
         expect(ops["bad_type"], "型の違う値を断らない")
         expect(ops["bad_range"] and "1〜5" in ops["bad_range"], f"範囲の外を断らない: {ops['bad_range']}")
         expect(ops["bad_enum"] and ops["bad_int_for_enum"] and ops["bad_json"], "未知の選択肢・型の違う値・壊れた JSON を断らない")
         expect(ops["after"] == {"LiveConversion": False, "DetectionLevel": "Conservative", "Punctuation": "CommaJapanese", "PredictionMinLength": 4,
-                                "ContinueAfterConversion": True, "ShiftEnterNewline": False, "LogTypedText": True}, f"保存後の値が違う: {ops['after']}")
+                                "ContinueAfterConversion": True, "ShiftEnterNewline": False, "TabConversion": True, "LogTypedText": True}, f"保存後の値が違う: {ops['after']}")
         expect(ops["flag_continue"] == 1 and ops["flag_shift_enter"] == 0, "入力メニュー用の getter に、設定タブの変更が見えない")
 
         data = os.path.join(home, "data")
@@ -809,7 +813,7 @@ def check_settings_tab(lib_path, failures):
         reset = run(lib_path, home, "settings-reset")
         expect(reset["reset"] is None, f"既定値に戻せない: {reset['reset']}")
         expect(reset["values"]["LiveConversion"] is True and reset["values"]["DetectionLevel"] == "Balanced" and reset["values"]["PredictionMinLength"] == 2
-               and reset["values"]["ContinueAfterConversion"] is False and reset["values"]["ShiftEnterNewline"] is True, f"既定値に戻っていない: {reset['values']}")
+               and reset["values"]["ContinueAfterConversion"] is False and reset["values"]["ShiftEnterNewline"] is True and reset["values"]["TabConversion"] is False, f"既定値に戻っていない: {reset['values']}")
         expect(reset["flag_continue"] == 0 and reset["flag_shift_enter"] == 1, "入力メニュー用の getter も既定値に戻らない")
         after_reset = json.load(open(os.path.join(data, "config.json"), encoding="utf-8"))
         expect(after_reset.get("PasteApps") == "Foo.exe" and after_reset.get("Mode") == "AutoSwitch", "既定値に戻すとき、一覧にない設定まで消した")
