@@ -2636,7 +2636,31 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
   - ただし 209 件のうち 30 件は、W が `english-words.txt` にあり X は無い (`kokodelivery` ここでlivery → ここdelivery、`kokodebris` → ここdebris、`kokodecree`・`kokodefinitely`・`kokodepict`・`kokoderived`・`koregalactic`・`kyouhabitable`・`gakkouhearty`・`gakkouheavens`・`watashimourning`・`kokonitwit`・`nihongonothingness`・`anatatoaster`・`kyouwashroom` など)。これは K82 の本体 (`kyouhadelivery` → `きょうはdelivery` を正しいとする) と同じ形で、W の読みのほうが自然。この 30 件を「直る側」と数え直しても、残り **179 件** (W も X も同梱の表に無い、どちらとも読める語。`decarbonize` と `carbonize` のように、文字だけでは分けられない K81 と同じ型) が変更前の答えから変わる。
 - **go 判定: no-go**。テスト・正解表の新しい外れは 0 だが、前後比較で変更前が正しい (助詞 + 語と読む) 入力を 209 件 (W が同梱の一般語の 30 件を除いても 179 件) 壊す。`inv/k82` には入れていない。
   - 実際に困る度合い (推測): 壊れる 179 件はどれも `english-words.txt` (SCOWL のよく使う語) に無い珍しい語どうしの組み合わせ (`de` + 化学・専門用語が多い) で、得の側 (`derive`・`delivery`・`topics`・`moments` など 97 語はよく使う語) と比べると打つ機会は少ないと考えるが、測っていない。
-- **参考: 案 A' (実験。ブランチ `inv/k82-plan-a2` の `591c149`)**: 守りを「同梱の表で見て残りが語」または「区間全体が `english-words.txt` に無く、残りが `IsKnownEnglishWord` (前の条件)」にする。区間全体がよく使う英単語なら、残りをスペルチェッカーに聞かない。結果: テスト 780/780。`kyouha` + 語 (419 語) 7 → 104 (案 A と同じ。776 語では 104 で、案 A の 266 より少ない)。776 語 × 4 形で壊れる 0。(A) で変わるのは 31 件で、30 件は上の「W が同梱の一般語」の側 (直る側)、1 件は `kokodelegatee` → ここdelegateえ (`delegate` の区間が守られなくなる。どちらの読みでも外れ)。(B) は変わらない。同梱の一覧での出力は変更前と差 0。品質テスト・正解表・`eval-compare` は回していない。採るかどうかはリョウさんの判断待ち。
+- **参考: 案 A' (実験。ブランチ `inv/k82-plan-a2` の `591c149`)**: 守りを「同梱の表で見て残りが語」または「区間全体が `english-words.txt` に無く、残りが `IsKnownEnglishWord` (前の条件)」にする。区間全体がよく使う英単語なら、残りをスペルチェッカーに聞かない。結果: テスト 780/780。`kyouha` + 語 (419 語) 7 → 104 (案 A と同じ。776 語では 104 で、案 A の 266 より少ない)。776 語 × 4 形で壊れる 0。(A) で変わるのは 31 件で、30 件は上の「W が同梱の一般語」の側 (直る側)、1 件は `kokodelegatee` → ここdelegateえ (`delegate` の区間が守られなくなる。どちらの読みでも外れ)。(B) は変わらない。同梱の一覧での出力は変更前と差 0。品質テスト・正解表・`eval-compare` は回していない (この時点)。採るかどうかはリョウさんの判断待ち (この時点)。
 - **未確認**: 実機での確認 (案 A・案 A' ともビルドしていない)。数は NSSpellChecker の答えの表での比較で、実機で 1 語ずつは打っていない。(A)・(B) の「正しい」は上の機械的な基準で、どちらの読みが利用者の意図に近いかは確かめていない。Windows のスペルチェッカーでの同じ比較。案 A' の `--eval`・正解表。
 - **採用: 案 A' (2026-10-16、リョウさんの判断)**: `a216429` (実験の `591c149` を `inv/k82` に取り込み、コメントとコミットの説明だけ直した)。テスト 780/780、品質テスト 1269/1271 (変わらず)、正解表 278/310 → 278/310 (main `bab5b26` に対して broken 0 / fixed 0)。KNOWN_LIMITS の K82 は「直った (実機未確認)」へ。案 A は上の no-go のまま採らない。
 - **実機で確かめること** (リョウさん): `kyouhaderive` → きょうはderive、`kyouhadelivery` → きょうはdelivery、`kyounotopics` → きょうのtopics、`kyouhamoments` → きょうはmoments、今までどおり `githubdevote` → githubでvote、`deriveyadevote` → deriveやでvote。
+
+### 査読での案 A' の悪化と案 A'' (2026-10-16)
+
+- **査読で見つかった悪化**: 案 A' の守り `!english.txt(W) && (StartsWithParticleThenEnglishWord(W) || (!BuiltIn(W) && 前の条件))` は、左の枝が前の条件で守らなかった語も守る。語全体 W も残り X も `english-words.txt` にあり、X を NSSpellChecker が語と答えない 6 語 (`devised`・`devising`・`nomads`・`hashes`・`washes`・`gashes`。X は `vised`・`mads`・`shes`) で 14 入力が変更前より悪くなっていた: `kyouhadevised` きょうはdevised → きょうはでゔぃsed、`kyouhanomads` → きょうはのまds、`kyouhahasheswo` → きょうははしぇあを、`kyouhawasheswo` → きょうはわしぇあを、`kyouhagasheswo`、`kyouhadevisingwo`、`konodevised`・`koregadevised` など (6 語 × kyouha/kono/korega/kyouha…wo のうちの 14)。
+- **案 A'' (`9e5b509`)**: 守りを「変更前 (`bab5b26`) の条件 G かつ でない (W が `english-words.txt` の語 かつ `StartsWithParticleThenEnglishWord(W)` が偽)」にした。
+  - 式: 変更前 G = `before < 0 ∧ 助詞 + 残り 3 文字以上 ∧ ¬english.txt(W) ∧ IsKnownEnglishWord(X)`。案 A'' = G ∧ ¬(BuiltIn(W) ∧ ¬S(W)) (S = `StartsWithParticleThenEnglishWord`)。G に AND を足しただけなので 案 A'' ⇒ G、つまり守りが効く (区間を 1 語の英語にしない) 入力は変更前の部分集合で、守りが外れる向き (英字のまま) にしか変わらない。BuiltIn(W) が偽なら G と同じ、真なら G ∧ S。案 A' との違いは「案 A' は守るが G は守らない」(S が真で `IsKnownEnglishWord(X)` が偽 = X が `english-words.txt` にあり NSSpellChecker が語と言わない) 場合だけで、そこを守らなくした。
+  - テスト `K82_ParticlePlusWordGuardAfterJapanese_DoesNotAskTheSpellChecker` の使うスペルチェッカーを、`rive`・`livery`・`pics`・`ments`・`mouser` を語と答え、`vised`・`mads`・`shes` を語と答えないもの (実機と同じ) にし、`kyouhadevised` → きょうはdevised、`konodevised` → このdevised、`kyouhanomads` → きょうはnomads、`kyouhahasheswo` → きょうはhashesを を足した (既存の期待値は変えていない)。`a216429` のコードでは `kyouhadevised` (きょうはでゔぃsed) で落ち、新しいコードで通る。
+- **テスト・正解表**: テスト 780/780。品質テスト (`--eval`) 1269/1271 (出力の全文が変更前・案 A' と同じ)。正解表 (`tools/eval-compare.sh`、base は main `bab5b26` を detach した作業ツリー) 278/310 → 278/310、broken 0 / fixed 0。同梱の一覧での `--nsprobe builtin` の出力は、下のすべての入力で変更前・案 A' と差 0。
+- **NS の表での前後比較** (base = `bab5b26`。表は今回の入力で聞かれた語をすべて書き足し、最後の回は表に無い語 0 件。Enter の結果。「正しい」の基準は上の案 A の節と同じ):
+  | 入力 | 数 | 変更前 | 案 A' | 案 A'' | 変更前と違う | 案 A' と違う |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 調査の 776 語 × 4 形 | 3104 | 1464 | 1658 | 1658 | 196 | 0 |
+  | うち `kyouha` + 語 (`english-words.txt` の 419 語) | 419 | 7 | 104 | 104 | 98 | 0 |
+  | 損の側 (A) 日本語 + 助詞 + X (助詞 + X が辞書の別の語) | 545 | 423 | 392 | 392 | 36 | 0 |
+  | 損の側 (B) 日本語 + 助詞 + X (ふつうの語) | 2161 | 1931 | 1931 | 1931 | 0 | 0 |
+  | `english-words.txt` の助詞で始まる全語 (残り 3 文字以上) × `kyouha`・`kono` | 5752 | 3966 | 4156 | 4162 | 198 | 6 |
+  | 査読の `korega` + 同じ全語 | 2876 | 1982 | 2077 | 2080 | 99 | 3 |
+  | 査読の 6 語の形 (`kyouhadevised` など) | 36 | — | — | — | 0 | 14 |
+  | 査読の自然文 / 損の側の例 / 小さい例 | 96 / 288 / 32 | — | — | — | 6 / 1 / 12 | 0 |
+  - Enter の結果が変更前と違う入力は全部で 548 行 (表の重なりを除いて 346 通り)。どれも変更前より英字が長く残る向き (区間を分けない。`kokodelegatee` 以外は変更前の英字の部分をそのまま含む)。ほかに空白で確定した結果の区間の分け方だけ違う 1 件 (`今日は|derive`) も同じ向き。kyouha 419 語の 98 件は直る 97 件と `kyouhawarehouses` (きょうはわれほうせ → きょうはwarehouse。どちらも外れ。`kono` も同じ)。
+  - 案 A' と違う入力は査読の 14 入力 (表の重なりを含め 23 行) だけで、どれも変更前の答えに戻る (`kyouhadevised` → きょうはdevised など)。案 A' より悪くなる入力は 0。
+  - **変更前が正しく案 A'' が違う入力**: (A) の 31 件と査読の損の側の例 1 件。(A) の 30 件は W が `english-words.txt` にある K82 の本体と同じ形 (`kokodelivery` ここでlivery → ここdelivery、`kokodebris`・`kokodefinitely`・`koregalactic`・`gakkouhearty`・`anatatoaster` など。W の読みのほうが自然なので直る側と数える)。残る 2 件は `kokodelegatee` ここでlegatee → ここdelegateえ と `kokodebrisks` ここでbrisks → ここdebrisks: 区間全体 (`delegatee`・`debrisks`) は変更前どおり守るが、短い `delegate`・`debris` の区間 (`english-words.txt` の語で、残り `legate`・`bris` は同梱の表に無い) が守られなくなり、そちらが選ばれる。derive を直すのと同じ働きで、案 A' でも同じ答え。式の上での「守りは変更前の部分集合」は保たれるが、結果は変更前の読みにも語全体の読みにもならない。
+- **go 判定**: テスト・正解表の新しい外れ 0。前後比較で変更前が正しく壊れるのは上の 2 件 (`kokodelegatee`・`kokodebrisks`。どちらも珍しい語で、案 A' から引き継いだもの)。依頼の基準 (変更前が正しいものを壊さない) どおりなら no-go。案 A' (今の `inv/k82`) と比べると悪化 0 で査読の 14 件を消すので、ブランチには `9e5b509` として入れた。採るか戻すかはリョウさんの判断待ち。
+- **未確認**: 実機 (ビルドしていない)。数は NSSpellChecker の答えの表での比較。Windows のスペルチェッカーでの比較。`kokodelegatee`・`kokodebrisks` の型 (W の頭の短い区間が `english-words.txt` の語) をほかの語でどれだけ起こすかは探していない。
