@@ -21,10 +21,10 @@ internal static class LastWordToggleTests
         public string Doc { get; private set; } = "";
         public SessionResult? Last { get; private set; }
 
-        public Editor(bool ctrlKeys = false, Func<string, bool>? commonJapanese = null, bool continueAfterConversion = false)
+        public Editor(bool ctrlKeys = false, Func<string, bool>? commonJapanese = null, bool continueAfterConversion = false, bool tokMode = false)
         {
             Memory = new LanguageMemory(null) { IsCommonJapanese = commonJapanese };
-            var options = new CompositionOptions { Languages = Memory, ToggleLastWordCtrlKeys = () => ctrlKeys, ContinueAfterConversion = () => continueAfterConversion };
+            var options = new CompositionOptions { Languages = Memory, ToggleLastWordCtrlKeys = () => ctrlKeys, ContinueAfterConversion = () => continueAfterConversion, TokMode = () => tokMode };
             Session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(), options, () => new Settings());
         }
 
@@ -589,5 +589,22 @@ internal static class LastWordToggleTests
         var e = new Editor();
         e.Type("i want ");
         Assert.True(e.Doc.StartsWith("I want", StringComparison.Ordinal), "従来の確定し直し: " + e.Doc);
+    }
+
+    [Test]
+    public static void AfterFirstSoundCommit_TheRestIsNotATarget()
+    {
+        // 1 音確定 (Shift+↓。ATOK スタイルのキー操作) のあとの残りの確定は、語の途中から始まる (kyouha の uha)。
+        // 確定後の F10 で uha に置き換えたり、uha を英語として覚えたりしない
+        var e = new Editor(tokMode: true);
+        e.Type("kyouha");
+        e.Key(VirtualKeys.Down, null, shift: true);
+        Assert.Equal("きょ", e.Doc, "前提: 先頭の 1 音だけ確定");
+        e.Enter();
+        Assert.Equal("きょうは", e.Doc, "前提: 残りを Enter で確定");
+        var result = e.F10();
+        Assert.True(!result.Consumed, "残りの確定は確定後の F10 の対象にしない (キーはアプリへ)");
+        Assert.Equal("きょうは", e.Doc);
+        Assert.True(e.Memory.Get("uha") is null, "語の途中 (uha) を英語として覚えない");
     }
 }

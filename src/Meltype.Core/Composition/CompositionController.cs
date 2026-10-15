@@ -2983,6 +2983,8 @@ public sealed class CompositionController
         var hadFixed = _headCount > 0;
         // 確定後の F6 で開いた変換ボックスの確定は、手で直した語。自動の確定し直しの対象にも、確定し直しの元にもしない (R41-2)。
         var fromToggle = _toggleBox is not null;
+        // 1 音確定 (Shift+↓) のあとの残りの確定は語の途中から始まる (kanpai の npai)。確定後の F10 / F6 の対象にしない (npai を英語として覚えない)
+        var afterFirstSound = _firstSoundCommitted;
         // 再変換 (選択 + Shift+Space) で入れ替えた文字は、打った英字ではないので、確定後の F10 / F6 の対象にしない。
         var reconverted = (_reconvertOriginal is not null && !fromToggle) || _reconvertRomaji;
         _toggleBox = null;
@@ -3020,7 +3022,7 @@ public sealed class CompositionController
         // 確定後の F10 / F6 で直せる直前の 1 語 (打った英字が分かる確定だけ。固定した文節を含む・再変換の確定は記録しない)。
         // 区間ごとの打った英字が渡されない確定 (全部が英語・全部が日本語) は、確定 1 回分の打った英字が 1 区間
         raws ??= new SegmentRawSet(hasEnglish && !hasJapanese ? [raw] : [], hasJapanese && !hasEnglish ? [raw] : [], JapaneseWord: hasJapanese && !hasEnglish);
-        _lastWord = !hadFixed && !reconverted && raw.Any(char.IsAsciiLetter) && (hasEnglish || hasJapanese) ? new LastWord(text, raw, hasEnglish, hasJapanese, _lastCommitTime, raws) : null;
+        _lastWord = !hadFixed && !reconverted && !afterFirstSound && raw.Any(char.IsAsciiLetter) && (hasEnglish || hasJapanese) ? new LastWord(text, raw, hasEnglish, hasJapanese, _lastCommitTime, raws) : null;
         _host.CommitText(text);
         Committed?.Invoke(text);
     }
