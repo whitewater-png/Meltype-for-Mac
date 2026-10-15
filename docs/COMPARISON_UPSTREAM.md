@@ -79,11 +79,11 @@ Meltype for Mac を、本家 (Windows 版 `yksr-melt/Meltype` の main) と並�
 | --- | --- | --- | --- | --- | --- |
 | `my name is taro` | 1 | 取り込み候補 (本家 `4ce7ca8` に含まれる可能性が高い。**推測**) | `4ce7ca8` (2026-10-07、`Preserve mixed protected input and reduce composition latency`)。本家 `4ce7ca8^` は品質テスト 1241/1243、`4ce7ca8` は 1243/1243、Mac 版の最初の Core (`c3c247f`) は 1241/1243 (外れ 2 件は Mac 版の現在と同じ 2 件と**推測**。`--eval` は外れの名前を出さないので、個別の成否は未確認) | 低 (どの部分が `taro` を直したかは未特定) | 大: Core だけで +198/−39 行 (7 ファイル。`CompositionDetector`・`CompositionText` が主)。Mac 版は両ファイルに独自の改変があるので手移植が前提で、性能最適化 (`CanBeEnglishSpan` ほか) が混ざる。リスク大。部分抜き出しは hunk の特定から |
 | `apinoerror` | 1 | 取り込み候補 | `4ce7ca8` の `EnglishBeforeParticleAndEnglishTail` (api + no + error のように辞書の英語見出しを助詞と英単語が挟む。差分を読んで確認)。のちの `2a2bf10` (#376) も触れている | 中〜高 (関数の意図は読んで確認。単独で Mac 版に足して直るかは未実行) | 小〜中: 新規関数 1 つ (約 20 行) と呼び出し 1 か所。ただし `IsListedEnglishWord`・`TrailingParticles` などの前提が Mac 版にあるかは未確認。`sushi + no + error` が壊れないか eval で見る必要 |
-| `inviteshimashita`・`invitewookutta` | 2 | 取り込み候補 (P45 で見送り済み) | `c6b281e` (#69、2026-10-08)。Core は +2 行。P45 の n=4 | 高 (P45 が実測) | 小: 2 行。ただし入れると `githubdevote` (期待 `githubでvote`) が壊れて見送った。直すなら `githubdevote` の守りが先 |
+| `inviteshimashita`・`invitewookutta` | 2 | 取り込み候補 (P45 で見送り済み) | `c6b281e` (#69、2026-10-08)。Core は +2 行。P45 の n=4 | 高 (P45 が実測) | 小: 2 行。ただし入れると `githubdevote` (期待 `githubでvote`) が壊れて見送った。直すなら `githubdevote` の守りが先 **→ 2026-10-15 取り込み済み (守りつき。下の小節)** |
 | `i18n`・`l10n`・`h2o` | 3 | 取り込み候補 (P45 で見送り済み) | `b4484c4` (2026-10-11、数字挟み略語)。Core は +38 行 (2 ファイル)。P45 の n=6 | 高 (P45 が実測。eval は broken 0 で 3 件直る) | 中: +38 行。入れると既存テスト 2 件 (`video.mp4woMP3ni`・`今日は3かける4を`) が落ちる。本家は `ScoredSegmentation.cs` 側にも守りがあり、Mac 版には無い。条件を絞るか、その 2 件の守りが先 |
 | `や` + 英単語 (`githubya`・`yapython`・`yacursor`・`yaslack`・`yastack`・`yaplay`・`yasync`) | 7 | 取り込み候補 (P45 で見送り済み) | `3cb0758` の `や` の部分 (2026-10-08) と `ffd7e6a` (2026-10-08)。P45 の n=8 の残り。`githubya` は `-S` で `27e907c` ・`3cb0758` にも出る | 高 (P45 が実測) | 中: 2 コミットで Core +57/−8 行。全部入れると eval の broken 3 件と既存テスト 4 件が壊れた。`ffd7e6a` を外しても 2 件壊れた。リスク大 (過去に撤退した系統。方針は「同じ種類の回帰が出る修正は撤退」) |
 | 英字のあいだの `と` (`devtoprod`・`edittopub`・`dottonet`・`rdstoredshift`・`uikittoswiftui`) | 5 | 取り込み候補 (前提つき) | `35beb60` の `と` の部分 (2026-10-12、Core +62/−5) が `74ca494` (#154、「英字のあいだの『と』を助詞にする」、Core +13 行) を前提にする。Mac 版に `74ca494` の機能が無い | 高 (P45 が実測。`74ca494` が前提という点は P45 の記載で、今回は差分を読んでいない) | 中: 先に `74ca494` (13 行) を別項目として入れ、そのあと `35beb60` の `と` の部分。リスクは中 (`と` 助詞は日本語側に影響しやすい。eval の broken 0 を条件に) |
-| `site PR` | 1 | 取り込み候補 (P45 で見送り済み) | `8dfec9d` (2026-10-08、Core +19/−4)。P45 の n=12 | 高 (P45 が実測) | 小〜中: 入れると既存の英文 `make sure you have time` が `まけ すれ よう have time` に壊れた (`sure` が `すれ` と読める)。守りを足さないと入れられない |
+| `site PR` | 1 | 取り込み候補 (P45 で見送り済み) | `8dfec9d` (2026-10-08、Core +19/−4)。P45 の n=12 | 高 (P45 が実測) | 小〜中: 入れると既存の英文 `make sure you have time` が `まけ すれ よう have time` に壊れた (`sure` が `すれ` と読める)。守りを足さないと入れられない **→ 2026-10-15 再実験の結果も見送り (下の小節)** |
 | `*pedia` (`pedia`・`protopedia`・`conservapedia`・`wikipedias`・`protopedias`・`Protopedia`・`Protopedias`・`worldpedia`) | 8 | 取り込み候補だが**本家側の修正にも悪化あり** (P45 の査読 R35) | `3cb0758` の pedia の部分・`fd66db0` (-pedias)・`f1a190e` (先頭大文字、#207 系)。P45 の n=8・9 | 高 (P45 が実測。R35 の悪化は P45 の記載) | 中: 3 コミットで Core 約 +45 行。一度入れて外した: `kyouhawikipediadeshirabeta` が前の日本語ごと英字になる悪化があり、**本家の `a4b6f1a` も同じ**。入れ直すなら「前の日本語を巻き込まない条件」を先に決める。本家への報告は判断待ち (P45)。リスク大 |
 | 合計 | 28 | 取り込み候補 28 / Mac 版固有の回帰 0 / 不明 0 (ただし `my name is taro` の確度は低) | | | |
 
@@ -93,3 +93,15 @@ Meltype for Mac を、本家 (Windows 版 `yksr-melt/Meltype` の main) と並�
 - P45 の記載 (n=4・6・8・9・11・12) は今回の調査で本家のコミットが実在し `a4b6f1a` の祖先であること、変更行数だけを確かめました。「入れると何が壊れるか」は P45 の記録を写したもので、今回は再実行していません。
 - `my name is taro`・`apinoerror` は、P45 の n=13 では「直した修正は見つからなかった (未特定)」でした。今回、本家の木を `4ce7ca8^` と `4ce7ca8` で回して、`4ce7ca8` で 2 件分の差が出ることを見つけました (`apinoerror` は関数まで特定、`my name is taro` はコミットまで)。Mac 版は `c3c247f` (同じ 2026-10-07) の時点から外れているので、写した時期が `4ce7ca8` の直前だった**と推測**します。
 - 見積もりの「行数」は `git show --shortstat <hash> -- src/Meltype.Core dictionaries` の数字です。Mac 版への手移植の実際の量とは違います。
+
+### 小さい 2 型の取り込み実験 (2026-10-15)
+
+| 型 | 結果 | 内容 |
+| --- | --- | --- |
+| `inviteshimashita`・`invitewookutta` (本家 `c6b281e`、#69) | **取り込み** | 本家のままだと `githubdevote` (期待 `githubでvote`) が今も壊れるので、「助詞で始まり、残り 3 文字以上が英単語の語 (`de|vote`)」には新しい規則を使わない守りを足した。損: `devotewo` は今までどおり `でゔぉてを` |
+| `site PR` (本家 `8dfec9d`) | **見送り** | 本家のままだと英文の `site` が壊れる (`make sure you have time` → `まけ すれ よう have time`、前後比較で 525 件)。3 つの条件 (本家が後で直した語の一覧に限る・今の語が大文字で始まる・前が空白で区切った英単語でない) を足すと実装者の前後比較では悪化 0 だったが、独立した査読の自作入力で、名詞の site + 大文字の略語が壊れた: `kono site URL wo oshiete` → `このして URL をおしえて`、`sono site API` → `そのして API`、`site ID wo kakunin`・`web no site URL` なども同じ。`e.g. site PR` も「して」になる。直るのは `site PR` の 1 件だけで、技術系の文でよく打つ形を壊すので見送った (リョウさんの判断)。条件をさらに足す案は特定の例合わせになるので採らない。実験のコミットは `exp/p3-3-2-small` の `169b8bc` に残す |
+
+- 取り込み後の数字 (変更前 → 後): テスト 777 → 778 (全件通過)、品質テスト 1266/1268 → 1269/1271、正解表 276/310 → 278/310 (broken 0 / fixed 2: `inviteshimashita`・`invitewookutta`)。本家に対する broken は 28 → 26 (推定: 実験ブランチで A だけを入れた段階の値)。
+- 独立した査読: 自作の入力 79 件 (v を含む語・助詞 + 英単語・文頭・句読点など) で、この型による悪化は 0 件、`derive` も直った。
+- 本家も同じ: 本家 `45e14f8` は `the site is down` → `the して is down`、`site map` → `して map`。本家への連絡は戦略書 §8 の決定 (現時点では行わない) に従い、ここに記録だけ残す。
+- 未確認: 実機。Mac は macOS のスペルチェッカー (NSSpellChecker) を使うので、v の規則はテストより多くの語に効く。`devote` のように頭が助詞に見える英単語で確かめる。
