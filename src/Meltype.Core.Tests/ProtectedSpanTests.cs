@@ -82,6 +82,7 @@ internal static class ProtectedSpanTests
         // 打っている途中の最後の部分は IsValid だけで見る (「ーー」を打つ途中で子音ごとに英字と日本語が入れ替わらない)。--no-edit は、打っている間は日本語に見え、確定で英字になる (K75)
         foreach (var typed in new[] { "--no-edi", "--no-ed", "--no-onl" })
             Assert.True(!HasProtected(typed, final: false), $"「{typed}」は打っている途中なので守らない (日本語のまま)");
+        Assert.True(!HasProtected("--no-edit", final: false), "--no-edit も、打っている間 (後ろに空白が無い) は守らない (K75)");
         Assert.True(!HasProtected("--no-edi", final: false) && HasProtected("--no-edit", final: true), "--no-edit は確定で守る");
     }
 

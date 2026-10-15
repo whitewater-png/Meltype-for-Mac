@@ -977,7 +977,7 @@ public sealed class CompositionDetector
         while (wordEnd < n && !IsSpace(units[wordEnd])) wordEnd++;
         // 開きの記号の直後なら、範囲は対応する閉じの記号まで (閉じの記号も含める)。閉じが無ければ空白まで。
         // 開きの記号が確定済みの文字の側にあるとき (start == 0) は、キャレットの前の文字から決める。
-        // 確定済みの 「 に対応するのは、打った ] (日本語の 」)。確定済みの全角の （ に対応するのは、打った ) (全角の ）)
+        // 確定済みの 「 に対応するのは、打った ] (日本語の 」)。確定済みの全角の （ に対応するのは、打った ) (閉じは半角の ) のまま範囲に入り、幅はそろわない。後ろの助詞は日本語に戻る)
         var closeAt = -1;
         var opener = start > 0 ? units[start - 1].Raw : precedingOpener;
         var closer = "";
@@ -1017,7 +1017,7 @@ public sealed class CompositionDetector
                 // -- は小説・台詞の「ーー」(--sorekara) にも使うので、- と同じく絞る。--name のようなローマ字として読めるオプションは英語の後ろでだけ守る。
                 // 長音の - (--ko-hi-wo・--ra-men) は日本語なので、- で区切った部分が全部ローマ字として「最後まで」読めるなら守らない。
                 // 最後まで読める = { IsValid, Partial が "" か n (語末の n は ん) }。語末が n 以外の子音 (--no-edit の t・--ff-only の ly・--all の l) で終わる日本語は無いので、守る。
-                // -- の前の部分はいつもこの条件。最後の部分は、打ち終わり (final か後ろが空白) のときだけこの条件にする
+                // - の前の部分はいつもこの条件。最後の部分は、打ち終わり (final か後ろが空白) のときだけこの条件にする
                 // (打っている途中は IsValid だけ。「ーー」を打つ途中で子音ごとに英字と日本語が入れ替わらないため。--no-edit は打っている間は日本語に見え、確定で英字になる)。= と大文字を含むものは守る
                 var complete = final || wordEnd < n;
                 var parts = word[2..].Split('-', StringSplitOptions.RemoveEmptyEntries);
