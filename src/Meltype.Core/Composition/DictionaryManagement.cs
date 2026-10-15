@@ -274,6 +274,7 @@ internal static class DictionaryManagement
             KanaInput = false,
             PrecedingEnglish = CompositionController.LanguageOf(before),
             PrecedingEnglishSentence = CompositionController.IsEnglishSentence(before),
+            PrecedingTail = before,
             FollowingEnglish = CompositionController.LanguageOfStart(after),
         };
         foreach (var c in typed) text.Append(c);

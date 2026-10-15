@@ -1,0 +1,51 @@
+# 保護区間 (docs/IMPROVEMENT_PLAN.md「追加項目 1-4a」): パス・オプション・変数は、語の頭から空白まで英字のまま。
+# 拡張子の後ろの助詞は日本語 (./build.shde → ./build.shで)。拡張子の無いパスの直後は空白まで英字のまま (/tmp/fooni)。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打った結果を測る。
+# カテゴリ: 守るもの
+./src/main.ts	./src/main.ts	full	計画書 1-4a (保護区間 P42)
+./build.sh	./build.sh	full	計画書 1-4a (保護区間 P42)
+./build.shde	./build.shで	full	計画書 1-4a (保護区間 P42)
+./build.shwojikkousite	./build.shをじっこうして	full	計画書 1-4a (保護区間 P42)
+../README.mdwo	../README.mdを	full	計画書 1-4a (保護区間 P42)
+~/Documents	~/Documents	full	計画書 1-4a (保護区間 P42)
+/home/taro/project	/home/taro/project	full	計画書 1-4a (保護区間 P42)
+/tmp/fooni	/tmp/fooni	full	計画書 1-4a (保護区間 P42) / リョウさんの決定 1
+/tmp/fooni hozon	/tmp/fooni ほぞん	full	計画書 1-4a (保護区間 P42)
+--no-install	--no-install	full	計画書 1-4a (保護区間 P42)
+mac/build.sh --no-install wo jikkou	mac/build.sh --no-install をじっこう	full	計画書 1-4a (保護区間 P42)
+~/.config/nvim wo	~/.config/nvim を	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 7
+./node_modules/.bin/tsc	./node_modules/.bin/tsc	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 7
+/etc/hosts ni	/etc/hosts に	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 7
+cd ~/Downloads	cd ~/Downloads	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 7 (既知の外れ: cd が英語と判定されず Space で変換が始まり cd~/Downloads になる。mac-terminal.tsv の cd ~/Documents/Meltype と同じ原因)
+`./build.sh` wo	`./build.sh` を	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 3 (開きの記号の後)
+(~/Documents)wo	(~/Documents)を	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 3 (開きの記号の後)
+[~/Documents]wo	「~/Documents」を	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 3 ([ ] は日本語の入力では 「」)
+--color=auto	--color=auto	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2
+--help	--help	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2
+--dry-run	--dry-run	full	計画書 1-4a (保護区間 P42) / 査読 R57 推奨 C (- で区切った dry がローマ字として読めないので守る)
+git --name	git --name	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2 (直前が英語ならローマ字として読めても守る)
+$HOME/.zshrc	$HOME/.zshrc	full	計画書 1-4a (保護区間 P42)
+-la	-la	full	計画書 1-4a (保護区間 P42)
+tar -xzvf a.tar.gz	tar -xzvf a.tar.gz	full	計画書 1-4a (保護区間 P42)
+gcc -Wall	gcc -Wall	full	計画書 1-4a (保護区間 P42)
+find . -name	find . -name	full	計画書 1-4a (保護区間 P42)
+# カテゴリ: 守らないもの・今までうまくいくもの (回帰。今の結果を期待にした)
+-kyou	ーきょう	full	計画書 1-4a (保護区間 P42)
+--sorekara	ーーそれから	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2 (小説・台詞の「ーー」。守らない)
+--sate	ーーさて	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 2 (守らない)
+--ko-hi-wo	ーーこーひーを	full	計画書 1-4a (保護区間 P42) / 査読 R57 推奨 C (長音の - を含む。全部の部分がローマ字として読めるので守らない)
+--ra-men	ーーらーめん	full	計画書 1-4a (保護区間 P42) / 査読 R57 推奨 C (守らない)
+--no-sushi	ーーのーすし	full	計画書 1-4a (保護区間 P42) / 査読 R57 推奨 C (守らない)
+1~2ko	1～2こ	full	計画書 1-4a (保護区間 P42)
+aka/ao	あか/あお	full	計画書 1-4a (保護区間 P42)
+$100	＄100	full	計画書 1-4a (保護区間 P42)
+a/b	あ/b	full	計画書 1-4a (保護区間 P42)
+2026-10-05	2026-10-05	full	計画書 1-4a (保護区間 P42)
+taro.yamada@example.com	taro.yamada@example.com	full	計画書 1-4a (保護区間 P42)
+@yksr_melt arigatou	@yksr_melt ありがとう	full	計画書 1-4a (保護区間 P42)
+https://example.com wo mite	https://example.com をみて	full	計画書 1-4a (保護区間 P42)
+README.mdwo	README.mdを	full	計画書 1-4a (保護区間 P42)
+localhost:3000	localhost:3000	full	計画書 1-4a (保護区間 P42)
+--no-edit	--no-edit	full	計画書 1-4a (保護区間 P42) / 査読 R62 推奨 1 (最後の部分が語末の n 以外の子音で終わる・大文字を含む)
+--ff-only	--ff-only	full	計画書 1-4a (保護区間 P42) / 査読 R62 推奨 1 (最後の部分が語末の n 以外の子音で終わる・大文字を含む)
+--no-Sushi	--no-Sushi	full	計画書 1-4a (保護区間 P42) / 査読 R62 推奨 1 (最後の部分が語末の n 以外の子音で終わる・大文字を含む)
