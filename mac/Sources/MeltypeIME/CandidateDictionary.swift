@@ -33,6 +33,7 @@ enum CandidateDictionary {
     ///      例: Tokyo「To･ky･o | tóʊkiòʊ | 名詞東京.」→「名詞東京.」
     ///  略語の項目 (定義側ですべて大文字の 2 文字以上) は、選んだ語もすべて大文字のときだけ当てる。aids に AIDS (エイズ)、
     ///  it に IT を出さないため (R56 推奨 1)。Tokyo / tokyo のような先頭だけの大文字の違いは当てる。
+    ///  損: 小文字で選んだ略語 (pc・tv・usb など) には、正しい PC・TV の項目があっても意味を出さない (別の語を出さないほうを優先)。
     ///  どちらにも当たらない例: river「R. ① 〖ratio〗数学で「比」…」/ api「API 〖American Petroleum Institute〗…」/
     ///  Einstein「アインシュタイン Albert Einstein［1879〜1955］…」(人名の項目)。
     /// 最初の改行・「。」・「②」の手前で切り、空白をつめ、maxLength 文字ほどで切って「…」。

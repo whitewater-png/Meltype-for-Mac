@@ -695,7 +695,7 @@ final class MeltypeInputController: IMKInputController {
             if let meaning = view.meaning {
                 window.showAnnotation(NSAttributedString(string: meaning))
             } else if let dictionaryWord {
-                // 辞書は別のキューで引く。戻ってきたとき候補が変わっていなければ (meaningKey が同じ) 出す。
+                // 辞書は別のキューで引く。戻ってきたとき候補が変わっていなければ (meaningGeneration が同じ) 出す。
                 CandidateDictionary.lookup(dictionaryWord) { [weak self] summary in
                     guard let self, self.meaningGeneration == generation, let summary, let window = candidatesWindow, window.isVisible() else { return }
                     self.shownDictionaryMeaning = (key, summary)
