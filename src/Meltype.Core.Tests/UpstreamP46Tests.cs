@@ -208,4 +208,11 @@ internal static class UpstreamP46Tests
         // (kyouhadatawo = きょうはだたを。日本語の語の終わり + data の綴りが、はだ + た などと読めるため)。
         ExpectCommitted(("data", "data"), ("datawo", "dataを"), ("dataha", "dataは"), ("kyouhadatawo", "きょうはだたを"), ("kyouhadata", "きょうはだた"));
     }
+
+    [Test]
+    public static void P46_16_Cye_IsReadAsChe()
+    {
+        // 本家 #34 (05a1bb5): cyen が cyen のまま (ちぇん と読めない) だった。cye を ちぇ の綴りに足した。
+        ExpectCommitted(("cyen", "ちぇん"), ("cye", "ちぇ"));
+    }
 }
