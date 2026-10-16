@@ -462,7 +462,7 @@ final class MeltypeInputController: IMKInputController {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "学習データをすべて消去しますか？"
-        alert.informativeText = "変換の学習・辞書の登録提案の履歴・英語/日本語の学習・英訳の学習・ユーザーモデル・azooKey の学習を消します。読めなくて保存を止めているファイルがあれば、それも中身ごと消します。ログ (meltype.log・crash.log・原因調査用の imk-trace.log) と、学習データの退避コピー (読めない・大きすぎるために残した .broken・.oversize) も消します。元に戻せません。\n不具合を報告する予定があれば、先にログを保存してください。ユーザー辞書と設定は消えません。"
+        alert.informativeText = "変換の学習・辞書の登録提案の履歴・英語/日本語の学習・英訳の学習・ユーザーモデル・azooKey の学習を消します。ログ (meltype.log・crash.log・原因調査用の imk-trace.log と、それぞれの古い分) と、学習データの退避コピー (読めない・大きすぎるために残した .broken・.oversize) も消します。\n\n壊れている・読めないために Meltype が上書きを避けているファイルがあれば、それも中身ごと消します。中身を取り出したいときは、キャンセルして、先にデータフォルダー (~/Library/Application Support/Meltype) のコピーを取ってください。\n\n元に戻せません。不具合を報告する予定があれば、先にログを保存してください。ユーザー辞書と設定は消えません。"
         // 取り消せない操作なので、Return で押される先頭のボタンはキャンセルにする。
         alert.addButton(withTitle: "キャンセル")
         alert.addButton(withTitle: "消去")
