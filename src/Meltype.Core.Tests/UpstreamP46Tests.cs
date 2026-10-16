@@ -44,6 +44,25 @@ internal static class UpstreamP46Tests
         }
     }
 
+    /// <summary>打ち終わった時点の表示 (変換ボックスの文字) と、続けて Enter で確定した結果を返す。終わったら元の判定器に戻す。</summary>
+    private static (string Shown, string Committed) ShownAndCommitted(Detection.IWordChecker checker, string typed)
+    {
+        var previous = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = checker;
+        try
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed);
+            var shown = k.Host.View?.Text ?? "";
+            k.Type("\n");
+            return (shown, k.Host.Document);
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = previous;
+        }
+    }
+
     [Test]
     public static void P46_1_Infobesity_StaysEnglish()
     {
@@ -1117,8 +1136,11 @@ internal static class UpstreamP46Tests
     [Test]
     public static void P46_42_LeadingDot_CommittedEnglishIsAlwaysTyped()
     {
-        // 先頭が . の入力 (名前 + ローマ字の続き) を 1,452 通り確定して、出力の英字の連続が、必ず打った文字の一部になることを見る
-        // (打った英字が消えたり、別の字に化けたりしない)。直す前は 111 通りで崩れた。
+        // 先頭が . の入力 (名前 + ローマ字の続き) を 1,452 通り確定して、次の 2 つを見る。
+        // (1) 出力の英字の連続が、必ず打った文字の一部になる (打った英字が消えたり、別の字に化けたりしない)。直す前は 111 通りで崩れた。
+        // (2) 表示で英字に見えている入力 (表示が . で始まる) は、確定してもその表示のまま。(1) だけだと、r が消えただけの崩れ
+        //     (.zoverdesu → .zoveです。zove は打った文字の一部) を見逃す (5 回目の査読 RL-02。直す前に表示と確定が食い違った 140 通りのうち 42 通り)。
+        //     表示が日本語になる入力 (.zovermade → 。ぞゔぇまで。最後の e で表示が日本語に変わる) は、打ち間違いの直しが今までどおり効くので、(2) の対象にしない。
         var stems = new[]
         {
             "zover", "rever", "mover", "hover", "cover", "lover", "kyoumolink", "doumolist", "kinoumolast", "kyoumolike", "doumolink", "sorehalist",
@@ -1131,20 +1153,29 @@ internal static class UpstreamP46Tests
             "deshita", "masu", "dene", "tsuka", "ssu", "sa", "ssa", "taa",
         };
         var broken = new List<string>();
+        var differs = new List<string>();
         var count = 0;
+        var shownEnglish = 0;
         foreach (var stem in stems)
         {
             foreach (var tail in tails)
             {
                 var typed = "." + stem + tail;
-                var committed = Committed(Detection.BuiltInWordChecker.Shared, typed);
+                var (shown, committed) = ShownAndCommitted(Detection.BuiltInWordChecker.Shared, typed);
                 count++;
                 var lower = typed.ToLowerInvariant();
                 if (System.Text.RegularExpressions.Regex.Matches(committed, "[A-Za-z]+").Any(m => !lower.Contains(m.Value.ToLowerInvariant()))) broken.Add(typed + " → " + committed);
+                if (shown.StartsWith('.'))
+                {
+                    shownEnglish++;
+                    if (committed != shown) differs.Add(typed + " → 表示 " + shown + " / 確定 " + committed);
+                }
             }
         }
         Assert.Equal(1452, count, "確かめた入力の数");
         Assert.True(broken.Count == 0, $"{count} 通りのうち {broken.Count} 通りで、打っていない英字が出た: " + string.Join(" / ", broken.Take(6)));
+        Assert.True(shownEnglish >= 1200, $"表示が英字の入力が少なすぎる (この性質を見られていない): {shownEnglish}");
+        Assert.True(differs.Count == 0, $"表示が英字の {shownEnglish} 通りのうち {differs.Count} 通りで、確定が表示と違った: " + string.Join(" / ", differs.Take(6)));
     }
 
     [Test]
