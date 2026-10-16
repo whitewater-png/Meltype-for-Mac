@@ -104,10 +104,12 @@ internal static class SafeFile
 
     /// <summary>
     /// ログに出す例外の説明。JsonException.Message は "Path: $.打った読み.Used" のようにキー (= 打った文字) を含み、
-    /// 「ログに入力した文字を残す」が OFF でも漏れるので、種類と位置だけにする。
+    /// 「ログに入力した文字を残す」が OFF でも漏れるので、種類と位置 (と、原因の切り分けに役立つ HResult) だけにする。
     /// </summary>
     internal static string Describe(Exception ex) =>
-        ex is System.Text.Json.JsonException json ? $"JsonException (行 {json.LineNumber}、位置 {json.BytePositionInLine})" : ex.GetType().Name;
+        ex is System.Text.Json.JsonException json
+            ? $"JsonException (行 {json.LineNumber?.ToString() ?? "?"}、位置 {json.BytePositionInLine?.ToString() ?? "?"})"
+            : $"{ex.GetType().Name} (0x{ex.HResult:X8})";
 
     /// <summary>読み込めず退避もできなかったファイル (保存しない)。</summary>
     private static readonly HashSet<string> Blocked = new(StringComparer.Ordinal);

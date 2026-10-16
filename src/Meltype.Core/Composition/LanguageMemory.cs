@@ -129,7 +129,7 @@ public sealed class LanguageMemory
         catch (Exception ex)
         {
             broken = File.Exists(path);
-            Diagnostics.Log.Warn($"英語 / 日本語の学習データを読めませんでした: {ex.Message}");
+            Diagnostics.Log.Warn($"英語 / 日本語の学習データを読めませんでした: {SafeFile.Describe(ex)}");
             return null;
         }
     }

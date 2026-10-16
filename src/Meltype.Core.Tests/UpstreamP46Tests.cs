@@ -794,4 +794,36 @@ internal static class UpstreamP46Tests
         }
         finally { Directory.Delete(directory, recursive: true); }
     }
+
+    [Test]
+    public static void P46_31_WarnLog_LanguageMemoryAndUserModel_DoNotContainTypedWords()
+    {
+        // P46-26 (RC-5) は変換と英訳の学習データの警告から打った読みを外したが、languages.json (打った英語/日本語の語がキー) と
+        // model.json (打った綴りの先頭がキー) の警告は JsonException.Message のままで、"Path: $.打った語" がログに出た。
+        var directory = TempDir("log2");
+        try
+        {
+            var secret = "ひみつ" + Guid.NewGuid().ToString("N");
+            var languagesPath = Path.Combine(directory, "languages.json");
+            var modelPath = Path.Combine(directory, "model.json");
+            File.WriteAllText(languagesPath, "{\"" + secret + "\":\"not-an-object\"}");
+            File.WriteAllText(modelPath, "{\"version\":1,\"prefixes\":{\"" + secret + "\":\"not-an-object\"}}");
+            _ = new LanguageMemory(languagesPath);
+            _ = new Meltype.Learning.UserModel(modelPath);
+            var logged = string.Join("\n", Diagnostics.Log.Snapshot().Select(e => e.Message));
+            Assert.True(logged.Contains("英語 / 日本語の学習データを読めませんでした") && logged.Contains("model.json を読み込めなかった"), "警告は出る");
+            Assert.True(!logged.Contains(secret), "打った語をログに残さない");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_31_Describe_ShowsOnlyKindAndPosition()
+    {
+        // 位置が無い JsonException でも「行 、位置 」と空欄にならない。ほかの例外は種類と HResult (原因の切り分けに使う数字) だけで、メッセージ (パスが入る) は出さない。
+        var noPosition = SafeFile.Describe(new System.Text.Json.JsonException("Path: $.ひみつ"));
+        Assert.True(!noPosition.Contains("ひみつ") && !noPosition.Contains("行 、") && noPosition.Contains('?'), "位置が無いときは ?: " + noPosition);
+        var io = SafeFile.Describe(new IOException("Access to the path '/Users/someone/secret.json' is denied."));
+        Assert.True(io.StartsWith("IOException (0x") && !io.Contains("someone") && !io.Contains('/'), "種類と HResult だけ: " + io);
+    }
 }
