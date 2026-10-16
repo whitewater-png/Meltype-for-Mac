@@ -1098,4 +1098,52 @@ internal static class UpstreamP46Tests
         }
         finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
     }
+
+    [Test]
+    public static void P46_42_LeadingDot_CommitKeepsTheShownText()
+    {
+        // 4 回目の査読 RJ-01: 先頭が . の入力で、確定のとき打った英字が消えたり別の字に変わったりした (打っている間の表示は .zoverです なのに、確定すると .zoveです)。
+        // 確定の直前の打ち間違いの直し (FixTypos) は、「表示で英字に見えている文字」の表を見て、英字の部分には手を付けない。
+        // その表に、先頭の . で始まる英字の区間 (.zover) が入っていなかったので、読めない並び (zover|desu の rd) の r が消えた。
+        ExpectCommitted(
+            (".zoverdesu", ".zoverです"), (".zoverdetsu", ".zoverでつ"), (".zoverdesu-zu", ".zoverdesu-zu"), (".zovers", ".zovers"), (".zovermasu", ".zovermasu"), (".zoverd", ".zoverd"),
+            (".reverdetsu", ".reverでつ"), (".kyoumolinks", ".kyoumolinks"), (".doumolisttsu", ".doumolisっつ"), (".kinoumolasttsu", ".kinoumolasっつ"),
+            // 守り: ドットファイルは今までどおり (打ち間違いの直しにも、英字の部分は触られない)
+            (".gitignore", ".gitignore"), (".env", ".env"), (".exe", ".exe"), (".dotfilesdesu", ".dotfilesです"),
+            // 守り: 表示が日本語になる入力 (最後の e で日本語に変わる) は、打ち間違いが今までどおり直る (r が消える)
+            (".zovermade", "。ぞゔぇまで"));
+    }
+
+    [Test]
+    public static void P46_42_LeadingDot_CommittedEnglishIsAlwaysTyped()
+    {
+        // 先頭が . の入力 (名前 + ローマ字の続き) を 1,452 通り確定して、出力の英字の連続が、必ず打った文字の一部になることを見る
+        // (打った英字が消えたり、別の字に化けたりしない)。直す前は 111 通りで崩れた。
+        var stems = new[]
+        {
+            "zover", "rever", "mover", "hover", "cover", "lover", "kyoumolink", "doumolist", "kinoumolast", "kyoumolike", "doumolink", "sorehalist",
+            "git", "env", "bash", "config", "node", "zsh", "vim", "npm", "ver", "verde", "over", "hoge", "foo", "bar", "main", "test", "kyou", "doumo",
+            "zoverd", "kyoumolinkd", "doumolistd", "mailt", "backupt", "overt", "moverd", "readme", "dockerfile", "bashrc", "profile", "ignore", "kyoumoreadm", "doumolast",
+        };
+        var tails = new[]
+        {
+            "", "desu", "detsu", "tsu", "su", "s", "ttsu", "wo", "no", "ga", "ni", "de", "dayo", "ne", "-zu", "s-zu", "desu-zu", "mo", "kara", "made", "to", "ha", "ka", "ta", "te",
+            "deshita", "masu", "dene", "tsuka", "ssu", "sa", "ssa", "taa",
+        };
+        var broken = new List<string>();
+        var count = 0;
+        foreach (var stem in stems)
+        {
+            foreach (var tail in tails)
+            {
+                var typed = "." + stem + tail;
+                var committed = Committed(Detection.BuiltInWordChecker.Shared, typed);
+                count++;
+                var lower = typed.ToLowerInvariant();
+                if (System.Text.RegularExpressions.Regex.Matches(committed, "[A-Za-z]+").Any(m => !lower.Contains(m.Value.ToLowerInvariant()))) broken.Add(typed + " → " + committed);
+            }
+        }
+        Assert.Equal(1452, count, "確かめた入力の数");
+        Assert.True(broken.Count == 0, $"{count} 通りのうち {broken.Count} 通りで、打っていない英字が出た: " + string.Join(" / ", broken.Take(6)));
+    }
 }

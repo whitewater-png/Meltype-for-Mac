@@ -1253,6 +1253,13 @@ public sealed class CompositionText
                 for (var i = 0; i < segment.Raw.Length; i++) mask.Add(true);
                 continue;
             }
+            // 入力の先頭の . で始まる英字の区間 (ドットファイル: .gitignore、.zover|desu の .zover) も、表示のまま英字にする。
+            // 入れないと、確定の直前の打ち間違いの直し (FixTypos) が、読めない並び (zover|desu の rd) の r を消した (表示は .zoverです なのに確定で .zoveです)。
+            if (segment.IsEnglish && s == 0 && segment.Raw.Length >= 2 && segment.Raw[0] == '.')
+            {
+                for (var i = 0; i < segment.Raw.Length; i++) mask.Add(true);
+                continue;
+            }
             // 5 文字以上の知っている語 (meeting) か、同梱の英語の辞書の 2〜4 文字の語 (user・rta・av)
             // 4 文字の知っている語で、ローマ字として読めないもの (help・milk) も英語 (help|pe-ji → へおっぺーじ にしない)
             var lower = segment.Raw.ToLowerInvariant();
