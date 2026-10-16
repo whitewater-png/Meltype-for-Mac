@@ -132,4 +132,35 @@ internal static class UpstreamP46Tests
         // 本家 #712: japanese が じゃぱねせ になっていた (english.txt には元からあるが、全体がローマ字として読めるので日本語側が勝っていた)。
         ExpectCommitted(("japanese", "japanese"), ("japanesewo", "japaneseを"), ("kyouhajapanese", "きょうはjapanese"), ("Japanese", "Japanese"));
     }
+
+    /// <summary>やほやほ を 谷保谷保 にする変換エンジン (本家 PR #622 のテストと同じ)。</summary>
+    private sealed class YahoyahoConverter : IKanjiConverter
+    {
+        public string? Convert(string hiragana) => hiragana == "やほやほ" ? "谷保谷保" : null;
+
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null) =>
+            hiragana == "やほやほ" ? [new("やほ", "谷保"), new("やほ", "谷保")] : null;
+    }
+
+    /// <summary>ぶいあーるちゃっと を 部位アールチャット にする変換エンジン (本家 bot の Mozc の結果)。</summary>
+    private sealed class VrchatConverter : IKanjiConverter
+    {
+        public string? Convert(string hiragana) => hiragana == "ぶいあーるちゃっと" ? "部位アールチャット" : null;
+
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null) =>
+            hiragana == "ぶいあーるちゃっと" ? [new("ぶい", "部位"), new("あーるちゃっと", "アールチャット")] : null;
+    }
+
+    [Test]
+    public static void P46_10_Yahoyaho_StaysHiragana_AndVrChatIsKept()
+    {
+        // 本家 #424 (PR #622): やほやほ が 谷保谷保 になる。同梱の語句 (phrases.txt) にして、1 つの文節として確定する。
+        var yahoyaho = new CompositionTests.Keyboard(live: true, converter: new YahoyahoConverter(), userDictionary: new UserDictionary(null));
+        yahoyaho.Type("yahoyaho\n");
+        Assert.Equal("やほやほ", yahoyaho.Host.Document, "yahoyaho");
+        // 本家 #365: VRChat が 部位アールチャット (Vアールチャット) と変換される。
+        var vrchat = new CompositionTests.Keyboard(live: true, converter: new VrchatConverter(), userDictionary: new UserDictionary(null));
+        vrchat.Type("buia-rutyatto\n");
+        Assert.Equal("VRChat", vrchat.Host.Document, "buia-rutyatto");
+    }
 }
