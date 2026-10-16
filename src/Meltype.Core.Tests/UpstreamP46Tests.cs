@@ -663,4 +663,27 @@ internal static class UpstreamP46Tests
         }
         finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
     }
+
+    [Test]
+    public static void P46_29_Data_BoundaryCases()
+    {
+        // P46-15 の査読 (RA-6): data を英語にする守りの境界。data を含む英語の複合語は英字のまま、data を含む日本語の語は今までどおり。
+        // 同梱の英単語表と、実機の NSSpellChecker に近い模擬の両方で確かめる。
+        foreach (var checker in new Detection.IWordChecker[] { Detection.BuiltInWordChecker.Shared, new NsLikeChecker() })
+        {
+            ExpectCommitted(checker,
+                ("mydata", "mydata"), ("bigdata", "bigdata"), ("database", "database"), ("dataset", "dataset"), ("datacenter", "datacenter"),
+                ("kyouhadatagaooi", "きょうはだたがおおい"), ("madatabun", "まだたぶん"), ("hidatabi", "ひだたび"), ("kodatawarinoaru", "こだたわりのある"),
+                ("yamadatarouwoyobu", "やまだたろうをよぶ"), ("sorehadatadato", "それはだただと"), ("watashihadatawomiru", "わたしはだたをみる"),
+                ("hedatari", "へだたり"), ("hedataru", "へだたる"));
+        }
+    }
+
+    [Test]
+    public static void P46_29_Data_KnownLimits()
+    {
+        // 既知の限界 (KNOWN_LIMITS): metadata は英語の複合語だが直らない (めただた。守りを外すと めたdata になるが、それも誤り)。
+        ExpectCommitted(("metadata", "めただた"));
+        ExpectCommitted(new NsLikeChecker(), ("metadata", "めただた"));
+    }
 }
