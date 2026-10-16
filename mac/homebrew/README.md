@@ -1,7 +1,7 @@
 # Homebrew cask (自前 tap)
 
 `Casks/meltype-for-mac.rb` が cask の正本です。tap リポジトリ (`whitewater-png/homebrew-meltype-for-mac`) へは、ここからコピーして使います。
-**公開 tap はまだありません** (GitHub にリポジトリは作っていません)。以下のうち「公開」の節は、許可を取ってから実行します。
+公開 tap は作成済みです (2026-10-14。<https://github.com/whitewater-png/homebrew-meltype-for-mac>)。利用者は `brew install --cask whitewater-png/meltype-for-mac/meltype-for-mac` で入れられます。tap への push は公開行為なので、Release の公開と同時に、許可を取って行います (下の「公開 tap」の節)。
 
 配布物は zip (`Meltype-mac-<version>.zip`) です。dmg の中身は pkg で、Homebrew の `pkg` stanza は `sudo installer -target /` になり、「このユーザーのみ」の pkg と合わないため使いません。Apple シリコン・macOS 13.3 以降だけが対象です (cask の `depends_on macos:` は Ventura = 13 までしか書けないので、13.0〜13.2 の人には caveats で案内します)。
 
@@ -29,16 +29,9 @@ python3 tools/update-cask.py <version> <sha256>      # 例: 1.1.8 と、zip の 
 
 そのあと tap 側へコピーし、上の audit / style を通します。`livecheck` は GitHub の Release のタグ (`v<version>-mac`) を見ます。
 
-## 公開 tap を作る (将来。**公開行為なので、許可を取るまで実行しない**)
+## 公開 tap (作成済み)
 
-```bash
-gh repo create whitewater-png/homebrew-meltype-for-mac --public
-cd "$(brew --repository whitewater-png/meltype-for-mac)"
-git remote add origin https://github.com/whitewater-png/homebrew-meltype-for-mac.git
-git push -u origin main
-```
-
-公開後は `brew install --cask whitewater-png/meltype-for-mac/meltype-for-mac` で入れられます。そのあとで、README の入れ方の節に追記します。
+`whitewater-png/homebrew-meltype-for-mac` は 2026-10-14 に作成済みです。版を上げたあとの反映 (tap の `Casks/` に同じファイルを写してコミットし、push する) は、Release の公開と同時に行います。手順は [docs/RELEASE.md](../../docs/RELEASE.md) の「Mac 版: cask の更新 (Homebrew)」にあります。**push は公開行為なので、事前に許可を取ります。** 入れ方は本体の README.md の入れ方の節にも書いてあります。
 
 ## 注意
 
