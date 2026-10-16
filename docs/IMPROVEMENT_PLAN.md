@@ -2683,3 +2683,61 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
   - README の「できること」に Phase 1 の機能 (Tab で変換・保護区間・候補の意味のパネル・アプリごとのモード・コード系アプリのコマンド名・判定を調べるタブ) が載っていない。確定後の F10 / F6 は制限節と FAQ にだけある。README は公開文書なので、書くかどうかと書き方はリョウさんが決める。
   - 実機未確認の一覧: 1-2 / 1-6 (確定後の F10 / F6 と学習の強度)、1-3 (判定を調べるタブ)、1-4a (保護区間)、1-4b / 1-4c (アプリごとのモード)、1-7 (辞書から引く英字の候補の意味。パネルはライトモードだけ確認済み)、1-8 (Tab で変換)。どれも v1.2.1-mac のタグに含まれる。各節の「実機で確かめること」のとおり、リョウさんの確認待ち。
   - COMPARISON_UPSTREAM の §2 (現在値) の判定精度 2 の行は、最初の枠の数字 (231/264、broken 28) のまま。最新は §4 の更新履歴の最後の行。
+
+## スペルチェッカー起因の実機だけの外れ (2026-10-16)
+
+実機 (Mac) は英単語の判定に NSSpellChecker を使い、テストと `--repro` は同梱の一覧 (`BuiltInWordChecker` = `english-words.txt`) を使う。NSSpellChecker は語の途中から始まる断片 (`verde`・`umol`・`rive`) も英単語と答えるので、テストでは当たり実機でだけ外れる入力がある。K82 (`9e5b509`) と #69 の守り (`809548c`) はその 2 か所を直したもの。ここでは Core がスペルチェッカーに聞く箇所を洗い出して外れを分類し、そのうち 2 か所を K82 と同じ「変更前の条件に AND を 1 つ足す」形で直した。push はしていない。実機での確認はまだ。
+
+- **調査の要約** (main `0dee8de` で測った。行番号はそのときのもの):
+  - スペルチェッカーに語の一部 (頭・残り・途中から始まる区間) を聞く箇所は、`CompositionDetector.cs` では (`FindSpans`:379 の長い語、`IsEnglishSpanCore`:676 の K82 の守り・:691 の英語区間の判定の本体、`CapitalizedWordEnd`、`IsHyphenatedEnglishWord`、`DotSuffixEnd` の頭・残りの判定など)、`CompositionText.cs` に 5 か所 (`SplitEnglishFinalN`:251、`RereadSmallTsuAfterEnglishL`:288、`EndsWithEnglishWord`:323、`EndsWithEnglishWordFromUnit`:369、`KeepLaughterAt`:1228 と `ContainsEnglishWord`:1276 は既に同梱の一覧だけで見る形)。Mac の `CallbackWordChecker` は `AutoCorrection` を返さないので、`FixEnglishTypo` (英語の打ち間違い直し) は実機では効かない (Windows だけ)。
+  - 測り方: google の頻度表の上位で `english-words.txt` にある 5000 語を 50 の型 (単独・語 + 助詞・`kyouha` + 語 + `desu` など。計 249,992 入力) で打ち、Enter の結果を「かな + 語 + かな」の正解と比べた。NSSpellChecker の答えは Swift で表にし (Mac 版と同じ `checkSpelling(of:startingAt:language:"en"...)`)、表に無い語は書き足して打ち直した (最後の回は表に無い語 0 件)。ずれた入力ごとに、聞いた箇所 (スタックの最初の判定コード) ごと・語ごとに答えを同梱の一覧に差し替えて、どこで直るかを記録した。
+  - NS の表で外れ、同梱の一覧で当たる入力は 349 件 (逆向き、テストでだけ外れるのは 96 件。両方外れ 186 件):
+    | 分類 | 件数 | 単独で直る箇所 | 原因の語 (NSSpellChecker だけが語と言う) | 例 (NS の表での結果) |
+    | --- | --- | --- | --- | --- |
+    | H1 日本語の音の途中の母音 1 つの単位 (`kyo\|u`・`sense\|i`) + 助詞 + 語頭 | 231 | `IsEnglishSpanCore`:691 (222)。そのうち 153 は `EndsWithEnglishWordFromUnit`:369 だけでも直る | `umol` 153、`inis`、`ides`、`unicity` など | `kyoumolike` → きょumolいけ、`kyounicity` → きょunicity、`senseidestar` → せんせidestar |
+    | H2 助詞 + 語頭 | 43 | :691 | `haver`・`hasta`・`noter`・`noms` など | `kyouhaverydesu` → きょうhaveryです、`konotermwo` → こnotermを |
+    | T1 語尾 + 後ろの日本語 | 49 | `FindSpans`:379 (49 全部) | `verde` 28、`thermo` 5、`ndidatede`、`steno`、`mailto` など | `overdesu` → overdesu、`emailto` → えmailto、`candidatedesu` → かndidatedeす |
+    | T2 語尾 + 後ろの日本語の頭 | 9 | :691 | `usda`・`markka`・`barde` | `usdayo` → usdaよ |
+    | W1 入力全体が NSSpellChecker だけの英単語 | 4 | — | `promo`・`mailto` など | NSSpellChecker のほうが正しいと思われる (正解表の決め打ちの側) |
+    | W2 日本語を含む入力全体を NSSpellChecker が語と言う | 13 | :691 (10) | `residentsga`・`konosugarwo` | 理由は不明 |
+- **今回直したもの** (`fix/sc-t1-h1`。それぞれ go):
+  - **T1 (`a83afad`)**: `FindSpans` の「見つけた区間 (`teal`) の途中から始まって後ろへ続く長い語 (`alcoholic`) があれば、見つけた区間を捨てる」(sometealcoholic 用)。長い語は `IsLongEnglishWord` でスペルチェッカーに聞くので、`o|verde|su` の `verde` で `over` を捨てていた。
+    - 式: 変更前の捨てる条件 D = `IsLongEnglishWord(W)`。変更後 = D ∧ ¬(B(X) ∧ ¬B(W) ∧ P(W の X より後ろの部分))。X = 見つけた区間、W = 長い語、B = 同梱の一覧の語 (`IsBundledEnglishWord`: `IsListedEnglishWord` か、4 文字以上なら `english-words.txt`)、P = ちょうど助詞 1 つ (`DictionaryDetector.StartsWithParticle` の表: no ga wo ni de to ha mo wa he)。D に AND を足しただけなので変更後 ⇒ D、つまり区間を捨てるのは変更前に捨てていた場合の一部だけ。同梱の一覧 (テスト) では、`IsLongEnglishWord(W)` が真なら W は同梱の一覧の語なので ¬B(W) が偽になり、答えは変わらない。
+    - P (助詞 1 つ) を足したのは、無い形では W が打ちたい語のことが多い入力 (`hiringtone` = ひ + ringtone、`dealpine` = で + alpine。W が `english-words.txt` に無いよく使う語) を壊したため。下の「採らなかった形」。
+  - **H1 の一部 (`29fa4f3`)**: `EndsWithEnglishWordFromUnit` (l・x・t を小書き・つ にしない守り) は、最後の単位からさかのぼった英字の語を `IsKnownEnglishWord` (4 文字以上はスペルチェッカー) で見る。`kyo|u|mo|l` の `umol` で、きょうも + like の l を英字に残していた。
+    - 式: 変更前の守り G = `letters.Length >= 4 ∧ IsKnownEnglishWord(letters)`。変更後 = G ∧ (¬V ∨ B(letters))。V = 語が「英字の並びの途中 (前の単位も英字) にある、母音 1 文字の単位」から始まる。G に AND を足しただけなので、l・x・t を英字に残すのは変更前に残していた場合の一部だけ。同梱の一覧では、`IsKnownEnglishWord` が真なら B も真なので答えは変わらない。
+    - V (母音 1 つの単位に限る) を足したのは、無い形 (途中の単位から始まる語はすべて同梱の一覧だけ) では `kyouha|vi|ll` の `vill` を見なくなり、`villa`・`viola` が ゔぃっぁ になったため (よく使う語の外れ)。
+- **テスト・正解表**: テスト 780 → 782 (`SpellCheckerFragmentAfterListedWord_DoesNotDropTheListedWord`・`SpellCheckerWordFromMidSound_DoesNotKeepTheLetterL`。どちらも NSSpellChecker のように断片を語と答える `IWordChecker` を使う。変更前のコードではそれぞれ `overdesu`・`kyoumolike` で落ちることを確かめた。既存テストの期待値は変えていない)。条件を 1 つずつ外すと落ちる行: T1 の P → `hiringtone`、¬B(W) → `untilde`、H1 の V → `kyouhavilla`、「前の単位も英字」→ `kyou,umolike`。外しても落ちない条件が 2 つある: T1 の B(X) (今回のどの入力でも結果を変えなかった。メインの 249,992 入力で差 0。変更を狭くするために残した) と H1 の B(letters) (母音 1 つの単位から始まる同梱の語は、ほかの単位から始まる語でも守られる)。`--eval` 1269/1271 (出力の全文が変更前と同じ)。正解表 (`tools/eval-compare.sh`、base は `1a11bf3` を detach した作業ツリー) 278/310 → 278/310、broken 0 / fixed 0 (T1 だけ・両方の 2 回)。
+- **NS の表での前後比較** (base = `1a11bf3`。Enter の結果。正解は入力の作り方から決めた「かな + 語 + かな」。表は今回聞かれた語をすべて書き足し、最後の回は表に無い語 0 件):
+  | 入力 | 数 | 変更前 | T1 だけ | H1 だけ | 両方 | 変更前と違う (両方) | 変更前が正しく外れる (両方) |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | 調査の 50 型 (5000 語) | 249,992 | 215,089 | 215,132 | 215,242 | 215,285 | 200 | 0 |
+  | T1 の得の側: `english-words.txt` の全語 (2 文字以上) × 助詞・`desu` など 13 種 + `kyouha` + 語 + `desu` | 547,328 | 481,945 | 482,065 | — | 482,065 | 121 | 0 |
+  | T1 の損の側: 1 音 (68 種) + `/usr/share/dict/words` の語 (5 文字以上・同梱の一覧に無い・NSSpellChecker が語と言う 46,606 語)。1 音 + 語の頭 が同梱の一覧の語になるものだけ | 213,004 | 159,628 | 159,616 | — | 159,616 | 39 | 12 |
+  | H1 の得の側: `english-words.txt` の l・x・ts を含む語 × `kyoumo`・`doumo`・`kinoumo`・`kyouha`・`kono`・`korewo` (+ `kyoumo` + 語 + `desu`) | 103,348 | 101,648 | — | 102,084 | 102,087 | 536 | 0 |
+  | H1 の損の側: `/usr/share/dict/words` の l・x・ts を含む語 (4 文字以上・同梱の一覧に無い・NSSpellChecker が語と言う) × 日本語 6 種 (+ `desu`) | 288,024 | 284,322 | — | 284,408 | 284,408 | 246 | 4 |
+  | 日本語のローマ字 (`readings.txt` の 2 万語 × 5 形 + 2 語の連結 6 万) | 160,598 | 正解なし | 差 0 | 差 3 | 差 3 | 3 | — |
+  - 調査の 349 件のうち直ったのは 196 件 (T1 43 / 49、H1 153 / 231)。メインの 50 型で変更前と違う 200 件は、直る 196 件と、前後とも外れの 4 件 (`kyoumolee` きょumolええ → きょうもぇえ など `lee` 3 件、`kyouhadeliverdesu` きょうはでぃverdeす → きょうはでliverです)。
+  - **変更前が正しく変更後が外れる入力** (よく使う語 = `english-words.txt` か google の頻度表 1 万語にある語):
+    - T1 の損の側の 12 件。よく使う語は `emailto` だけで、これは T1 で直したい入力そのもの (損の側の正解を「1 音 + 語」と決め打ちしたので外れと数えた。メインの正解表では `emailと` が正しい)。`wasteno` (wasteの) も同じ。残る 10 件は珍しい語: `apronto` あpronto → apronと、`baconga` ばconga → baconが、`bogusto` ぼgusto → bogusと、`pecanto` ぺcanto → pecanと、`basteno`・`hasteno`・`pasteno`・`tasteno` (steno) → baste の など、`karathe` かrathe → karatへ、`nowhereto` のwhereto → nowhereと。多くは変更後の読み (bacon が・nowhere と) も自然。
+    - H1 の損の側の 4 件。どれも珍しい語 `lemma`: `kyoumolemma`・`doumolemma` (+ `desu`) きょうもlemma → きょうもぇっま。
+    - よく使う語の悪化は 0 件。
+  - 日本語のローマ字の 3 件は H1 による日本語側の改善: `ro-shonnanatsu` ろーしょんanatす → ろーしょんあなつ、`shuuintsuduru` しゅuintすづる → しゅういんつづる、`supeingotsuyuiri` すぺingotすゆいり → すぺいんごつゆいり。
+- **採らなかった形** (同じ入力での数。実験のコミットは手元のブランチ `exp/sc-t1-h1-v1` に残した。push していない):
+  | 形 | メインの直る数 | 損の側で変更前が正しく外れる (うちよく使う語) | 得の側の外れ |
+  | --- | --- | --- | --- |
+  | T1 で P なし (B(X) ∧ ¬B(W) だけ) | 49 | 26,508 (262: `chichristian` ちchristian → chichりsちあん、`haringtone`、`midwest`、`playlist`) | 1 (`sparmade` sparまで → sparmade) |
+  | T1 で P の代わりに「後ろの部分がローマ字で読める」 | 49 | 7,801 (118) | — |
+  | T1 で P の代わりに「後ろの部分が助詞で始まり読める」 | 44 | 1,013 (31: `haringtone`・`deadware`) | — |
+  | **T1 の採った形 (ちょうど助詞 1 つ)** | 43 | 12 (`emailto` だけ。上) | 0 |
+  | H1 で V なし (途中の単位から始まる語はすべて同梱の一覧だけ) | 153 | 6 | メイン 32 件・得の側 13 件 (`kyouhavilla` → きょうはゔぃっぁ、`konoviola`、`kononets`) |
+  | **H1 の採った形 (母音 1 つの単位だけ)** | 153 | 4 (`lemma`) | 0 |
+- **直していないもの**:
+  - T1 の残り 6 件: 長い語の後ろの部分が助詞 1 つでないもの (`visitkara` の `sitka`、`accidentdayo`・`accidentdake` の `ccidentda`、`outletdake`、`arisingshita`、`symptomsdeshita`)。P を広げると上の表のとおり よく使う語 で外れが出る。
+  - :691 の本体 (H1 の残り 78 件、H2 43 件、T2 9 件): `IsEnglishSpanCore` の英語区間の判定そのものがスペルチェッカーに聞くので、広く変えると損が大きい (助詞で始まり同梱に無い NSSpellChecker だけの語が `/usr/share/dict/words` に 3,908 語)。狭い案 (日本語のすぐ後ろの、同梱に無い区間は、区間の途中から始まって区間の後ろまで続く同梱の語があれば英語にしない) は新しい枝なので変更前の部分集合にならず、別の項目として前後比較が要る。例: `kyounicity` → きょunicity、`kyouhaverydesu` → きょうhaveryです、`konotermwo` → こnotermを、`usdayo` → usdaよ。
+  - W2 (13 件): NSSpellChecker が日本語込みの連結 (`residentsga`・`konosugarwo`) を語と答える理由が分からない。Core では見分けにくい。
+  - W1 (4 件): NSSpellChecker の答えのほうが正しいと思われるので直さない。
+  - 測っていない箇所: `DotSuffixEnd`・`CapitalizedWordEnd`・`SplitEnglishFinalN`・`IsHyphenatedEnglishWord` (`.`・大文字・`nn`・`-` を含む型が今回の入力に無い)。
+  - 残る外れは KNOWN_LIMITS の K83・K84。
+- **実機で確かめる入力** (期待): `overdesu` → overです、`neverde` → neverで、`othermo` → otherも、`emailto` → emailと、`candidatedesu` → candidateです、`wasteno` → wasteの、`kyoumolike` → 今日もlike、`doumolist` → どうもlist、`kinoumolast` → 昨日もlast。変わらないこと: `sometealcoholic` → 染めてalcoholic (かな漢字変換は azooKey 次第)、`hiringtone` → ひringtone、`kyouhavilla` → 今日はvilla、`kyouhaderive` → 今日はderive (K82)。
+- **未確認**: 実機 (ビルド・インストールしていない)。数はすべて NSSpellChecker の答えの表 + Core のテスト用キーボードでの比較で、かな漢字変換はしていない。NSSpellChecker の答えはこの Mac (言語の自動判定 on) のもので、ほかの Mac で同じかは未確認。Windows のスペルチェッカーでの比較。損の側の入力は機械的に作った形 (1 音 + 語、日本語 6 種 + 語) で、日本人がよく打つ形の割合は分からない。頻度は google の頻度表で、日本人がよく打つ英単語の順ではない。
