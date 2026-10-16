@@ -14,7 +14,8 @@ public static class LearningData
 {
     /// <summary>
     /// 渡された学習データ (共有しているメモリ上のもの) を空にして、ファイルにも書く。null のものは飛ばす。
-    /// modelFile は Windows 版が使うユーザーモデルのファイル (あるときだけ空にする。無ければ作らない)。
+    /// modelFile はユーザーモデル (Windows 版の学習。Mac は作らないので、無ければ何もしない) のファイル。あるときだけ空にする (無ければ作らない)。
+    /// UserModel は書けなくても例外にしないので、このファイルだけは、書けなかった失敗が戻り値に出ない。
     /// learningFiles は学習データのファイル (渡すと、読めない・退避できないために保存を止めていたものを先に消して、止めた状態を解く)。
     /// 1 つが失敗しても残りは消す (失敗は例外にせずログに残し、false を返す)。ファイルに書けなかった (フォルダーに書けない・保存を止めたまま) ときも失敗として返す。
     /// </summary>
@@ -93,6 +94,11 @@ public static class LearningData
     internal static bool ClearAllAt(string modelFile, string conversionsFile, string suggestionsFile, string translationsFile, string languagesFile, IEnumerable<string> logFiles)
     {
         string[] learningFiles = [modelFile, conversionsFile, suggestionsFile, translationsFile, languagesFile];
+        // ログは最初に消す。ログへの書き出しは、積んでおいた分を 1 秒おきにまとめて追記する (無ければ作る) 作りなので、消去のあとで消すと、
+        // 書き出しが消去の途中に重なったとき、失敗の警告 (ダイアログが「meltype.log を確認してください」と案内する理由) まで一緒に消える。
+        // 積んである分 (消去の前の記録。打った文字が入ることがある) を先に書いて消せば、消去の途中の警告は、あとから新しいログに必ず残る。
+        Diagnostics.Log.FlushFile();
+        var logsCleared = ClearLeftovers([], logFiles);
         var ok = ClearAll(
             ConversionHistory.Shared(conversionsFile),
             DictionarySuggestions.Shared(suggestionsFile),
@@ -100,8 +106,8 @@ public static class LearningData
             TranslationHistory.Shared(translationsFile),
             modelFile,
             learningFiles);
-        var leftoversCleared = ClearLeftovers(learningFiles, logFiles);
-        return ok && leftoversCleared;
+        var leftoversCleared = ClearLeftovers(learningFiles, []);
+        return ok && leftoversCleared && logsCleared;
     }
 
     /// <summary>

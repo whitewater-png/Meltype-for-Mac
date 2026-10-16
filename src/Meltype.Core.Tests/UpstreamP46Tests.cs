@@ -1146,4 +1146,116 @@ internal static class UpstreamP46Tests
         Assert.Equal(1452, count, "確かめた入力の数");
         Assert.True(broken.Count == 0, $"{count} 通りのうち {broken.Count} 通りで、打っていない英字が出た: " + string.Join(" / ", broken.Take(6)));
     }
+
+    [Test]
+    public static void P46_43_ClearAllAt_DeletesLogsAndLeftoversButNotTheUserFiles()
+    {
+        // 3 回目の査読 RG-1 は学習データ 5 ファイルの一覧を固定したが、同じ関数の残り 2 点が穴だった (4 回目 RI-1: 変異 MI・MH が緑のまま)。
+        // ダイアログは「ログも消します」「学習データの退避コピーも消します」と約束するので、その配線は ClearAllAt で守る。
+        var directory = TempDir("clear-at-wiring");
+        try
+        {
+            string P(string name) => Path.Combine(directory, name);
+            var learning = new[] { P("model.json"), P("conversions.json"), P("suggest.json"), P("translations.json"), P("languages.json") };
+            var guid = Guid.NewGuid().ToString("N");
+            var removed = new[] { P("meltype.log"), P("meltype.log.old"), P("crash.log"), P("conversions.json.broken"), P("suggest.json.oversize"), P("languages.json." + guid + ".tmp") };
+            var kept = new[] { P("userdict.txt"), P("userdict.txt.broken"), P("config.json.broken") };
+            foreach (var path in removed.Concat(kept)) File.WriteAllText(path, "ひみつ");
+            Assert.True(LearningData.ClearAllAt(learning[0], learning[1], learning[2], learning[3], learning[4], [P("meltype.log"), P("crash.log")]), "消せたら成功を返す");
+            foreach (var path in removed) Assert.True(!File.Exists(path), Path.GetFileName(path) + ": ログ・退避コピー・一時ファイルは消える");
+            foreach (var path in kept) Assert.True(File.Exists(path), Path.GetFileName(path) + ": ユーザー辞書・設定とその退避コピーは消さない");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_43_ClearAllAt_ReturnsFalseWhenALogCannotBeDeleted()
+    {
+        // 4 回目の査読 RI-1 (変異 MH): ログや退避コピーを消せなかったときも、全消去は失敗を返す (Mac は「消去できなかったものがあります」と出す)。
+        // 戻り値の合成を外しても、学習データそのものは消せるので、どのテストも赤にならなかった。root・Windows は権限で消せなくできないので飛ばす。
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess) return;
+        var directory = TempDir("clear-at-log-kept");
+        var logs = Path.Combine(directory, "logs");
+        var all = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        try
+        {
+            Directory.CreateDirectory(logs);
+            var log = Path.Combine(logs, "meltype.log");
+            File.WriteAllText(log, "ひみつ");
+            File.SetUnixFileMode(logs, UnixFileMode.UserRead | UnixFileMode.UserExecute);   // 中のファイルを消せない
+            string P(string name) => Path.Combine(directory, name);
+            Assert.True(!LearningData.ClearAllAt(P("model.json"), P("conversions.json"), P("suggest.json"), P("translations.json"), P("languages.json"), [log]), "ログを消せなかったので失敗を返す");
+            Assert.True(File.Exists(log), "消せなかったログは残る");
+        }
+        finally
+        {
+            File.SetUnixFileMode(logs, all);
+            SafeFile.ResetBlockedForTests();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public static void P46_43_ClearAllAt_FailureWarningSurvivesInTheNewLog()
+    {
+        // 全消去が失敗したとき、Mac のダイアログは「meltype.log を確認してください」と案内する。ところが全消去はログも消すので、
+        // 失敗の警告を書いたあとでログを消すと、理由が消えることがある (3 回目 RH の申し送り・4 回目 RK-08)。ログへの書き出しは 1 秒おきの追記なので、
+        // たいていは消去のあとに新しいログへ書かれるが、書き出しが消去の途中に重なると、警告ごと消える。ログを先に消せば、警告は必ず新しいログに残る。
+        // 消去の前に積んである記録 (打った文字が入ることがある) は、消すログと一緒に消え、新しいログには出ない。
+        // 書き出しが消去の途中に重なる最悪の場合を、書き出しを休まず繰り返す別のスレッドで作る (Windows は開いているログを消せないので、このスレッドは立てない)。
+        var directory = TempDir("clear-at-log-order");
+        var log = Path.Combine(directory, "meltype.log");
+        using var stop = new CancellationTokenSource();
+        Task? flusher = null;
+        try
+        {
+            string P(string name) => Path.Combine(directory, name);
+            // 消せない「止めたファイル」: 中身のあるフォルダーを conversions.json の名前で置く (File.Delete が例外を投げる)
+            Directory.CreateDirectory(P("conversions.json"));
+            File.WriteAllText(Path.Combine(P("conversions.json"), "x"), "x");
+            SafeFile.Block(P("conversions.json"));
+            Diagnostics.Log.SetFileOutput(log);
+            if (!OperatingSystem.IsWindows()) flusher = Task.Run(() => { while (!stop.IsCancellationRequested) { Diagnostics.Log.FlushFile(); Thread.Yield(); } });
+            for (var i = 0; i < 20; i++)
+            {
+                Diagnostics.Log.Info("BEFORE-CLEAR-" + i);   // 消去の前の記録
+                Assert.True(!LearningData.ClearAllAt(P("model.json"), P("conversions.json"), P("suggest.json"), P("translations.json"), P("languages.json"), [log]), "止めたファイルを消せないので失敗を返す");
+                stop.Token.WaitHandle.WaitOne(2);   // 書き出しのスレッドが、消去の途中に積んだ警告を書く時間
+                Diagnostics.Log.FlushFile();
+                var text = File.Exists(log) ? File.ReadAllText(log) : "";
+                Assert.True(text.Contains("conversions.json を消せませんでした"), $"{i} 回目: 失敗の警告が新しいログに残る: {text}");
+                Assert.True(!text.Contains("BEFORE-CLEAR-" + i), $"{i} 回目: 消去の前の記録は新しいログに出ない");
+            }
+        }
+        finally
+        {
+            stop.Cancel();
+            flusher?.Wait();
+            Diagnostics.Log.SetFileOutput(null);
+            SafeFile.ResetBlockedForTests();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public static void P46_43_LanguageMemory_UnblockedSaveFailure_StillWarns()
+    {
+        // 4 回目の査読 RI-2 (変異 MN): 保存を止めているときは「今回の学習は取り消しました」の警告を出さない (止めた警告が原因を言っている) が、
+        // 止めていない失敗 (フォルダーに書けない) では、出さないと学習されない原因がログに残らない。「いつも出さない」に変えても、どのテストも赤にならなかった。
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess) return;
+        var directory = TempDir("language-unblocked-fail");
+        var all = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        try
+        {
+            var memory = new LanguageMemory(Path.Combine(directory, "languages.json"));
+            File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserExecute);   // フォルダーに書けない (保存を止めてはいない)
+            var before = Diagnostics.Log.Version;
+            var undo = memory.RememberUndoable("sample", english: true);
+            var written = (int)(Diagnostics.Log.Version - before);
+            var cancelled = Diagnostics.Log.Snapshot().TakeLast(written).Count(e => e.Level == Diagnostics.LogLevel.Warn && e.Message.Contains("今回の学習は取り消しました"));
+            Assert.True(undo is null, "保存できなかったので覚えない");
+            Assert.Equal(1, cancelled, "止めていない失敗は、取り消した、という警告を出す");
+        }
+        finally { File.SetUnixFileMode(directory, all); Directory.Delete(directory, recursive: true); }
+    }
 }
