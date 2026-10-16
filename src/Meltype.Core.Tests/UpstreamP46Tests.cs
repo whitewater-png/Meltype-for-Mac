@@ -112,4 +112,17 @@ internal static class UpstreamP46Tests
             ("datamation", "datamation"), ("Datamation", "Datamation"), ("datamationwo", "datamationを"),
             ("openstreetmap", "openstreetmap"), ("openstreetmapwo", "openstreetmapを"));
     }
+
+    [Test]
+    public static void P46_8_Aonishiki_IsOffered()
+    {
+        // 本家 #706: 安青錦 (大相撲の力士) を あおにしき の候補に出す。
+        foreach (var keys in new[] { "aonishiki ", "aonisiki " })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(keys);
+            var candidates = k.Host.View?.Candidates ?? [];
+            Assert.True(candidates.Contains("安青錦"), keys + ": " + string.Join(" | ", candidates));
+        }
+    }
 }
