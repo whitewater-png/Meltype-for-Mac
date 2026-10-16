@@ -414,21 +414,22 @@ internal static class UpstreamP46Tests
     }
 
     /// <summary>
-    /// 実機の NSSpellChecker が単語と答える語のうち、確かめた 10 語 (shat・doit・ment・gat・gatt・mahout・techno・empowerment・entitlement・ament。後ろの 3 語は P46-47・P46-48 で足した) だけを足した模擬。
+    /// 実機の NSSpellChecker が単語と答える語のうち、確かめた 11 語 (shat・doit・ment・gat・gatt・mahout・techno・empowerment・entitlement・ament・underemployment。後ろの 4 語は P46-47・P46-48・P46-50 で足した) だけを足した模擬。
     /// それ以外は同梱の英単語表のまま。実機はほかにも表にない語 (datas・taanal など) を単語と答えるので、無作為の 577 入力では 5.5% ほど食い違う (7 語のときに測った値。語を足したあとは測り直していない)。
-    /// 見つけられるのは、この 10 語に関わる、語の境目の読み方が実機でだけ変わる退行に限られる。
+    /// 見つけられるのは、この 11 語に関わる、語の境目の読み方が実機でだけ変わる退行に限られる。
     /// </summary>
     private sealed class NsLikeChecker : Detection.IWordChecker
     {
         public bool IsAvailable => true;
 
         public bool IsWord(string lower) =>
-            lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" or "techno" or "empowerment" or "entitlement" or "ament" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+            lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" or "techno" or "empowerment" or "entitlement" or "ament" or "underemployment" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
     }
 
     /// <summary>
     /// 論理の確認用 (実機のまねではない): cadent (ca + dent) を単語と答える判定器。IsPartOfLongerEnglishWord の「先頭の単位まで伸ばす」ところ (ループの j >= 0) を試すためだけに使う。
-    /// 実機の NSSpellChecker も同梱の英単語表も cadent を単語と答えないので、この形は今の判定器では起きない。
+    /// 開発機で NSSpellChecker を直接呼んだ答え (tools/nsd) も同梱の英単語表も cadent を単語と答えないので、この形は今の判定器では起きない
+    /// (利用者が cadent のような語を英字の語として学習した場合は別。推測。IME の中は実機未確認)。
     /// </summary>
     private sealed class HeadWordChecker : Detection.IWordChecker
     {
@@ -507,13 +508,17 @@ internal static class UpstreamP46Tests
         // main の規則は、伸ばす音の u から始まる語 (unemployment。本家 7a20aff) と、同梱の一覧にない母音 1 つの単位から始まる語 (empowerment。H1) を飛ばす。
         // 単独の main では ment が (実機の NSSpellChecker が単語と答えるので) 救い、単独の P46 では長い語が救っていたのが、両方が入ると何も見られなくなる。
         // 断片が知っている英単語で、さらに前へ伸ばした並びも知っている英単語なら、断片は長い語の終わりなので、読みの頭として飛ばさない。
-        // 変異の確認 (5 回目の査読 RM-01 と 6 回目の RN-01。P46-47 で答えが変わる入力と、語頭から始まる語・記号をはさむ形の 2,848 入力を、BI と NS で現在のコードと比べた):
+        // 変異の確認 (5 回目の査読 RM-01、6 回目の RN-01、7 回目の RP1-01・02。P46-47 で答えが変わる入力と、語頭から始まる語・記号をはさむ形の 2,848 入力を、BI と NS で現在のコードと比べた。
+        // 7 回目の査読員は別の作り方 (大文字・数字や記号をはさむ形・短い断片・非常に長い列・深い語) の BI 7,652・NS 1,168 入力で比べた):
         // - 長い語の下限 (ループの letters.Length >= 4) を 6 にすると 208 入力で答えが変わる → ament の例で赤になる。
         // - ループの j >= 0 を j > 0 にすると、現在の判定器 (同梱の表・NS) では 2,848 入力のどれも変わらないが、等価ではない。先頭の単位から始まる語が、全体も「かな + つ」の読みの頭に見えるとき
         //   (外側のループの先頭の単位でも ReadsAsJapaneseWithTsu が真になって受け入れられない) だけ変わる。今の判定器にはそのような語が無いので、cadent を単語と答える
-        //   試験用の判定器 (HeadWordChecker) の例を下に足した (論理の確認。実機で起きる形ではない)。
+        //   試験用の判定器 (HeadWordChecker) の例を下に足した (論理の確認。今の判定器では起きない形)。
+        // - ループの「英字だけの単位」の条件を小文字だけ (IsAsciiLetterLower) にすると、大文字で始まる語 (Entitlement) を前へ伸ばせず、断片 ment が日本語の読みの頭になる → 大文字の例で赤になる。
+        // - 前へ伸ばす深さに上限 (6・7 単位) を入れると、長い語の頭まで 8 単位さかのぼる語 (underemployment) を伸ばせない → その例で赤になる。
         // - 最初の letters.Length < 4 を外す (同じ単位の後ろの本判定が 4 文字以上を要るので、判定器を呼ぶ回数が増えるだけ)・ループの「英字だけの単位」の条件を外す
-        //   (IsKnownEnglishWord が ASCII の小文字以外を含む並びを単語としないので、数字・記号をはさんだ並びは以降ずっと知らない語になり、元のコードがそこでループを終えるのと同じ) は、
+        //   (IsKnownEnglishWord は小文字にしてから a-z だけの並びかを見るので、数字・記号をはさんだ並びは以降ずっと知らない語になり、元のコードがそこでループを終えるのと同じ。
+        //   大文字は元の条件 (IsAsciiLetter) も通す。小文字にすると a-z になる文字 (U+212A ケルビン記号) だけは例外だが、打鍵では普通出てこない。6 回目の RN が試して差なし) は、
         //   読みでも測っても等価。
         ExpectCommitted(new NsLikeChecker(),
             // 長音の u から始まる語 (同梱の一覧にある unemployment)。o・u の段の後ろ (このう) でも同じ
@@ -529,6 +534,10 @@ internal static class UpstreamP46Tests
         // 先頭の単位から始まる語 (ループの j >= 0 の境目。6 回目の査読 RN-01)。cadent は ca + dent で、全体も断片 (dent) も知っている語、全体は「かな + つ」の読みの頭にも見える。
         // 先頭の単位まで伸ばさないと、全体が日本語に読まれる (かでんつる)。対照は先頭が日本語の形。
         ExpectCommitted(new HeadWordChecker(), ("cadentsuru", "cadentする"), ("kyouhacadentsuru", "きょうはcadentする"));
+        // 大文字で始まる語 (7 回目の査読 RP1-01)。条件を小文字だけにすると Entitlement の E で止まり、きょうはEntitleめんつる になる。
+        // 長い語の頭まで 8 単位さかのぼる語 (RP1-02)。深さを 6・7 単位で止めると崩れる (この模擬の判定器では いまうんでれmployめんつる、開発機の NSSpellChecker では いまうんでremployめんつる)。
+        ExpectCommitted(new NsLikeChecker(), ("kyouhaEntitlementsuru", "きょうはEntitlementする"), ("imaEntitlementsu", "いまEntitlementす"),
+            ("imaunderemploymentsuru", "いまunderemploymentする"));
     }
 
     [Test]
