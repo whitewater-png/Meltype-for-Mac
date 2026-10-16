@@ -350,17 +350,22 @@ internal static class UpstreamP46Tests
     {
         public int Calls;
 
+        /// <summary>変換エンジンに渡された読み (呼ばれたかだけでなく、何を渡したかを見る)。</summary>
+        public readonly List<string> Received = [];
+
         private static string? Map(string hiragana) => hiragana switch { "な～～～" => "名～～～", "らーめん" => "ラーメン", _ => null };
 
         public string? Convert(string hiragana)
         {
             Calls++;
+            Received.Add(hiragana);
             return Map(hiragana);
         }
 
         public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null)
         {
             Calls++;
+            Received.Add(hiragana);
             var mapped = Map(hiragana);
             return mapped is null ? null : [new(hiragana, mapped)];
         }
@@ -390,8 +395,9 @@ internal static class UpstreamP46Tests
     }
 
     /// <summary>
-    /// 実機の NSSpellChecker のように、同梱の英単語表にない語 (shat・doit・ment・gat・gatt・mahout・techno) も単語と答えるスペルチェッカー。
-    /// それ以外は同梱の英単語表。語の境目の読み方が実機でだけ変わるかを見る。
+    /// 実機の NSSpellChecker が単語と答える語のうち、確かめた 7 語 (shat・doit・ment・gat・gatt・mahout・techno) だけを足した模擬。
+    /// それ以外は同梱の英単語表のまま。実機はほかにも表にない語 (datas・taanal など) を単語と答えるので、無作為の 577 入力では 5.5% ほど食い違う。
+    /// 見つけられるのは、この 7 語に関わる、語の境目の読み方が実機でだけ変わる退行に限られる。
     /// </summary>
     private sealed class NsLikeChecker : Detection.IWordChecker
     {
@@ -432,7 +438,7 @@ internal static class UpstreamP46Tests
     [Test]
     public static void P46_23_DictionaryAdditions_AlsoHoldWithNsLikeChecker()
     {
-        // 辞書の追加 (P46-1〜15) を、実機の NSSpellChecker のように techno なども単語と答える判定器でも確かめる。
+        // 辞書の追加 (P46-1〜15) を、実機の NSSpellChecker の答えを 7 語だけまねた判定器 (NsLikeChecker) でも確かめる。
         // 同梱の英単語表だけでは、実機でだけ起きる差 (語の境目の読み方の違い) が見えない。
         ExpectCommitted(new NsLikeChecker(),
             ("infobesity", "infobesity"), ("infobesitywo", "infobesityを"), ("kyouhainfobesity", "きょうはinfobesity"),
@@ -445,8 +451,9 @@ internal static class UpstreamP46Tests
     [Test]
     public static void P46_23_Adtech_KnownLimit_NoAfterAdtechIsEnglishWithNsLikeChecker()
     {
-        // 既知の限界 (KNOWN_LIMITS): 実機の NSSpellChecker は techno を単語と答えるので、adtech + の (adtechno…) の no が英語側に取り込まれる
-        // (今までは adtechのような だった)。adtech 単独・助詞つき (を・は など)・日本語の後ろは直るので、辞書には入れたままにしている。
+        // 既知の限界 (KNOWN_LIMITS K84): 実機の NSSpellChecker は techno を単語と答えるので、adtech + の (adtechno…) の no が英語側に取り込まれる
+        // (今までは adtechのような だった)。同じく、続きが英語の語に読める形 (adtechmade・adtechhanami・adtechhaha) も戻る。
+        // adtech 単独・助詞つき (を・は など)・日本語の後ろは直るので、辞書には入れたままにしている。
         // 直ったら、この期待値を adtechのような に変える。
         ExpectCommitted(new NsLikeChecker(), ("adtechnoyouna", "adtechnoyouna"));
         // 同梱の英単語表では adtechのような のまま
@@ -458,13 +465,26 @@ internal static class UpstreamP46Tests
     {
         // P46-19 の見落とし: 記号 (～ ! ? .) を数えないつもりが、かな以外 (数字・英字) も数えず、12がつ・100えん・iPhone15をかう のライブ変換が止まっていた。
         // 文字として読めるもの (かな・ー・数字・英字) は数え、記号だけを数えない。
-        foreach (var typed in new[] { "12gatsu", "100en", "2024nen", "iPhone15wokau", "arigatou!" })
+        // 数字: 数字を含む読みが変換エンジンに渡る。
+        foreach (var (typed, digits) in new[] { ("12gatsu", "12"), ("100en", "100"), ("2024nen", "2024"), ("iPhone15wokau", "15") })
         {
             var converter = new CountingLiveConverter();
             var k = new CompositionTests.Keyboard(live: true, converter: converter);
             k.Type(typed + "\n");
-            Assert.True(converter.Calls > 0, typed + ": 変換エンジンを呼ぶ");
+            Assert.True(converter.Received.Any(r => r.Contains(digits)), typed + ": 数字を含む読みを変換エンジンに渡す: " + string.Join(" / ", converter.Received));
         }
+        // 英字: かなが 3 文字以下で、後ろに読みきれない子音が残る形 (きょう + qxz) は、英字も数えて 4 文字に届く (かなだけ数えると呼ばれない)。
+        foreach (var (typed, japanese) in new[] { ("kyouqxz", "きょう"), ("kyouq", "きょう"), ("soukq", "そう") })
+        {
+            var converter = new CountingLiveConverter();
+            var k = new CompositionTests.Keyboard(live: true, converter: converter);
+            k.Type(typed + "\n");
+            Assert.True(converter.Received.Contains(japanese), typed + ": 英字も数えて、日本語の区間を変換エンジンに渡す: " + string.Join(" / ", converter.Received));
+        }
+        // 対照 (数え方を変える前でも呼ばれる): 記号が付いても、かなだけで 4 文字以上ある。
+        var control = new CountingLiveConverter();
+        new CompositionTests.Keyboard(live: true, converter: control).Type("arigatou!\n");
+        Assert.True(control.Calls > 0, "arigatou!: かなが 4 文字以上あれば、記号が付いても呼ぶ (対照)");
     }
 
     [Test]
@@ -485,10 +505,13 @@ internal static class UpstreamP46Tests
     {
         // P46-13 の見落とし: 小文字で打った固有名詞を英字の語に数えない変更が . の前まで及び、miro.com・canon.jp の . が 。 になった。
         // 長音の - の前だけにとどめる (. の前は今までどおり半角の . のまま)。
-        foreach (var typed in new[] { "miro.com", "jira.com", "node.com", "deno.com", "canon.jp", "siri.com" })
+        foreach (var checker in new Detection.IWordChecker[] { Detection.BuiltInWordChecker.Shared, new NsLikeChecker() })
         {
-            var result = Committed(Detection.BuiltInWordChecker.Shared, typed);
-            Assert.True(!result.Contains('。'), typed + ": . が 。 にならない: " + result);
+            foreach (var typed in new[] { "miro.com", "jira.com", "node.com", "deno.com", "canon.jp", "siri.com" })
+            {
+                var result = Committed(checker, typed);
+                Assert.True(result.Contains('.') && !result.Contains('。'), typed + ": 半角の . のまま残り、。 にならない: " + result);
+            }
         }
         // - の前は直ったまま
         ExpectCommitted(("siri-zu", "しりーず"));
@@ -530,7 +553,11 @@ internal static class UpstreamP46Tests
     {
         // 壊れているのではなく、読めなかっただけのファイル (権限・所有者違い。sudo で作られた学習データなど) は、.broken にも残せない。
         // 新しい 1 件のファイルで置き換えると、読めなかった中身が消えるので、置き換えない。
-        if (OperatingSystem.IsWindows() || Environment.UserName == "root") return; // 権限で読めなくできる環境だけ
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        {
+            Console.WriteLine("  P46_26_UnreadableFile_IsNotOverwritten: スキップ (権限で読めなくできる環境だけ)");
+            return;
+        }
         var directory = TempDir("unreadable");
         try
         {
@@ -682,7 +709,8 @@ internal static class UpstreamP46Tests
     [Test]
     public static void P46_29_Data_KnownLimits()
     {
-        // 既知の限界 (KNOWN_LIMITS): metadata は英語の複合語だが直らない (めただた。守りを外すと めたdata になるが、それも誤り)。
+        // 既知の限界 (KNOWN_LIMITS K83): metadata は英語の複合語だが直らない (めただた。守りを外すと めたdata になるが、それも誤り)。
+        // 直ったら (metadata が英語になったら)、この期待値を metadata に変える。
         ExpectCommitted(("metadata", "めただた"));
         ExpectCommitted(new NsLikeChecker(), ("metadata", "めただた"));
     }
@@ -884,5 +912,31 @@ internal static class UpstreamP46Tests
             Assert.True(File.ReadAllBytes(path + ".broken").SequenceEqual(new byte[] { 0x00, (byte)'{' }), "{ が混じっていれば .broken に残す");
         }
         finally { SafeFile.ResetBlockedForTests(); Directory.Delete(withData, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_34_ProtectUnreadable_ClassifiesByException()
+    {
+        // P46-26 の分け方を例外ごとに固定する: IOException・UnauthorizedAccessException (読めなかっただけ) は .broken を作らず保存を止める。
+        // FileNotFound・DirectoryNotFound (読もうとしたら無かった) は何もしない。それ以外 (壊れている) は .broken に残す。
+        var cases = new (string Name, Exception Error, bool Blocked, bool Broken)[]
+        {
+            ("IOException", new IOException(), true, false), ("UnauthorizedAccessException", new UnauthorizedAccessException(), true, false),
+            ("FileNotFoundException", new FileNotFoundException(), false, false), ("DirectoryNotFoundException", new DirectoryNotFoundException(), false, false),
+            ("JsonException", new System.Text.Json.JsonException("x"), false, true),
+        };
+        foreach (var (name, error, blocked, broken) in cases)
+        {
+            var directory = TempDir("classify");
+            try
+            {
+                var path = Path.Combine(directory, "conversions.json");
+                File.WriteAllText(path, "{\"corrupt\":");
+                SafeFile.ProtectUnreadable(path, error);
+                Assert.Equal(blocked, SafeFile.IsBlocked(path), name + ": 保存を止めるか");
+                Assert.Equal(broken, File.Exists(path + ".broken"), name + ": .broken に残すか");
+            }
+            finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+        }
     }
 }
