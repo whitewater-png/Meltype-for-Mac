@@ -183,4 +183,12 @@ internal static class UpstreamP46Tests
         // 本家 #674: fyu で ふゅ (フュージョン = fyu-jon) が打てない。Microsoft IME・Mozc と同じ綴りの ふゃ・ふゅ・ふょ を足した。
         ExpectCommitted(("fyu", "ふゅ"), ("fyuzyon", "ふゅじょん"), ("fya", "ふゃ"), ("fyo", "ふょ"), ("fyuu", "ふゅう"));
     }
+
+    [Test]
+    public static void P46_13_LowercaseSiriZu_StaysJapanese()
+    {
+        // 本家 #656: siri-zu (シリーズ) の siri が固有名詞 (Siri) と数えられて、しり-ず (長音が - のまま) になっていた。
+        // 小文字で打った、ローマ字として最後まで読める固有名詞は、英字の語として数えない。
+        ExpectCommitted(("siri-zu", "しりーず"), ("siri-zumodel", "しりーずmodel"), ("siri", "siri"), ("sirinoondoku", "しりのおんどく"));
+    }
 }

@@ -82,7 +82,8 @@ public sealed class CompositionText
             var lower = word.ToLowerInvariant();
             var acronym = word.Any(char.IsAsciiLetterUpper) && word.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c));
             var knownUnambiguous = word.Length >= 3 && _detector.IsKnownEnglishWord(word) && !_detector.Romaji.AnalyzeFragment(lower).IsValid;
-            var properNoun = _detector.ProperNouns.Contains(lower);
+            // 小文字で打った、ローマ字として最後まで読める固有名詞 (siri-zu の siri) は、英字の語として数えない (長音のまま。本家 #656)
+            var properNoun = _detector.ProperNouns.Contains(lower) && (char.IsAsciiLetterUpper(word[0]) || !_detector.Romaji.AnalyzeFragment(lower).IsValid);
             var loneConsonant = word.Length == 1 && char.IsAsciiLetterLower(word[0]) && word[0] is not ('a' or 'i' or 'u' or 'e' or 'o');
             if (acronym || knownUnambiguous || properNoun || _units[^1].Raw == "-" && loneConsonant)
                 _units[^1] = _units[^1] with { Kana = _units[^1].Raw };
