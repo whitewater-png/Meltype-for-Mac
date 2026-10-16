@@ -297,4 +297,42 @@ internal static class UpstreamP46Tests
         }
         finally { Directory.Delete(directory, recursive: true); }
     }
+
+    /// <summary>
+    /// 実機の NSSpellChecker のように、73 文字以上の文字列を (検査せず) 単語と答えるスペルチェッカー (実測: 60〜72 文字は単語でない、73 文字以上は全部単語)。
+    /// それ以外は同梱の英単語表。
+    /// </summary>
+    private sealed class LongStringsAreWordsChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+
+        public bool IsWord(string lower) => lower.Length >= 73 || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void P46_18_LongRomajiSentence_IsNotOneEnglishWord()
+    {
+        // 本家 PR #709: 73 文字以上のローマ字の文を、macOS の NSSpellChecker が 1 語の英単語と答える (検査せず「誤りなし」を返す) ので、
+        // 小書き文字 (xe・xi) を含む文の後ろが ふxえんす・ちxえっくいん のまま崩れていた (長い文を 1 回の変換ボックスに溜めたとき)。
+        const string head = "kyounoasagohanwotabeteikaradenshadegakkounimukattatokorodengakkounokoutou"; // 73 文字
+        const string headKana = "きょうのあさごはんをたべていからでんしゃでがっこうにむかったところでんがっこうのこうとう";
+        CompositionTests.Detector.SpellChecker = new LongStringsAreWordsChecker();
+        try
+        {
+            foreach (var (tail, expected) in new[] { ("oirufuxensu", "おいるふぇんす"), ("chixekkuin", "ちぇっくいん"), ("goru", "ごる") })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(head + tail + "\n");
+                Assert.Equal(headKana + expected, k.Host.Document, tail);
+            }
+            // 短い文は今までどおり
+            var shortSentence = new CompositionTests.Keyboard();
+            shortSentence.Type("kyouhaiitenkidesune\n");
+            Assert.Equal("きょうはいいてんきですね", shortSentence.Host.Document, "短い文");
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
 }

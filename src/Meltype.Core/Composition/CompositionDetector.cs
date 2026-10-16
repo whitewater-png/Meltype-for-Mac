@@ -563,7 +563,10 @@ public sealed class CompositionDetector
     }
 
     /// <summary>スペルチェッカーが正しいと言う英単語か、よくある打ち間違い (teh、recieve) か。</summary>
-    private bool IsSpellWord(string lower) => SpellChecker is { } checker && (checker.IsWord(lower) || checker.AutoCorrection(lower) is not null);
+    private bool IsSpellWord(string lower) =>
+        // macOS の NSSpellChecker は 73 文字以上の未知の文字列を検査せず「誤りなし」(= 語) と返す (実測 60〜72 文字は語でない、73 文字以上は全部語)。
+        // 長いローマ字の文を 1 語の英単語とみなさない (本家 PR #709)。
+        lower.Length <= 72 && SpellChecker is { } checker && (checker.IsWord(lower) || checker.AutoCorrection(lower) is not null);
 
     /// <summary>
     /// 助詞 (de・ni・no…) で始まり、残り 3 文字以上が英単語の語 (de|vote = devote、no|vice = novice)。
