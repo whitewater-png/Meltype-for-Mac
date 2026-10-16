@@ -886,7 +886,7 @@ internal static class UpstreamP46Tests
         var blanks = new (string Name, byte[] Bytes)[]
         {
             ("NUL", new byte[] { 0, 0, 0 }), ("UTF-16LE の BOM", new byte[] { 0xFF, 0xFE }), ("UTF-16BE の BOM", new byte[] { 0xFE, 0xFF }),
-            ("VT", new byte[] { 0x0B }), ("UTF-16LE の空白と改行", new byte[] { 0xFF, 0xFE, 0x20, 0x00, 0x0A, 0x00 }),
+            ("VT", new byte[] { 0x0B }), ("FF", new byte[] { 0x0C }), ("UTF-16LE の空白と改行", new byte[] { 0xFF, 0xFE, 0x20, 0x00, 0x0A, 0x00 }),
             ("UTF-8 の BOM と CR・TAB", new byte[] { 0xEF, 0xBB, 0xBF, 0x09, 0x0D }),
         };
         foreach (var (name, bytes) in blanks)
@@ -1003,5 +1003,52 @@ internal static class UpstreamP46Tests
             SafeFile.ResetBlockedForTests();
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Test]
+    public static void P46_38_ClearAllAt_ReleasesEveryLearningFile()
+    {
+        // ClearAllAt (公開の ClearAll() の本体) は、学習データの 5 つのファイルのどれが止まっていても、削除して止めた状態を解く。
+        // 3 回目の査読 RG-1: この一覧を渡す行を消しても、どのテストも赤にならなかった。ユーザー辞書は、止まっていても触らない。
+        var directory = TempDir("clear-at");
+        try
+        {
+            string P(string name) => Path.Combine(directory, name);
+            var learning = new[] { P("model.json"), P("conversions.json"), P("suggest.json"), P("translations.json"), P("languages.json") };
+            var userDictionary = P("userdict.txt");
+            File.WriteAllText(P("conversions.json"), ClearOriginal);
+            File.WriteAllText(userDictionary, "ひみつ\tひみつ");
+            foreach (var path in learning) SafeFile.Block(path);
+            SafeFile.Block(userDictionary);
+            Assert.True(LearningData.ClearAllAt(learning[0], learning[1], learning[2], learning[3], learning[4], [P("meltype.log")]), "消せたら成功を返す");
+            foreach (var path in learning) Assert.True(!SafeFile.IsBlocked(path), Path.GetFileName(path) + ": 止めた状態が解ける");
+            Assert.True(!File.ReadAllText(P("conversions.json")).Contains("ひみつ"), "打った読みが残らない");
+            Assert.True(SafeFile.IsBlocked(userDictionary) && File.ReadAllText(userDictionary) == "ひみつ\tひみつ", "ユーザー辞書は、止まっていても触らない");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_38_ReleaseBlocked_DeletesOnlyTheBlockedFiles()
+    {
+        // 3 回目の査読 RG-2: 「止めているものだけ削除する」行を消しても、どのテストも赤にならなかった。消すべきでないものを消さないための唯一の砦。
+        var directory = TempDir("release-only");
+        try
+        {
+            var id = Guid.NewGuid().ToString("N");
+            var blocked = Path.Combine(directory, "blocked-" + id + ".json");
+            var normal = Path.Combine(directory, "normal-" + id + ".json");
+            var outside = Path.Combine(directory, "outside-" + id + ".txt");
+            foreach (var path in new[] { blocked, normal, outside }) File.WriteAllText(path, "KEEP-OR-DELETE");
+            SafeFile.Block(blocked);
+            SafeFile.Block(outside);
+            Assert.True(LearningData.ReleaseBlocked([blocked, normal]), "消せたら成功を返す");
+            Assert.True(!File.Exists(blocked) && !SafeFile.IsBlocked(blocked), "止めていたファイルは消えて、止めた状態が解ける");
+            Assert.Equal("KEEP-OR-DELETE", File.ReadAllText(normal), "止めていないファイルは消さない");
+            Assert.True(File.Exists(outside) && SafeFile.IsBlocked(outside), "渡した一覧に無いものは、止めていても触らない");
+            var logged = Diagnostics.Log.Snapshot().Select(e => e.Message).Where(m => m.Contains(id)).ToList();
+            Assert.True(logged.Count == 1 && logged[0].Contains("blocked-" + id), "削除した 1 つだけ警告を出す: " + string.Join(" / ", logged));
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
     }
 }
