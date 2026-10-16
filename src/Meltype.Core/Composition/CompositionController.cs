@@ -2313,12 +2313,15 @@ public sealed class CompositionController
         return converted;
     }
 
-    /// <summary>かなの文字数 (ひらがな・カタカナ・ー)。ライブ変換を始める長さの判定用。記号 (～ ! ? .) は数えない。</summary>
-    private static int KanaLengthForLiveConversion(string text)
+    /// <summary>
+    /// ライブ変換を始める長さの判定用の文字数。かな・ー・数字・英字など文字として読めるものを数え、記号 (～ ! ? . ！ ？ 。 など) は数えない。
+    /// (な～～～ のように記号で 4 文字に届いたものを変換しないため。12がつ・100えん のように数字を含む読みは数える。)
+    /// </summary>
+    private static int LengthForLiveConversion(string text)
     {
         var n = 0;
         foreach (var c in text)
-            if (c is >= 'ぁ' and <= 'ゖ' or >= 'ァ' and <= 'ヶ' or 'ー') n++;
+            if (char.IsLetterOrDigit(c) || c == 'ー') n++;
         return n;
     }
 
@@ -2328,8 +2331,8 @@ public sealed class CompositionController
     /// </summary>
     private string LiveConvert(string kana)
     {
-        // な～～～ など、記号だけで文字数が 4 に達しても漢字にしない (本家 PR #632 / #505)。ー は数える (らーめん を止めない)。
-        if (KanaLengthForLiveConversion(kana) < LiveConversionMinLength) return kana;
+        // な～～～ など、記号だけで文字数が 4 に達しても漢字にしない (本家 PR #632 / #505)。ー・数字・英字は数える (らーめん・12がつ を止めない)。
+        if (LengthForLiveConversion(kana) < LiveConversionMinLength) return kana;
         DropCachesIfLearned();
         var key = string.Join("\u0001", kana, PrecedingForConversion, _followingText, _options.History?.Version, _options.UserDictionary?.Version);
         if (_liveCache.TryGetValue(key, out var cached)) return cached;

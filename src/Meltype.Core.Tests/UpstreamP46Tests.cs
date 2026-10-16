@@ -452,4 +452,31 @@ internal static class UpstreamP46Tests
         // 同梱の英単語表では adtechのような のまま
         ExpectCommitted(("adtechnoyouna", "adtechのような"));
     }
+
+    [Test]
+    public static void P46_24_LiveConversion_StillConvertsReadingsWithDigitsOrLetters()
+    {
+        // P46-19 の見落とし: 記号 (～ ! ? .) を数えないつもりが、かな以外 (数字・英字) も数えず、12がつ・100えん・iPhone15をかう のライブ変換が止まっていた。
+        // 文字として読めるもの (かな・ー・数字・英字) は数え、記号だけを数えない。
+        foreach (var typed in new[] { "12gatsu", "100en", "2024nen", "iPhone15wokau", "arigatou!" })
+        {
+            var converter = new CountingLiveConverter();
+            var k = new CompositionTests.Keyboard(live: true, converter: converter);
+            k.Type(typed + "\n");
+            Assert.True(converter.Calls > 0, typed + ": 変換エンジンを呼ぶ");
+        }
+    }
+
+    [Test]
+    public static void P46_24_LiveConversion_SymbolsStillDoNotCount()
+    {
+        // 守り: 数字・英字を数えるようにしても、記号で 4 文字に届いただけのものは変換エンジンを呼ばない。
+        foreach (var typed in new[] { "na~~~", "1~~~", "sa!!!", "sou~~", "yada~~" })
+        {
+            var converter = new CountingLiveConverter();
+            var k = new CompositionTests.Keyboard(live: true, converter: converter);
+            k.Type(typed + "\n");
+            Assert.Equal(0, converter.Calls, typed + ": 変換エンジンを呼ばない");
+        }
+    }
 }
