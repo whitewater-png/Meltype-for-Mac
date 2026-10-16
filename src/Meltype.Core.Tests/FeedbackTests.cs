@@ -1427,9 +1427,9 @@ internal static class RomajiTypoTests
                 ("sometealcoholic", "そめてalcoholic"),
                 // 今までどおり: 長い語が助詞 1 つより後ろの英字まで続くなら、同梱の一覧に無い語でも長い語を取る (hiring ではなく ringtone)
                 ("hiringtone", "ひringtone"), ("kyouharingtone", "きょうはringtone"), ("dealpine", "でalpine"),
-                // 今までどおり: 長い語が同梱の一覧の語 (until|de の tilde、ultra|de の trade) なら捨てる (変更前と同じ答え。どちらも外れ)
+                // 今までどおり: 長い語が同梱の一覧の語 (until|de の tilde、ultra|de の trade) なら捨てる (変更前と同じ答えを固定しているだけ。どちらも外れで、正しい答えではない)
                 ("untilde", "うんtilde"), ("kyouhaultrade", "きょうはうltrade"),
-                // 今までどおり: 見つけた区間 (zover) が同梱の一覧の語でないなら、断片 (verde) でも捨てる
+                // 今までどおり: 見つけた区間 (zover) が同梱の一覧の語でないときの答え (この 2 件は他の条件でも同じ答えになり、条件 B(X) だけを守るテストにはなっていない)
                 ("zoverde", "zoverde"), ("zoverdesu", "ぞゔぇです"),
             })
             {
@@ -1468,7 +1468,7 @@ internal static class RomajiTypoTests
                 ("kyouhavilla", "きょうはvilla"), ("konoviola", "このviola"), ("doumovilla", "どうもvilla"),
                 // 今までどおり: 母音 1 つの単位からの語でも、同梱の一覧の語 (idol) なら l を英字に残す
                 ("kyouidol", "きょうidol"),
-                // 今までどおり: 記号の後ろ (英字の並びの頭) から始まる語は、スペルチェッカーでも見る (変更前と同じ答え)
+                // 今までどおり: 記号の後ろ (英字の並びの頭) から始まる語は、スペルチェッカーでも見る (変更前と同じ答えを固定しているだけ。外れで、正しい答えではない)
                 ("kyou,umolike", "きょう、umolいけ"),
             })
             {

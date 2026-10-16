@@ -596,7 +596,8 @@ public sealed class CompositionDetector
         lower.Length >= 2 && (Memory?.Get(lower) ?? (_english.Words.ContainsWord(lower) || _proper.Contains(lower)));
 
     /// <summary>
-    /// 同梱の一覧にある英単語か (IsListedEnglishWord か、4 文字以上なら english-words.txt = BuiltInWordChecker)。スペルチェッカーは使わない。
+    /// 同梱の一覧にある英単語か (IsListedEnglishWord か、4 文字以上なら english-words.txt = BuiltInWordChecker)。スペルチェッカーは使わない
+    /// (IsListedEnglishWord は学習した語も見るので、厳密には「同梱の一覧 + 学習」)。
     /// 語の途中から始まる断片 (verde・umol) は実機の NSSpellChecker が英単語と答えるので、それを根拠にする規則の守りに使う。
     /// </summary>
     internal bool IsBundledEnglishWord(string lower) =>

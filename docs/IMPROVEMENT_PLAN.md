@@ -2701,10 +2701,10 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
     | W1 入力全体が NSSpellChecker だけの英単語 | 4 | — | `promo`・`mailto` など | NSSpellChecker のほうが正しいと思われる (正解表の決め打ちの側) |
     | W2 日本語を含む入力全体を NSSpellChecker が語と言う | 13 | :691 (10) | `residentsga`・`konosugarwo` | 理由は不明 |
 - **今回直したもの** (`fix/sc-t1-h1`。それぞれ go):
-  - **T1 (`a83afad`)**: `FindSpans` の「見つけた区間 (`teal`) の途中から始まって後ろへ続く長い語 (`alcoholic`) があれば、見つけた区間を捨てる」(sometealcoholic 用)。長い語は `IsLongEnglishWord` でスペルチェッカーに聞くので、`o|verde|su` の `verde` で `over` を捨てていた。
+  - **T1 (`d36ef48`)**: `FindSpans` の「見つけた区間 (`teal`) の途中から始まって後ろへ続く長い語 (`alcoholic`) があれば、見つけた区間を捨てる」(sometealcoholic 用)。長い語は `IsLongEnglishWord` でスペルチェッカーに聞くので、`o|verde|su` の `verde` で `over` を捨てていた。
     - 式: 変更前の捨てる条件 D = `IsLongEnglishWord(W)`。変更後 = D ∧ ¬(B(X) ∧ ¬B(W) ∧ P(W の X より後ろの部分))。X = 見つけた区間、W = 長い語、B = 同梱の一覧の語 (`IsBundledEnglishWord`: `IsListedEnglishWord` か、4 文字以上なら `english-words.txt`)、P = ちょうど助詞 1 つ (`DictionaryDetector.StartsWithParticle` の表: no ga wo ni de to ha mo wa he)。D に AND を足しただけなので変更後 ⇒ D、つまり区間を捨てるのは変更前に捨てていた場合の一部だけ。同梱の一覧 (テスト) では、`IsLongEnglishWord(W)` が真なら W は同梱の一覧の語なので ¬B(W) が偽になり、答えは変わらない。
     - P (助詞 1 つ) を足したのは、無い形では W が打ちたい語のことが多い入力 (`hiringtone` = ひ + ringtone、`dealpine` = で + alpine。W が `english-words.txt` に無いよく使う語) を壊したため。下の「採らなかった形」。
-  - **H1 の一部 (`29fa4f3`)**: `EndsWithEnglishWordFromUnit` (l・x・t を小書き・つ にしない守り) は、最後の単位からさかのぼった英字の語を `IsKnownEnglishWord` (4 文字以上はスペルチェッカー) で見る。`kyo|u|mo|l` の `umol` で、きょうも + like の l を英字に残していた。
+  - **H1 の一部 (`a093319`)**: `EndsWithEnglishWordFromUnit` (l・x・t を小書き・つ にしない守り) は、最後の単位からさかのぼった英字の語を `IsKnownEnglishWord` (4 文字以上はスペルチェッカー) で見る。`kyo|u|mo|l` の `umol` で、きょうも + like の l を英字に残していた。
     - 式: 変更前の守り G = `letters.Length >= 4 ∧ IsKnownEnglishWord(letters)`。変更後 = G ∧ (¬V ∨ B(letters))。V = 語が「英字の並びの途中 (前の単位も英字) にある、母音 1 文字の単位」から始まる。G に AND を足しただけなので、l・x・t を英字に残すのは変更前に残していた場合の一部だけ。同梱の一覧では、`IsKnownEnglishWord` が真なら B も真なので答えは変わらない。
     - V (母音 1 つの単位に限る) を足したのは、無い形 (途中の単位から始まる語はすべて同梱の一覧だけ) では `kyouha|vi|ll` の `vill` を見なくなり、`villa`・`viola` が ゔぃっぁ になったため (よく使う語の外れ)。
 - **テスト・正解表**: テスト 780 → 782 (`SpellCheckerFragmentAfterListedWord_DoesNotDropTheListedWord`・`SpellCheckerWordFromMidSound_DoesNotKeepTheLetterL`。どちらも NSSpellChecker のように断片を語と答える `IWordChecker` を使う。変更前のコードではそれぞれ `overdesu`・`kyoumolike` で落ちることを確かめた。既存テストの期待値は変えていない)。条件を 1 つずつ外すと落ちる行: T1 の P → `hiringtone`、¬B(W) → `untilde`、H1 の V → `kyouhavilla`、「前の単位も英字」→ `kyou,umolike`。外しても落ちない条件が 2 つある: T1 の B(X) (今回のどの入力でも結果を変えなかった。メインの 249,992 入力で差 0。変更を狭くするために残した) と H1 の B(letters) (母音 1 つの単位から始まる同梱の語は、ほかの単位から始まる語でも守られる)。`--eval` 1269/1271 (出力の全文が変更前と同じ)。正解表 (`tools/eval-compare.sh`、base は `1a11bf3` を detach した作業ツリー) 278/310 → 278/310、broken 0 / fixed 0 (T1 だけ・両方の 2 回)。
@@ -2723,7 +2723,7 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
     - H1 の損の側の 4 件。どれも珍しい語 `lemma`: `kyoumolemma`・`doumolemma` (+ `desu`) きょうもlemma → きょうもぇっま。
     - よく使う語の悪化は 0 件。
   - 日本語のローマ字の 3 件は H1 による日本語側の改善: `ro-shonnanatsu` ろーしょんanatす → ろーしょんあなつ、`shuuintsuduru` しゅuintすづる → しゅういんつづる、`supeingotsuyuiri` すぺingotすゆいり → すぺいんごつゆいり。
-- **採らなかった形** (同じ入力での数。実験のコミットは手元のブランチ `exp/sc-t1-h1-v1` に残した。push していない):
+- **採らなかった形** (同じ入力での数。実験のコミットは手元の実験ブランチに残した。push していない):
   | 形 | メインの直る数 | 損の側で変更前が正しく外れる (うちよく使う語) | 得の側の外れ |
   | --- | --- | --- | --- |
   | T1 で P なし (B(X) ∧ ¬B(W) だけ) | 49 | 26,508 (262: `chichristian` ちchristian → chichりsちあん、`haringtone`、`midwest`、`playlist`) | 1 (`sparmade` sparまで → sparmade) |
@@ -2741,3 +2741,6 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
   - 残る外れは KNOWN_LIMITS の K83・K84。
 - **実機で確かめる入力** (期待): `overdesu` → overです、`neverde` → neverで、`othermo` → otherも、`emailto` → emailと、`candidatedesu` → candidateです、`wasteno` → wasteの、`kyoumolike` → 今日もlike、`doumolist` → どうもlist、`kinoumolast` → 昨日もlast。変わらないこと: `sometealcoholic` → 染めてalcoholic (かな漢字変換は azooKey 次第)、`hiringtone` → ひringtone、`kyouhavilla` → 今日はvilla、`kyouhaderive` → 今日はderive (K82)。
 - **未確認**: 実機 (ビルド・インストールしていない)。数はすべて NSSpellChecker の答えの表 + Core のテスト用キーボードでの比較で、かな漢字変換はしていない。NSSpellChecker の答えはこの Mac (言語の自動判定 on) のもので、ほかの Mac で同じかは未確認。Windows のスペルチェッカーでの比較。損の側の入力は機械的に作った形 (1 音 + 語、日本語 6 種 + 語) で、日本人がよく打つ形の割合は分からない。頻度は google の頻度表で、日本人がよく打つ英単語の順ではない。
+- **独立査読 (2026-10-16)**: 数字はすべて再現 (テスト 782/782、変更前で新しいテストが落ちる、`--eval` 全文同じ、eval-compare broken 0)。自作の入力 (日本人が打ちそうな文 247 件、よく使う語 2,546 語 × 前 4 種 × 助詞・です 8 種 = 81,472 件ほか) で、よく使う語の悪化は 0、直ったのは 328 件。損の側で悪化 10 件: `emailto` 系 4 件は直したい入力そのもの (えmailto → emailと)。残る 6 件は `verde`・`mailto` (google の 1 万語の 8,000 位台。この定義では「よく使う語」に入るので、上の「よく使う語の悪化 0」は english-words.txt の上位 3,000 語での話): `kyoumoverde` きょうもverde → きょうmoverで、`sonouemailto` そのうえmailto → そのうemailと など。変更後の出力は同梱の一覧で動くテストのときの出力と同じ (前の日本語の途中から始まる同梱の語 mover・ever・email を残すため)。日本語の利用者が打つことはまれと見て、許容する。
+- **査読の軽微な指摘で直したもの**: 文書の hash を作り直し前のもの (`a83afad`・`29fa4f3`) から `d36ef48`・`a093319` に。テストの説明 (`zoverde` は条件 B(X) だけを守るテストになっていない、`untilde`・`kyouhaultrade`・`kyou,umolike` は外れの答えを固定しているだけ)。`IsBundledEnglishWord` の説明に学習した語も見ることを足した (動きは変えていない)。
+
