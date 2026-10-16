@@ -19,6 +19,9 @@ public sealed class RomajiTypoCorrector
     private readonly RomajiDetector _romaji;
     private readonly HashSet<string> _words = new(StringComparer.Ordinal);
     private int _maxLength;
+    // 読みの前方一致 (2 文字以上)。t + s を つ にまとめるか決めるとき、よく使う語の頭になるかを見る (#594)。
+    // 使うときまで作らない (辞書アプリなど IsCommonJapanese だけを使うところで、約 3 MB の表を作らない)。
+    private readonly Lazy<HashSet<string>> _prefixes;
 
     public RomajiTypoCorrector(RomajiDetector romaji, string readings)
     {
@@ -32,7 +35,19 @@ public sealed class RomajiTypoCorrector
             Add(parts[0]);
             if (parts.Length > 1) AddConjugations(parts[0], parts[1]);
         }
+        _prefixes = new Lazy<HashSet<string>>(BuildPrefixes);
     }
+
+    private HashSet<string> BuildPrefixes()
+    {
+        var prefixes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var word in _words)
+            for (var length = 2; length <= word.Length; length++) prefixes.Add(word[..length]);
+        return prefixes;
+    }
+
+    /// <summary>読みが、よく使う語そのものか、その頭か (しゃつ、まほうつ)。</summary>
+    public bool IsReadingPrefix(string hiragana) => _prefixes.Value.Contains(hiragana);
 
     public static RomajiTypoCorrector Load(RomajiDetector romaji) => new(romaji, DictionarySource.ReadEmbedded("readings.txt"));
 

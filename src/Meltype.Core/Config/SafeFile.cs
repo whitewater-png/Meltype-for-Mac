@@ -46,14 +46,101 @@ internal static class SafeFile
         }
     }
 
+    /// <summary>
+    /// 読めなかった (壊れた) ファイルを「名前.broken」に残す。読めないまま空で動き、次の保存で上書きしても、元の中身は .broken に残る
+    /// (本家 #551 の考え方。LanguageMemory は保存の直前に同じことをするが、ConversionHistory・TranslationHistory は読んだ時点で残す)。
+    /// 一時ファイルに書いて置き換える (WriteAllBytes と同じ。.broken がリンクでもリンク先は書き換えず、最初から本人だけが読める権限)。
+    /// 中身がない (0 バイト・空白・NUL だけの) ファイルは残すものがないので、前の .broken を空で潰さない。
+    /// 残せた (または残すものがなかった) なら true。残せなければ false (呼び出し側は、このパスへの保存を止める)。
+    /// </summary>
+    internal static bool KeepBroken(string path)
+    {
+        try
+        {
+            if (new FileInfo(path).Length > MaxReadBytes) return false;
+            var bytes = File.ReadAllBytes(path);
+            if (IsBlank(bytes)) return true;
+            var backup = path + ".broken";
+            WriteAllBytes(backup, bytes);
+            Diagnostics.Log.Warn($"読めなかった {Path.GetFileName(path)} を {Path.GetFileName(backup)} に残しました。");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Warn($"{Path.GetFileName(path)} を .broken に残せませんでした: {Describe(ex)}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 空白・改行・NUL (と BOM) だけの中身か。強制終了のあとのファイルは 00 で埋まっていることがあり、
+    /// UTF-16 の空白は 20 00 のように NUL を挟み、BOM は FF FE / FE FF になる。{ や " など、データになりうるバイトが 1 つでもあれば false。
+    /// </summary>
+    private static bool IsBlank(byte[] bytes)
+    {
+        foreach (var b in bytes)
+            if (b is not (0x00 or 0x09 or 0x0A or 0x0B or 0x0C or 0x0D or 0x20 or 0xEF or 0xBB or 0xBF or 0xFE or 0xFF)) return false;
+        return true;
+    }
+
+    /// <summary>このパスへの保存を止める (読み込めず、退避もできなかったファイルを、新しい内容で上書きしないため)。</summary>
+    internal static void Block(string path) { lock (Blocked) Blocked.Add(Path.GetFullPath(path)); }
+
+    /// <summary>
+    /// このパスへの保存の停止を解く。「学習データをすべて消去」が、止めていたファイルを消したあとに呼ぶ
+    /// (中身ごと消すと利用者が選んだので、守るものがなくなる)。止めていなければ何もしない。
+    /// </summary>
+    internal static void Unblock(string path)
+    {
+        lock (Blocked)
+        {
+            var full = Path.GetFullPath(path);
+            Blocked.Remove(full);
+            BlockWarned.Remove(full);
+        }
+    }
+
+    /// <summary>
+    /// 学習データ (ConversionHistory・TranslationHistory) を読めなかったときの後始末。
+    /// 壊れていた (JSON として読めない) なら .broken に残して、空で続ける。残せなければ、元のファイルを守るため保存を止める。
+    /// 読めなかっただけ (権限・所有者・I/O。壊れているとは限らない) なら、残しようがないので、やはり保存を止める。
+    /// 読もうとした時点でファイルが無くなっていたときは、守るものがないので何もしない。
+    /// </summary>
+    internal static void ProtectUnreadable(string path, Exception ex)
+    {
+        if (ex is FileNotFoundException or DirectoryNotFoundException) return;
+        if (ex is IOException or UnauthorizedAccessException) { Block(path); return; }
+        if (!KeepBroken(path)) Block(path);
+    }
+
+    /// <summary>
+    /// ログに出す例外の説明。JsonException.Message は "Path: $.打った読み.Used" のようにキー (= 打った文字) を含み、
+    /// 「ログに入力した文字を残す」が OFF でも漏れるので、種類と位置 (と、原因の切り分けに役立つ HResult) だけにする。
+    /// </summary>
+    internal static string Describe(Exception ex) =>
+        ex is System.Text.Json.JsonException json
+            ? $"JsonException (行 {json.LineNumber?.ToString() ?? "?"}、位置 {json.BytePositionInLine?.ToString() ?? "?"})"
+            : $"{ex.GetType().Name} (0x{ex.HResult:X8})";
+
     /// <summary>読み込めず退避もできなかったファイル (保存しない)。</summary>
     private static readonly HashSet<string> Blocked = new(StringComparer.Ordinal);
+
+    /// <summary>「保存を止めています」の警告を出した、止めているパス (保存のたびに出すと、ログの上限の 1000 件が埋まるので、止めてから 1 回だけ出す)。</summary>
+    private static readonly HashSet<string> BlockWarned = new(StringComparer.Ordinal);
+
+    /// <summary>保存を止めているパスの警告を、止めてから 1 回だけ出す (保存のたびに出すと、ログの上限の 1000 件が埋まる)。止め直したら、また 1 回出る。</summary>
+    internal static void WarnBlockedOnce(string path, string message)
+    {
+        bool first;
+        lock (Blocked) first = BlockWarned.Add(Path.GetFullPath(path));
+        if (first) Diagnostics.Log.Warn(message);
+    }
 
     /// <summary>テスト用: 退避を必ず失敗させる。</summary>
     internal static bool FailBackupForTests { get; set; }
 
     /// <summary>テスト用: 保存を止めたパスの記録を空にする。</summary>
-    internal static void ResetBlockedForTests() { lock (Blocked) Blocked.Clear(); }
+    internal static void ResetBlockedForTests() { lock (Blocked) { Blocked.Clear(); BlockWarned.Clear(); } }
 
     internal static bool IsBlocked(string path) { lock (Blocked) return Blocked.Contains(Path.GetFullPath(path)); }
 
@@ -107,9 +194,11 @@ internal static class SafeFile
         // 読み込めず退避もできなかったファイルには書かない (元のデータを空に近い内容で上書きしないため)。
         lock (Blocked)
         {
-            if (Blocked.Contains(Path.GetFullPath(path)))
+            var full = Path.GetFullPath(path);
+            if (Blocked.Contains(full))
             {
-                Diagnostics.Log.Warn($"{Path.GetFileName(path)} は退避できなかったので、保存しません (元のファイルを守るため)。");
+                // 止めてから 1 回だけ警告する (原因は、止めた側が読めなかった・退避できなかった理由として書いている)。
+                if (BlockWarned.Add(full)) Diagnostics.Log.Warn($"{Path.GetFileName(path)} は、読めなかった・退避できなかったので、保存を止めています (元のファイルを守るため)。");
                 return;
             }
         }

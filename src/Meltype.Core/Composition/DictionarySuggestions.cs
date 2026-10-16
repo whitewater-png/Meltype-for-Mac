@@ -168,13 +168,16 @@ public sealed class DictionarySuggestions
     }
 
     /// <summary>数えた回数・提案待ち・却下をすべて消す。</summary>
-    public void Clear()
+    public void Clear() => TryClear();
+
+    /// <summary>すべて消して、ファイルにも書く。ファイルに書けなかった・保存を止めているときは false (理由は ConversionHistory.TryClear と同じ)。</summary>
+    internal bool TryClear()
     {
         lock (_gate)
         {
             _data.Items.Clear();
             _hintWord = null;
-            Save();
+            return Save();
         }
     }
 
@@ -212,16 +215,19 @@ public sealed class DictionarySuggestions
     }
 
     /// <summary>一時ファイルに書いてから置き換える (書き込み中に落ちても元のファイルを壊さない。変換履歴と同じ)。</summary>
-    private void Save()
+    // 書けたら true。書けなかった・保存を止めているときは false (ほとんどの呼び出しは戻り値を使わない)。
+    private bool Save()
     {
-        if (_path is null) return;
+        if (_path is null) return true;
         try
         {
             Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_data, Config.LearningJsonContext.Default.SuggestionData));
+            return !Config.SafeFile.IsBlocked(_path);
         }
         catch (Exception ex)
         {
             Diagnostics.Log.Warn($"辞書の提案データを保存できませんでした: {ex.Message}");
+            return false;
         }
     }
 }

@@ -94,7 +94,7 @@ public sealed class CompositionDetector
     /// 同じ入力の中の日本語や、かな側の記号 (`main`・(main)・。) の後ろでは今までどおりかな。入力の先頭は、前に確定した文 (前の行) が日本語でも英語にする
     /// (前の行が日本語の TextEdit で mainnima-ji が まいんに → mine に になっていた。Q11 の実機確認)。
     /// </summary>
-    private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain" };
+    private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain", "data" };
 
     /// <summary>ローマ字 letters の読みで始まる、よく使う日本語の語・ブランド名があるか。</summary>
     private bool StartsJapaneseReading(string letters)
@@ -327,6 +327,13 @@ public sealed class CompositionDetector
             // ドメイン・拡張子の . の後ろは、ローマ字として読めても英字のままにする (tetr.io、Wakatte.TV、MeltypeTip.dll)。
             // (本家 yksr-melt/Meltype の PR #267 / issue #260・#254 と同じ変更)
             if (found < 0 && !kanaInput && level != DetectionLevel.Manual && i > 0 && units[i - 1].Raw == "." && PrecededByEnglish(i) == true) found = DotSuffixEnd(units, i, pending, final);
+            // 入力の先頭の .gitignore / .env / .exe などドットファイルは英字のままにする (本家 803719c、#34)。
+            // 途中の 3.14desu や「です。」の . には使わない (i == 0 のときだけ)。
+            if (found < 0 && !kanaInput && level != DetectionLevel.Manual && i == 0 && units[i].Raw == ".")
+            {
+                var dotfile = DotSuffixEnd(units, i + 1, pending, final);
+                if (dotfile > i + 1) found = dotfile;
+            }
             // 英文の中の記号 (, . ! ? -) は読点・句点にせず半角のまま。日本語の文の中の英単語の後 (今日はgoogle、) は日本語の記号。
             // (かな入力では 、。 も かなのキーなので対象外。改行の直後の - は前の行の英語の続きではない: --sorekara の「ーー」。A-5)
             if (found < 0 && !kanaInput && i != bracketCloser && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && !(i == 0 && afterNewline && units[i].Raw == "-") && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&
@@ -564,7 +571,10 @@ public sealed class CompositionDetector
     }
 
     /// <summary>スペルチェッカーが正しいと言う英単語か、よくある打ち間違い (teh、recieve) か。</summary>
-    private bool IsSpellWord(string lower) => SpellChecker is { } checker && (checker.IsWord(lower) || checker.AutoCorrection(lower) is not null);
+    private bool IsSpellWord(string lower) =>
+        // macOS の NSSpellChecker は 73 文字以上の未知の文字列を検査せず「誤りなし」(= 語) と返す (実測 60〜72 文字は語でない、73 文字以上は全部語)。
+        // 長いローマ字の文を 1 語の英単語とみなさない (本家 PR #709)。
+        lower.Length <= 72 && SpellChecker is { } checker && (checker.IsWord(lower) || checker.AutoCorrection(lower) is not null);
 
     /// <summary>
     /// 助詞 (de・ni・no…) で始まり、残り 3 文字以上が英単語の語 (de|vote = devote、no|vice = novice)。
@@ -959,7 +969,7 @@ public sealed class CompositionDetector
     private static readonly HashSet<string> HyphenPrefixes = ["e", "x", "re", "co", "ex", "non", "anti", "semi", "multi", "pre", "sub", "post", "mid", "self", "well"];
 
     // 接頭辞の規則では拾えない、- の入ったよく使う英単語 (後ろが 2 文字以下など)
-    private static readonly HashSet<string> HyphenatedWords = ["co-op", "re-do", "x-ray", "t-shirt", "wi-fi", "hi-fi", "lo-fi", "sci-fi", "e-book", "e-sports", "k-pop", "j-pop", "j-rock", "j-core", "p-hub", "talk-admin", "r-18", "sub-6", "gpt-6.7", "a-z", "u-turn", "check-in", "log-in", "sign-in", "add-on", "plug-in", "built-in", "follow-up", "set-up", "pop-up", "drop-down"];
+    private static readonly HashSet<string> HyphenatedWords = ["bio-break", "co-op", "re-do", "x-ray", "t-shirt", "wi-fi", "hi-fi", "lo-fi", "sci-fi", "e-book", "e-sports", "k-pop", "j-pop", "j-rock", "j-core", "p-hub", "talk-admin", "r-18", "sub-6", "gpt-6.7", "a-z", "u-turn", "check-in", "log-in", "sign-in", "add-on", "plug-in", "built-in", "follow-up", "set-up", "pop-up", "drop-down", "blu-ray"];
     // 日本語のローマ字の途中を英語の接頭辞と誤認しないよう、日本語に続けて拾うのは明示した英数字表記だけ。
     private static readonly HashSet<string> NumericHyphenatedWords = ["r-18", "sub-6", "gpt-6.7"];
 

@@ -82,7 +82,10 @@ public sealed class CompositionText
             var lower = word.ToLowerInvariant();
             var acronym = word.Any(char.IsAsciiLetterUpper) && word.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c));
             var knownUnambiguous = word.Length >= 3 && _detector.IsKnownEnglishWord(word) && !_detector.Romaji.AnalyzeFragment(lower).IsValid;
-            var properNoun = _detector.ProperNouns.Contains(lower);
+            // 小文字で打った、ローマ字として最後まで読める固有名詞 (siri-zu の siri) は、英字の語として数えない (長音のまま。本家 #656)。
+            // 長音の - の前だけ。. の前 (miro.com・canon.jp) は、今までどおり固有名詞として数える。
+            var properNoun = _detector.ProperNouns.Contains(lower) &&
+                (_units[^1].Raw == "." || char.IsAsciiLetterUpper(word[0]) || !_detector.Romaji.AnalyzeFragment(lower).IsValid);
             var loneConsonant = word.Length == 1 && char.IsAsciiLetterLower(word[0]) && word[0] is not ('a' or 'i' or 'u' or 'e' or 'o');
             if (acronym || knownUnambiguous || properNoun || _units[^1].Raw == "-" && loneConsonant)
                 _units[^1] = _units[^1] with { Kana = _units[^1].Raw };
@@ -351,7 +354,7 @@ public sealed class CompositionText
         {
             if (!_units[i].Kana.All(c => c is >= 'ぁ' and <= 'ゖ' or 'ー') || _units[i].Raw.Length == 0 || !_units[i].Raw.All(char.IsAsciiLetter)) return false;
             kana = _units[i].Kana + kana;
-            if (i <= start && kana.Length + 1 >= (i == start ? 2 : 3) && _detector.IsJapaneseWordOrPrefix(kana + "つ")) return true;
+            if (i <= start && kana.Length + 1 >= (i == start ? 2 : 3) && (_detector.IsJapaneseWordOrPrefix(kana + "つ") || TypoCorrector?.IsReadingPrefix(kana + "つ") == true)) return true;
         }
         return false;
     }
@@ -1262,6 +1265,13 @@ public sealed class CompositionText
             var segment = segments[s];
             // 英語の語.の後ろの英字 (ドメイン・拡張子: Meltype.amr、MeltypeTip.dll) も、表示のまま英字にする (amr を あめ に直していた: 本家 issue #260)
             if (segment.IsEnglish && s >= 2 && segments[s - 1] is { IsEnglish: true, Raw: "." } && segments[s - 2].IsEnglish && segments[s - 2].Raw.Any(char.IsAsciiLetter))
+            {
+                for (var i = 0; i < segment.Raw.Length; i++) mask.Add(true);
+                continue;
+            }
+            // 入力の先頭の . で始まる英字の区間 (ドットファイル: .gitignore、.zover|desu の .zover) も、表示のまま英字にする。
+            // 入れないと、確定の直前の打ち間違いの直し (FixTypos) が、読めない並び (zover|desu の rd) の r を消した (表示は .zoverです なのに確定で .zoveです)。
+            if (segment.IsEnglish && s == 0 && segment.Raw.Length >= 2 && segment.Raw[0] == '.')
             {
                 for (var i = 0; i < segment.Raw.Length; i++) mask.Add(true);
                 continue;

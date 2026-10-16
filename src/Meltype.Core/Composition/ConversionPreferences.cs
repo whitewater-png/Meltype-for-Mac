@@ -184,7 +184,8 @@ public sealed class ConversionHistory
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Warn($"変換の学習データを読めませんでした: {ex.Message}");
+            Config.SafeFile.ProtectUnreadable(path, ex);
+            Diagnostics.Log.Warn($"変換の学習データを読めませんでした: {Config.SafeFile.Describe(ex)}");
         }
     }
 
@@ -282,28 +283,36 @@ public sealed class ConversionHistory
         lock (_gate) return _entries.OrderByDescending(e => e.Value.Used).Select(e => (e.Key, e.Value.Text, e.Value.Used)).ToList();
     }
 
-    public void Clear()
+    public void Clear() => TryClear();
+
+    /// <summary>
+    /// すべて忘れて、ファイルにも書く。ファイルに書けなかった (フォルダーに書けない・保存を止めている) ときは false。
+    /// 「学習データをすべて消去」が、メモリだけ空になって中身がファイルに残るのに、成功と答えないため (Clear() は今までどおり例外を投げない)。
+    /// </summary>
+    internal bool TryClear()
     {
         lock (_gate)
         {
             _entries.Clear();
             Version++;
-            Save();
+            return Save();
         }
     }
 
-    // 呼び出し側が _gate を持っている。
-    private void Save()
+    // 呼び出し側が _gate を持っている。書けたら true。書けなかった・保存を止めているときは false (ほとんどの呼び出しは戻り値を使わない)。
+    private bool Save()
     {
-        if (_path is null) return;
+        if (_path is null) return true;
         _dirty = false;
         try
         {
             Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_entries, Config.LearningJsonContext.Default.ConversionEntries));
+            return !Config.SafeFile.IsBlocked(_path);
         }
         catch (Exception ex)
         {
             Diagnostics.Log.Warn($"変換の学習データを保存できませんでした: {ex.Message}");
+            return false;
         }
     }
 }
