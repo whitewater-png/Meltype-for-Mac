@@ -93,4 +93,23 @@ internal static class UpstreamP46Tests
             ("kyouhadeepseekwotukau", "きょうはdeepseekをつかう"), ("DeepSeek", "DeepSeek"),
             ("mozcnohensyuu", "mozcのへんしゅう"), ("kyouhamozcwotukau", "きょうはmozcをつかう"), ("Mozc", "Mozc"));
     }
+
+    [Test]
+    public static void P46_7_RareEnglishWords_StayEnglish()
+    {
+        // 本家の誤判定報告 10 件 (#683 guesstimation・#692 greedflation・#730 adtech・#731 robonomics・#733 netizenry・#689 finfluencer・
+        // #726 malvertising・#686 enshittification・#690 datamation・#725 OpenStreetMap)。稀な英単語がローマ字として読まれて崩れていた。
+        // 全体がローマ字として読めてしまう語 (datamation・enshittification) は english-readable.txt、大文字小文字を持つ名前は propernouns.txt にも足した。
+        ExpectCommitted(
+            ("guesstimation", "guesstimation"), ("guesstimationwo", "guesstimationを"), ("kyouhaguesstimation", "きょうはguesstimation"),
+            ("greedflation", "greedflation"), ("greedflationwo", "greedflationを"),
+            ("adtech", "adtech"), ("kyouhaadtech", "きょうはadtech"),
+            ("robonomics", "robonomics"), ("robonomicswo", "robonomicsを"),
+            ("netizenry", "netizenry"), ("netizenrywo", "netizenryを"),
+            ("finfluencer", "finfluencer"), ("kyouhafinfluencer", "きょうはfinfluencer"),
+            ("malvertisingwo", "malvertisingを"), ("kyouhamalvertising", "きょうはmalvertising"),
+            ("enshittification", "enshittification"), ("enshittificationwo", "enshittificationを"),
+            ("datamation", "datamation"), ("Datamation", "Datamation"), ("datamationwo", "datamationを"),
+            ("openstreetmap", "openstreetmap"), ("openstreetmapwo", "openstreetmapを"));
+    }
 }

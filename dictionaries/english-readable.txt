@@ -26,3 +26,5 @@ vitamin warehouse warren whole whose
 main domain
 # overcute: over|cute に割れるが全体は日本語の語ではない (本家 #406、P45-1)
 overcute
+# 本家 #690 (datamation)・#686 (enshittification): 全体がローマ字として読めて、english.txt だけでは日本語側が勝つ語
+datamation enshittification

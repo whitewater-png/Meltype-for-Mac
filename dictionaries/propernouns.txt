@@ -88,3 +88,5 @@ LoRA QLoRA GGUF ONNX Veo
 Cline CrewAI ComfyUI OpenRouter OpenWebUI Cerebras Civitai Unsloth
 # 開発・AI ツールの名前 (本家 #34 Xcode、#347 DeepSeek、#249 Mozc。ローマ字として読まれて崩れていた)
 Xcode DeepSeek Mozc
+# 本家 #690 (Datamation)・#725 (OpenStreetMap)
+Datamation OpenStreetMap

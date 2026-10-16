@@ -217,3 +217,5 @@ online
 website websites campsite worksite onsite offsite
 # --- 本家 #538 / PR #609 (infobesity = 情報過多。ty が残って いんふぉべしty になっていた) ---
 infobesity
+# --- 本家の誤判定報告 (#683 guesstimation、#692 greedflation、#730 adtech、#731 robonomics、#733 netizenry、#689 finfluencer、#726 malvertising、#686 enshittification) ---
+guesstimation greedflation adtech robonomics netizenry finfluencer malvertising enshittification
