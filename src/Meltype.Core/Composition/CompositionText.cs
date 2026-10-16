@@ -356,10 +356,13 @@ public sealed class CompositionText
         return false;
     }
 
-    /// <summary>単位 i が、前の かな (o・u の段) を伸ばす う (そ|u・ほんと|u) か。本家 7a20aff。</summary>
+    /// <summary>
+    /// 単位 i が、前の かな (o・u の段) を伸ばす う (そ|u・ほんと|u) か。本家 7a20aff。
+    /// 助詞の を の後ろは除く (を を伸ばす語は無いので、これを|unset|する の unset は英単語のまま)。
+    /// </summary>
     private bool IsLongVowelU(int i) =>
         i > 0 && _units[i] is { Raw: "u", Kana: "う" } && _units[i - 1] is { Kana: [.., var kana], Raw: [.., var vowel] } &&
-        kana is >= 'ぁ' and <= 'ゖ' && vowel is 'o' or 'u';
+        kana is >= 'ぁ' and <= 'ゖ' and not 'を' && vowel is 'o' or 'u';
 
     private bool EndsWithEnglishWordFromUnit(int count, string extra = "", bool tsuFollows = false)
     {

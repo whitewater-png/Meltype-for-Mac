@@ -891,6 +891,8 @@ internal static class LanguageLearningTests
             {
                 ("sounitsuite", "そうについて"), ("hontounitsukareta", "ほんとうにつかれた"), ("kaijounitsukuto", "かいじょうにつくと"),
                 ("kyouhacommitsuru", "きょうはcommitする"), ("editsuru", "editする"), ("unitsuite", "unitsuite"), ("unitsuushin", "unitすうしん"), ("unit test", "unit test"),
+                // 助詞の を の後ろの u は伸ばす音ではない (これをunsetする。査読の指摘)
+                ("korewounsetsuru", "これをunsetする"), ("sorewounitsuika", "それをunitすいか"),
             })
             {
                 var k = new CompositionTests.Keyboard();
