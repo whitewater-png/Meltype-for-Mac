@@ -46,6 +46,25 @@ internal static class SafeFile
         }
     }
 
+    /// <summary>
+    /// 読めなかった (壊れた) ファイルを「名前.broken」にコピーして残す。読めないまま空で動き、次の保存で上書きしても、元の中身は .broken に残る
+    /// (本家 #551 の考え方。LanguageMemory は保存の直前に同じことをするが、ConversionHistory・TranslationHistory は読んだ時点で残す)。
+    /// コピーは本人だけが読める権限にする。残せなくても例外にせず、ログだけ残す。
+    /// </summary>
+    internal static void KeepBroken(string path)
+    {
+        try
+        {
+            var backup = path + ".broken";
+            File.Copy(path, backup, overwrite: true);
+            Restrict(backup);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Warn($"{Path.GetFileName(path)} を .broken に残せませんでした: {ex.Message}");
+        }
+    }
+
     /// <summary>読み込めず退避もできなかったファイル (保存しない)。</summary>
     private static readonly HashSet<string> Blocked = new(StringComparer.Ordinal);
 

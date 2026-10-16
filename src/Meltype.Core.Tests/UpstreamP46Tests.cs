@@ -215,4 +215,86 @@ internal static class UpstreamP46Tests
         // 本家 #34 (05a1bb5): cyen が cyen のまま (ちぇん と読めない) だった。cye を ちぇ の綴りに足した。
         ExpectCommitted(("cyen", "ちぇん"), ("cye", "ちぇ"));
     }
+
+    [Test]
+    public static void P46_17_BrokenMemoryFiles_AreCopiedToBroken()
+    {
+        // 本家 #551: 読めなかった (壊れた) 学習データは、次の保存で上書きされる前に「名前.broken」に残す。
+        // LanguageMemory は元から保存の直前に同じことをする。ConversionHistory・TranslationHistory は読んだ時点で残す。
+        var directory = Path.Combine(Path.GetTempPath(), "meltype-p46-broken-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            const string broken = "{\"sig\":\"--\\n雪代\",";
+            var languagesPath = Path.Combine(directory, "languages.json");
+            var conversionsPath = Path.Combine(directory, "conversions.json");
+            var translationsPath = Path.Combine(directory, "translations.json");
+            foreach (var path in new[] { languagesPath, conversionsPath, translationsPath }) File.WriteAllText(path, broken);
+
+            var languages = new LanguageMemory(languagesPath);
+            var conversions = new ConversionHistory(conversionsPath);
+            var translations = new TranslationHistory(translationsPath);
+            languages.Remember("cafe", english: false, explicitChoice: true);
+            conversions.Remember("くらいど", "クラウド");
+            translations.Remember("すし", "sushi");
+
+            foreach (var path in new[] { languagesPath, conversionsPath, translationsPath })
+            {
+                var backup = path + ".broken";
+                Assert.True(File.Exists(backup), Path.GetFileName(path) + ".broken ができている");
+                Assert.Equal(broken, File.ReadAllText(backup), Path.GetFileName(path) + " の元の中身が .broken に残っている");
+                if (!OperatingSystem.IsWindows())
+                    Assert.True(File.GetUnixFileMode(backup) == (UnixFileMode.UserRead | UnixFileMode.UserWrite), Path.GetFileName(backup) + " は本人だけが読み書きできる");
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_17_ValidOrMissingFiles_DoNotCreateBroken()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "meltype-p46-valid-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var conversionsPath = Path.Combine(directory, "conversions.json");
+            var translationsPath = Path.Combine(directory, "translations.json");
+            // 無いファイル: .broken を作らない
+            _ = new ConversionHistory(conversionsPath);
+            _ = new TranslationHistory(translationsPath);
+            Assert.True(!File.Exists(conversionsPath + ".broken") && !File.Exists(translationsPath + ".broken"), "ファイルが無いだけでは .broken を作らない");
+            // 正しいファイル: 読めて、.broken を作らない
+            new ConversionHistory(conversionsPath).Remember("くらいど", "クラウド");
+            new TranslationHistory(translationsPath).Remember("すし", "sushi");
+            Assert.Equal("クラウド", new ConversionHistory(conversionsPath).Get("くらいど"), "保存した変換を読み直せる");
+            Assert.Equal(1, new TranslationHistory(translationsPath).Get("すし").Count, "保存した英訳を読み直せる");
+            Assert.True(!File.Exists(conversionsPath + ".broken") && !File.Exists(translationsPath + ".broken"), "正しいファイルでは .broken を作らない");
+            // 空の JSON ({}) も壊れていない
+            File.WriteAllText(conversionsPath, "{}");
+            _ = new ConversionHistory(conversionsPath);
+            Assert.True(!File.Exists(conversionsPath + ".broken"), "{} は壊れていない");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_17_ClearLeftovers_RemovesBrokenOfConversionsAndTranslations()
+    {
+        // 学習データを全消去したとき (入力メニュー) に、今回できる .broken も消える。
+        var directory = Path.Combine(Path.GetTempPath(), "meltype-p46-clear-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var conversionsPath = Path.Combine(directory, "conversions.json");
+            var translationsPath = Path.Combine(directory, "translations.json");
+            File.WriteAllText(conversionsPath, "{\"a\":");
+            File.WriteAllText(translationsPath, "{\"a\":");
+            _ = new ConversionHistory(conversionsPath);
+            _ = new TranslationHistory(translationsPath);
+            Assert.True(File.Exists(conversionsPath + ".broken") && File.Exists(translationsPath + ".broken"), ".broken ができている");
+            Assert.True(LearningData.ClearLeftovers([conversionsPath, translationsPath], []), "ClearLeftovers が成功する");
+            Assert.True(!File.Exists(conversionsPath + ".broken") && !File.Exists(translationsPath + ".broken"), "全消去で .broken も消える");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
 }
