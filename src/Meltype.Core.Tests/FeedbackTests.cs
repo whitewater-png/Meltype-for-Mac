@@ -1443,4 +1443,43 @@ internal static class RomajiTypoTests
             CompositionTests.Detector.SpellChecker = null;
         }
     }
+
+    /// <summary>実機の NSSpellChecker のように、日本語の音の途中から始まる短い語 (kyo|u|mo|l の umol) や、英単語の頭 (vill・viol) も英単語と答えるスペルチェッカー。</summary>
+    private sealed class MidSoundWordsChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) => lower is "umol" or "vill" or "viol" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void SpellCheckerWordFromMidSound_DoesNotKeepTheLetterL()
+    {
+        // スペルチェッカー起因の実機だけの外れ (2026-10-16、H1 の一部): kyoumolike が きょumolいけ。l を小書き (ぃ) にしない守り
+        // (EndsWithEnglishWordFromUnit) が、英字の並びの途中の単位から始まる umol をスペルチェッカーに聞き、l を英字に残していた。
+        // 英字の並びの途中にある母音 1 つの単位 (kyo|u) から始まる語は、同梱の一覧だけで見る。
+        CompositionTests.Detector.SpellChecker = new MidSoundWordsChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("kyoumolike", "きょうもlike"), ("doumolist", "どうもlist"), ("kinoumolast", "きのうもlast"), ("kyoumolink", "きょうもlink"),
+                ("kyoumolife", "きょうもlife"),
+                // 今までどおり: 子音で始まる単位 (vi) からの語 (vill・viol) は、スペルチェッカーでも見る (villa・viola を ゔぃっぁ にしない)
+                ("kyouhavilla", "きょうはvilla"), ("konoviola", "このviola"), ("doumovilla", "どうもvilla"),
+                // 今までどおり: 母音 1 つの単位からの語でも、同梱の一覧の語 (idol) なら l を英字に残す
+                ("kyouidol", "きょうidol"),
+                // 今までどおり: 記号の後ろ (英字の並びの頭) から始まる語は、スペルチェッカーでも見る (変更前と同じ答え)
+                ("kyou,umolike", "きょう、umolいけ"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
 }

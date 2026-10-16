@@ -366,7 +366,13 @@ public sealed class CompositionText
             if (i > 0 && char.IsAsciiLetterUpper(_units[i].Raw[0]) && _units[i - 1].Raw is [.., var before] && char.IsAsciiLetterUpper(before)) continue;
             // 続けて打った s と合わせた つ まで読むと日本語の語 (shitsumon の shit) なら、英単語として見ない (本家 35beb60、P45-11)
             if (tsuFollows && ReadsAsJapaneseWithTsu(i, count, extra)) continue;
-            if (letters.Length >= 4 && _detector.IsKnownEnglishWord(letters)) return true;
+            // 英字の並びの途中にある母音 1 つの単位 (kyo|u、sense|i) から始まる語は、同梱の一覧の語 (IsBundledEnglishWord) のときだけ見る。
+            // 実機の NSSpellChecker は、日本語の音の途中から始まる短い語 (kyo|u|mo|l の umol) も英単語と答えるので、きょうも + like の
+            // l を英字に残し、kyoumolike が きょumolいけ になっていた。変更前の条件に AND を 1 つ足しただけなので、l・x・t を英字に
+            // 残すのは変更前に残していた場合の一部だけ。母音 1 つの単位に限るのは、子音で始まる単位 (kyouha|vi|ll の vill) からの語は
+            // 英単語の頭のことが多く、同梱の一覧だけで見ると villa・viola が ゔぃっぁ になったため。
+            var fromLoneVowel = i > 0 && IsLetters(_units[i - 1].Raw) && _units[i].Raw is [var vowel] && "aiueoAIUEO".Contains(vowel);
+            if (letters.Length >= 4 && _detector.IsKnownEnglishWord(letters) && (!fromLoneVowel || _detector.IsBundledEnglishWord(letters.ToLowerInvariant()))) return true;
         }
         return false;
     }
