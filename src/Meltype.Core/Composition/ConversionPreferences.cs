@@ -184,8 +184,8 @@ public sealed class ConversionHistory
         }
         catch (Exception ex)
         {
-            Config.SafeFile.KeepBroken(path);
-            Diagnostics.Log.Warn($"変換の学習データを読めませんでした: {ex.Message}");
+            Config.SafeFile.ProtectUnreadable(path, ex);
+            Diagnostics.Log.Warn($"変換の学習データを読めませんでした: {Config.SafeFile.Describe(ex)}");
         }
     }
 

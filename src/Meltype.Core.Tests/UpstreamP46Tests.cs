@@ -493,4 +493,174 @@ internal static class UpstreamP46Tests
         // - の前は直ったまま
         ExpectCommitted(("siri-zu", "しりーず"));
     }
+
+    private static string TempDir(string tag)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "meltype-p46-" + tag + "-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    [Test]
+    public static void P46_26_BrokenCannotBeKept_OriginalIsNotOverwritten()
+    {
+        // 壊れたファイルを .broken に残せないとき (.broken の場所がフォルダーなど) は、次の保存で元のファイルを上書きしない
+        // (LanguageMemory・.oversize と同じ。残せないまま上書きすると、元の中身がどこにも残らない)。
+        var directory = TempDir("keep-fail");
+        try
+        {
+            const string corrupt = "{\"corrupt-but-recoverable\":";
+            var conversionsPath = Path.Combine(directory, "conversions.json");
+            var translationsPath = Path.Combine(directory, "translations.json");
+            foreach (var path in new[] { conversionsPath, translationsPath })
+            {
+                File.WriteAllText(path, corrupt);
+                Directory.CreateDirectory(path + ".broken");
+            }
+            new ConversionHistory(conversionsPath).Remember("くらいど", "クラウド");
+            new TranslationHistory(translationsPath).Remember("すし", "sushi");
+            Assert.Equal(corrupt, File.ReadAllText(conversionsPath), "conversions.json は上書きされない");
+            Assert.Equal(corrupt, File.ReadAllText(translationsPath), "translations.json は上書きされない");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_26_UnreadableFile_IsNotOverwritten()
+    {
+        // 壊れているのではなく、読めなかっただけのファイル (権限・所有者違い。sudo で作られた学習データなど) は、.broken にも残せない。
+        // 新しい 1 件のファイルで置き換えると、読めなかった中身が消えるので、置き換えない。
+        if (OperatingSystem.IsWindows() || Environment.UserName == "root") return; // 権限で読めなくできる環境だけ
+        var directory = TempDir("unreadable");
+        try
+        {
+            const string original = "{\"ひみつ\":{\"Text\":\"秘密\"}}";
+            var conversionsPath = Path.Combine(directory, "conversions.json");
+            var translationsPath = Path.Combine(directory, "translations.json");
+            foreach (var path in new[] { conversionsPath, translationsPath })
+            {
+                File.WriteAllText(path, original);
+                File.SetUnixFileMode(path, UnixFileMode.None);
+            }
+            try
+            {
+                new ConversionHistory(conversionsPath).Remember("くらいど", "クラウド");
+                new TranslationHistory(translationsPath).Remember("すし", "sushi");
+            }
+            finally
+            {
+                foreach (var path in new[] { conversionsPath, translationsPath }) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+            foreach (var path in new[] { conversionsPath, translationsPath })
+            {
+                Assert.Equal(original, File.ReadAllText(path), Path.GetFileName(path) + " は上書きされない");
+                Assert.True(!File.Exists(path + ".broken"), "読めなかっただけなので .broken は作らない");
+            }
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_26_BrokenIsSymlink_TargetIsNotTouched()
+    {
+        // .broken がリンクのとき、コピーがリンク先まで上書きして権限を 0600 にしていた。一時ファイルに書いて置き換えるので、リンクそのものが置き換わる。
+        if (OperatingSystem.IsWindows()) return;
+        var directory = TempDir("symlink");
+        try
+        {
+            const string corrupt = "{\"corrupt\":";
+            const UnixFileMode loose = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
+            var path = Path.Combine(directory, "conversions.json");
+            var victim = Path.Combine(directory, "victim.txt");
+            File.WriteAllText(victim, "VICTIM-ORIGINAL");
+            File.SetUnixFileMode(victim, loose);
+            File.CreateSymbolicLink(path + ".broken", victim);
+            File.WriteAllText(path, corrupt);
+            _ = new ConversionHistory(path);
+            Assert.Equal("VICTIM-ORIGINAL", File.ReadAllText(victim), "リンク先は書き換えない");
+            Assert.True(File.GetUnixFileMode(victim) == loose, "リンク先の権限も変えない");
+            Assert.Equal(corrupt, File.ReadAllText(path + ".broken"), ".broken に壊れた中身が残る");
+            Assert.True(new FileInfo(path + ".broken").LinkTarget is null, ".broken はリンクではなく普通のファイルになる");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_26_EmptyFile_DoesNotReplaceBroken()
+    {
+        // 中身のない (0 バイト・空白だけの) ファイルには残すものがない。前に残した .broken を空で潰さない。
+        var directory = TempDir("empty");
+        try
+        {
+            var path = Path.Combine(directory, "conversions.json");
+            File.WriteAllText(path + ".broken", "FIRST-CORRUPT");
+            foreach (var empty in new[] { "", "   \n" })
+            {
+                File.WriteAllText(path, empty);
+                _ = new ConversionHistory(path);
+                Assert.Equal("FIRST-CORRUPT", File.ReadAllText(path + ".broken"), "中身が " + empty.Length + " 文字のファイルで .broken を潰さない");
+            }
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_26_ExistingLooseBroken_IsRestrictedAndUpdated()
+    {
+        // 前の版が 0644 で作った .broken があっても、残し直したあとは本人だけが読み書きできる (0600) になる。
+        if (OperatingSystem.IsWindows()) return;
+        var directory = TempDir("loose");
+        try
+        {
+            const string corrupt = "{\"corrupt\":";
+            var path = Path.Combine(directory, "conversions.json");
+            File.WriteAllText(path + ".broken", "OLD");
+            File.SetUnixFileMode(path + ".broken", UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+            File.WriteAllText(path, corrupt);
+            _ = new ConversionHistory(path);
+            Assert.Equal(corrupt, File.ReadAllText(path + ".broken"), ".broken が新しい中身になる");
+            Assert.True(File.GetUnixFileMode(path + ".broken") == (UnixFileMode.UserRead | UnixFileMode.UserWrite), ".broken は本人だけが読み書きできる");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_26_CorruptAgain_ReplacesBroken_KnownLimit()
+    {
+        // 既知の限界 (KNOWN_LIMITS): 壊れたまま、もう一度壊れると、.broken は新しい方で置き換わる (最初に壊れたコピーは残らない)。
+        var directory = TempDir("again");
+        try
+        {
+            var path = Path.Combine(directory, "conversions.json");
+            File.WriteAllText(path, "{\"first\":");
+            _ = new ConversionHistory(path);
+            Assert.Equal("{\"first\":", File.ReadAllText(path + ".broken"), "1 回目の壊れた中身");
+            File.WriteAllText(path, "{\"second\":");
+            _ = new ConversionHistory(path);
+            Assert.Equal("{\"second\":", File.ReadAllText(path + ".broken"), "2 回目の壊れた中身で置き換わる");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_26_WarnLog_DoesNotContainTypedReading()
+    {
+        // 壊れた学習データを読めなかったときの警告に、打った読み (JSON のキー) を入れない。JsonException.Message は
+        // "Path: $.打った読み.Used" のようにキーを含むので、「ログに入力した文字を残す」が OFF でも漏れていた。
+        var directory = TempDir("log");
+        try
+        {
+            var secret = "ひみつ" + Guid.NewGuid().ToString("N");
+            var conversionsPath = Path.Combine(directory, "conversions.json");
+            var translationsPath = Path.Combine(directory, "translations.json");
+            File.WriteAllText(conversionsPath, "{\"" + secret + "\":{\"Text\":\"秘密\",\"Used\":\"not-a-date\"}}");
+            File.WriteAllText(translationsPath, "{\"" + secret + "\":{\"sushi\":\"not-a-number\"}}");
+            _ = new ConversionHistory(conversionsPath);
+            _ = new TranslationHistory(translationsPath);
+            var logged = string.Join("\n", Diagnostics.Log.Snapshot().Select(e => e.Message));
+            Assert.True(logged.Contains("変換の学習データを読めませんでした") && logged.Contains("英訳の学習データを読めませんでした"), "警告は出る");
+            Assert.True(!logged.Contains(secret), "打った読みをログに残さない");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
 }
