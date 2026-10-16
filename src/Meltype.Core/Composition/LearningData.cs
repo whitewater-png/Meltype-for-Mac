@@ -82,19 +82,25 @@ public static class LearningData
     /// 既定の保存場所 (<see cref="AppPaths"/>) の学習データをすべて消す。入力欄のセッションがなくても呼べる
     /// (共有インスタンスはパスごとにプロセス内で 1 つなので、ここで取り直しても同じものが消える)。成功したら true。
     /// </summary>
-    public static bool ClearAll()
+    public static bool ClearAll() => ClearAllAt(
+        AppPaths.ModelFile, AppPaths.ConversionHistoryFile, AppPaths.DictionarySuggestionFile, AppPaths.TranslationHistoryFile, AppPaths.LanguageMemoryFile,
+        [AppPaths.LogFile, AppPaths.CrashLogFile, AppPaths.TraceLogFile]);
+
+    /// <summary>
+    /// ClearAll() の本体。保存場所を引数で受け取る (AppPaths の値はプロセスの起動時に決まるので、公開の ClearAll() をテストから呼ぶと本物の学習データを消してしまう。
+    /// 公開の入口は AppPaths の値を渡すだけにした)。学習データの 5 ファイルの一覧 (止めたものを削除して止めた状態を解く対象) は、ここで作る。
+    /// </summary>
+    internal static bool ClearAllAt(string modelFile, string conversionsFile, string suggestionsFile, string translationsFile, string languagesFile, IEnumerable<string> logFiles)
     {
-        string[] learningFiles = [AppPaths.ModelFile, AppPaths.ConversionHistoryFile, AppPaths.DictionarySuggestionFile, AppPaths.TranslationHistoryFile, AppPaths.LanguageMemoryFile];
+        string[] learningFiles = [modelFile, conversionsFile, suggestionsFile, translationsFile, languagesFile];
         var ok = ClearAll(
-            ConversionHistory.Shared(AppPaths.ConversionHistoryFile),
-            DictionarySuggestions.Shared(AppPaths.DictionarySuggestionFile),
-            LanguageMemory.Shared(AppPaths.LanguageMemoryFile),
-            TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
-            AppPaths.ModelFile,
+            ConversionHistory.Shared(conversionsFile),
+            DictionarySuggestions.Shared(suggestionsFile),
+            LanguageMemory.Shared(languagesFile),
+            TranslationHistory.Shared(translationsFile),
+            modelFile,
             learningFiles);
-        var leftoversCleared = ClearLeftovers(
-            learningFiles,
-            [AppPaths.LogFile, AppPaths.CrashLogFile, AppPaths.TraceLogFile]);
+        var leftoversCleared = ClearLeftovers(learningFiles, logFiles);
         return ok && leftoversCleared;
     }
 
