@@ -1,6 +1,6 @@
 # Zenzai 実験の結果 (2026-10-14、施策 1-1 段階 1〜3)
 
-設計: `docs/ZENZAI_DESIGN_1-1.md`。コード: ブランチ `exp/zenzai-1-1` (製品には入れない。`mac/Sources/MeltypeIME/ZenzaiEval.swift`、`mac/eval/kanji-cases.tsv` 212 文、`mac/eval/zenzai-analyze.py`)。計測機: M4 Max、macOS 26.6.2、CPU 版 (trait `ZenzaiCPU`)、重み zenz-v3.1-small Q5_K_M (73.9 MB)。査読: Opus (R39、計測コードと結果を敵対的に査読し、精度・メモリは信頼できる、速さは製品経路で測り直すこと → 段階 3 で測り直した)。
+設計: `docs/ZENZAI_DESIGN_1-1.md`。コード: ブランチ `exp/zenzai-1-1` (コミット `8104903`。手元のみで公開していない。製品には入れない。`mac/Sources/MeltypeIME/ZenzaiEval.swift`、`mac/eval/kanji-cases.tsv` 212 文、`mac/eval/zenzai-analyze.py`)。[追記 2026-10-16: 正解表は main では `eval/kanji/kanji-cases.tsv` にある (`4301bca` で入った。実験ブランチの `mac/eval/kanji-cases.tsv` と中身は同じ)。`ZenzaiEval.swift`・`zenzai-analyze.py` は main には無く、実験ブランチにだけある]計測機: M4 Max、macOS 26.6.2、CPU 版 (trait `ZenzaiCPU`)、重み zenz-v3.1-small Q5_K_M (73.9 MB)。査読: Opus (R39、計測コードと結果を敵対的に査読し、精度・メモリは信頼できる、速さは製品経路で測り直すこと → 段階 3 で測り直した)。
 
 ## 結論 (go の目安との比較)
 
