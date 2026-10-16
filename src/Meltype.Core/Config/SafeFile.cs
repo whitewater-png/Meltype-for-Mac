@@ -67,7 +67,7 @@ internal static class SafeFile
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Warn($"{Path.GetFileName(path)} を .broken に残せませんでした: {ex.GetType().Name}");
+            Diagnostics.Log.Warn($"{Path.GetFileName(path)} を .broken に残せませんでした: {Describe(ex)}");
             return false;
         }
     }
@@ -127,6 +127,14 @@ internal static class SafeFile
 
     /// <summary>「保存を止めています」の警告を出した、止めているパス (保存のたびに出すと、ログの上限の 1000 件が埋まるので、止めてから 1 回だけ出す)。</summary>
     private static readonly HashSet<string> BlockWarned = new(StringComparer.Ordinal);
+
+    /// <summary>保存を止めているパスの警告を、止めてから 1 回だけ出す (保存のたびに出すと、ログの上限の 1000 件が埋まる)。止め直したら、また 1 回出る。</summary>
+    internal static void WarnBlockedOnce(string path, string message)
+    {
+        bool first;
+        lock (Blocked) first = BlockWarned.Add(Path.GetFullPath(path));
+        if (first) Diagnostics.Log.Warn(message);
+    }
 
     /// <summary>テスト用: 退避を必ず失敗させる。</summary>
     internal static bool FailBackupForTests { get; set; }

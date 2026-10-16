@@ -342,7 +342,9 @@ public sealed class LanguageMemory
                 return (null, true);
             }) is { } failure)
         {
-            Diagnostics.Log.Warn($"英語 / 日本語の学習を保存できなかったので、今回の学習は取り消しました: {failure}");
+            // 保存を止めているときは、止めた警告 (Save が止めてから 1 回だけ出す) が原因を言っているので、ここでは出さない (保存のたびに出すと、ログの上限の 1000 件が埋まる)。
+            if (_path is null || !SafeFile.IsBlocked(_path))
+                Diagnostics.Log.Warn($"英語 / 日本語の学習を保存できなかったので、今回の学習は取り消しました: {failure}");
             return null;
         }
         return new RememberUndo(word, previous);
@@ -530,7 +532,7 @@ public sealed class LanguageMemory
         {
             if (SafeFile.IsBlocked(_path))
             {
-                Diagnostics.Log.Warn("大きすぎる英語 / 日本語の学習データを退避できなかったので、保存しません (元のファイルを守るため)。");
+                SafeFile.WarnBlockedOnce(_path, $"{Path.GetFileName(_path)} は、大きすぎて退避できなかったので、保存しません (元のファイルを守るため)。");
                 return "学習データのファイルが大きすぎて退避もできなかったので、保存しませんでした (元のファイルを守るため)。";
             }
             if (_brokenOnDisk && File.Exists(_path))

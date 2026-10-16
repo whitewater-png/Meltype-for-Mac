@@ -1051,4 +1051,51 @@ internal static class UpstreamP46Tests
         }
         finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
     }
+
+    [Test]
+    public static void P46_39_KeepBrokenFailure_WarningShowsHResult()
+    {
+        // .broken に残せなかったときの警告は、例外の種類しか出さず、P46-31 で足した HResult (共有違反か権限かの切り分け) が出なかった。
+        var directory = TempDir("keep-broken-fail");
+        try
+        {
+            var name = "kb-" + Guid.NewGuid().ToString("N") + ".json";
+            var path = Path.Combine(directory, name);
+            File.WriteAllText(path, "{\"corrupt\":");
+            Directory.CreateDirectory(path + ".broken");   // 残し先がフォルダーなので、置き換えられない
+            Assert.True(!SafeFile.KeepBroken(path), "残せなければ false");
+            var warning = string.Join("\n", Diagnostics.Log.Snapshot().Select(e => e.Message).Where(m => m.Contains(name)));
+            Assert.True(warning.Contains("を .broken に残せませんでした") && warning.Contains("(0x"), "種類と HResult が出る: " + warning);
+            Assert.True(!warning.Contains(directory), "パスは出さない: " + warning);
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_39_LanguageMemory_BlockedPath_WarnsOnce()
+    {
+        // languages.json は、大きすぎて退避もできなかったときだけ保存を止める。そのあいだの警告も、P46-32 と同じく止めてから 1 回だけにする
+        // (保存のたびに出すと、ログの上限 1000 件が埋まって、止めた原因の行が押し出される)。出した警告の数は、ログの版 (書いた行数) から数える。
+        var directory = TempDir("language-warn-once");
+        try
+        {
+            var path = Path.Combine(directory, "languages.json");
+            var memory = new LanguageMemory(path);
+            SafeFile.Block(path);
+            int Warnings(Action action)
+            {
+                var before = Diagnostics.Log.Version;
+                action();
+                var written = (int)(Diagnostics.Log.Version - before);
+                return Diagnostics.Log.Snapshot().TakeLast(written).Count(e => e.Level == Diagnostics.LogLevel.Warn);
+            }
+            Assert.Equal(1, Warnings(() => { for (var i = 0; i < 20; i++) memory.Remember("word" + (char)('a' + i), english: true); }),
+                "20 回の保存で、警告は 1 回だけ (止めた警告。保存できなかったので取り消した、という警告は、止めているあいだは出さない)");
+            SafeFile.Unblock(path);
+            SafeFile.Block(path);
+            Assert.Equal(1, Warnings(() => memory.Remember("again", english: true)), "止め直したら、また 1 回出る");
+            Assert.True(!File.Exists(path), "止めているので書かない");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
 }
