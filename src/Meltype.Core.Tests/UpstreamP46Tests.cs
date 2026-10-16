@@ -57,4 +57,17 @@ internal static class UpstreamP46Tests
         // 守り: 日本語の長音 (e-to・su-pa-・o-bun・bio-ka) は今までどおりかな。
         ExpectCommitted(("e-to", "えーと"), ("su-pa-", "すーぱー"), ("o-bun", "おーぶん"), ("bio-ka", "びおーか"));
     }
+
+    [Test]
+    public static void P46_3_Ime_IsOfferedForIme()
+    {
+        // 本家 #534: 「いめ」(ime) で IME を候補に出す (dictionaries/brands.txt)。
+        foreach (var (keys, expected) in new[] { ("ime ", "IME"), ("imede ", "IMEで") })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(keys);
+            var candidates = k.Host.View?.Candidates ?? [];
+            Assert.True(candidates.Contains(expected), keys + ": " + string.Join(" | ", candidates));
+        }
+    }
 }
