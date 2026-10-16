@@ -70,4 +70,11 @@ internal static class UpstreamP46Tests
             Assert.True(candidates.Contains(expected), keys + ": " + string.Join(" | ", candidates));
         }
     }
+
+    [Test]
+    public static void P46_4_VibeCoding_StaysEnglish()
+    {
+        // 本家 #412: vibecoding (vibe coding) が ゔぃべcoding になっていた。coding と vibe を英語の一覧に足した。
+        ExpectCommitted(("vibecoding", "vibecoding"), ("vibecodingwo", "vibecodingを"));
+    }
 }
