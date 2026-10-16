@@ -479,4 +479,18 @@ internal static class UpstreamP46Tests
             Assert.Equal(0, converter.Calls, typed + ": 変換エンジンを呼ばない");
         }
     }
+
+    [Test]
+    public static void P46_25_LowercaseProperNoun_BeforeDot_KeepsHalfWidthDot()
+    {
+        // P46-13 の見落とし: 小文字で打った固有名詞を英字の語に数えない変更が . の前まで及び、miro.com・canon.jp の . が 。 になった。
+        // 長音の - の前だけにとどめる (. の前は今までどおり半角の . のまま)。
+        foreach (var typed in new[] { "miro.com", "jira.com", "node.com", "deno.com", "canon.jp", "siri.com" })
+        {
+            var result = Committed(Detection.BuiltInWordChecker.Shared, typed);
+            Assert.True(!result.Contains('。'), typed + ": . が 。 にならない: " + result);
+        }
+        // - の前は直ったまま
+        ExpectCommitted(("siri-zu", "しりーず"));
+    }
 }
