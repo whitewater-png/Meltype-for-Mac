@@ -28,3 +28,5 @@ main domain
 overcute
 # 本家 #690 (datamation)・#686 (enshittification): 全体がローマ字として読めて、english.txt だけでは日本語側が勝つ語
 datamation enshittification
+# 本家 #712: japanese が ジャパねせ になっていた (english.txt にはあるが、全体がローマ字として読めるので日本語側が勝っていた)
+japanese

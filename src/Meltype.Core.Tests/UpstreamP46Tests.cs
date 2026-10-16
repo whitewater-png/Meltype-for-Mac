@@ -125,4 +125,11 @@ internal static class UpstreamP46Tests
             Assert.True(candidates.Contains("安青錦"), keys + ": " + string.Join(" | ", candidates));
         }
     }
+
+    [Test]
+    public static void P46_9_Japanese_StaysEnglish()
+    {
+        // 本家 #712: japanese が じゃぱねせ になっていた (english.txt には元からあるが、全体がローマ字として読めるので日本語側が勝っていた)。
+        ExpectCommitted(("japanese", "japanese"), ("japanesewo", "japaneseを"), ("kyouhajapanese", "きょうはjapanese"), ("Japanese", "Japanese"));
+    }
 }
