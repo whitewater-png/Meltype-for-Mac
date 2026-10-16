@@ -335,4 +335,48 @@ internal static class UpstreamP46Tests
             CompositionTests.Detector.SpellChecker = null;
         }
     }
+
+    /// <summary>な～～～ を 名～～～ に、らーめん を ラーメン にする変換エンジン (本家 #505 の報告と同じ)。呼ばれた回数を数える。</summary>
+    private sealed class CountingLiveConverter : IKanjiConverter
+    {
+        public int Calls;
+
+        private static string? Map(string hiragana) => hiragana switch { "な～～～" => "名～～～", "らーめん" => "ラーメン", _ => null };
+
+        public string? Convert(string hiragana)
+        {
+            Calls++;
+            return Map(hiragana);
+        }
+
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null)
+        {
+            Calls++;
+            var mapped = Map(hiragana);
+            return mapped is null ? null : [new(hiragana, mapped)];
+        }
+    }
+
+    [Test]
+    public static void P46_19_LiveConversion_DoesNotConvertTildesOnly()
+    {
+        // 本家 #505 (PR #632): ライブ変換が ON のとき、な～～～ は かな 1 文字 + 記号 3 つで 4 文字に届き、変換エンジンに渡って 名～～～ になっていた。
+        // かなの文字数 (ー を含む) で数える。らーめん のような長音を含む語は今までどおり変換する。
+        foreach (var typed in new[] { "na~~~", "sou~~", "sa!!!", "yada~~" })
+        {
+            var converter = new CountingLiveConverter();
+            var k = new CompositionTests.Keyboard(live: true, converter: converter);
+            k.Type(typed + "\n");
+            Assert.Equal(0, converter.Calls, typed + ": 変換エンジンを呼ばない");
+        }
+        var nakama = new CountingLiveConverter();
+        var k2 = new CompositionTests.Keyboard(live: true, converter: nakama);
+        k2.Type("na~~~\n");
+        Assert.Equal("な～～～", k2.Host.Document, "na~~~");
+        var ramen = new CountingLiveConverter();
+        var k3 = new CompositionTests.Keyboard(live: true, converter: ramen);
+        k3.Type("ra-men\n");
+        Assert.Equal("ラーメン", k3.Host.Document, "ra-men は今までどおり変換する");
+        Assert.True(ramen.Calls > 0, "ra-men は変換エンジンを呼ぶ");
+    }
 }

@@ -2313,13 +2313,23 @@ public sealed class CompositionController
         return converted;
     }
 
+    /// <summary>かなの文字数 (ひらがな・カタカナ・ー)。ライブ変換を始める長さの判定用。記号 (～ ! ? .) は数えない。</summary>
+    private static int KanaLengthForLiveConversion(string text)
+    {
+        var n = 0;
+        foreach (var c in text)
+            if (c is >= 'ぁ' and <= 'ゖ' or >= 'ァ' and <= 'ヶ' or 'ー') n++;
+        return n;
+    }
+
     /// <summary>
     /// ライブ変換: Space を押したときと同じく、文脈・手がかり辞書・学習を使って文節ごとに変換した結果を見せる。
     /// 打つたびに呼ばれるので、かな・文脈・学習・ユーザー辞書の状態が同じならキャッシュを使う。
     /// </summary>
     private string LiveConvert(string kana)
     {
-        if (kana.Length < LiveConversionMinLength) return kana;
+        // な～～～ など、記号だけで文字数が 4 に達しても漢字にしない (本家 PR #632 / #505)。ー は数える (らーめん を止めない)。
+        if (KanaLengthForLiveConversion(kana) < LiveConversionMinLength) return kana;
         DropCachesIfLearned();
         var key = string.Join("\u0001", kana, PrecedingForConversion, _followingText, _options.History?.Version, _options.UserDictionary?.Version);
         if (_liveCache.TryGetValue(key, out var cached)) return cached;
