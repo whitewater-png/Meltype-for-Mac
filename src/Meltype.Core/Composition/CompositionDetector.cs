@@ -370,13 +370,21 @@ public sealed class CompositionDetector
             {
                 // 後ろに日本語が続いてもよい (motte|school|he → mottes を取ると chool が ちょおl になる。持って + school + へ)。
                 var foundLength = Raw(units, i, found).Length;
+                // ただし、見つけた区間が同梱の一覧の語 (over・email・candidate) で、長い語が「見つけた区間の後ろの部分 + 助詞 1 つ」
+                // (o|ver + de、e|mail + to、ca|ndidate + de) で同梱の一覧に無い語なら、それでは捨てない。実機の NSSpellChecker は
+                // そういう断片 (verde・mailto・ndidatede・thermo・steno) も英単語と答えるので、overdesu が英字のまま、emailto が えmailto、
+                // candidatedesu が かndidatedeす になっていた。捨てる条件に AND を 1 つ足しただけなので、捨てるのは変更前に捨てていた
+                // 場合の一部だけ。助詞 1 つに限るのは、長い語が後ろの英字まで続く場合 (hi|ring + tone の ringtone、de|al + pine の alpine)
+                // は、長い語のほうが打ちたい語のことが多いため (前後比較で、助詞 1 つに限らないと よく使う語 で外れが出た)。
+                var foundListed = IsBundledEnglishWord(Raw(units, i, found).ToLowerInvariant());
                 for (var k = i + 1; k < found && found >= 0; k++)
                 {
                     for (var e = ReferenceMode ? n : table.LastLetterEnd(k); e > found; e--)
                     {
                         if (table.Length(k, e, pending) < foundLength || !ReferenceMode && table.Length(k, e, pending) > lengthLimit) continue;
                         var word = table.Raw(k, e) + (e == n ? pending : "");
-                        if (word.Length >= foundLength && IsLongEnglishWord(word))
+                        if (word.Length >= foundLength && IsLongEnglishWord(word) &&
+                            !(foundListed && !IsBundledEnglishWord(word.ToLowerInvariant()) && IsParticle(word[Raw(units, k, found).Length..])))
                         {
                             found = -1;
                             break;
@@ -586,6 +594,13 @@ public sealed class CompositionDetector
     /// <summary>同梱の英単語の辞書・固有名詞にある語か、ユーザーが英字に直して覚えた語か (ok、github)。スペルチェッカーは使わない。</summary>
     public bool IsListedEnglishWord(string lower) =>
         lower.Length >= 2 && (Memory?.Get(lower) ?? (_english.Words.ContainsWord(lower) || _proper.Contains(lower)));
+
+    /// <summary>
+    /// 同梱の一覧にある英単語か (IsListedEnglishWord か、4 文字以上なら english-words.txt = BuiltInWordChecker)。スペルチェッカーは使わない。
+    /// 語の途中から始まる断片 (verde・umol) は実機の NSSpellChecker が英単語と答えるので、それを根拠にする規則の守りに使う。
+    /// </summary>
+    internal bool IsBundledEnglishWord(string lower) =>
+        IsListedEnglishWord(lower) || (lower.Length >= 4 && Detection.BuiltInWordChecker.Shared.IsWord(lower));
 
     /// <summary>
     /// 知っている英単語か (同梱の辞書・固有名詞・ユーザーが英字に直して覚えた語・4 文字以上ならスペルチェッカー)。
@@ -1392,6 +1407,9 @@ public sealed class CompositionDetector
         if (suffix == "t") return stem.Length >= 2 && stem[^1] == 'n';
         return stem == "i" || _english.Words.ContainsWord(stem) || _proper.Contains(stem);
     }
+
+    /// <summary>ちょうど助詞 1 つ (de・mo・to・no …、DictionaryDetector.StartsWithParticle の表) か。</summary>
+    private static bool IsParticle(string raw) => Detection.DictionaryDetector.StartsWithParticle(raw) is { } particle && particle.Length == raw.Length;
 
     /// <summary>ローマ字として読めない、5 文字以上の英単語 (alcoholic, pressure)。</summary>
     private bool IsLongEnglishWord(string raw)

@@ -1397,4 +1397,50 @@ internal static class RomajiTypoTests
             CompositionTests.Detector.SpellChecker = null;
         }
     }
+
+    /// <summary>
+    /// 実機の NSSpellChecker のように、語の途中から始まって後ろの日本語にはみ出す断片 (verde・thermo・mailto・ndidatede・steno・lotto)
+    /// も英単語と答えるスペルチェッカー。同梱の一覧 (BuiltIn) に無いよく使う語 (ringtone・alpine) も答える。
+    /// </summary>
+    private sealed class TailFragmentsAreWordsChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) =>
+            lower is "verde" or "thermo" or "mailto" or "ndidatede" or "steno" or "lotto" or "ringtone" or "alpine" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void SpellCheckerFragmentAfterListedWord_DoesNotDropTheListedWord()
+    {
+        // スペルチェッカー起因の実機だけの外れ (2026-10-16、T1): overdesu が英字のまま、emailto が えmailto、candidatedesu が かndidatedeす。
+        // 見つけた英語の区間 (over) の途中から始まって後ろの日本語にはみ出す長い語 (o|verde|su) を NSSpellChecker が英単語と答え、
+        // 見つけた区間を捨てていた。見つけた区間が同梱の一覧の語で、長い語が「区間の後ろの部分 + 助詞 1 つ」で同梱の一覧に無い語なら、それでは捨てない。
+        CompositionTests.Detector.SpellChecker = new TailFragmentsAreWordsChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("overdesu", "overです"), ("kyouhaoverdesu", "きょうはoverです"), ("neverde", "neverで"), ("riverdesu", "riverです"),
+                ("othermo", "otherも"), ("mothermo", "motherも"), ("emailto", "emailと"), ("candidatedesu", "candidateです"),
+                ("wasteno", "wasteの"), ("pilotto", "pilotと"),
+                // 今までどおり: 長い語が同梱の一覧の語なら、見つけた区間 (teal) を捨てて長い語 (alcoholic) を取る
+                ("sometealcoholic", "そめてalcoholic"),
+                // 今までどおり: 長い語が助詞 1 つより後ろの英字まで続くなら、同梱の一覧に無い語でも長い語を取る (hiring ではなく ringtone)
+                ("hiringtone", "ひringtone"), ("kyouharingtone", "きょうはringtone"), ("dealpine", "でalpine"),
+                // 今までどおり: 長い語が同梱の一覧の語 (until|de の tilde、ultra|de の trade) なら捨てる (変更前と同じ答え。どちらも外れ)
+                ("untilde", "うんtilde"), ("kyouhaultrade", "きょうはうltrade"),
+                // 今までどおり: 見つけた区間 (zover) が同梱の一覧の語でないなら、断片 (verde) でも捨てる
+                ("zoverde", "zoverde"), ("zoverdesu", "ぞゔぇです"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
 }
