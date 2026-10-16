@@ -85,7 +85,13 @@ public static class LearningData
     /// </summary>
     public static bool ClearAll() => ClearAllAt(
         AppPaths.ModelFile, AppPaths.ConversionHistoryFile, AppPaths.DictionarySuggestionFile, AppPaths.TranslationHistoryFile, AppPaths.LanguageMemoryFile,
-        [AppPaths.LogFile, AppPaths.CrashLogFile, AppPaths.TraceLogFile]);
+        DefaultLogFiles);
+
+    /// <summary>
+    /// 全消去で消すログ。ダイアログが約束する 3 つ (meltype.log・crash.log・原因調査用の imk-trace.log)。回転して残った古い分 (.old) は ClearLeftovers が一緒に消す。
+    /// 公開の ClearAll() は AppPaths の本物の保存場所を消すのでテストから呼べない。一覧を取り出しておき、テストで 3 つであることを固定する (5 回目の査読 RL-04)。
+    /// </summary>
+    internal static string[] DefaultLogFiles => [AppPaths.LogFile, AppPaths.CrashLogFile, AppPaths.TraceLogFile];
 
     /// <summary>
     /// ClearAll() の本体。保存場所を引数で受け取る (AppPaths の値はプロセスの起動時に決まるので、公開の ClearAll() をテストから呼ぶと本物の学習データを消してしまう。
@@ -96,7 +102,8 @@ public static class LearningData
         string[] learningFiles = [modelFile, conversionsFile, suggestionsFile, translationsFile, languagesFile];
         // ログは最初に消す。ログへの書き出しは、積んでおいた分を 1 秒おきにまとめて追記する (無ければ作る) 作りなので、消去のあとで消すと、
         // 書き出しが消去の途中に重なったとき、失敗の警告 (ダイアログが「meltype.log を確認してください」と案内する理由) まで一緒に消える。
-        // 積んである分 (消去の前の記録。打った文字が入ることがある) を先に書いて消せば、消去の途中の警告は、あとから新しいログに必ず残る。
+        // 先に書いて消せば、この時点で積んである分 (消去の前の記録。打った文字が入ることがある) は消すログと一緒に消え、消去の途中の警告は、あとから新しいログに残る。
+        // FlushFile のあとに別のスレッドが積んだ記録は、新しいログに出ることがある (ダイアログの操作中なので実害は小さい。5 回目の査読 RL-05)。
         Diagnostics.Log.FlushFile();
         var logsCleared = ClearLeftovers([], logFiles);
         var ok = ClearAll(

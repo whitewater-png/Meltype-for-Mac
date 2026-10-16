@@ -1289,4 +1289,17 @@ internal static class UpstreamP46Tests
         }
         finally { File.SetUnixFileMode(directory, all); Directory.Delete(directory, recursive: true); }
     }
+
+    [Test]
+    public static void P46_46_ClearAll_PassesTheThreeLogsTheDialogPromises()
+    {
+        // 5 回目の査読 RL-04: 公開の ClearAll() は AppPaths の本物の保存場所を消すのでテストから呼べず、ClearAllAt に渡すログの一覧が、どのテストにも固定されていなかった
+        // (一覧を meltype.log だけにしても全テストが緑)。一覧を取り出して、ダイアログが約束する 3 つ (meltype.log・crash.log・imk-trace.log) であることを固定する。
+        var logs = LearningData.DefaultLogFiles;
+        Assert.Equal(3, logs.Length, "ログの数");
+        Assert.Equal(3, logs.Distinct().Count(), "3 つは別のファイル");
+        Assert.True(logs.Contains(AppPaths.LogFile), "meltype.log");
+        Assert.True(logs.Contains(AppPaths.CrashLogFile), "crash.log");
+        Assert.True(logs.Contains(AppPaths.TraceLogFile), "imk-trace.log");
+    }
 }
