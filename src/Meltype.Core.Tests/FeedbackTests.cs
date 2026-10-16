@@ -880,6 +880,31 @@ internal static class LanguageLearningTests
     }
 
     [Test]
+    public static void LongVowelUThenNi_TsuStaysJapanese()
+    {
+        // 日本語の後ろの u + ni + t (そう|u|ni|t の unit) で、t と s が つ にならず英単語 unit になっていた (sounitsuite が そunitsuite。
+        // 古いブランチ e8fbc64 の修正の移植、本家 7a20aff)。英単語 + する (commitする・editする) と、入力の先頭・英文の中の unit は今までどおり
+        CompositionTests.Detector.SpellChecker = TestSupport.WordChecker is { IsAvailable: true } checker ? checker : Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("sounitsuite", "そうについて"), ("hontounitsukareta", "ほんとうにつかれた"), ("kaijounitsukuto", "かいじょうにつくと"),
+                ("kyouhacommitsuru", "きょうはcommitする"), ("editsuru", "editする"), ("unitsuite", "unitsuite"), ("unitsuushin", "unitすうしん"), ("unit test", "unit test"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
     public static void ShortWord_ChosenFromCandidates_IsLearnedOnSecondTime()
     {
         // 変換の候補から go を英字で選んだだけで覚えると、日本語の中まで英字になりやすい (にほんgo)。2 文字の語は 2 回で覚える。

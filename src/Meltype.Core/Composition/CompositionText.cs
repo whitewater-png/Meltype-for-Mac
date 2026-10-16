@@ -356,6 +356,11 @@ public sealed class CompositionText
         return false;
     }
 
+    /// <summary>単位 i が、前の かな (o・u の段) を伸ばす う (そ|u・ほんと|u) か。本家 7a20aff。</summary>
+    private bool IsLongVowelU(int i) =>
+        i > 0 && _units[i] is { Raw: "u", Kana: "う" } && _units[i - 1] is { Kana: [.., var kana], Raw: [.., var vowel] } &&
+        kana is >= 'ぁ' and <= 'ゖ' && vowel is 'o' or 'u';
+
     private bool EndsWithEnglishWordFromUnit(int count, string extra = "", bool tsuFollows = false)
     {
         var letters = extra;
@@ -364,6 +369,8 @@ public sealed class CompositionText
             letters = _units[i].Raw + letters;
             // 大文字の略語の途中 (AI の I) から始まる語 (Init) は見ない (AInitsuite の t と s を つ にまとめるように。本家 #129、P45-10)
             if (i > 0 && char.IsAsciiLetterUpper(_units[i].Raw[0]) && _units[i - 1].Raw is [.., var before] && char.IsAsciiLetterUpper(before)) continue;
+            // 伸ばす音の う (そう・きょう・ほんとう の u) から始まる語 (unit) は見ない (sounitsuite の t と s を つ にまとめるように。本家 7a20aff)
+            if (tsuFollows && IsLongVowelU(i)) continue;
             // 続けて打った s と合わせた つ まで読むと日本語の語 (shitsumon の shit) なら、英単語として見ない (本家 35beb60、P45-11)
             if (tsuFollows && ReadsAsJapaneseWithTsu(i, count, extra)) continue;
             // 英字の並びの途中にある母音 1 つの単位 (kyo|u、sense|i) から始まる語は、同梱の一覧の語 (IsBundledEnglishWord) のときだけ見る。
