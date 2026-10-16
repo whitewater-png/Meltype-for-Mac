@@ -468,15 +468,24 @@ internal static class UpstreamP46Tests
     }
 
     [Test]
-    public static void P46_23_Adtech_KnownLimit_NoAfterAdtechIsEnglishWithNsLikeChecker()
+    public static void P46_23_Adtech_NoAfterAdtech_IsJapaneseWithNsLikeChecker()
     {
-        // 既知の限界 (KNOWN_LIMITS K84): 実機の NSSpellChecker は techno を単語と答えるので、adtech + の (adtechno…) の no が英語側に取り込まれる
-        // (今までは adtechのような だった)。同じく、続きが英語の語に読める形 (adtechmade・adtechhanami・adtechhaha) も戻る。
-        // adtech 単独・助詞つき (を・は など)・日本語の後ろは直るので、辞書には入れたままにしている。
-        // 直ったら、この期待値を adtechのような に変える。
-        ExpectCommitted(new NsLikeChecker(), ("adtechnoyouna", "adtechnoyouna"));
-        // 同梱の英単語表では adtechのような のまま
+        // 実機の NSSpellChecker は techno を単語と答えるので、adtech + の (adtechno…) の no が英語側に取り込まれ、adtechnoyouna になっていた
+        // (P46-7 で adtech を足した影響。P46-23 の時点では既知の限界として固定していた)。main の T1 (d36ef48: 見つけた英語の区間を後ろの長い語で
+        // 捨てる条件に AND を足す) で、見つけた区間 (adtech) が同梱の一覧の語で、長い語 (techno…) が一覧に無く、後ろの部分が助詞 1 つ (no) のときは
+        // 区間を捨てなくなり、直った。
+        ExpectCommitted(new NsLikeChecker(), ("adtechnoyouna", "adtechのような"), ("adtechno", "adtechの"));
         ExpectCommitted(("adtechnoyouna", "adtechのような"));
+    }
+
+    [Test]
+    public static void P46_41_Adtech_FollowedByEnglishLookingWord_KnownLimit()
+    {
+        // 既知の限界 (KNOWN_LIMITS K88): adtech の直後に、英語の語に読める続きが来ると、続きまで英字になる (P46-7 の前は adtechまで・adtechはなみ・adtechはは)。
+        // 無作為の読み 1,218 形のうち 3 形 (NS・BI とも)。単独の adtech や、日本語の後ろ・助詞つきの形は直っているので、辞書には入れたままにしている。
+        // 直ったら、この期待値を adtechまで・adtechはなみ・adtechはは に変える。
+        foreach (var checker in new Detection.IWordChecker[] { Detection.BuiltInWordChecker.Shared, new NsLikeChecker() })
+            ExpectCommitted(checker, ("adtechmade", "adtechmade"), ("adtechhanami", "adtechhanami"), ("adtechhaha", "adtechhaha"));
     }
 
     [Test]
@@ -728,7 +737,7 @@ internal static class UpstreamP46Tests
     [Test]
     public static void P46_29_Data_KnownLimits()
     {
-        // 既知の限界 (KNOWN_LIMITS K83): metadata は英語の複合語だが直らない (めただた。守りを外すと めたdata になるが、それも誤り)。
+        // 既知の限界 (KNOWN_LIMITS K87): metadata は英語の複合語だが直らない (めただた。守りを外すと めたdata になるが、それも誤り)。
         // 直ったら (metadata が英語になったら)、この期待値を metadata に変える。
         ExpectCommitted(("metadata", "めただた"));
         ExpectCommitted(new NsLikeChecker(), ("metadata", "めただた"));
