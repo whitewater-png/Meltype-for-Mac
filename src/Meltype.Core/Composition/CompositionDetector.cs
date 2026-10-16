@@ -327,6 +327,13 @@ public sealed class CompositionDetector
             // ドメイン・拡張子の . の後ろは、ローマ字として読めても英字のままにする (tetr.io、Wakatte.TV、MeltypeTip.dll)。
             // (本家 yksr-melt/Meltype の PR #267 / issue #260・#254 と同じ変更)
             if (found < 0 && !kanaInput && level != DetectionLevel.Manual && i > 0 && units[i - 1].Raw == "." && PrecededByEnglish(i) == true) found = DotSuffixEnd(units, i, pending, final);
+            // 入力の先頭の .gitignore / .env / .exe などドットファイルは英字のままにする (本家 803719c、#34)。
+            // 途中の 3.14desu や「です。」の . には使わない (i == 0 のときだけ)。
+            if (found < 0 && !kanaInput && level != DetectionLevel.Manual && i == 0 && units[i].Raw == ".")
+            {
+                var dotfile = DotSuffixEnd(units, i + 1, pending, final);
+                if (dotfile > i + 1) found = dotfile;
+            }
             // 英文の中の記号 (, . ! ? -) は読点・句点にせず半角のまま。日本語の文の中の英単語の後 (今日はgoogle、) は日本語の記号。
             // (かな入力では 、。 も かなのキーなので対象外。改行の直後の - は前の行の英語の続きではない: --sorekara の「ーー」。A-5)
             if (found < 0 && !kanaInput && i != bracketCloser && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && !(i == 0 && afterNewline && units[i].Raw == "-") && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&

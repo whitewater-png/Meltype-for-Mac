@@ -191,4 +191,13 @@ internal static class UpstreamP46Tests
         // 小文字で打った、ローマ字として最後まで読める固有名詞は、英字の語として数えない。
         ExpectCommitted(("siri-zu", "しりーず"), ("siri-zumodel", "しりーずmodel"), ("siri", "siri"), ("sirinoondoku", "しりのおんどく"));
     }
+
+    [Test]
+    public static void P46_14_LeadingDotFiles_StayEnglish()
+    {
+        // 本家 #34 (803719c): 入力の先頭が . のドットファイル (.exe → 。えぇ、.gitignore → 。ぎちgのれ) を英字のままにする。
+        // 途中の 3.14desu や、文末の「です。」の . には使わない (i == 0 のときだけ)。
+        ExpectCommitted((".exe", ".exe"), (".gitignore", ".gitignore"), (".env", ".env"), (".zshrc", ".zshrc"), (".exedesu", ".exeです"),
+            ("3.14desu", "3.14です"), ("desu.", "です。"));
+    }
 }
