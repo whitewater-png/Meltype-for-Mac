@@ -11,7 +11,7 @@ Mac の標準的な IME の仕組み (Input Method Kit) で動く Meltype です
 
 このリポジトリは、雪代 / Yukishiro さんの [Meltype](https://github.com/yksr-melt/Meltype) (Windows 版が本家) をもとにした **Mac 版の開発リポジトリ**です。判定・変換の中核 (`src/Meltype.Core`) は本家と共通で、Mac 用の IME (Swift) と、Mac 向けの機能追加を加えています。
 
-> テスト版です。動かないところがあれば、[Issues](https://github.com/whitewater-png/Meltype-for-Mac/issues) から教えてください。
+> 動かないところがあれば、[Issues](https://github.com/whitewater-png/Meltype-for-Mac/issues) から教えてください。
 > 「どのアプリで」「何と打って」「どうなったか」(できればスクリーンショット) があると助かります。
 
 > 更新は個人の気ままな対応です。ご意見・不具合・ご要望などは、ご連絡いただければ幸いです。
