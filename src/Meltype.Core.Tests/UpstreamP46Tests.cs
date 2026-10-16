@@ -77,4 +77,11 @@ internal static class UpstreamP46Tests
         // 本家 #412: vibecoding (vibe coding) が ゔぃべcoding になっていた。coding と vibe を英語の一覧に足した。
         ExpectCommitted(("vibecoding", "vibecoding"), ("vibecodingwo", "vibecodingを"));
     }
+
+    [Test]
+    public static void P46_5_Oem_StaysEnglish()
+    {
+        // 本家 #34 (4a5a62b): oem3 が おえm3、oemnopasokon が おえものぱそこん になっていた。技術用語の一覧に oem を足した。
+        ExpectCommitted(("oem3", "oem3"), ("oemnopasokon", "oemのぱそこん"), ("oemwo", "oemを"), ("kyouhaoem", "きょうはoem"));
+    }
 }
