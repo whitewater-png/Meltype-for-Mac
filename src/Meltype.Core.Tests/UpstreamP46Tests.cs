@@ -27,6 +27,19 @@ internal static class UpstreamP46Tests
         foreach (var (typed, expected) in cases) Assert.Equal(expected, Committed(checker, typed), typed);
     }
 
+    /// <summary>
+    /// 判定器 checker を差し込んで打ち、確定した文字が suffix で終わるかだけを確かめる。
+    /// 確定の前半が、確かめたい規則と別の規則の答えで、そこまで期待値に入れると別の規則を直したときに赤になるときに使う。
+    /// </summary>
+    private static void ExpectCommittedEndsWith(Detection.IWordChecker checker, params (string Typed, string Suffix)[] cases)
+    {
+        foreach (var (typed, suffix) in cases)
+        {
+            var got = Committed(checker, typed);
+            Assert.True(got.EndsWith(suffix, StringComparison.Ordinal), $"{typed} 期待値: …{suffix} で終わる / 実際: {got}");
+        }
+    }
+
     /// <summary>判定器 checker を差し込んで、打って Enter で確定した結果を返す。終わったら元の判定器に戻す。</summary>
     private static string Committed(Detection.IWordChecker checker, string typed)
     {
@@ -414,16 +427,16 @@ internal static class UpstreamP46Tests
     }
 
     /// <summary>
-    /// 実機の NSSpellChecker が単語と答える語のうち、確かめた 11 語 (shat・doit・ment・gat・gatt・mahout・techno・empowerment・entitlement・ament・underemployment。後ろの 4 語は P46-47・P46-48・P46-50 で足した) だけを足した模擬。
+    /// 実機の NSSpellChecker が単語と答える語のうち、確かめた 12 語 (shat・doit・ment・gat・gatt・mahout・techno・empowerment・entitlement・ament・underemployment・underachievement。後ろの 5 語は P46-47・P46-48・P46-50・P46-51 で足した) だけを足した模擬。
     /// それ以外は同梱の英単語表のまま。実機はほかにも表にない語 (datas・taanal など) を単語と答えるので、無作為の 577 入力では 5.5% ほど食い違う (7 語のときに測った値。語を足したあとは測り直していない)。
-    /// 見つけられるのは、この 11 語に関わる、語の境目の読み方が実機でだけ変わる退行に限られる。
+    /// 見つけられるのは、この 12 語に関わる、語の境目の読み方が実機でだけ変わる退行に限られる。
     /// </summary>
     private sealed class NsLikeChecker : Detection.IWordChecker
     {
         public bool IsAvailable => true;
 
         public bool IsWord(string lower) =>
-            lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" or "techno" or "empowerment" or "entitlement" or "ament" or "underemployment" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+            lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" or "techno" or "empowerment" or "entitlement" or "ament" or "underemployment" or "underachievement" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
     }
 
     /// <summary>
@@ -469,7 +482,7 @@ internal static class UpstreamP46Tests
     [Test]
     public static void P46_23_DictionaryAdditions_AlsoHoldWithNsLikeChecker()
     {
-        // 辞書の追加 (P46-1〜15) を、実機の NSSpellChecker の答えを 10 語だけまねた判定器 (NsLikeChecker) でも確かめる。
+        // 辞書の追加 (P46-1〜15) を、実機の NSSpellChecker の答えを一部の語だけまねた判定器 (NsLikeChecker。まねた語はその定義の注にある) でも確かめる。
         // 同梱の英単語表だけでは、実機でだけ起きる差 (語の境目の読み方の違い) が見えない。
         ExpectCommitted(new NsLikeChecker(),
             ("infobesity", "infobesity"), ("infobesitywo", "infobesityを"), ("kyouhainfobesity", "きょうはinfobesity"),
@@ -508,14 +521,21 @@ internal static class UpstreamP46Tests
         // main の規則は、伸ばす音の u から始まる語 (unemployment。本家 7a20aff) と、同梱の一覧にない母音 1 つの単位から始まる語 (empowerment。H1) を飛ばす。
         // 単独の main では ment が (実機の NSSpellChecker が単語と答えるので) 救い、単独の P46 では長い語が救っていたのが、両方が入ると何も見られなくなる。
         // 断片が知っている英単語で、さらに前へ伸ばした並びも知っている英単語なら、断片は長い語の終わりなので、読みの頭として飛ばさない。
-        // 変異の確認 (5 回目の査読 RM-01、6 回目の RN-01、7 回目の RP1-01・02。P46-47 で答えが変わる入力と、語頭から始まる語・記号をはさむ形の 2,848 入力を、BI と NS で現在のコードと比べた。
-        // 7 回目の査読員は別の作り方 (大文字・数字や記号をはさむ形・短い断片・非常に長い列・深い語) の BI 7,652・NS 1,168 入力で比べた):
+        // 変異の確認 (5 回目の査読 RM-01、6 回目の RN-01、7 回目の RP1-01・02、8 回目の RQ1-01・02。P46-47 で答えが変わる入力と、語頭から始まる語・記号をはさむ形の 2,848 入力を、BI と NS で現在のコードと比べた。
+        // 7 回目の査読員は、長い語 (BI 3,360・NS 500) と別の作り方の入力 (大文字・数字や記号をはさむ形・短い断片・非常に長い列・深い語。BI 4,292・NS 668) の、合わせて BI 7,652・NS 1,168 入力で、
+        // 8 回目の査読員は、長い語 39 × 頭 4 × 尾 2 = 312 入力と、大文字の置き方 76 × 頭 3 × 尾 2 = 456 入力で、BI と NS で比べた。
+        // 8 回目の対応では、6 語の大文字の置き方 82 通り × 頭 3 × 尾 2 = 492 入力を、この模擬の判定器で比べた):
         // - 長い語の下限 (ループの letters.Length >= 4) を 6 にすると 208 入力で答えが変わる → ament の例で赤になる。
         // - ループの j >= 0 を j > 0 にすると、現在の判定器 (同梱の表・NS) では 2,848 入力のどれも変わらないが、等価ではない。先頭の単位から始まる語が、全体も「かな + つ」の読みの頭に見えるとき
         //   (外側のループの先頭の単位でも ReadsAsJapaneseWithTsu が真になって受け入れられない) だけ変わる。今の判定器にはそのような語が無いので、cadent を単語と答える
         //   試験用の判定器 (HeadWordChecker) の例を下に足した (論理の確認。今の判定器では起きない形)。
         // - ループの「英字だけの単位」の条件を小文字だけ (IsAsciiLetterLower) にすると、大文字で始まる語 (Entitlement) を前へ伸ばせず、断片 ment が日本語の読みの頭になる → 大文字の例で赤になる。
         // - 前へ伸ばす深さに上限 (6・7 単位) を入れると、長い語の頭まで 8 単位さかのぼる語 (underemployment) を伸ばせない → その例で赤になる。
+        // - ループの「英字だけの単位」の条件を、小文字だけか頭だけ大文字の単位にする (pO のような単位で止まる)、または大文字で始まる単位まで伸ばしたらそこで止める (Po で止まる) と、
+        //   語の途中に大文字をはさむ語 (empOwerment・emPowerment) を前へ伸ばせず、断片 ment が日本語の読みの頭になる → 語の途中の大文字の例で赤になる。
+        // - 前へ伸ばす長さに文字数の上限 (15 文字) を入れると、16 文字の語 (underachievement) を伸ばせない → その例で赤になる。
+        //   単位で数える上限を 8・10 単位にした変異は、8 回目の査読員の長い語の 312 入力 (BI・NS) で答えが変わらなかった (8 単位は、上の 492 入力でも同じ)。
+        //   9 単位以上さかのぼらないと届かない語は見つけていないので、この 2 つはテストで捕まえていない。
         // - 最初の letters.Length < 4 を外す (同じ単位の後ろの本判定が 4 文字以上を要るので、判定器を呼ぶ回数が増えるだけ)・ループの「英字だけの単位」の条件を外す
         //   (IsKnownEnglishWord は小文字にしてから a-z だけの並びかを見るので、数字・記号をはさんだ並びは以降ずっと知らない語になり、元のコードがそこでループを終えるのと同じ。
         //   大文字は元の条件 (IsAsciiLetter) も通す。小文字にすると a-z になる文字 (U+212A ケルビン記号) だけは例外だが、打鍵では普通出てこない。6 回目の RN が試して差なし) は、
@@ -538,6 +558,11 @@ internal static class UpstreamP46Tests
         // 長い語の頭まで 8 単位さかのぼる語 (RP1-02)。深さを 6・7 単位で止めると崩れる (この模擬の判定器では いまうんでれmployめんつる、開発機の NSSpellChecker では いまうんでremployめんつる)。
         ExpectCommitted(new NsLikeChecker(), ("kyouhaEntitlementsuru", "きょうはEntitlementする"), ("imaEntitlementsu", "いまEntitlementす"),
             ("imaunderemploymentsuru", "いまunderemploymentする"));
+        // 16 文字の語 (8 回目の査読 RQ1-02)。前へ伸ばす長さを 15 文字までにすると崩れる (この模擬の判定器では いまうんでらちえゔぇめんつる、開発機の NSSpellChecker では いまunderachieveめんつる)。
+        ExpectCommitted(new NsLikeChecker(), ("imaunderachievementsuru", "いまunderachievementする"), ("kyouhaunderachievementsu", "きょうはunderachievementす"));
+        // 語の途中に大文字をはさむ語 (RQ1-01)。確定の前半 (きょうはえmpOwer… の え) は別の規則の答えで、取り込み前の木から同じなので、語の終わり (断片 ment + する) だけを見る。
+        // pO で止める・Po で止めると、どちらも …めんつる になる。今のコードの答えは、開発機の NSSpellChecker で流しても、この模擬の判定器と同じ。
+        ExpectCommittedEndsWith(new NsLikeChecker(), ("kyouhaempOwermentsuru", "mentする"), ("imaemPowermentsuru", "mentする"));
     }
 
     [Test]
