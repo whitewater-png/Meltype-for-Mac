@@ -174,25 +174,31 @@ public sealed class TranslationHistory
     }
 
     /// <summary>選んだ英訳の記録をすべて消す。</summary>
-    public void Clear()
+    public void Clear() => TryClear();
+
+    /// <summary>すべて消して、ファイルにも書く。ファイルに書けなかった・保存を止めているときは false (理由は ConversionHistory.TryClear と同じ)。</summary>
+    internal bool TryClear()
     {
         lock (_gate)
         {
             _counts.Clear();
-            Save();
+            return Save();
         }
     }
 
-    private void Save()
+    // 書けたら true。書けなかった・保存を止めているときは false (ほとんどの呼び出しは戻り値を使わない)。
+    private bool Save()
     {
-        if (_path is null) return;
+        if (_path is null) return true;
         try
         {
             Config.SafeFile.WriteAllText(_path, JsonSerializer.Serialize(_counts, Config.LearningJsonContext.Default.TranslationCounts));
+            return !Config.SafeFile.IsBlocked(_path);
         }
         catch (Exception ex)
         {
             Diagnostics.Log.Warn($"英訳の学習データを保存できませんでした: {ex.Message}");
+            return false;
         }
     }
 }

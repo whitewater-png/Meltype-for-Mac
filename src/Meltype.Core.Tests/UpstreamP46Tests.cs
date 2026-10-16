@@ -939,4 +939,69 @@ internal static class UpstreamP46Tests
             finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
         }
     }
+
+    [Test]
+    public static void P46_36_ClearAll_BlockedFileNotReleased_ReturnsFalse()
+    {
+        // 止めたファイルの一覧を渡さない呼び方 (Windows 版・テスト) で、保存を止めたままのファイルを消そうとしても、書かれないので中身が残る。成功と答えてはいけない。
+        var directory = TempDir("clear-blocked-kept");
+        try
+        {
+            var conversionsPath = Path.Combine(directory, "conversions.json");
+            var suggestionsPath = Path.Combine(directory, "suggest.json");
+            var translationsPath = Path.Combine(directory, "translations.json");
+            var history = new ConversionHistory(conversionsPath);
+            var suggestions = new DictionarySuggestions(suggestionsPath);
+            var translations = new TranslationHistory(translationsPath);
+            var paths = new[] { conversionsPath, suggestionsPath, translationsPath };
+            foreach (var path in paths) SafeFile.Block(path);
+            Assert.True(!LearningData.ClearAll(history, null, null, null, null), "変換: 保存を止めたままなら失敗を返す");
+            Assert.True(!LearningData.ClearAll(null, suggestions, null, null, null), "辞書の提案: 保存を止めたままなら失敗を返す");
+            Assert.True(!LearningData.ClearAll(null, null, null, translations, null), "英訳: 保存を止めたままなら失敗を返す");
+            foreach (var path in paths) SafeFile.Unblock(path);
+            Assert.True(LearningData.ClearAll(history, suggestions, null, translations, null), "止めた状態を解けば成功を返す");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_36_ClearAll_FolderNotWritable_ReturnsFalseAndKeepsContent()
+    {
+        // 読める普通のファイルでも、フォルダーに書けなければ、メモリは空になってもファイルの中身は残る。それを成功と答えてはいけない
+        // (2 回目の査読 RE-1 の一般形、3 回目の RG-11。以前は Clear() が保存の失敗を握るので true を返し、Mac は「消去しました」と出していた)。
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        {
+            Console.WriteLine("  P46_36_ClearAll_FolderNotWritable: スキップ (権限で書けなくできる環境だけ)");
+            return;
+        }
+        var directory = TempDir("clear-readonly");
+        try
+        {
+            var conversionsPath = Path.Combine(directory, "conversions.json");
+            var suggestionsPath = Path.Combine(directory, "suggest.json");
+            var translationsPath = Path.Combine(directory, "translations.json");
+            var history = new ConversionHistory(conversionsPath);
+            var suggestions = new DictionarySuggestions(suggestionsPath);
+            var translations = new TranslationHistory(translationsPath);
+            history.Remember("くらいど", "クラウド");
+            translations.Remember("ひみつ", "secret");
+            File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+            try
+            {
+                Assert.True(!LearningData.ClearAll(history, null, null, null, null), "変換: フォルダーに書けないので失敗を返す");
+                Assert.True(!LearningData.ClearAll(null, suggestions, null, null, null), "辞書の提案: フォルダーに書けないので失敗を返す");
+                Assert.True(!LearningData.ClearAll(null, null, null, translations, null), "英訳: フォルダーに書けないので失敗を返す");
+                Assert.Equal("クラウド", new ConversionHistory(conversionsPath).Get("くらいど"), "書けなかったので、ファイルには学習が残っている (これが成功と答えてはいけない理由)");
+            }
+            finally { File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute); }
+            Assert.True(LearningData.ClearAll(history, suggestions, null, translations, null), "書けるようになれば、もう一度の消去で成功する");
+            Assert.True(new ConversionHistory(conversionsPath).Get("くらいど") is null, "消えた");
+        }
+        finally
+        {
+            File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            SafeFile.ResetBlockedForTests();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

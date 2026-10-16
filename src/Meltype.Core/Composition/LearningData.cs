@@ -16,14 +16,20 @@ public static class LearningData
     /// 渡された学習データ (共有しているメモリ上のもの) を空にして、ファイルにも書く。null のものは飛ばす。
     /// modelFile は Windows 版が使うユーザーモデルのファイル (あるときだけ空にする。無ければ作らない)。
     /// learningFiles は学習データのファイル (渡すと、読めない・退避できないために保存を止めていたものを先に消して、止めた状態を解く)。
-    /// 1 つが失敗しても残りは消す (失敗は例外にせずログに残し、false を返す)。
+    /// 1 つが失敗しても残りは消す (失敗は例外にせずログに残し、false を返す)。ファイルに書けなかった (フォルダーに書けない・保存を止めたまま) ときも失敗として返す。
     /// </summary>
     internal static bool ClearAll(ConversionHistory? history, DictionarySuggestions? suggestions, LanguageMemory? languages, TranslationHistory? translations, string? modelFile, IEnumerable<string>? learningFiles = null)
     {
         var ok = true;
-        void Run(string name, Action action)
+        // action は、消してファイルにも書けたら true。書けなかったときも失敗にする (メモリだけ空になって、中身がファイルに残るのに、成功と答えないため)。
+        void Run(string name, Func<bool> action)
         {
-            try { action(); }
+            try
+            {
+                if (action()) return;
+                ok = false;
+                Diagnostics.Log.Warn($"{name}をファイルに書き込めなかったので、中身がファイルに残っているかもしれません。");
+            }
             catch (Exception ex)
             {
                 ok = false;
@@ -33,13 +39,14 @@ public static class LearningData
         // 読めない・退避できないために保存を止めたファイル (SafeFile.Block) は、メモリを空にしても書けず、中身が残る。
         // 消去は利用者が確認して選んだ操作なので、そのファイルは消して、止めた状態を解く。消せなければ失敗として返す。
         if (learningFiles is not null && !ReleaseBlocked(learningFiles)) ok = false;
-        Run("変換の学習データ", () => history?.Clear());
-        Run("辞書の提案データ", () => suggestions?.Clear());
-        Run("英語 / 日本語の学習データ", () => languages?.Clear());
-        Run("英訳の学習データ", () => translations?.Clear());
+        Run("変換の学習データ", () => history?.TryClear() ?? true);
+        Run("辞書の提案データ", () => suggestions?.TryClear() ?? true);
+        Run("英語 / 日本語の学習データ", () => { languages?.Clear(); return true; });   // 書けないときは IOException を投げる
+        Run("英訳の学習データ", () => translations?.TryClear() ?? true);
         Run("ユーザーモデル", () =>
         {
             if (modelFile is not null && File.Exists(modelFile)) new UserModel(modelFile).Reset();
+            return true;
         });
         return ok;
     }
