@@ -849,4 +849,40 @@ internal static class UpstreamP46Tests
         }
         finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
     }
+
+    [Test]
+    public static void P46_33_BlankLookingFiles_DoNotReplaceBroken()
+    {
+        // 中身がない (0 バイト・空白・NUL・BOM だけの) ファイルは、前に残した .broken を潰さない。強制終了のあとの NUL で埋まったファイルや、
+        // メモ帳で「Unicode」保存した空のファイル (UTF-16 の BOM だけ) も同じ。データになりうるバイトが混じっていれば、今までどおり残す。
+        var blanks = new (string Name, byte[] Bytes)[]
+        {
+            ("NUL", new byte[] { 0, 0, 0 }), ("UTF-16LE の BOM", new byte[] { 0xFF, 0xFE }), ("UTF-16BE の BOM", new byte[] { 0xFE, 0xFF }),
+            ("VT", new byte[] { 0x0B }), ("UTF-16LE の空白と改行", new byte[] { 0xFF, 0xFE, 0x20, 0x00, 0x0A, 0x00 }),
+            ("UTF-8 の BOM と CR・TAB", new byte[] { 0xEF, 0xBB, 0xBF, 0x09, 0x0D }),
+        };
+        foreach (var (name, bytes) in blanks)
+        {
+            var directory = TempDir("blank");
+            try
+            {
+                var path = Path.Combine(directory, "conversions.json");
+                File.WriteAllText(path + ".broken", "FIRST-CORRUPT");
+                File.WriteAllBytes(path, bytes);
+                _ = new ConversionHistory(path);
+                Assert.Equal("FIRST-CORRUPT", File.ReadAllText(path + ".broken"), name + ": 前の .broken を潰さない");
+            }
+            finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+        }
+        var withData = TempDir("blank-data");
+        try
+        {
+            var path = Path.Combine(withData, "conversions.json");
+            File.WriteAllText(path + ".broken", "FIRST-CORRUPT");
+            File.WriteAllBytes(path, new byte[] { 0x00, (byte)'{' });
+            _ = new ConversionHistory(path);
+            Assert.True(File.ReadAllBytes(path + ".broken").SequenceEqual(new byte[] { 0x00, (byte)'{' }), "{ が混じっていれば .broken に残す");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(withData, recursive: true); }
+    }
 }

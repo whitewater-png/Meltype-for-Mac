@@ -50,7 +50,7 @@ internal static class SafeFile
     /// 読めなかった (壊れた) ファイルを「名前.broken」に残す。読めないまま空で動き、次の保存で上書きしても、元の中身は .broken に残る
     /// (本家 #551 の考え方。LanguageMemory は保存の直前に同じことをするが、ConversionHistory・TranslationHistory は読んだ時点で残す)。
     /// 一時ファイルに書いて置き換える (WriteAllBytes と同じ。.broken がリンクでもリンク先は書き換えず、最初から本人だけが読める権限)。
-    /// 中身がない (0 バイト・空白だけの) ファイルは残すものがないので、前の .broken を空で潰さない。
+    /// 中身がない (0 バイト・空白・NUL だけの) ファイルは残すものがないので、前の .broken を空で潰さない。
     /// 残せた (または残すものがなかった) なら true。残せなければ false (呼び出し側は、このパスへの保存を止める)。
     /// </summary>
     internal static bool KeepBroken(string path)
@@ -72,11 +72,14 @@ internal static class SafeFile
         }
     }
 
-    /// <summary>空白 (と UTF-8 の BOM) だけの中身か。</summary>
+    /// <summary>
+    /// 空白・改行・NUL (と BOM) だけの中身か。強制終了のあとのファイルは 00 で埋まっていることがあり、
+    /// UTF-16 の空白は 20 00 のように NUL を挟み、BOM は FF FE / FE FF になる。{ や " など、データになりうるバイトが 1 つでもあれば false。
+    /// </summary>
     private static bool IsBlank(byte[] bytes)
     {
         foreach (var b in bytes)
-            if (b is not (0x20 or 0x09 or 0x0A or 0x0D or 0xEF or 0xBB or 0xBF)) return false;
+            if (b is not (0x00 or 0x09 or 0x0A or 0x0B or 0x0C or 0x0D or 0x20 or 0xEF or 0xBB or 0xBF or 0xFE or 0xFF)) return false;
         return true;
     }
 
