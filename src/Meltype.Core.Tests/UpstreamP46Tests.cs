@@ -379,4 +379,43 @@ internal static class UpstreamP46Tests
         Assert.Equal("ラーメン", k3.Host.Document, "ra-men は今までどおり変換する");
         Assert.True(ramen.Calls > 0, "ra-men は変換エンジンを呼ぶ");
     }
+
+    /// <summary>
+    /// 実機の NSSpellChecker のように、英単語の頭 (shat・doit・ment・gat・gatt・mahout) を単語と答えるスペルチェッカー (同梱の英単語表はどれも答えない)。
+    /// それ以外は同梱の英単語表。
+    /// </summary>
+    private sealed class WordHeadsAreWordsChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+
+        public bool IsWord(string lower) =>
+            lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void P46_20_TsuAfterEnglishLookingHead_IsReadAsJapanese()
+    {
+        // 本家 #594: shatsu が、実機では shatす (NSSpellChecker が shat を単語と答える) になる。同梱の表では しゃつ で、実機でだけ崩れる。
+        // 英単語の頭の t + s を つ にまとめるかを、「かな + つ」が、よく使う語 (readings.txt) の頭になるか (しゃつ・どいつ・めんつ・がっつ・まほうつ) でも見る。
+        CompositionTests.Detector.SpellChecker = new WordHeadsAreWordsChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("shatsu", "しゃつ"), ("waishatsu", "わいしゃつ"), ("shatsuwokau", "しゃつをかう"), ("kyouhashatsuwokau", "きょうはしゃつをかう"),
+                ("doitsu", "どいつ"), ("mentsu", "めんつ"), ("gattsu", "がっつ"), ("mahoutsukai", "まほうつかい"),
+                // 守り: 今までどおり (つ を含む日本語の語、英単語)
+                ("tsunami", "つなみ"), ("natsu", "なつ"), ("matsuri", "まつり"), ("outsource", "outsource"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
 }

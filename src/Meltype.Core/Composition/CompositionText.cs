@@ -352,7 +352,7 @@ public sealed class CompositionText
         {
             if (!_units[i].Kana.All(c => c is >= 'ぁ' and <= 'ゖ' or 'ー') || _units[i].Raw.Length == 0 || !_units[i].Raw.All(char.IsAsciiLetter)) return false;
             kana = _units[i].Kana + kana;
-            if (i <= start && kana.Length + 1 >= (i == start ? 2 : 3) && _detector.IsJapaneseWordOrPrefix(kana + "つ")) return true;
+            if (i <= start && kana.Length + 1 >= (i == start ? 2 : 3) && (_detector.IsJapaneseWordOrPrefix(kana + "つ") || TypoCorrector?.IsReadingPrefix(kana + "つ") == true)) return true;
         }
         return false;
     }

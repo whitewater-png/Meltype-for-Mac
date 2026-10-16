@@ -19,6 +19,8 @@ public sealed class RomajiTypoCorrector
     private readonly RomajiDetector _romaji;
     private readonly HashSet<string> _words = new(StringComparer.Ordinal);
     private int _maxLength;
+    // 読みの前方一致 (2 文字以上)。t + s を つ にまとめるか決めるとき、よく使う語の頭になるかを見る (#594)
+    private readonly HashSet<string> _prefixes = new(StringComparer.Ordinal);
 
     public RomajiTypoCorrector(RomajiDetector romaji, string readings)
     {
@@ -32,7 +34,12 @@ public sealed class RomajiTypoCorrector
             Add(parts[0]);
             if (parts.Length > 1) AddConjugations(parts[0], parts[1]);
         }
+        foreach (var word in _words)
+            for (var length = 2; length <= word.Length; length++) _prefixes.Add(word[..length]);
     }
+
+    /// <summary>読みが、よく使う語そのものか、その頭か (しゃつ、まほうつ)。</summary>
+    public bool IsReadingPrefix(string hiragana) => _prefixes.Contains(hiragana);
 
     public static RomajiTypoCorrector Load(RomajiDetector romaji) => new(romaji, DictionarySource.ReadEmbedded("readings.txt"));
 
