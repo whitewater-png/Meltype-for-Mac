@@ -686,4 +686,112 @@ internal static class UpstreamP46Tests
         ExpectCommitted(("metadata", "めただた"));
         ExpectCommitted(new NsLikeChecker(), ("metadata", "めただた"));
     }
+
+    private const string ClearOriginal = "{\"ひみつ\":{\"Text\":\"秘密\"}}";
+
+    [Test]
+    public static void P46_30_ClearAll_UnreadableFile_IsDeletedAndSavingResumes()
+    {
+        // P46-26 は読めなかったファイルを守るため保存を止めるが、そのせいで「学習データをすべて消去」が効かなくなっていた
+        // (メモリを空にしても書けず、打った読みがファイルに残るのに、例外が出ないので成功と表示された)。
+        // 消去は利用者が確認して選んだ操作なので、止めていたファイルは消して、保存を再開する。
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        {
+            Console.WriteLine("  P46_30_ClearAll_UnreadableFile: スキップ (権限で読めなくできる環境だけ)");
+            return;
+        }
+        var directory = TempDir("clear-unreadable");
+        try
+        {
+            var conversionsPath = Path.Combine(directory, "conversions.json");
+            var translationsPath = Path.Combine(directory, "translations.json");
+            foreach (var path in new[] { conversionsPath, translationsPath })
+            {
+                File.WriteAllText(path, ClearOriginal);
+                File.SetUnixFileMode(path, UnixFileMode.None);
+            }
+            var history = new ConversionHistory(conversionsPath);
+            var translations = new TranslationHistory(translationsPath);
+            Assert.True(SafeFile.IsBlocked(conversionsPath) && SafeFile.IsBlocked(translationsPath), "読めなかったので保存を止めている");
+            Assert.True(LearningData.ClearAll(history, null, null, translations, null, [conversionsPath, translationsPath]), "消せたら成功を返す");
+            foreach (var path in new[] { conversionsPath, translationsPath })
+            {
+                Assert.True(!File.ReadAllText(path).Contains("ひみつ"), Path.GetFileName(path) + ": 打った読みが残らない");
+                Assert.True(!SafeFile.IsBlocked(path), Path.GetFileName(path) + ": 止めた状態が解ける");
+            }
+            history.Remember("くらいど", "クラウド");
+            Assert.Equal("クラウド", new ConversionHistory(conversionsPath).Get("くらいど"), "消去のあとは保存が再開する (ファイルから読み直して確かめる)");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_30_ClearAll_LockedAtStartup_IsDeletedAndSavingResumes()
+    {
+        // 起動したとき他のプログラムが開いていて読めなかった (Windows の共有違反と同じ IOException。FileShare.None は Mac / Linux でも排他で開く) ファイルも同じ。
+        var directory = TempDir("clear-locked");
+        try
+        {
+            var path = Path.Combine(directory, "conversions.json");
+            File.WriteAllText(path, ClearOriginal);
+            ConversionHistory history;
+            using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                history = new ConversionHistory(path);
+                Assert.True(SafeFile.IsBlocked(path), "読めなかったので保存を止めている");
+            }
+            Assert.True(LearningData.ClearAll(history, null, null, null, null, [path]), "消せたら成功を返す");
+            Assert.True(!File.ReadAllText(path).Contains("ひみつ"), "打った読みが残らない");
+            Assert.True(!SafeFile.IsBlocked(path), "止めた状態が解ける");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public static void P46_30_ClearAll_CannotDeleteBlockedFile_ReturnsFalse()
+    {
+        // 止めていたファイルを消せなかった (フォルダーに書けない) ときは、成功と答えずに失敗を返す (Mac は「消去できなかったものがあります」と出す)。
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        {
+            Console.WriteLine("  P46_30_ClearAll_CannotDeleteBlockedFile: スキップ (権限で消せなくできる環境だけ)");
+            return;
+        }
+        var directory = TempDir("clear-nodelete");
+        try
+        {
+            var path = Path.Combine(directory, "conversions.json");
+            File.WriteAllText(path, ClearOriginal);
+            File.SetUnixFileMode(path, UnixFileMode.None);
+            var history = new ConversionHistory(path);
+            Assert.True(SafeFile.IsBlocked(path), "読めなかったので保存を止めている");
+            File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+            Assert.True(!LearningData.ClearAll(history, null, null, null, null, [path]), "消せなかったので失敗を返す");
+            Assert.True(SafeFile.IsBlocked(path), "消せなかったので止めたまま");
+        }
+        finally
+        {
+            File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            SafeFile.ResetBlockedForTests();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public static void P46_30_ClearLeftovers_RemovesInterruptedTempFiles()
+    {
+        // 保存の途中で止まると 名前.<GUID>.tmp (.broken を書く途中なら 名前.broken.<GUID>.tmp) が残る。打った内容が入っているので、全消去で消す。
+        var directory = TempDir("clear-tmp");
+        try
+        {
+            var path = Path.Combine(directory, "conversions.json");
+            var other = Path.Combine(directory, "userdict.txt");
+            var leftovers = new[] { path + "." + Guid.NewGuid().ToString("N") + ".tmp", path + ".broken." + Guid.NewGuid().ToString("N") + ".tmp" };
+            var kept = new[] { other + "." + Guid.NewGuid().ToString("N") + ".tmp", Path.Combine(directory, "notes.txt") };
+            foreach (var file in leftovers.Concat(kept)) File.WriteAllText(file, "ひみつ");
+            Assert.True(LearningData.ClearLeftovers([path], []), "消せる");
+            foreach (var file in leftovers) Assert.True(!File.Exists(file), Path.GetFileName(file) + ": 消える");
+            foreach (var file in kept) Assert.True(File.Exists(file), Path.GetFileName(file) + ": 学習データのものではないので消さない");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
 }

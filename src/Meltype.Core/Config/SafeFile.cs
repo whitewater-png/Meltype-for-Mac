@@ -84,6 +84,12 @@ internal static class SafeFile
     internal static void Block(string path) { lock (Blocked) Blocked.Add(Path.GetFullPath(path)); }
 
     /// <summary>
+    /// このパスへの保存の停止を解く。「学習データをすべて消去」が、止めていたファイルを消したあとに呼ぶ
+    /// (中身ごと消すと利用者が選んだので、守るものがなくなる)。止めていなければ何もしない。
+    /// </summary>
+    internal static void Unblock(string path) { lock (Blocked) Blocked.Remove(Path.GetFullPath(path)); }
+
+    /// <summary>
     /// 学習データ (ConversionHistory・TranslationHistory) を読めなかったときの後始末。
     /// 壊れていた (JSON として読めない) なら .broken に残して、空で続ける。残せなければ、元のファイルを守るため保存を止める。
     /// 読めなかっただけ (権限・所有者・I/O。壊れているとは限らない) なら、残しようがないので、やはり保存を止める。
