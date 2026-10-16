@@ -87,6 +87,8 @@ public sealed class RomajiDetector
         ("か", ["ca"]), ("く", ["cu"]), ("こ", ["co"]),
         ("ちぃ", ["cyi", "tyi"]),
         ("くぁ", ["kwa"]), ("ぐぁ", ["gwa"]), ("つぁ", ["tsa"]), ("つぃ", ["tsi"]), ("つぇ", ["tse"]), ("つぉ", ["tso"]),
+        // ふゃ ふゅ ふょ (Microsoft IME・Mozc と同じ綴り。フュージョン = fyu-jon。本家 #674)
+        ("ふゃ", ["fya"]), ("ふゅ", ["fyu"]), ("ふょ", ["fyo"]),
     ];
 
     private static readonly Dictionary<string, string> SpellingToKana = BuildSpellingMap(Table);

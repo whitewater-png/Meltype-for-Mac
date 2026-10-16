@@ -176,4 +176,11 @@ internal static class UpstreamP46Tests
             Assert.True(candidates.Contains(expected), keys + ": " + string.Join(" | ", candidates));
         }
     }
+
+    [Test]
+    public static void P46_12_Fyu_IsReadAsSmallYu()
+    {
+        // 本家 #674: fyu で ふゅ (フュージョン = fyu-jon) が打てない。Microsoft IME・Mozc と同じ綴りの ふゃ・ふゅ・ふょ を足した。
+        ExpectCommitted(("fyu", "ふゅ"), ("fyuzyon", "ふゅじょん"), ("fya", "ふゃ"), ("fyo", "ふょ"), ("fyuu", "ふゅう"));
+    }
 }
