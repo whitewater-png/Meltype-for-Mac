@@ -367,6 +367,21 @@ public sealed class CompositionText
         i > 0 && _units[i] is { Raw: "u", Kana: "う" } && _units[i - 1] is { Kana: [.., var kana], Raw: [.., var vowel] } &&
         kana is >= 'ぁ' and <= 'ゖ' and not 'を' && vowel is 'o' or 'u';
 
+    /// <summary>
+    /// 単位 i から後ろの英字 letters (+ extra) が 4 文字以上の知っている英単語で、さらに前の単位へ伸ばした英字の並びも知っている英単語か (empowerment の中の ment)。
+    /// 英字の単位だけをさかのぼる。EndsWithEnglishWordFromUnit が「かな + つ が読みの頭」で飛ばす断片に、より長い知っている語が重なっているかを見る。
+    /// </summary>
+    private bool IsPartOfLongerEnglishWord(int i, string letters)
+    {
+        if (letters.Length < 4 || !_detector.IsKnownEnglishWord(letters)) return false;
+        for (var j = i - 1; j >= 0 && _units[j].Raw.Length > 0 && _units[j].Raw.All(char.IsAsciiLetter); j--)
+        {
+            letters = _units[j].Raw + letters;
+            if (letters.Length >= 4 && _detector.IsKnownEnglishWord(letters)) return true;
+        }
+        return false;
+    }
+
     private bool EndsWithEnglishWordFromUnit(int count, string extra = "", bool tsuFollows = false)
     {
         var letters = extra;
@@ -378,7 +393,10 @@ public sealed class CompositionText
             // 伸ばす音の う (そう・きょう・ほんとう の u) から始まる語 (unit) は見ない (sounitsuite の t と s を つ にまとめるように。本家 7a20aff)
             if (tsuFollows && IsLongVowelU(i)) continue;
             // 続けて打った s と合わせた つ まで読むと日本語の語 (shitsumon の shit) なら、英単語として見ない (本家 35beb60、P45-11)
-            if (tsuFollows && ReadsAsJapaneseWithTsu(i, count, extra)) continue;
+            // ただし、その断片 (ment) が知っている英単語で、さらに前へ伸ばした並び (unemployment・empowerment) も知っている英単語なら、断片は長い語の終わりなので日本語とは見ない
+            // (P46-20 が ment・dent・pant を読みの頭として飛ばし、main の規則 (伸ばす音の u から始まる語・同梱の一覧にない母音 1 つの単位から始まる語を見ない) が長い語を飛ばすと、
+            // どちらも見られずに t と s が つ にまとまった。5 回目の統合の確認)
+            if (tsuFollows && ReadsAsJapaneseWithTsu(i, count, extra) && !IsPartOfLongerEnglishWord(i, letters)) continue;
             // 英字の並びの途中にある母音 1 つの単位 (kyo|u、sense|i) から始まる語は、同梱の一覧の語 (IsBundledEnglishWord) のときだけ見る。
             // 実機の NSSpellChecker は、日本語の音の途中から始まる短い語 (kyo|u|mo|l の umol) も英単語と答えるので、きょうも + like の
             // l を英字に残し、kyoumolike が きょumolいけ になっていた。変更前の条件に AND を 1 つ足しただけなので、l・x・t を英字に
