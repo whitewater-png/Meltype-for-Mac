@@ -87,7 +87,15 @@ internal static class SafeFile
     /// このパスへの保存の停止を解く。「学習データをすべて消去」が、止めていたファイルを消したあとに呼ぶ
     /// (中身ごと消すと利用者が選んだので、守るものがなくなる)。止めていなければ何もしない。
     /// </summary>
-    internal static void Unblock(string path) { lock (Blocked) Blocked.Remove(Path.GetFullPath(path)); }
+    internal static void Unblock(string path)
+    {
+        lock (Blocked)
+        {
+            var full = Path.GetFullPath(path);
+            Blocked.Remove(full);
+            BlockWarned.Remove(full);
+        }
+    }
 
     /// <summary>
     /// 学習データ (ConversionHistory・TranslationHistory) を読めなかったときの後始末。
@@ -114,11 +122,14 @@ internal static class SafeFile
     /// <summary>読み込めず退避もできなかったファイル (保存しない)。</summary>
     private static readonly HashSet<string> Blocked = new(StringComparer.Ordinal);
 
+    /// <summary>「保存を止めています」の警告を出した、止めているパス (保存のたびに出すと、ログの上限の 1000 件が埋まるので、止めてから 1 回だけ出す)。</summary>
+    private static readonly HashSet<string> BlockWarned = new(StringComparer.Ordinal);
+
     /// <summary>テスト用: 退避を必ず失敗させる。</summary>
     internal static bool FailBackupForTests { get; set; }
 
     /// <summary>テスト用: 保存を止めたパスの記録を空にする。</summary>
-    internal static void ResetBlockedForTests() { lock (Blocked) Blocked.Clear(); }
+    internal static void ResetBlockedForTests() { lock (Blocked) { Blocked.Clear(); BlockWarned.Clear(); } }
 
     internal static bool IsBlocked(string path) { lock (Blocked) return Blocked.Contains(Path.GetFullPath(path)); }
 
@@ -172,9 +183,11 @@ internal static class SafeFile
         // 読み込めず退避もできなかったファイルには書かない (元のデータを空に近い内容で上書きしないため)。
         lock (Blocked)
         {
-            if (Blocked.Contains(Path.GetFullPath(path)))
+            var full = Path.GetFullPath(path);
+            if (Blocked.Contains(full))
             {
-                Diagnostics.Log.Warn($"{Path.GetFileName(path)} は退避できなかったので、保存しません (元のファイルを守るため)。");
+                // 止めてから 1 回だけ警告する (原因は、止めた側が読めなかった・退避できなかった理由として書いている)。
+                if (BlockWarned.Add(full)) Diagnostics.Log.Warn($"{Path.GetFileName(path)} は、読めなかった・退避できなかったので、保存を止めています (元のファイルを守るため)。");
                 return;
             }
         }

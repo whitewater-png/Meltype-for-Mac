@@ -826,4 +826,27 @@ internal static class UpstreamP46Tests
         var io = SafeFile.Describe(new IOException("Access to the path '/Users/someone/secret.json' is denied."));
         Assert.True(io.StartsWith("IOException (0x") && !io.Contains("someone") && !io.Contains('/'), "種類と HResult だけ: " + io);
     }
+
+    [Test]
+    public static void P46_32_BlockedPath_WarnsOnceNotOnEverySave()
+    {
+        // 止めたファイルへの保存のたびに警告を出すと、確定を 1000 回するとログ (上限 1000 件) が埋まって、止めた原因の行が押し出される。
+        var directory = TempDir("warn-once");
+        try
+        {
+            var path = Path.Combine(directory, "conv-" + Guid.NewGuid().ToString("N") + ".json");
+            var name = Path.GetFileName(path);
+            SafeFile.Block(path);
+            for (var i = 0; i < 20; i++) SafeFile.WriteAllBytes(path, [1, 2, 3]);
+            Assert.Equal(1, Diagnostics.Log.Snapshot().Count(e => e.Message.Contains(name)), "警告は 1 回だけ");
+            Assert.True(!File.Exists(path), "止めているので書かない");
+            SafeFile.Unblock(path);
+            SafeFile.WriteAllBytes(path, [1, 2, 3]);
+            Assert.True(File.Exists(path), "止めた状態が解けたら書ける");
+            SafeFile.Block(path);
+            SafeFile.WriteAllBytes(path, [4]);
+            Assert.Equal(2, Diagnostics.Log.Snapshot().Count(e => e.Message.Contains(name)), "止め直したら、また 1 回出る");
+        }
+        finally { SafeFile.ResetBlockedForTests(); Directory.Delete(directory, recursive: true); }
+    }
 }
