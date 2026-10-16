@@ -18,21 +18,29 @@ internal static class UpstreamP46Tests
     /// <summary>
     /// 同梱の英単語表のスペルチェッカー (アプリ・--repro と同じ) で打って Enter で確定した結果を、(打つ文字, 期待する文字) の表で確かめる。
     /// </summary>
-    private static void ExpectCommitted(params (string Typed, string Expected)[] cases)
+    private static void ExpectCommitted(params (string Typed, string Expected)[] cases) =>
+        ExpectCommitted(Detection.BuiltInWordChecker.Shared, cases);
+
+    /// <summary>判定器 checker を差し込んで、上と同じことをする。実機の NSSpellChecker に近い模擬 (NsLikeChecker) を渡すと、同梱の表だけでは見えない差が見える。</summary>
+    private static void ExpectCommitted(Detection.IWordChecker checker, params (string Typed, string Expected)[] cases)
     {
-        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        foreach (var (typed, expected) in cases) Assert.Equal(expected, Committed(checker, typed), typed);
+    }
+
+    /// <summary>判定器 checker を差し込んで、打って Enter で確定した結果を返す。終わったら元の判定器に戻す。</summary>
+    private static string Committed(Detection.IWordChecker checker, string typed)
+    {
+        var previous = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = checker;
         try
         {
-            foreach (var (typed, expected) in cases)
-            {
-                var k = new CompositionTests.Keyboard();
-                k.Type(typed + "\n");
-                Assert.Equal(expected, k.Host.Document, typed);
-            }
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            return k.Host.Document;
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = previous;
         }
     }
 
@@ -316,6 +324,7 @@ internal static class UpstreamP46Tests
         // 小書き文字 (xe・xi) を含む文の後ろが ふxえんす・ちxえっくいん のまま崩れていた (長い文を 1 回の変換ボックスに溜めたとき)。
         const string head = "kyounoasagohanwotabeteikaradenshadegakkounimukattatokorodengakkounokoutou"; // 73 文字
         const string headKana = "きょうのあさごはんをたべていからでんしゃでがっこうにむかったところでんがっこうのこうとう";
+        var previous = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = new LongStringsAreWordsChecker();
         try
         {
@@ -332,7 +341,7 @@ internal static class UpstreamP46Tests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = previous;
         }
     }
 
@@ -381,15 +390,15 @@ internal static class UpstreamP46Tests
     }
 
     /// <summary>
-    /// 実機の NSSpellChecker のように、英単語の頭 (shat・doit・ment・gat・gatt・mahout) を単語と答えるスペルチェッカー (同梱の英単語表はどれも答えない)。
-    /// それ以外は同梱の英単語表。
+    /// 実機の NSSpellChecker のように、同梱の英単語表にない語 (shat・doit・ment・gat・gatt・mahout・techno) も単語と答えるスペルチェッカー。
+    /// それ以外は同梱の英単語表。語の境目の読み方が実機でだけ変わるかを見る。
     /// </summary>
-    private sealed class WordHeadsAreWordsChecker : Detection.IWordChecker
+    private sealed class NsLikeChecker : Detection.IWordChecker
     {
         public bool IsAvailable => true;
 
         public bool IsWord(string lower) =>
-            lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+            lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" or "techno" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
     }
 
     [Test]
@@ -397,7 +406,8 @@ internal static class UpstreamP46Tests
     {
         // 本家 #594: shatsu が、実機では shatす (NSSpellChecker が shat を単語と答える) になる。同梱の表では しゃつ で、実機でだけ崩れる。
         // 英単語の頭の t + s を つ にまとめるかを、「かな + つ」が、よく使う語 (readings.txt) の頭になるか (しゃつ・どいつ・めんつ・がっつ・まほうつ) でも見る。
-        CompositionTests.Detector.SpellChecker = new WordHeadsAreWordsChecker();
+        var previous = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = new NsLikeChecker();
         try
         {
             foreach (var (typed, expected) in new[]
@@ -415,7 +425,31 @@ internal static class UpstreamP46Tests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = previous;
         }
+    }
+
+    [Test]
+    public static void P46_23_DictionaryAdditions_AlsoHoldWithNsLikeChecker()
+    {
+        // 辞書の追加 (P46-1〜15) を、実機の NSSpellChecker のように techno なども単語と答える判定器でも確かめる。
+        // 同梱の英単語表だけでは、実機でだけ起きる差 (語の境目の読み方の違い) が見えない。
+        ExpectCommitted(new NsLikeChecker(),
+            ("infobesity", "infobesity"), ("infobesitywo", "infobesityを"), ("kyouhainfobesity", "きょうはinfobesity"),
+            ("vibecoding", "vibecoding"), ("oem3", "oem3"), ("Xcode", "Xcode"), ("DeepSeek", "DeepSeek"), ("Mozc", "Mozc"),
+            ("guesstimation", "guesstimation"), ("greedflationwo", "greedflationを"), ("robonomicswo", "robonomicsを"), ("netizenrywo", "netizenryを"),
+            ("japanese", "japanese"), ("japanesewo", "japaneseを"), ("data", "data"), ("datawo", "dataを"), ("kyouhadatawo", "きょうはだたを"),
+            ("adtech", "adtech"), ("adtechwo", "adtechを"), ("kyouhaadtech", "きょうはadtech"), ("kyouhaadtechwo", "きょうはadtechを"));
+    }
+
+    [Test]
+    public static void P46_23_Adtech_KnownLimit_NoAfterAdtechIsEnglishWithNsLikeChecker()
+    {
+        // 既知の限界 (KNOWN_LIMITS): 実機の NSSpellChecker は techno を単語と答えるので、adtech + の (adtechno…) の no が英語側に取り込まれる
+        // (今までは adtechのような だった)。adtech 単独・助詞つき (を・は など)・日本語の後ろは直るので、辞書には入れたままにしている。
+        // 直ったら、この期待値を adtechのような に変える。
+        ExpectCommitted(new NsLikeChecker(), ("adtechnoyouna", "adtechnoyouna"));
+        // 同梱の英単語表では adtechのような のまま
+        ExpectCommitted(("adtechnoyouna", "adtechのような"));
     }
 }
