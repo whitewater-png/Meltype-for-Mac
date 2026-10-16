@@ -163,4 +163,17 @@ internal static class UpstreamP46Tests
         vrchat.Type("buia-rutyatto\n");
         Assert.Equal("VRChat", vrchat.Host.Document, "buia-rutyatto");
     }
+
+    [Test]
+    public static void P46_11_UchikataKaikata_OfferBothReadings()
+    {
+        // 本家 PR #615 の辞書の部分だけ: うちかた (打ち方・撃ち方)、かいかた (買い方・飼い方) の同音異義語を候補に出す。
+        foreach (var (keys, expected) in new[] { ("uchikata ", "打ち方"), ("uchikata ", "撃ち方"), ("kaikata ", "買い方"), ("kaikata ", "飼い方") })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(keys);
+            var candidates = k.Host.View?.Candidates ?? [];
+            Assert.True(candidates.Contains(expected), keys + ": " + string.Join(" | ", candidates));
+        }
+    }
 }
