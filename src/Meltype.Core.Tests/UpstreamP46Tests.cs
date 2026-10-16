@@ -414,16 +414,16 @@ internal static class UpstreamP46Tests
     }
 
     /// <summary>
-    /// 実機の NSSpellChecker が単語と答える語のうち、確かめた 9 語 (shat・doit・ment・gat・gatt・mahout・techno・empowerment・entitlement。後ろの 2 語は P46-47 で足した) だけを足した模擬。
+    /// 実機の NSSpellChecker が単語と答える語のうち、確かめた 10 語 (shat・doit・ment・gat・gatt・mahout・techno・empowerment・entitlement・ament。後ろの 3 語は P46-47・P46-48 で足した) だけを足した模擬。
     /// それ以外は同梱の英単語表のまま。実機はほかにも表にない語 (datas・taanal など) を単語と答えるので、無作為の 577 入力では 5.5% ほど食い違う。
-    /// 見つけられるのは、この 9 語に関わる、語の境目の読み方が実機でだけ変わる退行に限られる。
+    /// 見つけられるのは、この 10 語に関わる、語の境目の読み方が実機でだけ変わる退行に限られる。
     /// </summary>
     private sealed class NsLikeChecker : Detection.IWordChecker
     {
         public bool IsAvailable => true;
 
         public bool IsWord(string lower) =>
-            lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" or "techno" or "empowerment" or "entitlement" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+            lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" or "techno" or "empowerment" or "entitlement" or "ament" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
     }
 
     [Test]
@@ -457,7 +457,7 @@ internal static class UpstreamP46Tests
     [Test]
     public static void P46_23_DictionaryAdditions_AlsoHoldWithNsLikeChecker()
     {
-        // 辞書の追加 (P46-1〜15) を、実機の NSSpellChecker の答えを 9 語だけまねた判定器 (NsLikeChecker) でも確かめる。
+        // 辞書の追加 (P46-1〜15) を、実機の NSSpellChecker の答えを 10 語だけまねた判定器 (NsLikeChecker) でも確かめる。
         // 同梱の英単語表だけでは、実機でだけ起きる差 (語の境目の読み方の違い) が見えない。
         ExpectCommitted(new NsLikeChecker(),
             ("infobesity", "infobesity"), ("infobesitywo", "infobesityを"), ("kyouhainfobesity", "きょうはinfobesity"),
@@ -496,11 +496,17 @@ internal static class UpstreamP46Tests
         // main の規則は、伸ばす音の u から始まる語 (unemployment。本家 7a20aff) と、同梱の一覧にない母音 1 つの単位から始まる語 (empowerment。H1) を飛ばす。
         // 単独の main では ment が (実機の NSSpellChecker が単語と答えるので) 救い、単独の P46 では長い語が救っていたのが、両方が入ると何も見られなくなる。
         // 断片が知っている英単語で、さらに前へ伸ばした並びも知っている英単語なら、断片は長い語の終わりなので、読みの頭として飛ばさない。
+        // 変異の確認 (5 回目の査読 RM-01。P46-47 で答えが変わる入力と、語頭から始まる語・記号をはさむ形の 2,848 入力を、BI と NS で現在のコードと比べた):
+        // 長い語の下限 (ループの letters.Length >= 4) を 6 にすると 208 入力で答えが変わる → ament の例で赤になる。
+        // 最初の letters.Length < 4 を外す (後ろの本判定が 4 文字以上を要るので、実機の判定器を呼ぶ回数が増えるだけ)・ループの j >= 0 を j > 0 にする・
+        // ループの「英字だけの単位」の条件を外す、の 3 つは 1 入力も変わらない (等価変異とみなす。テストでは見分けられないので足さない)。
         ExpectCommitted(new NsLikeChecker(),
             // 長音の u から始まる語 (同梱の一覧にある unemployment)。o・u の段の後ろ (このう) でも同じ
             ("souunemploymentsuru", "そうunemploymentする"), ("kyouunemploymentsurudake", "きょうunemploymentするだけ"), ("konounemploymentsuru", "このunemploymentする"),
             // 同梱の一覧にない、母音で始まる語。前が o・u の段でなくても (きょうは・いま・これを) 同じ
             ("kyouhaempowermentsuru", "きょうはempowermentする"), ("imaentitlementsuru", "いまentitlementする"), ("korewoempowermentsu", "これをempowermentす"),
+            // 前の 1 単位 (a) と断片 (ment) で、短い語 (ament。5 文字) になる形。ループの中の長い語の下限を 6 以上にすると、日本語の いまあめんつる に戻る (5 回目の査読 RM-01)
+            ("imaamentsuru", "いまamentする"), ("kyouhaamentsuru", "きょうはamentする"),
             // 守り: 前に英単語が続かない断片は P46-20 のとおり日本語 (めんつ・しゃつ)
             ("mentsu", "めんつ"), ("kyouhamentsuwo", "きょうはめんつを"), ("shatsu", "しゃつ"), ("kyouhashatsuwokau", "きょうはしゃつをかう"),
             // 守り: 語尾が su で始まらなければ t と s は つ にならない。語全体が先頭にあるときも今までどおり
