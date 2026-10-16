@@ -415,7 +415,7 @@ internal static class UpstreamP46Tests
 
     /// <summary>
     /// 実機の NSSpellChecker が単語と答える語のうち、確かめた 10 語 (shat・doit・ment・gat・gatt・mahout・techno・empowerment・entitlement・ament。後ろの 3 語は P46-47・P46-48 で足した) だけを足した模擬。
-    /// それ以外は同梱の英単語表のまま。実機はほかにも表にない語 (datas・taanal など) を単語と答えるので、無作為の 577 入力では 5.5% ほど食い違う。
+    /// それ以外は同梱の英単語表のまま。実機はほかにも表にない語 (datas・taanal など) を単語と答えるので、無作為の 577 入力では 5.5% ほど食い違う (7 語のときに測った値。語を足したあとは測り直していない)。
     /// 見つけられるのは、この 10 語に関わる、語の境目の読み方が実機でだけ変わる退行に限られる。
     /// </summary>
     private sealed class NsLikeChecker : Detection.IWordChecker
@@ -424,6 +424,17 @@ internal static class UpstreamP46Tests
 
         public bool IsWord(string lower) =>
             lower is "shat" or "doit" or "ment" or "gat" or "gatt" or "mahout" or "techno" or "empowerment" or "entitlement" or "ament" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    /// <summary>
+    /// 論理の確認用 (実機のまねではない): cadent (ca + dent) を単語と答える判定器。IsPartOfLongerEnglishWord の「先頭の単位まで伸ばす」ところ (ループの j >= 0) を試すためだけに使う。
+    /// 実機の NSSpellChecker も同梱の英単語表も cadent を単語と答えないので、この形は今の判定器では起きない。
+    /// </summary>
+    private sealed class HeadWordChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+
+        public bool IsWord(string lower) => lower is "cadent" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
     }
 
     [Test]
@@ -496,10 +507,14 @@ internal static class UpstreamP46Tests
         // main の規則は、伸ばす音の u から始まる語 (unemployment。本家 7a20aff) と、同梱の一覧にない母音 1 つの単位から始まる語 (empowerment。H1) を飛ばす。
         // 単独の main では ment が (実機の NSSpellChecker が単語と答えるので) 救い、単独の P46 では長い語が救っていたのが、両方が入ると何も見られなくなる。
         // 断片が知っている英単語で、さらに前へ伸ばした並びも知っている英単語なら、断片は長い語の終わりなので、読みの頭として飛ばさない。
-        // 変異の確認 (5 回目の査読 RM-01。P46-47 で答えが変わる入力と、語頭から始まる語・記号をはさむ形の 2,848 入力を、BI と NS で現在のコードと比べた):
-        // 長い語の下限 (ループの letters.Length >= 4) を 6 にすると 208 入力で答えが変わる → ament の例で赤になる。
-        // 最初の letters.Length < 4 を外す (後ろの本判定が 4 文字以上を要るので、実機の判定器を呼ぶ回数が増えるだけ)・ループの j >= 0 を j > 0 にする・
-        // ループの「英字だけの単位」の条件を外す、の 3 つは 1 入力も変わらない (等価変異とみなす。テストでは見分けられないので足さない)。
+        // 変異の確認 (5 回目の査読 RM-01 と 6 回目の RN-01。P46-47 で答えが変わる入力と、語頭から始まる語・記号をはさむ形の 2,848 入力を、BI と NS で現在のコードと比べた):
+        // - 長い語の下限 (ループの letters.Length >= 4) を 6 にすると 208 入力で答えが変わる → ament の例で赤になる。
+        // - ループの j >= 0 を j > 0 にすると、現在の判定器 (同梱の表・NS) では 2,848 入力のどれも変わらないが、等価ではない。先頭の単位から始まる語が、全体も「かな + つ」の読みの頭に見えるとき
+        //   (外側のループの先頭の単位でも ReadsAsJapaneseWithTsu が真になって受け入れられない) だけ変わる。今の判定器にはそのような語が無いので、cadent を単語と答える
+        //   試験用の判定器 (HeadWordChecker) の例を下に足した (論理の確認。実機で起きる形ではない)。
+        // - 最初の letters.Length < 4 を外す (同じ単位の後ろの本判定が 4 文字以上を要るので、判定器を呼ぶ回数が増えるだけ)・ループの「英字だけの単位」の条件を外す
+        //   (IsKnownEnglishWord が ASCII の小文字以外を含む並びを単語としないので、数字・記号をはさんだ並びは以降ずっと知らない語になり、元のコードがそこでループを終えるのと同じ) は、
+        //   読みでも測っても等価。
         ExpectCommitted(new NsLikeChecker(),
             // 長音の u から始まる語 (同梱の一覧にある unemployment)。o・u の段の後ろ (このう) でも同じ
             ("souunemploymentsuru", "そうunemploymentする"), ("kyouunemploymentsurudake", "きょうunemploymentするだけ"), ("konounemploymentsuru", "このunemploymentする"),
@@ -511,6 +526,9 @@ internal static class UpstreamP46Tests
             ("mentsu", "めんつ"), ("kyouhamentsuwo", "きょうはめんつを"), ("shatsu", "しゃつ"), ("kyouhashatsuwokau", "きょうはしゃつをかう"),
             // 守り: 語尾が su で始まらなければ t と s は つ にならない。語全体が先頭にあるときも今までどおり
             ("kyouhaempowermentsareta", "きょうはempowermentされた"), ("empowermentsuru", "empowermentする"), ("sounitsuite", "そうについて"));
+        // 先頭の単位から始まる語 (ループの j >= 0 の境目。6 回目の査読 RN-01)。cadent は ca + dent で、全体も断片 (dent) も知っている語、全体は「かな + つ」の読みの頭にも見える。
+        // 先頭の単位まで伸ばさないと、全体が日本語に読まれる (かでんつる)。対照は先頭が日本語の形。
+        ExpectCommitted(new HeadWordChecker(), ("cadentsuru", "cadentする"), ("kyouhacadentsuru", "きょうはcadentする"));
     }
 
     [Test]
