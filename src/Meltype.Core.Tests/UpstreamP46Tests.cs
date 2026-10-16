@@ -200,4 +200,12 @@ internal static class UpstreamP46Tests
         ExpectCommitted((".exe", ".exe"), (".gitignore", ".gitignore"), (".env", ".env"), (".zshrc", ".zshrc"), (".exedesu", ".exeです"),
             ("3.14desu", "3.14です"), ("desu.", "です。"));
     }
+
+    [Test]
+    public static void P46_15_Data_StaysEnglish_ExceptAfterJapanese()
+    {
+        // 本家 #34: data が だた になっていた。english-readable.txt に足し、main・domain と同じく日本語のすぐ後ろでは英語にしない
+        // (kyouhadatawo = きょうはだたを。日本語の語の終わり + data の綴りが、はだ + た などと読めるため)。
+        ExpectCommitted(("data", "data"), ("datawo", "dataを"), ("dataha", "dataは"), ("kyouhadatawo", "きょうはだたを"), ("kyouhadata", "きょうはだた"));
+    }
 }

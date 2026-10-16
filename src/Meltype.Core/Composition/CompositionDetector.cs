@@ -94,7 +94,7 @@ public sealed class CompositionDetector
     /// 同じ入力の中の日本語や、かな側の記号 (`main`・(main)・。) の後ろでは今までどおりかな。入力の先頭は、前に確定した文 (前の行) が日本語でも英語にする
     /// (前の行が日本語の TextEdit で mainnima-ji が まいんに → mine に になっていた。Q11 の実機確認)。
     /// </summary>
-    private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain" };
+    private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain", "data" };
 
     /// <summary>ローマ字 letters の読みで始まる、よく使う日本語の語・ブランド名があるか。</summary>
     private bool StartsJapaneseReading(string letters)
