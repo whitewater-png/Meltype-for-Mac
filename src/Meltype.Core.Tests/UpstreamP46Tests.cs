@@ -521,7 +521,7 @@ internal static class UpstreamP46Tests
         // main の規則は、伸ばす音の u から始まる語 (unemployment。本家 7a20aff) と、同梱の一覧にない母音 1 つの単位から始まる語 (empowerment。H1) を飛ばす。
         // 単独の main では ment が (実機の NSSpellChecker が単語と答えるので) 救い、単独の P46 では長い語が救っていたのが、両方が入ると何も見られなくなる。
         // 断片が知っている英単語で、さらに前へ伸ばした並びも知っている英単語なら、断片は長い語の終わりなので、読みの頭として飛ばさない。
-        // 変異の確認 (5 回目の査読 RM-01、6 回目の RN-01、7 回目の RP1-01・02、8 回目の RQ1-01・02、9 回目の RR1-02、10 回目の RS1-01・02、11 回目の RT1-01・02、12 回目の RU1-01・03、13 回目の RW1-01・02、14 回目の RX1-01・02、15 回目の RY1-01・02。P46-47 で答えが変わる入力と、語頭から始まる語・記号をはさむ形の 2,848 入力を、BI と NS で現在のコードと比べた。
+        // 変異の確認 (5 回目の査読 RM-01、6 回目の RN-01、7 回目の RP1-01・02、8 回目の RQ1-01・02、9 回目の RR1-02、10 回目の RS1-01・02、11 回目の RT1-01・02、12 回目の RU1-01・03、13 回目の RW1-01・02、14 回目の RX1-01・02、15 回目の RY1-01・02、16 回目の RZ1-01・02。P46-47 で答えが変わる入力と、語頭から始まる語・記号をはさむ形の 2,848 入力を、BI と NS で現在のコードと比べた。
         // 7 回目の査読員は、長い語 (BI 3,360・NS 500) と別の作り方の入力 (BI は大文字・数字や記号をはさむ形・短い断片・非常に長い列・深い語の 4,292、NS は大文字と深い語の 668) の、合わせて BI 7,652・NS 1,168 入力で、
         // 8 回目の査読員は、長い語 39 × 頭 4 × 尾 2 = 312 入力と、大文字の置き方 76 × 頭 3 × 尾 2 = 456 入力で、BI と NS で比べた。
         // 8 回目の対応では、6 語の大文字の置き方 82 通り × 頭 3 × 尾 2 = 492 入力を、この模擬の判定器で比べた。
@@ -539,7 +539,9 @@ internal static class UpstreamP46Tests
         // = 84 入力と、前置き 2 (kyouha・ima) × 7 文字以上の大文字だけの並び 11 (辞書に無い HTTPSAPI・GITHUBAPI など 8 と、辞書の語 WARNING・UNDERSTANDING・INTERNATIONAL)
         // × 後ろ 4 (amentsuru など)・3 (Amentsuru など) = 88・66 入力を、BI と NS で比べた。
         // 15 回目の査読員は、前置き 2 (kyouha・ima) × 10 文字以上の大文字だけの並び 10 (辞書に無い HTTPSAPIJP・GITHUBAPIJP など 8 と、辞書の語 INTERNATIONAL・UNDERSTANDING)
-        // × 後ろ 3 (amentsuru・pantsuwokau・dentsu) = 60 入力を、BI と NS で比べた):
+        // × 後ろ 3 (amentsuru・pantsuwokau・dentsu) = 60 入力を、BI と NS で比べた。
+        // 16 回目の査読員は、大文字だけの並び 32 (7 文字以上の 16 と、QWER・AWSJ など 2〜6 文字の 16) × 8 形 (kyouha・ima・入力の頭の後の頭が大文字・小文字の語と、守りの 2 形)
+        // = 256 入力を、BI と NS で比べた):
         // - 長い語の下限 (ループの letters.Length >= 4) を 6 にすると 208 入力で答えが変わる → ament の例で赤になる。
         // - ループの j >= 0 を j > 0 にすると、現在の判定器 (同梱の表・NS) では 2,848 入力のどれも変わらないが、等価ではない。先頭の単位から始まる語が、全体も「かな + つ」の読みの頭に見えるとき
         //   (外側のループの先頭の単位でも ReadsAsJapaneseWithTsu が真になって受け入れられない) だけ変わる。今の判定器にはそのような語が無いので、cadent を単語と答える
@@ -570,6 +572,11 @@ internal static class UpstreamP46Tests
         //   だけだと、K = 10〜13 のもの (15 回目の査読員の capsnw10・capsnw10u・capsnw13) が赤にならないが、答えが変わる (15 回目の査読員の 60 入力で、capsnw10 は NS 16/60・BI 0 入力。変わるのは辞書に無い 8 つの並び × 前置き 2 の amentsuru の形だけで、kyouhaHTTPSAPIJPamentsuru が きょうはHTTPSAPIJPあめんつる に)
         //   → 辞書に無い並びを 7〜13 文字で 1 つずつ置いた例で、K = 2〜13 の写し方 (capsnw2〜13・capsnw2u〜13u) がどれも赤になる (K = 8〜13 の 1 本目の赤は、K 文字以上の辞書に無い並びのうち並びの最初の例。10〜13 は、足した HTTPSAPIJP・NASDAQJPAPI・HTTPSAPIJSON・GITHUBAPIJSON の例)。直前の大文字の並びがちょうど K 文字のときだけに当てる写し方 (capsnwKx・capsnwKux) も、
         //   K = 7〜13 のどれも、ちょうど K 文字の例 (JSONAPI・HTTPSAPI・GITHUBAPI・HTTPSAPIJP・NASDAQJPAPI・HTTPSAPIJSON・GITHUBAPIJSON) で赤になる。K を 14 以上にした写し方 (capsnw14・capsnw14u) は、14 文字以上の辞書に無い大文字だけの並びの例が無いので、テストで捕まえていない。
+        //   この写し方を、並びが入力の頭から始まる (前置きの無い) ときだけに当てたもの (capsnw7s・lowabbr3s) と、ちょうど 3〜5 文字の並びだけに当てたもの
+        //   (capsnw3x〜5x・capsnw3ux〜5ux。どれも 16 回目の査読員) は、前置きの無い頭が小文字の語の例が 2 文字の AIamentsuru だけで、3〜5 文字の並びの例が辞書の語
+        //   (API・HTTP・HTTPS) だけだと赤にならないが、答えが変わる (16 回目の査読員の 256 入力で、capsnw7s は NS 26・lowabbr3s は NS 58・capsnw4x は NS 8 入力 (BI はどれも 0)。例: HTTPSAPIJPamentsu が HTTPSAPIJPあめんつ に、kyouhaQWERamentsuru が きょうはQWERあめんつる に) → 下の略語の並びの位置 3 × 語の頭 2 の形と、辞書に無い 3〜5 文字の並びの例で、16 回目の査読員の 12 本 (capsnw7s・lowabbr3s・capsnw2x〜6x・capsnw2ux〜6ux) がどれも赤になる (1 本目の赤は、capsnw7s が HTTPSAPIamentsu、lowabbr3s が APIamentsu、capsnw3x〜5x が kyouhaJPNamentsuru・kyouhaQWERamentsuru・kyouhaJETROamentsuru)。
+        //   変異が条件にできる次元 (並びの長さ・辞書の語か・位置・語の頭) の組ごとに、ちょうど K 文字の並びだけに当てる写し方を作って流した (格子の族): 150 本のうち、置いた組と長さ (辞書に無い並び 2〜13 文字・辞書の語の並び 3〜13 文字) の 138 本はどれも、その組の形とその長さの並びの例で赤になる。緑は、14 文字以上に当てるもの (6 本) と、2 文字の辞書の語の並びだけに当てるもの (6 本。IsKnownEnglishWord は 3 文字未満の語を辞書の語としないので、この写し方は答えを変えない)。
+        //   語の後ろ (su・suru・wokau) で条件を付けた写し方は答えを変えない (開発機の NSSpellChecker と同梱の表で 423 入力の答えを変えない (判断のときの最後の単位 (n か t) で条件を付けた対照は NS で 276 入力を変える))。t と s を つ にまとめる判断は後ろを打つ前に行われ、後ろは差し込み先から見えない。
         // - 伸ばす音の う から始まる語を、長い語の一部なら飛ばさない変異と、断片が長い語の一部なら外側の最後の判定を飛ばしてすぐ英単語とみなす変異 (どちらも 11 回目の査読員) は、
         //   査読員の入力 (前者は 56 入力、後者は 420 入力。BI・NS) で答えが変わらず、テストで捕まえていない (後者は、断片が同梱の一覧にない母音 1 つの単位から始まるときだけ
         //   差が出うる)。
@@ -662,14 +669,26 @@ internal static class UpstreamP46Tests
         // 10 文字の HTTPSAPIJP・11 文字の NASDAQJPAPI・12 文字の HTTPSAPIJSON・13 文字の GITHUBAPIJSON は 15 回目の査読 RY1-01)。7 文字以上の例が辞書の語 (WARNING・UNDERSTANDING)
         // だけだと、大文字だけの語の規則を、直前の大文字の並びが辞書の語でない (略語の) ときだけに当てる写し方が赤にならない (NS では kyouhaHTTPSAPIamentsuru が きょうはHTTPSAPIあめんつる に、kyouhaHTTPSAPIAmentsuru が きょうはHTTPSAPIAめんつる に崩れる。同梱の表では、この 4 つの形はどの木でも崩れているので答えが変わらない)。
         // 辞書に無い並びの例が 8・9 文字だけだと、その写し方を 10 文字以上の並びだけに当てたもの (capsnw10 など) も赤にならない (NS では、足した 10〜13 文字の並びの頭が小文字の 2 つの形が崩れる (kyouhaHTTPSAPIJPamentsuru が きょうはHTTPSAPIJPあめんつる に)。同梱の表では、この形はどの木でも崩れているので答えが変わらない)。
-        // 長さごとに 1 つずつ置くのは、ちょうど n 文字の並びだけに当てる写し方も捕まえるため。14 文字以上の並びだけに当てる写し方は、14 文字以上の例を置いていないので捕まえていない。
-        // 開発機の NSSpellChecker と同梱の表で 5 つの木に流した答えも、上の略語の例と同じ形。
-        foreach (var abbr in new[] { "PC", "API", "HTTP", "HTTPS", "NASDAQ", "WARNING", "UNDERSTANDING", "HTTPSAPI", "GITHUBAPI", "JSONAPI", "HTTPSAPIJP", "NASDAQJPAPI", "HTTPSAPIJSON", "GITHUBAPIJSON" })
+        // 形と並びは、写し方が差し込み先 (IsPartOfLongerEnglishWord のループ) で条件にできる次元をそろえて置く (16 回目の査読 RZ1-01・02):
+        // - 位置 3 (kyouha の後・ima の後・入力の頭) × 語の頭 2 (大文字・小文字) の 6 形をどれも置く。入力の頭の頭が小文字の語 ({abbr}amentsu) と ima の後の頭が大文字の語
+        //   (ima{abbr}Amentsu) は 16 回目に足した (それまで前置きの無い頭が小文字の語の例は 2 文字の AIamentsuru だけだった。RZ1-01)。守りの断片も 3 つの位置に置く
+        //   (ima{abbr}pantsu を足した)。
+        // - 並びは、辞書に無い並びを 2〜13 文字で 1 つずつ (3・4・5 文字の JPN・QWER・JETRO は 16 回目に足した。それまで 3〜5 文字の例は辞書の語の API・HTTP・HTTPS
+        //   だけだった。RZ1-02)、大文字だけの辞書の語を 3〜13 文字で 1 つずつ (6・8〜12 文字の SYSTEM・PASSWORD・DIRECTORY・TECHNOLOGY・INFORMATION・RELATIONSHIP は
+        //   16 回目に足した) 置く。2 文字の並びは、どの判定器でも辞書の語にならない (IsKnownEnglishWord は 3 文字未満の語を辞書の語としない) ので、2 文字の辞書の語の並びは置けない。
+        //   辞書の語か否かは、NsLikeChecker (同梱の表) の答え。開発機の NSSpellChecker は NASDAQ を辞書の語と答える (NS では 6 文字の辞書に無い並びの例は無い)。
+        // - 語の後ろ (su・suru・wokau) は次元に入れていない (上の変異の注のとおり、差し込み先から見えない)。
+        // 捕まえていない写し方: 14 文字以上の並びだけに当てるもの (14 文字以上の例を置いていない)、kyouha・ima 以外の前置きだけ、ament・pant 以外の断片だけに当てるもの。
+        // 2 文字の辞書の語の並びだけに当てる写し方は、その条件が真にならない (上のとおり) ので、答えを変えない。P46-58 で書いた「14 文字以上の並びだけに
+        // 当てる写し方は捕まえていない」は、捕まえていないのが 14 文字以上だけと読めたが、3〜5 文字の辞書に無い並びの例が無かった (この書き方は 16 回目の査読 RZ1-02 で直した)。
+        // 開発機の NSSpellChecker と同梱の表で 5 つの木に流した答えも、上の略語の例と同じ形 (入力の頭の頭が小文字の語は今の頭が小文字の語と、ima の後の頭が大文字の語は
+        // 今の頭が大文字の語と、ima の守りは今の守りと同じ木で崩れる)。
+        foreach (var abbr in new[] { "PC", "API", "HTTP", "HTTPS", "NASDAQ", "WARNING", "UNDERSTANDING", "HTTPSAPI", "GITHUBAPI", "JSONAPI", "HTTPSAPIJP", "NASDAQJPAPI", "HTTPSAPIJSON", "GITHUBAPIJSON", "JPN", "QWER", "JETRO", "SYSTEM", "PASSWORD", "DIRECTORY", "TECHNOLOGY", "INFORMATION", "RELATIONSHIP" })
         {
             ExpectCommitted(new NsLikeChecker(), ($"kyouha{abbr}Amentsuru", $"きょうは{abbr}Amentする"), ($"kyouha{abbr}amentsuru", $"きょうは{abbr}amentする"),
-                ($"ima{abbr}amentsu", $"いま{abbr}amentす"), ($"{abbr}Amentsu", $"{abbr}Amentす"));
+                ($"ima{abbr}amentsu", $"いま{abbr}amentす"), ($"{abbr}Amentsu", $"{abbr}Amentす"), ($"{abbr}amentsu", $"{abbr}amentす"), ($"ima{abbr}Amentsu", $"いま{abbr}Amentす"));
             foreach (var checker in new Detection.IWordChecker[] { Detection.BuiltInWordChecker.Shared, new NsLikeChecker() })
-                ExpectCommitted(checker, ($"kyouha{abbr}pantsuwokau", $"きょうは{abbr}ぱんつをかう"), ($"{abbr}pantsu", $"{abbr}ぱんつ"));
+                ExpectCommitted(checker, ($"kyouha{abbr}pantsuwokau", $"きょうは{abbr}ぱんつをかう"), ($"ima{abbr}pantsu", $"いま{abbr}ぱんつ"), ($"{abbr}pantsu", $"{abbr}ぱんつ"));
         }
     }
 
