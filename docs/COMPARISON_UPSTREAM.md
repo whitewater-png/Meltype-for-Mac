@@ -21,10 +21,10 @@ Meltype for Mac を、本家 (Windows 版 `yksr-melt/Meltype` の main) と並�
 | 判定精度 2 の broken 28 件の内訳 | `compare.md` の broken 表 | すべて `upstream-quality.tsv`。`my name is taro`、`apinoerror`、`inviteshimashita`、`や` + 英単語 7 件 (`yapython`・`githubya` など)、`devtoprod` 型 5 件、`site PR`、`*pedia` 型 8 件、`i18n`・`l10n`・`h2o` など。対応づけは §5 (2026-10-15 実施)。**28 件すべてが、本家が `a4b6f1a` より前に直したもので、Mac 版に入っていない分** (26 件は P45 で意図して見送った分、2 件 `my name is taro`・`apinoerror` は本家 `4ce7ca8` が候補)。`a4b6f1a` 以降の本家の修正で直ったものは 0 件。Mac 版の後からの回帰と疑える件は見つからなかった (§5) |
 | 判定精度 3: Mac 固有コーパスでの上乗せ | 判定精度 2 の `mac-device.tsv` / `mac-terminal.tsv` の行 | 上の表のとおり。`mac-terminal.tsv` の外れ 4 件は「今は外れると分かっている」例を含めた表 (`eval/README.md`)。この外れ 4 件の内訳は、引用元の記載を転記したもので、今回再確認していない |
 | 判定精度 4: 実機の体感・かな漢字変換 | リョウさんの実機 (「打った>結果」形式で `mac-device.tsv` に足す)。かな→漢字は `eval/kanji/kanji-cases.tsv` (212 文) を Zenzai の計測で使う | **未計測** (本家との比較としては実機の数字は無い。Zenzai の計測結果は [ZENZAI_EXPERIMENT_2026-10.md](ZENZAI_EXPERIMENT_2026-10.md)) |
-| 機能: 本家の変更の取り込み状況 | [UPSTREAM_WATCH.md](UPSTREAM_WATCH.md) の「取り込み」列と [UPSTREAM_PR_TRACKER.md](UPSTREAM_PR_TRACKER.md) の P 項目 | 本家 main は watch が最後に見た `db433da` より 28 コミット先 (未分類)。watch の候補表の 2 件はどちらも「未」。管理表の保留・未着手は P40〜P44。**機能の網羅的な比較表 (本家にあって Mac 版に無いもの/逆) は未作成 = 未計測** |
+| 機能: 本家の変更の取り込み状況 | [UPSTREAM_WATCH.md](UPSTREAM_WATCH.md) の「取り込み」列と [UPSTREAM_PR_TRACKER.md](UPSTREAM_PR_TRACKER.md) の P 項目 | 本家 main `45e14f8` (2026-10-14) までの 28 コミット (PR 単位 12 件) は 2026-10-16 に分類し、取り込み (P46) と見送りを管理表に記録した (watch の seen も `45e14f8` に進めた。精査は [UPSTREAM_REVIEW_2026-10-16.md](UPSTREAM_REVIEW_2026-10-16.md))。管理表の保留・未着手は P40〜P44。**機能の網羅的な比較表 (本家にあって Mac 版に無いもの/逆) は未作成 = 未計測** |
 | 対応ホスト | [HOST_COMPAT.md](HOST_COMPAT.md) の 8 項目の打鍵表 (リョウさんの Mac で手動) | Mac 版: 7 アプリ確認済み (再変換が効かないのは Google ドキュメント・ターミナル。文字は壊れない。この表は引用元の記載を転記したもので、今回再確認していない)、VS Code・Slack は未確認。確認日 2026-10-14、ビルドは `446dd48`。**本家 (Windows 版) のホスト対応は対象外で、同じ打鍵表での比較は未計測** |
-| 既知の制限 | [KNOWN_LIMITS.md](KNOWN_LIMITS.md) の「件数」の表 | Mac 版 67 件 (仕様 40 / 直す予定 8 / 直った 9 / 未確認 10。2026-10-16 に KNOWN_LIMITS の表の行を数えて件数表と一致することを確認) [更新 2026-10-16: もとは「58 件 (仕様 34 / 直す予定 9 / 直った 5 / 未確認 10)」で、引用元の記載の転記だった]。本家の制限は同じ基準で数えていないので**未計測** |
-| 参考: Mac 版のテスト件数 | `src/Meltype.Core.Tests` の通常実行 | 今回は再実行していない (直近の記録は IMPROVEMENT_PLAN の 1 音確定の節: 659/661、環境由来の 2 件を除き通過。(引用元の記載を転記したもので、今回再確認していない)) |
+| 既知の制限 | [KNOWN_LIMITS.md](KNOWN_LIMITS.md) の「件数」の表 | Mac 版 74 件 (仕様 45 / 直す予定 9 / 直った 9 / 未確認 11。2026-10-16 の P46 の取り込み後に KNOWN_LIMITS の表の行を数えて件数表と一致することを確認) [更新 2026-10-16: もとは「58 件 (仕様 34 / 直す予定 9 / 直った 5 / 未確認 10)」で、引用元の記載の転記だった]。本家の制限は同じ基準で数えていないので**未計測** |
+| 参考: Mac 版のテスト件数 | `src/Meltype.Core.Tests` の通常実行 | 2026-10-16 の P46 の取り込み後に、統合した木 (P46 の枝 + main `657d042`) で 852 件すべて通過 (`src/Meltype.Core.Tests` の通常実行。Windows / Linux では未確認) |
 
 ### 数字の注意
 
