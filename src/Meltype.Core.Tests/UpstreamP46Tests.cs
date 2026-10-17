@@ -580,7 +580,7 @@ internal static class UpstreamP46Tests
         //   語の後ろ (su・suru・wokau) で条件を付けた写し方は答えを変えない (開発機の NSSpellChecker と同梱の表で 423 入力の答えを変えない (判断のときの最後の単位 (n か t) で条件を付けた対照は NS で 276 入力を変える))。t と s を つ にまとめる判断は後ろを打つ前に行われ、後ろは差し込み先から見えない。
         //   語の頭が大文字の子音のときだけに当てる写し方 (sa1_consU。17 回目の査読員) は、大文字の並びの直後の頭が大文字の語の例が A (Ament) と U (PCUnderachievement)
         //   だけだと赤にならないが、答えが変わる (17 回目の査読員の 180 入力で、開発機の NSSpellChecker で 30・同梱の表で 0 入力。例: kyouhaHTTPSDocumentsuru が きょうはHTTPSDおくめんつる に (変異なしは きょうはHTTPSDocumentする)) → 下の略語の並びの頭が大文字の子音の形 ({abbr}Cement) で赤になる。
-        //   語の頭の字の種類ごとに写し方を作って流した: 頭が大文字の子音 (sa1_consU・3 文字以上の並びの後だけの h_UC3)・A (h_UA)・A 以外の大文字の母音 (h_Uv。並びが 3 文字以上のときだけの h_Uv3・kyouha の後のほかだけの h_UvIH も)・小文字の a 1 つの単位 (h_la) だけに当てるものは赤になる (1 本目の赤は kyouhaPCCementsuru・kyouhaAPICementsuru・kyouhaPCAmentsuru・kyouhaPCUnderachievementsuru・kyouhaJPNElementsuru・imaPCElementsu・AIamentsuru)。頭が小文字の子音 (sa1_cons)・頭の単位が 2 字以上 (sa1_multi) だけに当てるものは緑で、答えを変えない (下の略語の並びの注)。a 以外の小文字の母音 1 つの単位だけに当てるもの (sa1_lvow) は、P46-60 では緑で答えを変えないと書いたが、同梱の一覧に無い語では答えが変わる (18 回目の査読員の 24 入力で、開発機の NSSpellChecker で 12 入力 (頭が小文字の emolument の 12 入力のすべて。頭が大文字の Emolument は 0)。例: kyouhaPCemolumentsuru が きょうはPCえもlumenつる に (変異なしは きょうはPCemolumentする)。同梱の一覧に無い、頭が e・i・u・o の語だけに当てる写し方 (sb1_lvNB) も 12 入力) → 下の略語の並びの emolument の形で赤になる (1 本目の赤は、どちらも kyouhaPCemolumentsuru)。頭が A 以外の大文字の母音の語に、並びの長さや位置で条件を付けた写し方 (18 回目の査読員の sb1_Uv4 (並び 4 文字以上)・sb1_UvH2 (入力の頭の 2 文字)・sb1_UvI3 (ima の後の 3 文字以上)・sb1_UvK4 (kyouha の後の 4 文字以上)) は、P46-60 の Element の 3 例では赤にならないが、答えが変わる (査読員の Element・Underachievement の 24 入力で、開発機の NSSpellChecker で 10・2・6・4 入力。例: kyouhaHTTPSElementsuru が きょうはHTTPSEぇめんつる に) → 下の Element の例 (並び 7 × 位置 3) で赤になる (1 本目の赤は kyouhaHTTPElementsuru・PCElementsu・imaJPNElementsu・kyouhaHTTPElementsuru)。頭が I・O の語だけに当てる写し方 (sb1_UIO。18 回目の査読員) は緑 (I・O の例は置いていない)。大文字の子音までさかのぼったら判定器に聞かずに長い語とみなす救いすぎ (h_overC) は、今の守りの例で赤になる (1 本目の赤は kyouhaHTTPpantsuwokau)。格子の族の語の頭に大文字の子音を足したもの: 75 本のうち、辞書に無い並び 2〜13 文字・辞書の語の並び 3〜13 文字の 69 本はどれも、その位置の Cement の形とその長さの並びの例で赤になる。緑は、14 文字以上に当てるもの (3 本) と、2 文字の辞書の語の並びだけに当てるもの (3 本。答えを変えない)。
+        //   語の頭の字の種類ごとに写し方を作って流した: 頭が大文字の子音 (sa1_consU・3 文字以上の並びの後だけの h_UC3)・A (h_UA)・A 以外の大文字の母音 (h_Uv。並びが 3 文字以上のときだけの h_Uv3・kyouha の後のほかだけの h_UvIH も)・小文字の a 1 つの単位 (h_la) だけに当てるものは赤になる (1 本目の赤は kyouhaPCCementsuru・kyouhaAPICementsuru・kyouhaPCAmentsuru・kyouhaPCUnderachievementsuru・kyouhaJPNElementsuru・imaPCElementsu・AIamentsuru)。頭が小文字の子音 (sa1_cons)・頭の単位が 2 字以上 (sa1_multi) だけに当てるものは緑で、答えを変えない (下の略語の並びの注)。a 以外の小文字の母音 1 つの単位だけに当てるもの (sa1_lvow) は、P46-60 では緑で答えを変えないと書いたが、同梱の一覧に無い語では答えが変わる (18 回目の査読員の 48 入力 (語は emolument・Emolument・inducement・Inducement の 4 つ、並び 4 × 位置 3) のうち、開発機の NSSpellChecker で 12 入力 (頭が小文字の emolument の 12 入力のすべて。ほかの 3 語の 36 入力は 0。P46-61 の注は母数を 24 と書いていた。19 回目の査読 SC1-02)。例: kyouhaPCemolumentsuru が きょうはPCえもlumenつる に (変異なしは きょうはPCemolumentする)。同梱の一覧に無い、頭が e・i・u・o の語だけに当てる写し方 (sb1_lvNB) も、emolument の 12 入力のすべて (査読員はこの写し方を emolument の 12 入力だけで測った)) → 下の略語の並びの emolument の形で赤になる (1 本目の赤は、どちらも kyouhaPCemolumentsuru)。頭が A 以外の大文字の母音の語に、並びの長さや位置で条件を付けた写し方 (18 回目の査読員の sb1_Uv4 (並び 4 文字以上)・sb1_UvH2 (入力の頭の 2 文字)・sb1_UvI3 (ima の後の 3 文字以上)・sb1_UvK4 (kyouha の後の 4 文字以上)) は、P46-60 の Element の 3 例では赤にならないが、答えが変わる (査読員の Element・Underachievement の 24 入力で、開発機の NSSpellChecker で 10・2・6・4 入力。例: kyouhaHTTPSElementsuru が きょうはHTTPSEぇめんつる に) → 下の Element の例の 1 つ目の組 (英字のまま残る 7 つの並び × 位置 3) で赤になる (1 本目の赤は kyouhaHTTPElementsuru・PCElementsu・imaJPNElementsu・kyouhaHTTPElementsuru)。直前の並びが 3 文字の辞書の語のときだけ・7 文字以上のときだけに当てる写し方 (19 回目の査読員の sc1_UvD3・sc1_Uv7) は、Element の例が 1 つ目の組だけだと赤にならないが、答えが変わる (査読員の 48 入力 (Element × API・NASDAQ と 7 文字以上の 14 の並び × 位置 3) で、開発機の NSSpellChecker で 3・42 入力。例: kyouhaAPIElementsuru が きょうはAPIEぇめんつる に (変異なしは きょうはあPIElementする)、kyouhaWARNINGElementsuru が きょうはWARNINGEぇめんつる に (変異なしは きょうはWARNINGEぇmentする)) → 下の Element の例の 2 つ目・3 つ目の組で赤になる (1 本目の赤は kyouhaAPIElementsuru・kyouhaWARNINGElementsuru)。直前の並びが 6 文字の辞書に無い語のときだけに当てる写し方 (sc1_Uv6。19 回目の査読員) は、開発機の NSSpellChecker では答えを変えない (NASDAQ を語と答えるので条件が真にならない。査読員の 48 入力で 0) が、この模擬の判定器は NASDAQ を語と答えないので、このテストでは赤になる (1 本目の赤は kyouhaNASDAQElementsuru)。頭が I・O の語だけに当てる写し方 (sb1_UIO。18 回目の査読員) は緑 (I・O の例は置いていない)。同梱の一覧に無い、頭が小文字の u・o の語だけに当てる写し方 (sc1_luo。19 回目の査読員) も緑 (その語の例は置いていない。開発機の NSSpellChecker の答えを変えるかは測っていない)。大文字の子音までさかのぼったら判定器に聞かずに長い語とみなす救いすぎ (h_overC) は、今の守りの例で赤になる (1 本目の赤は kyouhaHTTPpantsuwokau)。格子の族の語の頭に大文字の子音を足したもの: 75 本のうち、辞書に無い並び 2〜13 文字・辞書の語の並び 3〜13 文字の 69 本はどれも、その位置の Cement の形とその長さの並びの例で赤になる。緑は、14 文字以上に当てるもの (3 本) と、2 文字の辞書の語の並びだけに当てるもの (3 本。答えを変えない)。
         // - 伸ばす音の う から始まる語を、長い語の一部なら飛ばさない変異と、断片が長い語の一部なら外側の最後の判定を飛ばしてすぐ英単語とみなす変異 (どちらも 11 回目の査読員) は、
         //   査読員の入力 (前者は 56 入力、後者は 420 入力。BI・NS) で答えが変わらず、テストで捕まえていない (後者は、断片が同梱の一覧にない母音 1 つの単位から始まるときだけ
         //   差が出うる)。
@@ -697,15 +697,16 @@ internal static class UpstreamP46Tests
         //   頭が a 以外の小文字の母音 1 つの単位の語の 3 形 (kyouha{abbr}emolumentsuru・ima{abbr}emolumentsu・{abbr}emolumentsu) を 18 回目に足した (emolument は、開発機の
         //   NSSpellChecker が語と答え、同梱の一覧に無いので、模擬の判定器に足した。答えは開発機の NSSpellChecker で流した統合の木の答えで、23 の並びとも同じ形。5 つの木では、
         //   P46-47 の前の統合だけが …えもlumenつ(る) に崩れ、ほかの 4 つは英字のまま。同梱の表では、どの木でも …えもぅめんつ(る) に崩れる)。
-        //   頭が A 以外の大文字の母音の語 (Element・Underachievement) は、統合の木でも並びによって答えが違う (Element は、7 文字以上の並びの後ろでは …Eぇment… になる。
-        //   取り込み前の木から同じ答えで、別の規則) ので形には入れず、並びのループの後ろに、Element の例を、統合の木で英字のまま残る 7 つの並び (2〜6 文字の
-        //   PC・JPN・HTTP・QWER・HTTPS・JETRO・SYSTEM) × 位置 3 に置いた (17 回目に位置 3 つに 1 つずつ足し、18 回目に並びを 7 つにした。3 例では、並びの長さや位置で条件を
-        //   付けた写し方 (18 回目の査読員の sb1_Uv4・sb1_UvH2・sb1_UvI3・sb1_UvK4) が赤にならなかった。18 回目の査読 SB1-01)。頭が U の語の例は kyouhaPCUnderachievementsuru
-        //   の 1 つで、I・O の例は置いていない。
-        // ここに置いた例 (並び 23 × 語の形 12 と守りの形 3 (2 つの判定器)、Element の並び 7 × 形 3) の答えをどれも変えない写し方は、ほかのテストの例の答えも変えなければ
+        //   頭が A 以外の大文字の母音の語 (Element・Underachievement) は、統合の木でも並びによって答えが違う (Element は、2〜6 文字の 9 つの並びのうち PC・JPN・HTTP・
+        //   QWER・HTTPS・JETRO・SYSTEM の後ろでは英字のまま、API・NASDAQ の後ろでは英字のまま残るが並びの頭が崩れ、7 文字以上の 14 の並びの後ろでは …Eぇment… になる。
+        //   並びの頭の崩れも Eぇ も、取り込み前の木から同じ答え) ので形には入れず、並びのループの後ろに、Element の例を 23 の並びのすべて × 位置 3 に、答えの形で 3 つの組に
+        //   分けて置いた (17 回目に位置 3 つに 1 つずつ足し、18 回目に英字のまま残る 7 つの並びに、19 回目に 23 の並びのすべてにした。3 例では、並びの長さや位置で条件を
+        //   付けた写し方 (18 回目の査読員の sb1_Uv4・sb1_UvH2・sb1_UvI3・sb1_UvK4) が、7 つの並びでは、直前の並びの長さで条件を付けた写し方 (19 回目の査読員の sc1_UvD3・
+        //   sc1_Uv7) が赤にならなかった。18 回目の査読 SB1-01・19 回目の査読 SC1-01)。頭が U の語の例は kyouhaPCUnderachievementsuru の 1 つで、I・O の例は置いていない。
+        // ここに置いた例 (並び 23 × 語の形 12 と守りの形 3 (2 つの判定器)、Element の並び 23 × 形 3) の答えをどれも変えない写し方は、ほかのテストの例の答えも変えなければ
         // 捕まえない。見つかっているもの (これで全部とは言えない): 14 文字以上の並びだけに当てるもの (14 文字以上の例を置いていない)、kyouha・ima 以外の前置きだけ、
         // 断片 (letters の初め) が ment・pant 以外のときだけ、語が ament・Ament・Cement・Element・emolument・Underachievement 以外のときだけ、頭が I・O の語だけに当てるもの
-        // (18 回目の査読員の sb1_UIO)。例を置いていない形 (7 文字以上の並びの後ろの、頭が A 以外の大文字の母音の語・kyouha の後の 2 文字の並びのほかの位置の、頭が U の語)
+        // (18 回目の査読員の sb1_UIO)。例を置いていない形 (kyouha の後の 2 文字の並びのほかの位置の、頭が U の語。7 文字以上の並びの後ろの Element は 19 回目に置いた)
         // だけに当てる写し方も、同じ理由で捕まえない (変異では確かめていない)。P46-60 までは「見つかっている捕まえていない写し方」を並べたが、一覧に無い写し方が回ごとに
         // 見つかった (18 回目の査読 SB1-01)。
         // P46-59 で書いた「ament・pant 以外の断片」は、語 (ament) と断片 (ment・pant) を分けていなかった (この書き方は 17 回目の査読 SA1-02 で直した)。
@@ -722,11 +723,23 @@ internal static class UpstreamP46Tests
             foreach (var checker in new Detection.IWordChecker[] { Detection.BuiltInWordChecker.Shared, new NsLikeChecker() })
                 ExpectCommitted(checker, ($"kyouha{abbr}pantsuwokau", $"きょうは{abbr}ぱんつをかう"), ($"ima{abbr}pantsu", $"いま{abbr}ぱんつ"), ($"{abbr}pantsu", $"{abbr}ぱんつ"));
         }
-        // 頭が A 以外の大文字の母音の語 (Element) の例を、統合の木で英字のまま残る 7 つの並び × 位置 3 に置く (17 回目に位置 3 つに 1 つずつ足し、18 回目に並びを 7 つにした。
-        // 上の略語の並びの注のとおり、形には入れていない)。今のコードの答えは、開発機の NSSpellChecker で流しても、この模擬の判定器と同じ (NS では取り込み前と main も
-        // 同じ答えで、P46 だけの木と P46-47 の前の統合は …Eぇめんつ(る) に崩れる。同梱の表では、どの木でも崩れる)。
+        // 頭が A 以外の大文字の母音の語 (Element) の例を、23 の並びのすべて × 位置 3 に、答えの形で 3 つの組に分けて置く (17 回目に位置 3 つに 1 つずつ足し、18 回目に
+        // 英字のまま残る 7 つの並びに、19 回目に 23 の並びのすべてにした。上の略語の並びの注のとおり、形には入れていない)。今のコードの答えは、開発機の NSSpellChecker で
+        // 流しても、この模擬の判定器と同じ (69 入力。NS では 3 つの組のどれも取り込み前と main も同じ答えで、P46 だけの木と P46-47 の前の統合は …Eぇめんつ(る) に崩れる
+        // (並びは崩れない)。同梱の表では、どの木でも …Eぇめんつ(る) に崩れる)。
+        // 1 つ目の組: Element が英字のまま残る 7 つの並び。
         foreach (var abbr in new[] { "PC", "JPN", "HTTP", "QWER", "HTTPS", "JETRO", "SYSTEM" })
             ExpectCommitted(new NsLikeChecker(), ($"kyouha{abbr}Elementsuru", $"きょうは{abbr}Elementする"), ($"ima{abbr}Elementsu", $"いま{abbr}Elementsu"), ($"{abbr}Elementsu", $"{abbr}Elementsu"));
+        // 2 つ目の組: 2〜6 文字の残りの 2 つ (3 文字の辞書の語の API と、6 文字の NASDAQ)。Element は英字のまま残るが、並びの頭が崩れる (API は 3 つの位置のどれも あPI、
+        // NASDAQ は kyouha・ima の後で んASDAQ。入力の頭では NASDAQElementsu のまま)。並びの頭の崩れは、取り込み前と main も同じ答え (P46 で入ったものではない) で、
+        // その答えが変わると、この 6 入力の期待値も変わる。開発機の NSSpellChecker は NASDAQ を語と答え、この模擬の判定器は語と答えない (答えは同じ)。
+        ExpectCommitted(new NsLikeChecker(), ("kyouhaAPIElementsuru", "きょうはあPIElementする"), ("imaAPIElementsu", "いまあPIElementsu"), ("APIElementsu", "あPIElementsu"),
+            ("kyouhaNASDAQElementsuru", "きょうはんASDAQElementする"), ("imaNASDAQElementsu", "いまんASDAQElementsu"), ("NASDAQElementsu", "NASDAQElementsu"));
+        // 3 つ目の組: 7 文字以上の 14 の並び。Element の ment は英字のまま残るが、頭が Eぇ に崩れる。Eぇ は取り込み前の木から同じ答えで (上の注の「別の規則」)、
+        // その規則を直すと、この 42 入力の期待値も変わる。
+        foreach (var abbr in new[] { "WARNING", "UNDERSTANDING", "HTTPSAPI", "GITHUBAPI", "JSONAPI", "HTTPSAPIJP", "NASDAQJPAPI", "HTTPSAPIJSON", "GITHUBAPIJSON",
+                     "PASSWORD", "DIRECTORY", "TECHNOLOGY", "INFORMATION", "RELATIONSHIP" })
+            ExpectCommitted(new NsLikeChecker(), ($"kyouha{abbr}Elementsuru", $"きょうは{abbr}Eぇmentする"), ($"ima{abbr}Elementsu", $"いま{abbr}Eぇmentす"), ($"{abbr}Elementsu", $"{abbr}Eぇmentす"));
     }
 
     [Test]
