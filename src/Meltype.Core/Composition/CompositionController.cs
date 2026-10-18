@@ -162,6 +162,9 @@ public sealed class CompositionOptions
     /// <summary>英訳の候補 (複雑な → complex)。null なら出さない。</summary>
     public TranslationDictionary? Translations { get; init; }
 
+    /// <summary>今の時刻 (いま・なう → 17:22、きょう → 2026年10月9日 の候補に使う。テストで差し替える)。</summary>
+    public Func<DateTime> Now { get; init; } = () => DateTime.Now;
+
     /// <summary>英訳の候補を出すか (設定)。</summary>
     public Func<bool> TranslationCandidates { get; init; } = () => true;
 
@@ -2131,7 +2134,8 @@ public sealed class CompositionController
     }
 
     /// <summary>
-    /// 文節の候補: 文の中での変換結果 → その文節だけでの変換結果 → 補助辞書の同音異義語 → ひらがな → カタカナ。
+    /// 文節の候補: 文の中での変換結果 → その文節だけでの変換結果 → 補助辞書の同音異義語 → ひらがな → カタカナ
+    /// → 日付・時刻 (いま・なう・きょう)。
     /// </summary>
     private List<string> JapaneseCandidates(string reading, string? inContext)
     {
@@ -2149,8 +2153,49 @@ public sealed class CompositionController
         {
             if (!candidates.Contains(kana)) candidates.Add(kana);
         }
+        // 日付・時刻 (いま・なう・きょう) は、かなの後ろに出す (いつもの候補の並びは変えない)
+        foreach (var time in TimeCandidates(reading))
+        {
+            if (!candidates.Contains(time)) candidates.Add(time);
+        }
         return candidates;
     }
+
+    /// <summary>今の時刻を表す読み (本家 #208)。</summary>
+    private static readonly HashSet<string> NowReadings = ["いま", "なう"];
+
+    private static readonly string[] WeekDays = ["日", "月", "火", "水", "木", "金", "土"];
+
+    /// <summary>
+    /// いま・なう の文節に今の日時、きょう の文節に今日の日付を候補として出す (本家 #208。書式は本家と同じ)。
+    /// いま → 17:22 / 17時22分 / 午後5時22分 / 2026年10月9日(金) 17時22分 / 10月9日(金) 17時22分 / 2026年10月9日(金) 17:22 / 2026/10/09 17:22
+    /// きょう → 2026年10月9日 / 2026年10月9日(金) / 10月9日 / 10月9日(金) / 2026/10/09 / 2026-10-09 / 金曜日
+    /// 文節の読みがまるごとこの語のときだけ (いまから・きょうは では出さない)。
+    /// </summary>
+    private IEnumerable<string> TimeCandidates(string reading)
+    {
+        var isNow = NowReadings.Contains(reading);
+        if (!isNow && reading != "きょう") return [];
+        var now = _options.Now();
+        var day = WeekDays[(int)now.DayOfWeek];
+        var date = $"{now.Year}年{now.Month}月{now.Day}日";
+        var monthDay = $"{now.Month}月{now.Day}日";
+        // 区切りの / と : は、地域の設定に左右されないように数字から組み立てる (DateTime の書式の / : は地域の区切りになる)
+        var slashDate = $"{now.Year:D4}/{now.Month:D2}/{now.Day:D2}";
+        var clock = $"{now.Hour:D2}:{now.Minute:D2}";
+        if (!isNow)
+            return [date, $"{date}({day})", monthDay, $"{monthDay}({day})", slashDate, $"{now.Year:D4}-{now.Month:D2}-{now.Day:D2}", $"{day}曜日"];
+        var time = $"{now.Hour}時{now.Minute}分";
+        return [clock, time, $"{(now.Hour < 12 ? "午前" : "午後")}{now.Hour % 12}時{now.Minute}分",
+            $"{date}({day}) {time}", $"{monthDay}({day}) {time}", $"{date}({day}) {clock}", $"{slashDate} {clock}"];
+    }
+
+    /// <summary>
+    /// 日付・時刻の候補 (いま → 17:22、きょう → 10月9日・金曜日) を選んだ文節か。
+    /// 学習しない (覚えると、次に打ったときに古い日時・違う日付が最初に出る)。
+    /// </summary>
+    private static bool IsDateTimeChoice(Clause clause) =>
+        (NowReadings.Contains(clause.Reading) || clause.Reading == "きょう") && (clause.Text.Any(char.IsAsciiDigit) || clause.Text.EndsWith("曜日", StringComparison.Ordinal));
 
     /// <summary>英語の文節の候補: 打ったまま → 固有名詞の正しい形 (GitHub) → 先頭だけ大文字 → すべて大文字 → 全角。</summary>
     private List<string> EnglishCandidates(string raw)
@@ -2314,12 +2359,25 @@ public sealed class CompositionController
     }
 
     /// <summary>
+    /// ライブ変換を始める長さの判定用の文字数。かな・ー・数字・英字など文字として読めるものを数え、記号 (～ ! ? . ！ ？ 。 など) は数えない。
+    /// (な～～～ のように記号で 4 文字に届いたものを変換しないため。12がつ・100えん のように数字を含む読みは数える。)
+    /// </summary>
+    private static int LengthForLiveConversion(string text)
+    {
+        var n = 0;
+        foreach (var c in text)
+            if (char.IsLetterOrDigit(c) || c == 'ー') n++;
+        return n;
+    }
+
+    /// <summary>
     /// ライブ変換: Space を押したときと同じく、文脈・手がかり辞書・学習を使って文節ごとに変換した結果を見せる。
     /// 打つたびに呼ばれるので、かな・文脈・学習・ユーザー辞書の状態が同じならキャッシュを使う。
     /// </summary>
     private string LiveConvert(string kana)
     {
-        if (kana.Length < LiveConversionMinLength) return kana;
+        // な～～～ など、記号だけで文字数が 4 に達しても漢字にしない (本家 PR #632 / #505)。ー・数字・英字は数える (らーめん・12がつ を止めない)。
+        if (LengthForLiveConversion(kana) < LiveConversionMinLength) return kana;
         DropCachesIfLearned();
         var key = string.Join("\u0001", kana, PrecedingForConversion, _followingText, _options.History?.Version, _options.UserDictionary?.Version);
         if (_liveCache.TryGetValue(key, out var cached)) return cached;
@@ -2983,8 +3041,8 @@ public sealed class CompositionController
             if (clause.Text == clause.Reading || clause.Text == CompositionText.ToKatakana(clause.Reading) || clause.Text == CompositionText.ToHalfWidthKatakana(clause.Reading) || clause.Text == clause.Raw) continue;
             // 英訳は上で英訳の記録に入れた (ここで覚えると次から 1 番目に出てしまう)。
             if (clause.Translations.Contains(clause.Text)) continue;
-            // 計算の記号 (かける → ×) も覚えない
-            if (IsMathSymbolChoice(clause)) continue;
+            // 計算の記号 (かける → ×)・日付と時刻 (いま → 17:22) も覚えない
+            if (IsMathSymbolChoice(clause) || IsDateTimeChoice(clause)) continue;
             history.Remember(clause.Reading, clause.Text);
         }
     }
@@ -2999,7 +3057,8 @@ public sealed class CompositionController
     {
         if (_options.Suggestions is not { } suggestions || !_options.DictionarySuggest()) return;
         var threshold = _options.DictionarySuggestThreshold();
-        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Text != c.Raw))
+        // 日付・時刻 (きょう → 金曜日) も数えない (学習しないのと同じ理由。登録すると、次から古い日付が出る)
+        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c)))
         {
             // 学習済みの語を最初の候補としてそのまま確定した場合 (History はこの後の Remember で更新されるので、ここで先に見る)。
             if (clause.Changed || _options.History?.Get(clause.Reading) == clause.Text)
@@ -3039,7 +3098,7 @@ public sealed class CompositionController
         }
         foreach (var clause in _clauses)
         {
-            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause))
+            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause) || IsDateTimeChoice(clause))
             {
                 Flush();
                 continue;

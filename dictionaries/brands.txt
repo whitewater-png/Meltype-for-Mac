@@ -9,6 +9,7 @@
 うぃんどうず Windows
 まっくおーえす macOS
 あいおーえす iOS
+いめ IME
 あんどろいど Android
 うぶんつ Ubuntu
 でびあん Debian

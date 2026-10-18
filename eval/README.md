@@ -64,3 +64,18 @@
 
 Zenzai (ニューラル変換) の計測用の、かな → 漢字の正解表です (212 文。列: category / reading / expected / left_context / note / accepted。accepted は `|` 区切りの別の正解)。上の `cases/` (日英判定用) とは別物で、日英判定の `--expect-all` には読ませません。
 計測は `exp/zenzai-1-1` ブランチの `ZenzaiEval` (結果は [docs/ZENZAI_EXPERIMENT_2026-10.md](../docs/ZENZAI_EXPERIMENT_2026-10.md))。製品の変換の経路での配線の確認は `MeltypeIME --zenzai-self-test --weights <gguf> --cases eval/kanji/kanji-cases.tsv` (`mac/README.md`)。
+
+## 前の文字つきの正解表 (`eval/context/`)
+
+実験 2-2 (キャレット前 20 文字の英日比率を判定に使うか) の表です (列: 前の文字 / 打鍵 / 期待 / 種類 / メモ)。`context-cases.tsv` (68 件) は作者が、`review-cases.tsv` (56 件) は査読者が書いた作例で、期待は人の判断です (実機の記録ではありません。件数の配分も実際の利用の頻度ではありません)。上の `cases/` とは別物で、日英判定の `--expect-all` には読ませません。
+読むのは実験ブランチ `exp/p2-2-2-on-main` (手元のみで公開していない) の `--ctx-experiment` だけで、main には無いので、このリポジトリだけでは測り直せません。結果は [docs/EXPERIMENT_2-2_RESULT.md](../docs/EXPERIMENT_2-2_RESULT.md) (no-go)。
+
+## 言語モデルの採点の結果 (`eval/lm-judge/`)
+
+実験 2-1 (Zenzai の言語モデルで迷ったときの最終判定) のデータです。`extra/extra-cases.tsv` は補足の 14 件 (`cases/` と同じ 4 列。作者が作った架空の例で、実機で確かめた値ではありません) で、`cases/` には入れていないので `--expect-all ../../eval/cases` には入りません (`--expect-all ../../eval/lm-judge/extra` と直接指せば読めます)。`results/` の jsonl・json は、`cases/` の表と補足の打鍵についての、今のルールの出力と言語モデルの採点の結果です (`main-54a2002/` は main 54a2002 で増えた 46 件の分)。
+採点器 `tools/lm-judge/` は実験ブランチ `exp/p2-2-1` (手元のみで公開していない) にあり、main には無いので、このリポジトリだけでは採点し直せません。結果は [docs/EXPERIMENT_2-1_RESULT.md](../docs/EXPERIMENT_2-1_RESULT.md) (no-go)。
+
+## Foundation Models の測定データ (`eval/p2-4/`)
+
+実験 2-4 (Apple の Foundation Models で英語部分の整形・訳ができるか) の単体ツール `fmprobe` の出力 3 回分です (`run1`〜`run3` の `.json` と `.txt`。`run3.lsof.txt` はネットワーク接続を見た回数だけ)。入力 30 文は作者が書いた作例 (個人情報なし) で、正解表ではないので `--expect-all` には読ませません。
+`fmprobe` は実験ブランチ `exp/p2-2-4` (手元のみで公開していない) にあり、main には無いので、このリポジトリだけでは測り直せません。結果は [docs/EXPERIMENT_2-4_RESULT.md](../docs/EXPERIMENT_2-4_RESULT.md)。

@@ -82,7 +82,10 @@ public sealed class CompositionText
             var lower = word.ToLowerInvariant();
             var acronym = word.Any(char.IsAsciiLetterUpper) && word.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c));
             var knownUnambiguous = word.Length >= 3 && _detector.IsKnownEnglishWord(word) && !_detector.Romaji.AnalyzeFragment(lower).IsValid;
-            var properNoun = _detector.ProperNouns.Contains(lower);
+            // 小文字で打った、ローマ字として最後まで読める固有名詞 (siri-zu の siri) は、英字の語として数えない (長音のまま。本家 #656)。
+            // 長音の - の前だけ。. の前 (miro.com・canon.jp) は、今までどおり固有名詞として数える。
+            var properNoun = _detector.ProperNouns.Contains(lower) &&
+                (_units[^1].Raw == "." || char.IsAsciiLetterUpper(word[0]) || !_detector.Romaji.AnalyzeFragment(lower).IsValid);
             var loneConsonant = word.Length == 1 && char.IsAsciiLetterLower(word[0]) && word[0] is not ('a' or 'i' or 'u' or 'e' or 'o');
             if (acronym || knownUnambiguous || properNoun || _units[^1].Raw == "-" && loneConsonant)
                 _units[^1] = _units[^1] with { Kana = _units[^1].Raw };
@@ -351,7 +354,30 @@ public sealed class CompositionText
         {
             if (!_units[i].Kana.All(c => c is >= 'ぁ' and <= 'ゖ' or 'ー') || _units[i].Raw.Length == 0 || !_units[i].Raw.All(char.IsAsciiLetter)) return false;
             kana = _units[i].Kana + kana;
-            if (i <= start && kana.Length + 1 >= (i == start ? 2 : 3) && _detector.IsJapaneseWordOrPrefix(kana + "つ")) return true;
+            if (i <= start && kana.Length + 1 >= (i == start ? 2 : 3) && (_detector.IsJapaneseWordOrPrefix(kana + "つ") || TypoCorrector?.IsReadingPrefix(kana + "つ") == true)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 単位 i が、前の かな (o・u の段) を伸ばす う (そ|u・ほんと|u) か。本家 7a20aff。
+    /// 助詞の を の後ろは除く (を を伸ばす語は無いので、これを|unset|する の unset は英単語のまま)。
+    /// </summary>
+    private bool IsLongVowelU(int i) =>
+        i > 0 && _units[i] is { Raw: "u", Kana: "う" } && _units[i - 1] is { Kana: [.., var kana], Raw: [.., var vowel] } &&
+        kana is >= 'ぁ' and <= 'ゖ' and not 'を' && vowel is 'o' or 'u';
+
+    /// <summary>
+    /// 単位 i から後ろの英字 letters (+ extra) が 4 文字以上の知っている英単語で、さらに前の単位へ伸ばした英字の並びも知っている英単語か (empowerment の中の ment)。
+    /// 英字の単位だけをさかのぼる。EndsWithEnglishWordFromUnit が「かな + つ が読みの頭」で飛ばす断片に、より長い知っている語が重なっているかを見る。
+    /// </summary>
+    private bool IsPartOfLongerEnglishWord(int i, string letters)
+    {
+        if (letters.Length < 4 || !_detector.IsKnownEnglishWord(letters)) return false;
+        for (var j = i - 1; j >= 0 && _units[j].Raw.Length > 0 && _units[j].Raw.All(char.IsAsciiLetter); j--)
+        {
+            letters = _units[j].Raw + letters;
+            if (letters.Length >= 4 && _detector.IsKnownEnglishWord(letters)) return true;
         }
         return false;
     }
@@ -364,9 +390,20 @@ public sealed class CompositionText
             letters = _units[i].Raw + letters;
             // 大文字の略語の途中 (AI の I) から始まる語 (Init) は見ない (AInitsuite の t と s を つ にまとめるように。本家 #129、P45-10)
             if (i > 0 && char.IsAsciiLetterUpper(_units[i].Raw[0]) && _units[i - 1].Raw is [.., var before] && char.IsAsciiLetterUpper(before)) continue;
+            // 伸ばす音の う (そう・きょう・ほんとう の u) から始まる語 (unit) は見ない (sounitsuite の t と s を つ にまとめるように。本家 7a20aff)
+            if (tsuFollows && IsLongVowelU(i)) continue;
             // 続けて打った s と合わせた つ まで読むと日本語の語 (shitsumon の shit) なら、英単語として見ない (本家 35beb60、P45-11)
-            if (tsuFollows && ReadsAsJapaneseWithTsu(i, count, extra)) continue;
-            if (letters.Length >= 4 && _detector.IsKnownEnglishWord(letters)) return true;
+            // ただし、その断片 (ment) が知っている英単語で、さらに前へ伸ばした並び (unemployment・empowerment) も知っている英単語なら、断片は長い語の終わりなので日本語とは見ない
+            // (P46-20 が ment・dent・pant を読みの頭として飛ばし、main の規則 (伸ばす音の u から始まる語・同梱の一覧にない母音 1 つの単位から始まる語を見ない) が長い語を飛ばすと、
+            // どちらも見られずに t と s が つ にまとまった。5 回目の統合の確認)
+            if (tsuFollows && ReadsAsJapaneseWithTsu(i, count, extra) && !IsPartOfLongerEnglishWord(i, letters)) continue;
+            // 英字の並びの途中にある母音 1 つの単位 (kyo|u、sense|i) から始まる語は、同梱の一覧の語 (IsBundledEnglishWord) のときだけ見る。
+            // 実機の NSSpellChecker は、日本語の音の途中から始まる短い語 (kyo|u|mo|l の umol) も英単語と答えるので、きょうも + like の
+            // l を英字に残し、kyoumolike が きょumolいけ になっていた。変更前の条件に AND を 1 つ足しただけなので、l・x・t を英字に
+            // 残すのは変更前に残していた場合の一部だけ。母音 1 つの単位に限るのは、子音で始まる単位 (kyouha|vi|ll の vill) からの語は
+            // 英単語の頭のことが多く、同梱の一覧だけで見ると villa・viola が ゔぃっぁ になったため。
+            var fromLoneVowel = i > 0 && IsLetters(_units[i - 1].Raw) && _units[i].Raw is [var vowel] && "aiueoAIUEO".Contains(vowel);
+            if (letters.Length >= 4 && _detector.IsKnownEnglishWord(letters) && (!fromLoneVowel || _detector.IsBundledEnglishWord(letters.ToLowerInvariant()))) return true;
         }
         return false;
     }
@@ -1246,6 +1283,13 @@ public sealed class CompositionText
             var segment = segments[s];
             // 英語の語.の後ろの英字 (ドメイン・拡張子: Meltype.amr、MeltypeTip.dll) も、表示のまま英字にする (amr を あめ に直していた: 本家 issue #260)
             if (segment.IsEnglish && s >= 2 && segments[s - 1] is { IsEnglish: true, Raw: "." } && segments[s - 2].IsEnglish && segments[s - 2].Raw.Any(char.IsAsciiLetter))
+            {
+                for (var i = 0; i < segment.Raw.Length; i++) mask.Add(true);
+                continue;
+            }
+            // 入力の先頭の . で始まる英字の区間 (ドットファイル: .gitignore、.zover|desu の .zover) も、表示のまま英字にする。
+            // 入れないと、確定の直前の打ち間違いの直し (FixTypos) が、読めない並び (zover|desu の rd) の r を消した (表示は .zoverです なのに確定で .zoveです)。
+            if (segment.IsEnglish && s == 0 && segment.Raw.Length >= 2 && segment.Raw[0] == '.')
             {
                 for (var i = 0; i < segment.Raw.Length; i++) mask.Add(true);
                 continue;

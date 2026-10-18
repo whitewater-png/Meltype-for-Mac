@@ -94,7 +94,7 @@ public sealed class CompositionDetector
     /// 同じ入力の中の日本語や、かな側の記号 (`main`・(main)・。) の後ろでは今までどおりかな。入力の先頭は、前に確定した文 (前の行) が日本語でも英語にする
     /// (前の行が日本語の TextEdit で mainnima-ji が まいんに → mine に になっていた。Q11 の実機確認)。
     /// </summary>
-    private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain" };
+    private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain", "data" };
 
     /// <summary>ローマ字 letters の読みで始まる、よく使う日本語の語・ブランド名があるか。</summary>
     private bool StartsJapaneseReading(string letters)
@@ -327,6 +327,13 @@ public sealed class CompositionDetector
             // ドメイン・拡張子の . の後ろは、ローマ字として読めても英字のままにする (tetr.io、Wakatte.TV、MeltypeTip.dll)。
             // (本家 yksr-melt/Meltype の PR #267 / issue #260・#254 と同じ変更)
             if (found < 0 && !kanaInput && level != DetectionLevel.Manual && i > 0 && units[i - 1].Raw == "." && PrecededByEnglish(i) == true) found = DotSuffixEnd(units, i, pending, final);
+            // 入力の先頭の .gitignore / .env / .exe などドットファイルは英字のままにする (本家 803719c、#34)。
+            // 途中の 3.14desu や「です。」の . には使わない (i == 0 のときだけ)。
+            if (found < 0 && !kanaInput && level != DetectionLevel.Manual && i == 0 && units[i].Raw == ".")
+            {
+                var dotfile = DotSuffixEnd(units, i + 1, pending, final);
+                if (dotfile > i + 1) found = dotfile;
+            }
             // 英文の中の記号 (, . ! ? -) は読点・句点にせず半角のまま。日本語の文の中の英単語の後 (今日はgoogle、) は日本語の記号。
             // (かな入力では 、。 も かなのキーなので対象外。改行の直後の - は前の行の英語の続きではない: --sorekara の「ーー」。A-5)
             if (found < 0 && !kanaInput && i != bracketCloser && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && !(i == 0 && afterNewline && units[i].Raw == "-") && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&
@@ -370,13 +377,21 @@ public sealed class CompositionDetector
             {
                 // 後ろに日本語が続いてもよい (motte|school|he → mottes を取ると chool が ちょおl になる。持って + school + へ)。
                 var foundLength = Raw(units, i, found).Length;
+                // ただし、見つけた区間が同梱の一覧の語 (over・email・candidate) で、長い語が「見つけた区間の後ろの部分 + 助詞 1 つ」
+                // (o|ver + de、e|mail + to、ca|ndidate + de) で同梱の一覧に無い語なら、それでは捨てない。実機の NSSpellChecker は
+                // そういう断片 (verde・mailto・ndidatede・thermo・steno) も英単語と答えるので、overdesu が英字のまま、emailto が えmailto、
+                // candidatedesu が かndidatedeす になっていた。捨てる条件に AND を 1 つ足しただけなので、捨てるのは変更前に捨てていた
+                // 場合の一部だけ。助詞 1 つに限るのは、長い語が後ろの英字まで続く場合 (hi|ring + tone の ringtone、de|al + pine の alpine)
+                // は、長い語のほうが打ちたい語のことが多いため (前後比較で、助詞 1 つに限らないと よく使う語 で外れが出た)。
+                var foundListed = IsBundledEnglishWord(Raw(units, i, found).ToLowerInvariant());
                 for (var k = i + 1; k < found && found >= 0; k++)
                 {
                     for (var e = ReferenceMode ? n : table.LastLetterEnd(k); e > found; e--)
                     {
                         if (table.Length(k, e, pending) < foundLength || !ReferenceMode && table.Length(k, e, pending) > lengthLimit) continue;
                         var word = table.Raw(k, e) + (e == n ? pending : "");
-                        if (word.Length >= foundLength && IsLongEnglishWord(word))
+                        if (word.Length >= foundLength && IsLongEnglishWord(word) &&
+                            !(foundListed && !IsBundledEnglishWord(word.ToLowerInvariant()) && IsParticle(word[Raw(units, k, found).Length..])))
                         {
                             found = -1;
                             break;
@@ -556,7 +571,25 @@ public sealed class CompositionDetector
     }
 
     /// <summary>スペルチェッカーが正しいと言う英単語か、よくある打ち間違い (teh、recieve) か。</summary>
-    private bool IsSpellWord(string lower) => SpellChecker is { } checker && (checker.IsWord(lower) || checker.AutoCorrection(lower) is not null);
+    private bool IsSpellWord(string lower) =>
+        // macOS の NSSpellChecker は 73 文字以上の未知の文字列を検査せず「誤りなし」(= 語) と返す (実測 60〜72 文字は語でない、73 文字以上は全部語)。
+        // 長いローマ字の文を 1 語の英単語とみなさない (本家 PR #709)。
+        lower.Length <= 72 && SpellChecker is { } checker && (checker.IsWord(lower) || checker.AutoCorrection(lower) is not null);
+
+    /// <summary>
+    /// 助詞 (de・ni・no…) で始まり、残り 3 文字以上が英単語の語 (de|vote = devote、no|vice = novice)。
+    /// 残りの判定にスペルチェッカーは使わず、同梱の表 (english.txt・固有名詞・4 文字以上は english-words.txt) と覚えた語だけを見る。
+    /// 実機の NSSpellChecker は rive を英単語と答えるので、スペルチェッカーで見ると derive も de|rive になり、
+    /// deriveyadevote が でりゔぇやでvote になっていた (テストの同梱の表には rive が無いので deriveやでvote)。
+    /// </summary>
+    private bool StartsWithParticleThenEnglishWord(string lower)
+    {
+        if (Detection.DictionaryDetector.StartsWithParticle(lower) is not { } particle || lower.Length - particle.Length < 3) return false;
+        var rest = lower[particle.Length..];
+        if (!rest.All(char.IsAsciiLetterLower)) return false;
+        if (Memory?.Get(rest) is { } learned) return learned;
+        return _english.Words.ContainsWord(rest) || _proper.Contains(rest) || (rest.Length >= 4 && Detection.BuiltInWordChecker.Shared.IsWord(rest));
+    }
 
     internal bool IsJapaneseWordOrPrefix(string kana) => _kana?.IsJapaneseWordOrPrefix(kana) == true;
 
@@ -571,6 +604,14 @@ public sealed class CompositionDetector
     /// <summary>同梱の英単語の辞書・固有名詞にある語か、ユーザーが英字に直して覚えた語か (ok、github)。スペルチェッカーは使わない。</summary>
     public bool IsListedEnglishWord(string lower) =>
         lower.Length >= 2 && (Memory?.Get(lower) ?? (_english.Words.ContainsWord(lower) || _proper.Contains(lower)));
+
+    /// <summary>
+    /// 同梱の一覧にある英単語か (IsListedEnglishWord か、4 文字以上なら english-words.txt = BuiltInWordChecker)。スペルチェッカーは使わない
+    /// (IsListedEnglishWord は学習した語も見るので、厳密には「同梱の一覧 + 学習」)。
+    /// 語の途中から始まる断片 (verde・umol) は実機の NSSpellChecker が英単語と答えるので、それを根拠にする規則の守りに使う。
+    /// </summary>
+    internal bool IsBundledEnglishWord(string lower) =>
+        IsListedEnglishWord(lower) || (lower.Length >= 4 && Detection.BuiltInWordChecker.Shared.IsWord(lower));
 
     /// <summary>
     /// 知っている英単語か (同梱の辞書・固有名詞・ユーザーが英字に直して覚えた語・4 文字以上ならスペルチェッカー)。
@@ -652,8 +693,14 @@ public sealed class CompositionDetector
         }
         // 日本語のすぐ後ろで、助詞 + 英単語 (dochira|mo|user の mouser) は、スペルチェッカーが 1 語と言っても 助詞 + 英単語
         // (同梱の英語の辞書の語は除く)。後ろの英単語の区間は、この後で別に見る。
+        // ただし区間全体が同梱の英単語の一覧 (english-words.txt) の語 (derive・delivery・topics) なら、残りが同梱の表の語
+        // (#69 の守りと同じ StartsWithParticleThenEnglishWord の意味) のときだけ分ける。スペルチェッカーだけが語と言う残りでは分けない:
+        // 実機の NSSpellChecker は rive・livery・pics を英単語と答えるので、kyouhaderive が きょうはでりゔぇ、
+        // kyounotopics が きょうのとpics になっていた (K82)。区間全体が一覧に無い語 (decarbonize) は、今までどおりスペルチェッカーにも聞く。
+        // この除外は分けないほう (英字のまま) にしか働かない: 分けるのは、除外が無かったとき (K82 の前) に分けていた場合の一部だけ。
         if (before < 0 && Detection.DictionaryDetector.StartsWithParticle(lower) is { } leading && lower.Length - leading.Length >= 3 &&
-            !_english.Words.ContainsWord(lower) && IsKnownEnglishWord(lower[leading.Length..]))
+            !_english.Words.ContainsWord(lower) && IsKnownEnglishWord(lower[leading.Length..]) &&
+            !(Detection.BuiltInWordChecker.Shared.IsWord(lower) && !StartsWithParticleThenEnglishWord(lower)))
         {
             return false;
         }
@@ -712,7 +759,10 @@ public sealed class CompositionDetector
         {
             if (lower.Contains('c') && _romaji.Analyze(RomajiDetector.ReadCRow(lower)) is { IsValid: true, Partial: "" or "n" }) return false;
             // v 行 (va = ゔぁ): 辞書の英単語 (video) でなければ日本語 (vanpaia → ゔぁんぱいあ → ヴァンパイア)。
+            // スペルチェッカーの 5 文字以上の英単語 (invite、private) は、ゔぃ と読める綴りでも英語 (いんviteしました になっていた: 本家 c6b281e、issue #69)。
+            // ただし 助詞 + 英単語 とも読める語 (de|vote = devote) は今までどおり (githubdevote → githubでvote。本家の c6b281e はここを壊す)。
             if (lower.Contains('v') && !lower.Contains('l') && !lower.Contains('x') && !inDictionary && !_proper.Contains(lower) &&
+                !(lower.Length >= 5 && IsSpellWord(lower) && IsCommonJapanese?.Invoke(lower) != true && !StartsWithParticleThenEnglishWord(lower)) &&
                 _romaji.AnalyzeFragment(lower) is { IsValid: true, Partial: "" or "n" })
             {
                 return false;
@@ -919,7 +969,7 @@ public sealed class CompositionDetector
     private static readonly HashSet<string> HyphenPrefixes = ["e", "x", "re", "co", "ex", "non", "anti", "semi", "multi", "pre", "sub", "post", "mid", "self", "well"];
 
     // 接頭辞の規則では拾えない、- の入ったよく使う英単語 (後ろが 2 文字以下など)
-    private static readonly HashSet<string> HyphenatedWords = ["co-op", "re-do", "x-ray", "t-shirt", "wi-fi", "hi-fi", "lo-fi", "sci-fi", "e-book", "e-sports", "k-pop", "j-pop", "j-rock", "j-core", "p-hub", "talk-admin", "r-18", "sub-6", "gpt-6.7", "a-z", "u-turn", "check-in", "log-in", "sign-in", "add-on", "plug-in", "built-in", "follow-up", "set-up", "pop-up", "drop-down"];
+    private static readonly HashSet<string> HyphenatedWords = ["bio-break", "co-op", "re-do", "x-ray", "t-shirt", "wi-fi", "hi-fi", "lo-fi", "sci-fi", "e-book", "e-sports", "k-pop", "j-pop", "j-rock", "j-core", "p-hub", "talk-admin", "r-18", "sub-6", "gpt-6.7", "a-z", "u-turn", "check-in", "log-in", "sign-in", "add-on", "plug-in", "built-in", "follow-up", "set-up", "pop-up", "drop-down", "blu-ray"];
     // 日本語のローマ字の途中を英語の接頭辞と誤認しないよう、日本語に続けて拾うのは明示した英数字表記だけ。
     private static readonly HashSet<string> NumericHyphenatedWords = ["r-18", "sub-6", "gpt-6.7"];
 
@@ -1368,6 +1418,9 @@ public sealed class CompositionDetector
         if (suffix == "t") return stem.Length >= 2 && stem[^1] == 'n';
         return stem == "i" || _english.Words.ContainsWord(stem) || _proper.Contains(stem);
     }
+
+    /// <summary>ちょうど助詞 1 つ (de・mo・to・no …、DictionaryDetector.StartsWithParticle の表) か。</summary>
+    private static bool IsParticle(string raw) => Detection.DictionaryDetector.StartsWithParticle(raw) is { } particle && particle.Length == raw.Length;
 
     /// <summary>ローマ字として読めない、5 文字以上の英単語 (alcoholic, pressure)。</summary>
     private bool IsLongEnglishWord(string raw)

@@ -880,6 +880,33 @@ internal static class LanguageLearningTests
     }
 
     [Test]
+    public static void LongVowelUThenNi_TsuStaysJapanese()
+    {
+        // 日本語の後ろの u + ni + t (そう|u|ni|t の unit) で、t と s が つ にならず英単語 unit になっていた (sounitsuite が そunitsuite。
+        // 古いブランチ e8fbc64 の修正の移植、本家 7a20aff)。英単語 + する (commitする・editする) と、入力の先頭・英文の中の unit は今までどおり
+        CompositionTests.Detector.SpellChecker = TestSupport.WordChecker is { IsAvailable: true } checker ? checker : Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("sounitsuite", "そうについて"), ("hontounitsukareta", "ほんとうにつかれた"), ("kaijounitsukuto", "かいじょうにつくと"),
+                ("kyouhacommitsuru", "きょうはcommitする"), ("editsuru", "editする"), ("unitsuite", "unitsuite"), ("unitsuushin", "unitすうしん"), ("unit test", "unit test"),
+                // 助詞の を の後ろの u は伸ばす音ではない (これをunsetする。査読の指摘)
+                ("korewounsetsuru", "これをunsetする"), ("sorewounitsuika", "それをunitすいか"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    [Test]
     public static void ShortWord_ChosenFromCandidates_IsLearnedOnSecondTime()
     {
         // 変換の候補から go を英字で選んだだけで覚えると、日本語の中まで英字になりやすい (にほんgo)。2 文字の語は 2 回で覚える。
@@ -1286,6 +1313,200 @@ internal static class RomajiTypoTests
             var k = new CompositionTests.Keyboard();
             k.Type(typed + "\n");
             Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Upstream69_SpellWordWithV_IsEnglish_ButParticlePlusWordKeepsSplit()
+    {
+        // 本家 c6b281e (#69): v を含むスペルチェッカーの 5 文字以上の英単語は、ゔぃ と読める綴りでも英語 (いんviteしました になっていた)。
+        // 本家のままだと de|vote (= devote) も 1 語の英語になり、githubdevote が githubでvote でなく githubdevote になる。
+        // 助詞 + 英単語 とも読める語は今までどおり (devotewo = でゔぉてを も変わらない。既知の限界として固定する)。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("inviteshimashita", "inviteしました"), ("invitewookutta", "inviteをおくった"), ("kyouhainvite", "きょうはinvite"), ("invitewo", "inviteを"),
+                ("githubdevote", "githubでvote"), ("slackdevote", "slackでvote"), ("kyoudevote", "きょうでvote"),
+                ("devotewo", "でゔぉてを"), ("githubdevise", "githubでゔぃせ"), ("kyouhanovice", "きょうはのゔぃせ"),
+                ("vanpaia", "ゔぁんぱいあ"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    /// <summary>rive を英単語と答えるスペルチェッカー (実機の NSSpellChecker は rive を英単語と答える。同梱の一覧 BuiltIn は答えない)。</summary>
+    private sealed class RiveIsWordChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) => lower is "rive" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void Upstream69_ParticlePlusWordGuard_DoesNotAskTheSpellChecker()
+    {
+        // 実機 (2026-10-16): deriveyadevote が でりゔぇやでvote になった。#69 の守り (助詞 + 英単語) が残りの rive を
+        // スペルチェッカーに聞き、実機の NSSpellChecker は rive を英単語と答えるので、derive が de|rive として日本語に戻っていた。
+        // 守りは同梱の表だけで見る。rive を英単語と答えるスペルチェッカーでも derive は英語のまま、de|vote の守りは今までどおり。
+        CompositionTests.Detector.SpellChecker = new RiveIsWordChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("deriveyadevote", "deriveやでvote"), ("githubdevote", "githubでvote"), ("derivewo", "deriveを"), ("derive", "derive"),
+                ("inviteshimashita", "inviteしました"),
+                // 既知の限界 (KNOWN_LIMITS): 助詞 + 同梱の英単語とも読める語は、続けて打つと日本語側
+                ("devotewo", "でゔぉてを"), ("devisewo", "でゔぃせを"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    /// <summary>
+    /// 実機の NSSpellChecker のように、英単語の後ろの断片 (rive・livery・pics・ments) や mouser も英単語と答えるスペルチェッカー
+    /// (同梱の一覧 BuiltIn はどれも答えない)。逆に、同梱の一覧にある vised・mads・shes は、実機と同じく英単語と答えない。
+    /// </summary>
+    private sealed class FragmentsAreWordsChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) =>
+            lower is "rive" or "livery" or "pics" or "ments" or "mouser" ||
+            (lower is not ("vised" or "mads" or "shes") && Detection.BuiltInWordChecker.Shared.IsWord(lower));
+    }
+
+    [Test]
+    public static void K82_ParticlePlusWordGuardAfterJapanese_DoesNotAskTheSpellChecker()
+    {
+        // 実機 (2026-10-16、K82): kyouhaderive が きょうはでりゔぇ になった。日本語のすぐ後ろの 助詞 + 英単語 の守り
+        // (dochira|mo|user) が残りの rive をスペルチェッカーに聞き、実機の NSSpellChecker は rive を英単語と答えるので、
+        // derive が de|rive として分かれていた。区間全体が同梱の一覧の語なら、守りは残りが同梱の表の語のときだけ分ける
+        // (#69 の守りと同じ表)。
+        CompositionTests.Detector.SpellChecker = new FragmentsAreWordsChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("kyouhaderive", "きょうはderive"), ("konoderive", "このderive"), ("kyouhadelivery", "きょうはdelivery"),
+                ("kyounotopics", "きょうのtopics"), ("kyouhamoments", "きょうはmoments"),
+                // 今までどおり分ける: 同梱の表の語 (user・vice・vote) が残りになる 助詞 + 英単語
+                ("dochiramouserga", "どちらもuserが"), ("kyouhanovice", "きょうはのゔぃせ"), ("githubdevote", "githubでvote"),
+                ("derive", "derive"), ("derivewo", "deriveを"),
+                // 残り (vised・mads・shes) が同梱の表の語でもスペルチェッカーが語と言わないなら、K82 の前と同じく分けない。
+                // 守りを「同梱の表の語なら分ける」と広げると、きょうはでゔぃsed・きょうはのまds・きょうははしぇあを になっていた
+                ("kyouhadevised", "きょうはdevised"), ("konodevised", "このdevised"), ("kyouhanomads", "きょうはnomads"),
+                ("kyouhahasheswo", "きょうはhashesを"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    /// <summary>
+    /// 実機の NSSpellChecker のように、語の途中から始まって後ろの日本語にはみ出す断片 (verde・thermo・mailto・ndidatede・steno・lotto)
+    /// も英単語と答えるスペルチェッカー。同梱の一覧 (BuiltIn) に無いよく使う語 (ringtone・alpine) も答える。
+    /// </summary>
+    private sealed class TailFragmentsAreWordsChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) =>
+            lower is "verde" or "thermo" or "mailto" or "ndidatede" or "steno" or "lotto" or "ringtone" or "alpine" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void SpellCheckerFragmentAfterListedWord_DoesNotDropTheListedWord()
+    {
+        // スペルチェッカー起因の実機だけの外れ (2026-10-16、T1): overdesu が英字のまま、emailto が えmailto、candidatedesu が かndidatedeす。
+        // 見つけた英語の区間 (over) の途中から始まって後ろの日本語にはみ出す長い語 (o|verde|su) を NSSpellChecker が英単語と答え、
+        // 見つけた区間を捨てていた。見つけた区間が同梱の一覧の語で、長い語が「区間の後ろの部分 + 助詞 1 つ」で同梱の一覧に無い語なら、それでは捨てない。
+        CompositionTests.Detector.SpellChecker = new TailFragmentsAreWordsChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("overdesu", "overです"), ("kyouhaoverdesu", "きょうはoverです"), ("neverde", "neverで"), ("riverdesu", "riverです"),
+                ("othermo", "otherも"), ("mothermo", "motherも"), ("emailto", "emailと"), ("candidatedesu", "candidateです"),
+                ("wasteno", "wasteの"), ("pilotto", "pilotと"),
+                // 今までどおり: 長い語が同梱の一覧の語なら、見つけた区間 (teal) を捨てて長い語 (alcoholic) を取る
+                ("sometealcoholic", "そめてalcoholic"),
+                // 今までどおり: 長い語が助詞 1 つより後ろの英字まで続くなら、同梱の一覧に無い語でも長い語を取る (hiring ではなく ringtone)
+                ("hiringtone", "ひringtone"), ("kyouharingtone", "きょうはringtone"), ("dealpine", "でalpine"),
+                // 今までどおり: 長い語が同梱の一覧の語 (until|de の tilde、ultra|de の trade) なら捨てる (変更前と同じ答えを固定しているだけ。どちらも外れで、正しい答えではない)
+                ("untilde", "うんtilde"), ("kyouhaultrade", "きょうはうltrade"),
+                // 今までどおり: 見つけた区間 (zover) が同梱の一覧の語でないときの答え (この 2 件は他の条件でも同じ答えになり、条件 B(X) だけを守るテストにはなっていない)
+                ("zoverde", "zoverde"), ("zoverdesu", "ぞゔぇです"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
+        }
+    }
+
+    /// <summary>実機の NSSpellChecker のように、日本語の音の途中から始まる短い語 (kyo|u|mo|l の umol) や、英単語の頭 (vill・viol) も英単語と答えるスペルチェッカー。</summary>
+    private sealed class MidSoundWordsChecker : Detection.IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) => lower is "umol" or "vill" or "viol" || Detection.BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void SpellCheckerWordFromMidSound_DoesNotKeepTheLetterL()
+    {
+        // スペルチェッカー起因の実機だけの外れ (2026-10-16、H1 の一部): kyoumolike が きょumolいけ。l を小書き (ぃ) にしない守り
+        // (EndsWithEnglishWordFromUnit) が、英字の並びの途中の単位から始まる umol をスペルチェッカーに聞き、l を英字に残していた。
+        // 英字の並びの途中にある母音 1 つの単位 (kyo|u) から始まる語は、同梱の一覧だけで見る。
+        CompositionTests.Detector.SpellChecker = new MidSoundWordsChecker();
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("kyoumolike", "きょうもlike"), ("doumolist", "どうもlist"), ("kinoumolast", "きのうもlast"), ("kyoumolink", "きょうもlink"),
+                ("kyoumolife", "きょうもlife"),
+                // 今までどおり: 子音で始まる単位 (vi) からの語 (vill・viol) は、スペルチェッカーでも見る (villa・viola を ゔぃっぁ にしない)
+                ("kyouhavilla", "きょうはvilla"), ("konoviola", "このviola"), ("doumovilla", "どうもvilla"),
+                // 今までどおり: 母音 1 つの単位からの語でも、同梱の一覧の語 (idol) なら l を英字に残す
+                ("kyouidol", "きょうidol"),
+                // 今までどおり: 記号の後ろ (英字の並びの頭) から始まる語は、スペルチェッカーでも見る (変更前と同じ答えを固定しているだけ。外れで、正しい答えではない)
+                ("kyou,umolike", "きょう、umolいけ"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = null;
         }
     }
 }

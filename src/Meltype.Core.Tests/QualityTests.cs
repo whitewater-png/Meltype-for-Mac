@@ -103,6 +103,10 @@ internal static class Quality
 
         // --- 日本語の中の英単語 ---
         new("混在", "kyouhagoogledekensaku", "きょうはgoogleでけんさく"),
+        new("混在", "inviteshimashita", "inviteしました"),
+        new("混在", "invitewookutta", "inviteをおくった"),
+        // 本家 c6b281e のままだと de|vote が 1 語の英語 devote になる (Mac 版で足した守り)
+        new("混在", "githubdevote", "githubでvote"),
         new("混在", "reflectsareta", "reflectされた"),
         new("混在", "selectshita", "selectした"),
         new("混在", "kyouhawikipediadeshirabeta", "きょうはwikipediaでしらべた"),

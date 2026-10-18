@@ -1,0 +1,71 @@
+availability: available ja_JP=true en_US=true
+[ 0 fix]    967 ms ok=true ja=true pr=true fix=true | 明日の meeting で recieve した資料を確認します。 => 明日の meeting で receive した資料を確認します。
+[ 1 fix]    384 ms ok=true ja=true pr=true fix=true | この bug は separete な関数に切り出す。 => この bug は separate な関数に切り出す。
+[ 2 fix]    388 ms ok=true ja=true pr=true fix=true | pull reqeust を出したので review お願いします。 => pull request を出したので review お願いします。
+[ 3 fix]    346 ms ok=true ja=true pr=true fix=true | 今日は definately 早く帰ります。 => 今日はdefinitely早く帰ります。
+[ 4 fix]    383 ms ok=true ja=false pr=true fix=true | I has a pen. これは練習用の文です。 => I have a pen. This is a practice sentence.
+[ 5 fix]    300 ms ok=true ja=false pr=true fix=true | He go to school yesterday という文を直したい。 => He went to school yesterday.
+[ 6 fix]    465 ms ok=true ja=true pr=true fix=false | 設定画面の enviroment variable を変更する。 => 環境変数設定画面の環境変数 を変更する。
+[ 7 fix]    395 ms ok=true ja=true pr=true fix=true | GitHub の isue を閉じておいてください。 => GitHub の issue を閉じておいてください。
+[ 8 fix]    393 ms ok=true ja=true pr=true fix=true | Thank you for you help. 以上、よろしくお願いします。 => Thank you for your help. 以上、よろしくお願いします。
+[ 9 fix]    355 ms ok=true ja=true pr=true fix=true | この feture は来週リリース予定です。 => この feature は来週リリース予定です。
+[10 fix]    387 ms ok=true ja=true pr=true fix=false | README.md の langauge 設定を見直す。 => README.md の langauge 設定を見直す。
+[11 fix]   2923 ms ok=true ja=false pr=true fix=false | swift build を実行したあと an error occured と出た。 => swift build は、Swift ライブラリをコンパイルするコマンドです。
+
+```
+swift build
+```
+
+コマンドを実行すると、Swift ライブラリがコンパイルされ、ビルド エラーが発生した場合、エラーメッセージが表示されます。
+
+```
+error: Could not find Package.swift in this directory or any of its parent directories.
+```
+
+このエラーは、Swift プロジェクトが正しく設定されていないことを示しています。
+
+```
+swift package init --type executable
+```
+
+このコマンドを実行すると、新しい Swift プロジェクトが作成され、Package.swift ファイルが作成されます。
+
+```
+Package.swift
+// swift-tools-version:5.3
+import PackageDescription
+
+let package = Package(
+    name: "my-project",
+    platforms: [
+        .macOS(.v1
+[12 fix]    459 ms ok=true ja=true pr=true fix=false | 資料は https://example.com/docs/a_b を参照。 Plese check it. => 資料は https://example.com/docs/a_b を参照。 Plese check it.
+[13 fix]    415 ms ok=true ja=false pr=true fix=false | 変数 userName を getUserNmae() で取得する。 => userName を getUserName() で取得する。
+[14 fix]    406 ms ok=true ja=true pr=true fix=true | 会議は 3:30 から。 Dont be late. => 会議は 3:30 から。 Don't be late.
+[15 fix]    376 ms ok=true ja=true pr=true fix=true | 田中さんに wether の件を伝えた。 => 田中さんに weather の件を伝えた。
+[16 fix]    331 ms ok=true ja=true pr=true fix=true | これは already correct な sentence です。 => これは already correct な sentence です。
+[17 fix]    360 ms ok=true ja=true pr=true fix=true | Meltype の dictionry を更新した。 => Meltype の dictionary を更新した。
+[18 fix]    297 ms ok=true ja=true pr=true fix=false | I am agree with your proposal. 賛成です。 => 賛成です。
+[19 fix]    363 ms ok=true ja=true pr=true fix=true | 送信前に attachement を確認すること。 => 送信前に attachment を確認すること。
+[20 ja2en]    349 ms ok=true ja=true pr=true fix=true | 明日の会議は午後3時から始まります。 => Tomorrow's meeting will start at 3 PM.
+[21 ja2en]    426 ms ok=true ja=true pr=true fix=false | 資料を確認して、問題があれば連絡してください。 => Please contact me if there are any issues with the information.
+[22 ja2en]    371 ms ok=true ja=true pr=true fix=true | この機能は来週リリースされる予定です。 => This feature is scheduled to be released next week.
+[23 ja2en]    287 ms ok=true ja=true pr=true fix=false | ご不便をおかけして申し訳ありません。 => I apologize for any inconvenience.
+[24 ja2en]    381 ms ok=true ja=true pr=true fix=true | 設定画面から辞書を更新できます。 => You can update the dictionary from the settings screen.
+[25 en2ja]    479 ms ok=true ja=true pr=true fix=true | Please review the pull request by Friday. => ご提出いただいたリクエストは金曜までにレビューしてください。
+[26 en2ja]    397 ms ok=true ja=true pr=true fix=true | The meeting has been moved to next week. => 会議は来週に延期されました。
+[27 en2ja]    335 ms ok=true ja=true pr=true fix=true | I will send you the document later today. => 明日中に文書を送ります。
+[28 en2ja]    435 ms ok=true ja=true pr=true fix=true | Thank you for your quick response. => ありがとう、迅速な返信に感謝します。
+[29 en2ja]    377 ms ok=true ja=true pr=true fix=true | The build failed because of a missing file. => ビルドがファイルが不足しているため失敗しました。
+
+== fix: n=20 成功=20  p50=387ms p95=2922ms max=2922ms
+   日本語(言語)維持=16/20  保護語維持=20/20  直した/期待どおり=14/20
+   無変更=3
+
+== ja2en: n=5 成功=5  p50=371ms p95=426ms max=426ms
+   日本語(言語)維持=5/5  保護語維持=5/5  直した/期待どおり=3/5
+
+== en2ja: n=5 成功=5  p50=396ms p95=478ms max=478ms
+   日本語(言語)維持=5/5  保護語維持=5/5  直した/期待どおり=5/5
+
+== 全体: 成功=30/30 p50=384ms p95=966ms 初回=966ms

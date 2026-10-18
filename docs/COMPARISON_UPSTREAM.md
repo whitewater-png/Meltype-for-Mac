@@ -18,13 +18,13 @@ Meltype for Mac を、本家 (Windows 版 `yksr-melt/Meltype` の main) と並�
 | --- | --- | --- |
 | 判定精度 1: 本家の品質テスト | 各ツリーで `dotnet run -c Release --project src/Meltype.Core.Tests -- --eval`。**各ツリー自身のテスト集で測るので、母数が違う** | Mac 版 **1266/1268** (99.8%。外れは `my name is taro`・`apinoerror`) / 本家 **1337/1337** (100%)。**今は Mac 版が下回っている** (母数が 69 件違う。**推測 (未確認)**: 本家が `a4b6f1a` 以降に足した分が Mac 版に入っていない。足された件の中身は確かめていない) |
 | 判定精度 2: 同じ正解表を両方で回す | `tools/eval-compare.sh <本家の clone> . eval/cases <出力先>` (正解表は 264 件の判定: `upstream-quality.tsv` 203 + `mac-device.tsv` 41 + `mac-terminal.tsv` 20) | 全体 Mac 版 231/264 (87.5%) / 本家 243/264 (92.0%)。**broken (本家で当たり Mac 版で外れ) 28 件、fixed (逆) 16 件**。表ごと: `upstream-quality` 175/203 (86.2%) / 203/203。`mac-device` 40/41 (97.6%) / 25/41 (61.0%)。`mac-terminal` 16/20 (80.0%) / 15/20 (75.0%) |
-| 判定精度 2 の broken 28 件の内訳 | `compare.md` の broken 表 | すべて `upstream-quality.tsv`。`my name is taro`、`apinoerror`、`inviteshimashita`、`yapython` 型 6 件、`devtoprod` 型 5 件、`site PR`、`*pedia` 型 8 件、`i18n`・`l10n`・`h2o` など。対応づけは §5 (2026-10-15 実施)。**28 件すべてが、本家が `a4b6f1a` より前に直したもので、Mac 版に入っていない分** (26 件は P45 で意図して見送った分、2 件 `my name is taro`・`apinoerror` は本家 `4ce7ca8` が候補)。`a4b6f1a` 以降の本家の修正で直ったものは 0 件。Mac 版の後からの回帰と疑える件は見つからなかった (§5) |
+| 判定精度 2 の broken 28 件の内訳 | `compare.md` の broken 表 | すべて `upstream-quality.tsv`。`my name is taro`、`apinoerror`、`inviteshimashita`、`や` + 英単語 7 件 (`yapython`・`githubya` など)、`devtoprod` 型 5 件、`site PR`、`*pedia` 型 8 件、`i18n`・`l10n`・`h2o` など。対応づけは §5 (2026-10-15 実施)。**28 件すべてが、本家が `a4b6f1a` より前に直したもので、Mac 版に入っていない分** (26 件は P45 で意図して見送った分、2 件 `my name is taro`・`apinoerror` は本家 `4ce7ca8` が候補)。`a4b6f1a` 以降の本家の修正で直ったものは 0 件。Mac 版の後からの回帰と疑える件は見つからなかった (§5) |
 | 判定精度 3: Mac 固有コーパスでの上乗せ | 判定精度 2 の `mac-device.tsv` / `mac-terminal.tsv` の行 | 上の表のとおり。`mac-terminal.tsv` の外れ 4 件は「今は外れると分かっている」例を含めた表 (`eval/README.md`)。この外れ 4 件の内訳は、引用元の記載を転記したもので、今回再確認していない |
 | 判定精度 4: 実機の体感・かな漢字変換 | リョウさんの実機 (「打った>結果」形式で `mac-device.tsv` に足す)。かな→漢字は `eval/kanji/kanji-cases.tsv` (212 文) を Zenzai の計測で使う | **未計測** (本家との比較としては実機の数字は無い。Zenzai の計測結果は [ZENZAI_EXPERIMENT_2026-10.md](ZENZAI_EXPERIMENT_2026-10.md)) |
-| 機能: 本家の変更の取り込み状況 | [UPSTREAM_WATCH.md](UPSTREAM_WATCH.md) の「取り込み」列と [UPSTREAM_PR_TRACKER.md](UPSTREAM_PR_TRACKER.md) の P 項目 | 本家 main は watch が最後に見た `db433da` より 28 コミット先 (未分類)。watch の候補表の 2 件はどちらも「未」。管理表の保留・未着手は P40〜P44。**機能の網羅的な比較表 (本家にあって Mac 版に無いもの/逆) は未作成 = 未計測** |
+| 機能: 本家の変更の取り込み状況 | [UPSTREAM_WATCH.md](UPSTREAM_WATCH.md) の「取り込み」列と [UPSTREAM_PR_TRACKER.md](UPSTREAM_PR_TRACKER.md) の P 項目 | 本家 main `45e14f8` (2026-10-14) までの 28 コミット (PR 単位 12 件) は 2026-10-16 に分類し、取り込み (P46) と見送りを管理表に記録した (watch の seen も `45e14f8` に進めた。精査は [UPSTREAM_REVIEW_2026-10-16.md](UPSTREAM_REVIEW_2026-10-16.md))。管理表の保留・未着手は P40〜P44。**機能の網羅的な比較表 (本家にあって Mac 版に無いもの/逆) は未作成 = 未計測** |
 | 対応ホスト | [HOST_COMPAT.md](HOST_COMPAT.md) の 8 項目の打鍵表 (リョウさんの Mac で手動) | Mac 版: 7 アプリ確認済み (再変換が効かないのは Google ドキュメント・ターミナル。文字は壊れない。この表は引用元の記載を転記したもので、今回再確認していない)、VS Code・Slack は未確認。確認日 2026-10-14、ビルドは `446dd48`。**本家 (Windows 版) のホスト対応は対象外で、同じ打鍵表での比較は未計測** |
-| 既知の制限 | [KNOWN_LIMITS.md](KNOWN_LIMITS.md) の「件数」の表 | Mac 版 58 件 (仕様 34 / 直す予定 9 / 直った 5 / 未確認 10)(引用元の記載を転記したもので、今回再確認していない)。本家の制限は同じ基準で数えていないので**未計測** |
-| 参考: Mac 版のテスト件数 | `src/Meltype.Core.Tests` の通常実行 | 今回は再実行していない (直近の記録は IMPROVEMENT_PLAN の 1 音確定の節: 659/661、環境由来の 2 件を除き通過。(引用元の記載を転記したもので、今回再確認していない)) |
+| 既知の制限 | [KNOWN_LIMITS.md](KNOWN_LIMITS.md) の「件数」の表 | Mac 版 74 件 (仕様 45 / 直す予定 9 / 直った 9 / 未確認 11。2026-10-16 の P46 の取り込み後に KNOWN_LIMITS の表の行を数えて件数表と一致することを確認) [更新 2026-10-16: もとは「58 件 (仕様 34 / 直す予定 9 / 直った 5 / 未確認 10)」で、引用元の記載の転記だった]。本家の制限は同じ基準で数えていないので**未計測** |
+| 参考: Mac 版のテスト件数 | `src/Meltype.Core.Tests` の通常実行 | 2026-10-16 の P46 の取り込み後に、統合した木 (P46 の枝 + main `657d042`) で 852 件すべて通過 (`src/Meltype.Core.Tests` の通常実行。Windows / Linux では未確認) |
 
 ### 数字の注意
 
@@ -58,8 +58,10 @@ Meltype for Mac を、本家 (Windows 版 `yksr-melt/Meltype` の main) と並�
 | --- | --- | --- | --- | --- | --- |
 | 2026-10-15 | `669ead5` (docs/p3-3-2)・1.2.0 | `45e14f8`・2026-10-14・1.2.1 | 1266/1268 / 1337/1337 | 231/264 / 243/264、broken 28 / fixed 16 | 最初の枠。今は「下回らない」を満たしていない (原因は §5 のとおり: 28 件は本家の `a4b6f1a` より前の修正のうち Mac 版に入っていない分で、`a4b6f1a` 以降の修正ではない)。実機・ホスト・機能の網羅比較は未計測。内部用で非公開 |
 | 2026-10-15 | `54a2002` (main)・1.2.1 の前 | `45e14f8`・2026-10-14・1.2.1 (手元の写し。取り直していない) | 未計測 / 未計測 | 276/310 / 266/310、broken 28 / fixed 38 | 1.2.1 の公開前。正解表に `mac-protected-spans.tsv` (46 件) が加わり母数が 310 になった。表ごと (Mac / 本家): `upstream-quality` 175/203 / 203/203、`mac-device` 40/41 / 25/41、`mac-protected-spans` 45/46 / 23/46、`mac-terminal` 16/20 / 15/20。broken 28 件は §5 の 28 件と同じ打鍵 (新しい回帰 0)。同じ表の合計は Mac 版が上だが、本家の品質テスト (`upstream-quality`) では今も下回っている |
+| 2026-10-15 | `feat/p3-3-2-invite` (main `db04ed8` + #69 の取り込み) | `45e14f8`・2026-10-14・1.2.1 (手元の写し) | 1269/1271 / 未計測 | 278/310 / 266/310、broken 26 / fixed 38 | `inviteshimashita`・`invitewookutta` を取り込み (§5 の小節)。残り 26 件 (P45 の見送り 24 件 + `my name is taro`・`apinoerror`) |
+| 2026-10-16 | `0dee8de` (main。コードは K82 の `9e5b509` まで) | `45e14f8`・2026-10-14・1.2.1 (手元の写し。取り直していない) | 未計測 / 未計測 | 278/310 / 266/310、broken 26 / fixed 38 | K82 (案 A'') の後。表ごと (Mac / 本家): `upstream-quality` 177/203 / 203/203、`mac-device` 40/41 / 25/41、`mac-protected-spans` 45/46 / 23/46、`mac-terminal` 16/20 / 15/20。broken 26 件の打鍵はどれも §5 の対応表にあるもの (新しい回帰 0)。`809548c`・`9e5b509` は同梱の英単語表では答えを変えないので、この表の数字は前の行と同じ (実機の NSSpellChecker での差は計画書の K82 の節)。この行は 2026-10-16 に main `0dee8de` と本家の写しで `tools/eval-compare.sh` を実行した結果 (文書の整理の作業で実行。品質テストは回していない) |
 
-## 5. broken 28 件の対応づけ (2026-10-15)
+## 5. broken 28 件の対応づけ (2026-10-15。同日に invite の 2 件を取り込み、現在は 26 件。§4 の最新の行と、この節の最後の小節)
 
 調べたこと (すべて読み取りのみ。ソースは変更していない):
 
@@ -79,13 +81,13 @@ Meltype for Mac を、本家 (Windows 版 `yksr-melt/Meltype` の main) と並�
 | --- | --- | --- | --- | --- | --- |
 | `my name is taro` | 1 | 取り込み候補 (本家 `4ce7ca8` に含まれる可能性が高い。**推測**) | `4ce7ca8` (2026-10-07、`Preserve mixed protected input and reduce composition latency`)。本家 `4ce7ca8^` は品質テスト 1241/1243、`4ce7ca8` は 1243/1243、Mac 版の最初の Core (`c3c247f`) は 1241/1243 (外れ 2 件は Mac 版の現在と同じ 2 件と**推測**。`--eval` は外れの名前を出さないので、個別の成否は未確認) | 低 (どの部分が `taro` を直したかは未特定) | 大: Core だけで +198/−39 行 (7 ファイル。`CompositionDetector`・`CompositionText` が主)。Mac 版は両ファイルに独自の改変があるので手移植が前提で、性能最適化 (`CanBeEnglishSpan` ほか) が混ざる。リスク大。部分抜き出しは hunk の特定から |
 | `apinoerror` | 1 | 取り込み候補 | `4ce7ca8` の `EnglishBeforeParticleAndEnglishTail` (api + no + error のように辞書の英語見出しを助詞と英単語が挟む。差分を読んで確認)。のちの `2a2bf10` (#376) も触れている | 中〜高 (関数の意図は読んで確認。単独で Mac 版に足して直るかは未実行) | 小〜中: 新規関数 1 つ (約 20 行) と呼び出し 1 か所。ただし `IsListedEnglishWord`・`TrailingParticles` などの前提が Mac 版にあるかは未確認。`sushi + no + error` が壊れないか eval で見る必要 |
-| `inviteshimashita`・`invitewookutta` | 2 | 取り込み候補 (P45 で見送り済み) | `c6b281e` (#69、2026-10-08)。Core は +2 行。P45 の n=4 | 高 (P45 が実測) | 小: 2 行。ただし入れると `githubdevote` (期待 `githubでvote`) が壊れて見送った。直すなら `githubdevote` の守りが先 |
+| `inviteshimashita`・`invitewookutta` | 2 | 取り込み候補 (P45 で見送り済み) | `c6b281e` (#69、2026-10-08)。Core は +2 行。P45 の n=4 | 高 (P45 が実測) | 小: 2 行。ただし入れると `githubdevote` (期待 `githubでvote`) が壊れて見送った。直すなら `githubdevote` の守りが先 **→ 2026-10-15 取り込み済み (守りつき。下の小節)** |
 | `i18n`・`l10n`・`h2o` | 3 | 取り込み候補 (P45 で見送り済み) | `b4484c4` (2026-10-11、数字挟み略語)。Core は +38 行 (2 ファイル)。P45 の n=6 | 高 (P45 が実測。eval は broken 0 で 3 件直る) | 中: +38 行。入れると既存テスト 2 件 (`video.mp4woMP3ni`・`今日は3かける4を`) が落ちる。本家は `ScoredSegmentation.cs` 側にも守りがあり、Mac 版には無い。条件を絞るか、その 2 件の守りが先 |
 | `や` + 英単語 (`githubya`・`yapython`・`yacursor`・`yaslack`・`yastack`・`yaplay`・`yasync`) | 7 | 取り込み候補 (P45 で見送り済み) | `3cb0758` の `や` の部分 (2026-10-08) と `ffd7e6a` (2026-10-08)。P45 の n=8 の残り。`githubya` は `-S` で `27e907c` ・`3cb0758` にも出る | 高 (P45 が実測) | 中: 2 コミットで Core +57/−8 行。全部入れると eval の broken 3 件と既存テスト 4 件が壊れた。`ffd7e6a` を外しても 2 件壊れた。リスク大 (過去に撤退した系統。方針は「同じ種類の回帰が出る修正は撤退」) |
 | 英字のあいだの `と` (`devtoprod`・`edittopub`・`dottonet`・`rdstoredshift`・`uikittoswiftui`) | 5 | 取り込み候補 (前提つき) | `35beb60` の `と` の部分 (2026-10-12、Core +62/−5) が `74ca494` (#154、「英字のあいだの『と』を助詞にする」、Core +13 行) を前提にする。Mac 版に `74ca494` の機能が無い | 高 (P45 が実測。`74ca494` が前提という点は P45 の記載で、今回は差分を読んでいない) | 中: 先に `74ca494` (13 行) を別項目として入れ、そのあと `35beb60` の `と` の部分。リスクは中 (`と` 助詞は日本語側に影響しやすい。eval の broken 0 を条件に) |
-| `site PR` | 1 | 取り込み候補 (P45 で見送り済み) | `8dfec9d` (2026-10-08、Core +19/−4)。P45 の n=12 | 高 (P45 が実測) | 小〜中: 入れると既存の英文 `make sure you have time` が `まけ すれ よう have time` に壊れた (`sure` が `すれ` と読める)。守りを足さないと入れられない |
+| `site PR` | 1 | 取り込み候補 (P45 で見送り済み) | `8dfec9d` (2026-10-08、Core +19/−4)。P45 の n=12 | 高 (P45 が実測) | 小〜中: 入れると既存の英文 `make sure you have time` が `まけ すれ よう have time` に壊れた (`sure` が `すれ` と読める)。守りを足さないと入れられない **→ 2026-10-15 再実験の結果も見送り (下の小節)** |
 | `*pedia` (`pedia`・`protopedia`・`conservapedia`・`wikipedias`・`protopedias`・`Protopedia`・`Protopedias`・`worldpedia`) | 8 | 取り込み候補だが**本家側の修正にも悪化あり** (P45 の査読 R35) | `3cb0758` の pedia の部分・`fd66db0` (-pedias)・`f1a190e` (先頭大文字、#207 系)。P45 の n=8・9 | 高 (P45 が実測。R35 の悪化は P45 の記載) | 中: 3 コミットで Core 約 +45 行。一度入れて外した: `kyouhawikipediadeshirabeta` が前の日本語ごと英字になる悪化があり、**本家の `a4b6f1a` も同じ**。入れ直すなら「前の日本語を巻き込まない条件」を先に決める。本家への報告は判断待ち (P45)。リスク大 |
-| 合計 | 28 | 取り込み候補 28 / Mac 版固有の回帰 0 / 不明 0 (ただし `my name is taro` の確度は低) | | | |
+| 合計 | 28 | 取り込み候補 28 / Mac 版固有の回帰 0 / 不明 0 (ただし `my name is taro` の確度は低)。うち 2 件 (invite) は取り込み済みで、残り 26 | | | |
 
 ### 注意
 
@@ -93,3 +95,15 @@ Meltype for Mac を、本家 (Windows 版 `yksr-melt/Meltype` の main) と並�
 - P45 の記載 (n=4・6・8・9・11・12) は今回の調査で本家のコミットが実在し `a4b6f1a` の祖先であること、変更行数だけを確かめました。「入れると何が壊れるか」は P45 の記録を写したもので、今回は再実行していません。
 - `my name is taro`・`apinoerror` は、P45 の n=13 では「直した修正は見つからなかった (未特定)」でした。今回、本家の木を `4ce7ca8^` と `4ce7ca8` で回して、`4ce7ca8` で 2 件分の差が出ることを見つけました (`apinoerror` は関数まで特定、`my name is taro` はコミットまで)。Mac 版は `c3c247f` (同じ 2026-10-07) の時点から外れているので、写した時期が `4ce7ca8` の直前だった**と推測**します。
 - 見積もりの「行数」は `git show --shortstat <hash> -- src/Meltype.Core dictionaries` の数字です。Mac 版への手移植の実際の量とは違います。
+
+### 小さい 2 型の取り込み実験 (2026-10-15)
+
+| 型 | 結果 | 内容 |
+| --- | --- | --- |
+| `inviteshimashita`・`invitewookutta` (本家 `c6b281e`、#69) | **取り込み** | 本家のままだと `githubdevote` (期待 `githubでvote`) が今も壊れるので、「助詞で始まり、残り 3 文字以上が英単語の語 (`de|vote`)」には新しい規則を使わない守りを足した。損: `devotewo` は今までどおり `でゔぉてを` |
+| `site PR` (本家 `8dfec9d`) | **見送り** | 本家のままだと英文が壊れる (`the site is down` → `the して is down`、`sure` を含む `make sure you have time` → `まけ すれ よう have time`。前後比較で 525 件)。3 つの条件 (本家が後で直した語の一覧に限る・今の語が大文字で始まる・前が空白で区切った英単語でない) を足すと実装者の前後比較では悪化 0 だったが、独立した査読の自作入力で、名詞の site + 大文字の略語が壊れた: `kono site URL wo oshiete` → `このして URL をおしえて`、`sono site API` → `そのして API`、`site ID wo kakunin`・`web no site URL` なども同じ。`e.g. site PR` も「して」になる。直るのは `site PR` の 1 件だけで、技術系の文でよく打つ形を壊すので見送った (リョウさんの判断)。条件をさらに足す案は特定の例合わせになるので採らない。実験のコミットは `exp/p3-3-2-small` の `169b8bc` に残す |
+
+- 取り込み後の数字 (変更前 → 後): テスト 777 → 778 (全件通過)、品質テスト 1266/1268 → 1269/1271、正解表 276/310 → 278/310 (broken 0 / fixed 2: `inviteshimashita`・`invitewookutta`)。本家 (`45e14f8`、266/310) に対する broken は 28 → 26、fixed 38 (このブランチで `tools/eval-compare.sh` を実行して確認)。
+- 独立した査読: 自作の入力 79 件 (v を含む語・助詞 + 英単語・文頭・句読点など) で、この型による悪化は 0 件、<del>`derive` も直った</del>。[訂正 2026-10-16: `derive` が直ったのは同梱の英単語表を使うテストでだけ。実機では NSSpellChecker が `rive` を英単語と答えるので直っていなかった (`deriveyadevote` → でリヴェヤでvote)。守りを同梱の表だけで見るようにして直した。計画書の「追加項目 3-2 の続き」]
+- 本家も同じ: 本家 `45e14f8` は `the site is down` → `the して is down`、`site map` → `して map`。本家への連絡は戦略書 §8 の決定 (現時点では行わない) に従い、ここに記録だけ残す。
+- 未確認: 実機。Mac は macOS のスペルチェッカー (NSSpellChecker) を使うので、v の規則はテストより多くの語に効く。`devote` のように頭が助詞に見える英単語で確かめる。[追記 2026-10-16: 2026-10-16 午前に実機で確認済み。`inviteshimashita` → inviteしました、`invitewookutta` → inviteを送った、`githubdevote` → githubでvote で狙いどおり、`devotewo` → デヴォテを は既知の限界どおり。`derive` は実機で直っていなかったので `809548c` と K82 の `9e5b509` で直し、それぞれ実機で確認した。計画書の「追加項目 3-2 の続き」と「K82 の原因調査」]

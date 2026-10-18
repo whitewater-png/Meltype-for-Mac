@@ -183,7 +183,7 @@ public sealed class UserModel
         catch (Exception ex)
         {
             try { File.Copy(_path, _path + ".broken", overwrite: true); } catch { }
-            Diagnostics.Log.Warn($"model.json を読み込めなかったため学習データなしで開始します: {ex.Message}");
+            Diagnostics.Log.Warn($"model.json を読み込めなかったため学習データなしで開始します: {Config.SafeFile.Describe(ex)}");
         }
     }
 

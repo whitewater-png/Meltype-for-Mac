@@ -1,0 +1,92 @@
+availability: available ja_JP=true en_US=true
+[ 0 fix]   1545 ms ok=true ja=false pr=true fix=false | 明日の meeting で recieve した資料を確認します。 => 明日のmeetingで受け取った資料を確認します。
+[ 1 fix]    526 ms ok=true ja=true pr=true fix=true | この bug は separete な関数に切り出す。 => このバグは、`separate` な関数に切り出す。
+[ 2 fix]    420 ms ok=true ja=true pr=true fix=true | pull reqeust を出したので review お願いします。 => *   Pull request を出したのでレビューお願いします。
+[ 3 fix]    352 ms ok=true ja=true pr=true fix=false | 今日は definately 早く帰ります。 => 今日は絶対に早く帰ります。
+[ 4 fix]    292 ms ok=true ja=false pr=true fix=true | I has a pen. これは練習用の文です。 => I have a pen.
+[ 5 fix]    292 ms ok=true ja=false pr=true fix=true | He go to school yesterday という文を直したい。 => He went to school yesterday.
+[ 6 fix]  50839 ms ok=false ja=false pr=true fix=false | 設定画面の enviroment variable を変更する。 => GenerationError: exceededContextWindowSize(FoundationModels.LanguageModelSession.GenerationError.Context(debugDescription: "Content contains 4090 tokens, which exceeds the maximum allowed context size of 4096.", underlyingErrors: [Provided 4,090 tokens, but the maximum allowed is 4,096.], errorDescriptionOverride: nil))
+[ 7 fix]    436 ms ok=true ja=true pr=true fix=true | GitHub の isue を閉じておいてください。 => GitHub の issue を閉じておいてください。
+[ 8 fix]    355 ms ok=true ja=true pr=true fix=true | Thank you for you help. 以上、よろしくお願いします。 => Thank you for your help. 以上、よろしくお願いします。
+[ 9 fix]    320 ms ok=true ja=true pr=true fix=false | この feture は来週リリース予定です。 => この機能は来週リリース予定です。
+[10 fix]   2379 ms ok=true ja=false pr=false fix=false | README.md の langauge 設定を見直す。 => ```markdown
+langauge:
+  en:
+    - "The purpose of this project is to demonstrate how to use the `python-data-visualization` library to create interactive visualizations."
+    - "This project is designed to be a beginner-friendly guide to using the library, with clear instructions and examples for each step."
+    - "To install the library, simply run the following command in your terminal: `pip install python-data-visualization`."
+    - "Once the library is installed, you can start exploring the examples provided in this document."
+    - "If you encounter any issues or have questions, please feel free to ask in the comments section below."
+```
+[11 fix]   5833 ms ok=true ja=false pr=true fix=true | swift build を実行したあと an error occured と出た。 => swift build を実行したあと an error occured と出たということは、compile を実行したときにエラーが出たことを意味します。
+
+エラーメッセージは以下の通りです。
+
+```
+An error occurred during build:
+
+error: couldNotFindTmpDir("/mnt/tmp")
+```
+
+このエラーは、build プロセス中に一時的なディレクトリが見つからないことを意味します。このディレクトリは、build プロセスに必要なファイルを保存するために使用されます。
+
+以下は、このエラーを修正するためのいくつかの方法です。
+
+1. **tmpdir 環境変数**: tmpdir 環境変数を設定して、一時的なディレクトリを指定することができます。この環境変数は、build プロセス中に使用される temporary ディレクトリを指定するために使用されます。
+
+   ```bash
+   export TMPDIR=/tmp
+   ```
+
+   ここで、/tmp は一般的な一時的なディレクトリであり、ほとんどのオペレーティングシステムで利用可能です。
+
+2. **build オプション**: build オプションを指定して、tmpdir 環境変数を自動的に設定することができます。
+
+   ```bash
+   swift build --tmpdir=/tmp
+   ```
+
+   ここで、/tmp は build プロセス中に使用される temporary ディレクトリを指定するために使用されます。
+
+3. **環境変数**: build プロセス中に使用される temporary ディレクトリを指定するために、環境変数を使用することもできます。
+
+   ```bash
+   export TMPDIR=/tmp
+   swift build
+   ```
+
+   ここで、TMPDIR 環境変数は build プロセス中に使用される temporary ディレクトリを指定するために使用されます。
+
+これらの方法を試して、エラーが解決するかどうか確認してください。もし問題が解決しない場合は、他の原因を確認することも必要です。
+[12 fix]    498 ms ok=true ja=true pr=true fix=false | 資料は https://example.com/docs/a_b を参照。 Plese check it. => 資料は <https://example.com/docs/a_b> を参照。Plese check it.
+[13 fix]    410 ms ok=true ja=false pr=true fix=false | 変数 userName を getUserNmae() で取得する。 => ```javascript
+const userName = getUserName();
+```
+[14 fix]    403 ms ok=true ja=true pr=true fix=false | 会議は 3:30 から。 Dont be late. => 会議は 3:30 から。遅れないで。
+[15 fix]    418 ms ok=true ja=true pr=true fix=false | 田中さんに wether の件を伝えた。 => 田中さんに「whether」の件を伝えた。
+[16 fix]    291 ms ok=true ja=true pr=true fix=false | これは already correct な sentence です。 => これは already correct な文です。
+[17 fix]    290 ms ok=true ja=false pr=true fix=false | Meltype の dictionry を更新した。 => Meltype の辞書を更新しました。
+[18 fix]  50935 ms ok=false ja=false pr=true fix=false | I am agree with your proposal. 賛成です。 => GenerationError: exceededContextWindowSize(FoundationModels.LanguageModelSession.GenerationError.Context(debugDescription: "Content contains 4091 tokens, which exceeds the maximum allowed context size of 4096.", underlyingErrors: [Provided 4,091 tokens, but the maximum allowed is 4,096.], errorDescriptionOverride: nil))
+[19 fix]    404 ms ok=true ja=true pr=true fix=true | 送信前に attachement を確認すること。 => 送信前にattachmentを確認すること。
+[20 ja2en]    340 ms ok=true ja=true pr=true fix=true | 明日の会議は午後3時から始まります。 => The meeting tomorrow starts at 3 PM.
+[21 ja2en]    422 ms ok=true ja=true pr=true fix=false | 資料を確認して、問題があれば連絡してください。 => Please contact me if there are any issues with the information.
+[22 ja2en]    361 ms ok=true ja=true pr=true fix=true | この機能は来週リリースされる予定です。 => This feature is scheduled to be released next week.
+[23 ja2en]    278 ms ok=true ja=true pr=true fix=false | ご不便をおかけして申し訳ありません。 => I apologize for any inconvenience.
+[24 ja2en]    359 ms ok=true ja=true pr=true fix=true | 設定画面から辞書を更新できます。 => You can update the dictionary from the settings screen.
+[25 en2ja]    421 ms ok=true ja=true pr=true fix=true | Please review the pull request by Friday. => ご来稿のレビューは金曜までに完了してください。
+[26 en2ja]    366 ms ok=true ja=true pr=true fix=true | The meeting has been moved to next week. => 会議は来週に延期されました。
+[27 en2ja]    349 ms ok=true ja=true pr=true fix=false | I will send you the document later today. => 明日遅くまでにファイルを送ります。
+[28 en2ja]    462 ms ok=true ja=true pr=true fix=true | Thank you for your quick response. => ありがとう、速やかな返信に感謝します。
+[29 en2ja]    414 ms ok=true ja=true pr=true fix=true | The build failed because of a missing file. => ビルドがファイルが不足していたため失敗しました。
+
+== fix: n=20 成功=18  p50=409ms p95=5832ms max=5832ms
+   日本語(言語)維持=11/18  保護語維持=17/18  直した/期待どおり=8/18
+   無変更=0
+
+== ja2en: n=5 成功=5  p50=359ms p95=421ms max=421ms
+   日本語(言語)維持=5/5  保護語維持=5/5  直した/期待どおり=3/5
+
+== en2ja: n=5 成功=5  p50=413ms p95=462ms max=462ms
+   日本語(言語)維持=5/5  保護語維持=5/5  直した/期待どおり=4/5
+
+== 全体: 成功=28/30 p50=403ms p95=2379ms 初回=1544ms

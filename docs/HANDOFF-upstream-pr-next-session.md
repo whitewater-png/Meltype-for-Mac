@@ -5,21 +5,21 @@
 > 状態の正本は `docs/UPSTREAM_PR_TRACKER.md` (項目ごとの状態) と `docs/IMPROVEMENT_PLAN.md` (設計・数字・限界)。この文書はそれを読むための道案内。
 
 ## 0. 先にやること
-1. `cd /Users/ryo/Meltype && git status --short && git log --oneline -5 && git log origin/main..HEAD --oneline | wc -l` (未 push の件数は上のコマンドで確認 (別セッションの分も含む)。**push していない**。`/Users/ryo/Meltype` の作業ツリーは、別セッションが `exp/zenzai-eval` などに切り替えていることがある。`git branch --show-current` を見て、`main` でなければそこへコミットしない。`main` へは一時の `git worktree add` で入れ、`git update-ref refs/heads/main <新> <旧>` で更新するとよい)。
+1. `cd <リポジトリ> && git status --short && git log --oneline -5 && git log origin/main..HEAD --oneline | wc -l` (未 push の件数は上のコマンドで確認 (別セッションの分も含む)。**push していない**。作者の作業ツリーは、別セッションが `exp/zenzai-eval` などに切り替えていることがある。`git branch --show-current` を見て、`main` でなければそこへコミットしない。`main` へは一時の `git worktree add` で入れ、`git update-ref refs/heads/main <新> <旧>` で更新するとよい)。
 2. 入っているアプリ: `~/Library/Input Methods/Meltype.app` は 1.1.5 (build 21)、**2026-10-12 17:20 ビルド** (`main` の `f5de00a` を、切り離した一時の作業ツリーでビルドして入れ替えたもの。P36・S2・かな入力・US 配列を含み、`exp/zenzai-eval` の変更は含まない)。`defaults read io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK` は「存在しない」になっていること (トレースログは切ってある)。
 3. テスト: `bash --noprofile --norc -c 'export PATH=$HOME/.dotnet:$PATH; cd src/Meltype.Core.Tests && dotnet run -c Release'` → **559/559** (かな入力・US 配列のマージ後)。
 4. かな入力 (JIS) と US 配列対応は、別セッションが `main` に取り込んだ (`afe2ccd`・`11c135f`)。マージ後のテストは 559 件通り、`tools/check-mac-aot-settings.py` は期待値が古くなって失敗していたので直した (`b33e571`。`InputStyle` は Mac の設定に出る)。**実機の確認 (2026-10-12、JIS キーボード、`main` の 17:20 ビルド、TextEdit): 設定の「入力方式」の表示と切り替え、かな入力 (`Shift+E` = ぃ など・英単語のときの英字表示)、ローマ字入力 (`kyouha,.` → `きょうは、。`、`` kono`config`wo `` → `` この`config`を ``。バッククォートは JIS の Shift+@)、`¥` キーは `¥`、Option + `¥` は `\` (半角) で、問題なし。US 配列そのもの (`docs/US_LAYOUT_CHECKLIST.md` の U1〜U13) は US キーボードが無いので未確認。**
 
 ## 1. 守ること (ガードレール)
-- **`exp/zenzai-eval` は、精度向上の検証用ブランチ (別セッションの作業。リョウさんに確認済み)。`/Users/ryo/Meltype` の作業ツリーがそのブランチに切り替わり、未コミットの変更 (`Package.swift`・`Converter.swift` など) があることがある。そこへはコミットしない・その変更を巻き込まない。`main` にはコミットしない。**
-- **push・タグ・版の更新・リリース・外部投稿は、リョウさんの明示の許可があるときだけ。** 実機への入れ替え (`mac/build.sh`) は許可済みだが、何を入れ替えるかを先に言う。入れ替え前に旧版を `~/.hermes/profiles/henrietta/cache/scratch/rollback/Meltype.app` へ退避 (24 時間で消える)。
+- **`exp/zenzai-eval` は、精度向上の検証用ブランチ (別セッションの作業。リョウさんに確認済み)。作者の作業ツリーがそのブランチに切り替わり、未コミットの変更 (`Package.swift`・`Converter.swift` など) があることがある。そこへはコミットしない・その変更を巻き込まない。`main` にはコミットしない。**
+- **push・タグ・版の更新・リリース・外部投稿は、リョウさんの明示の許可があるときだけ。** 実機への入れ替え (`mac/build.sh`) は許可済みだが、何を入れ替えるかを先に言う。入れ替え前に旧版を一時の作業用フォルダー (24 時間で消える) の `rollback/Meltype.app` へ退避。
 - 取り消せない操作 (削除・上書き・公開・送信) は、先に懸念と代替案を出して判断を仰ぐ。
 - **提出前に、実装者とは別の査読員 (別エージェント) が確認する。** 指摘がなくなってから提出。複数の独立した査読を並行して頼んでよい。
 - 実機で確かめていないことは「未確認」と書く。実行していないことを実行したと書かない。
-- トレースログ (`MeltypeTraceIMK`) は打った文字が残る。**取る前に毎回リョウさんの同意**を得る。終わったら `defaults delete ... MeltypeTraceIMK` → `pkill -x Meltype` → `~/Library/Application Support/Meltype/imk-trace.log` を削除。**`scratch/trace-backup` は別セッションのもの。触らない。**
+- トレースログ (`MeltypeTraceIMK`) は打った文字が残る。**取る前に毎回リョウさんの同意**を得る。終わったら `defaults delete ... MeltypeTraceIMK` → `pkill -x Meltype` → `~/Library/Application Support/Meltype/imk-trace.log` を削除。**手元の一時の作業用フォルダーにあるトレースの退避 (非公開) は別セッションのもの。触らない。**
 - コミットは 1 項目 1 コミットで、変更したファイルを明示して `git add` (`-A` 禁止)。Windows・Linux は「対象外」と書く (未検証にしない)。
 - ビルド・テストは `bash --noprofile --norc -c 'export PATH=$HOME/.dotnet:$PATH; ...'` で行う (`~/.zshrc` の対話プロンプトが混ざるため)。
-- 作業は `/Users/ryo/Meltype` の**複製** (`rsync -a --exclude bin --exclude obj --exclude mac/build --exclude mac/.build`、そのあと `git checkout -- . && git clean -fdq docs`) で行い、査読済みの差分だけを本体へ当てる。複雑な Python は `write_file` でファイルにして `python3 -c "exec(compile(open(f,encoding='utf-8').read(),'t','exec'))"` で実行 (インラインの heredoc は止められることがある)。
+- 作業は作者の作業ツリーの**複製** (`rsync -a --exclude bin --exclude obj --exclude mac/build --exclude mac/.build`、そのあと `git checkout -- . && git clean -fdq docs`) で行い、査読済みの差分だけを本体へ当てる。複雑な Python は `write_file` でファイルにして `python3 -c "exec(compile(open(f,encoding='utf-8').read(),'t','exec'))"` で実行 (インラインの heredoc は止められることがある)。
 
 ## 2. ここまでの状態 (詳細は管理表)
 | 項目 | 内容 | 状態 |
@@ -85,5 +85,5 @@
 
 ## 7. 取り込み済みのブランチ `batch/p36c-p38-p39-sec` (2026-10-12 夜)
 - `bd8e954` (P36 続き)・`36979e6` (P39)・`f57b031` (P38)・`b0726ff` (S3) を、別セッションが `main` に入れた 4 コミット (丸括弧の設定・pkg の文字化け修正・dmg 配布 (D1)・リリース手順) とマージして、`main` に取り込んだ (マージ後のテスト **575/575**・`build.sh --no-install`・codesign・AOT 検査・`tools/check-release.py` が通る)。計画書の衝突は、両方の節を残して解決した。
-- 取り込みの途中で、別セッションが `main` の作業ツリーで未コミットの変更を持っていたため、一時はブランチに積んで待った。**`/Users/ryo/Meltype` の作業ツリーは、別セッションが使っているので、`main` への変更は一時の `git worktree add` かブランチ経由で行い、作業ツリーが綺麗なときだけ `git merge --ff-only` で進める**。
+- 取り込みの途中で、別セッションが `main` の作業ツリーで未コミットの変更を持っていたため、一時はブランチに積んで待った。**作者の作業ツリーは、別セッションが使っているので、`main` への変更は一時の `git worktree add` かブランチ経由で行い、作業ツリーが綺麗なときだけ `git merge --ff-only` で進める**。
 - ブランチ `batch/p36c-p38-p39-sec` は残っている (`main` に含まれているので、不要なら `git branch -d` で消せる。消すのはリョウさんに確認してから)。

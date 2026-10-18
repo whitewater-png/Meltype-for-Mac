@@ -38,7 +38,7 @@ public sealed class RomajiDetector
         ("さ", ["sa"]), ("し", ["shi", "si"]), ("す", ["su"]), ("せ", ["se", "ce"]), ("そ", ["so"]),
         ("しゃ", ["sha", "sya"]), ("しゅ", ["shu", "syu"]), ("しょ", ["sho", "syo"]), ("しぇ", ["she", "sye"]),
         ("た", ["ta"]), ("ち", ["chi", "ti"]), ("つ", ["tsu", "tu"]), ("て", ["te"]), ("と", ["to"]),
-        ("ちゃ", ["cha", "tya", "cya"]), ("ちゅ", ["chu", "tyu", "cyu"]), ("ちょ", ["cho", "tyo", "cyo"]), ("ちぇ", ["che", "tye"]),
+        ("ちゃ", ["cha", "tya", "cya"]), ("ちゅ", ["chu", "tyu", "cyu"]), ("ちょ", ["cho", "tyo", "cyo"]), ("ちぇ", ["che", "tye", "cye"]),
         ("な", ["na"]), ("に", ["ni"]), ("ぬ", ["nu"]), ("ね", ["ne"]), ("の", ["no"]),
         ("にゃ", ["nya"]), ("にゅ", ["nyu"]), ("にょ", ["nyo"]),
         ("は", ["ha"]), ("ひ", ["hi"]), ("ふ", ["fu", "hu"]), ("へ", ["he"]), ("ほ", ["ho"]),
@@ -87,6 +87,8 @@ public sealed class RomajiDetector
         ("か", ["ca"]), ("く", ["cu"]), ("こ", ["co"]),
         ("ちぃ", ["cyi", "tyi"]),
         ("くぁ", ["kwa"]), ("ぐぁ", ["gwa"]), ("つぁ", ["tsa"]), ("つぃ", ["tsi"]), ("つぇ", ["tse"]), ("つぉ", ["tso"]),
+        // ふゃ ふゅ ふょ (Microsoft IME・Mozc と同じ綴り。フュージョン = fyu-jon。本家 #674)
+        ("ふゃ", ["fya"]), ("ふゅ", ["fyu"]), ("ふょ", ["fyo"]),
     ];
 
     private static readonly Dictionary<string, string> SpellingToKana = BuildSpellingMap(Table);

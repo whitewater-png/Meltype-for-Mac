@@ -1,0 +1,75 @@
+# 前文脈つきの正解表 (実験 2-2 B 用)。列: 前の文字<Tab>打鍵<Tab>期待<Tab>種類<Tab>メモ
+# 期待は現行・案のどちらの出力も見ずに、人が「ふつう期待する結果」として書いた。作者が書いた例で、実機の記録ではない (実機で確かめていない)。
+# 前の文字は実機では末尾 20 文字までしか渡らない。実験の実行側で末尾 20 文字に切る。
+# 種類: JA尾EN = 日本語の文の中で英単語の直後に日本語が続く / EN続 = 英文の続き / ENの中のJA = 英文に日本語が混ざる / コード後JA = コード・URL の後に日本語 / JA続 = 日本語の続き / 長JA尾EN = 日本語が長く末尾だけ英語
+今日は pull request 	no	の	JA尾EN	P36 の pull request no 型
+明日 Visual Studio Code 	no	の	JA尾EN	P36 の Visual Studio Code no 型
+今日は GitHub 	ni	に	JA尾EN	本家 QualityTests と同じ形
+会議で Zoom 	de	で	JA尾EN
+新しい Chrome 	ga	が	JA尾EN
+資料を Slack 	de	で	JA尾EN
+これは Python 	no	の	JA尾EN
+昨日の議論を踏まえて Pull Request 	wo	を	JA尾EN	20 文字に切ると Pull Request のみ
+バグを fix 	shimasu	します	JA尾EN
+ドキュメントを update 	shita	した	JA尾EN
+明日のレビューは pull request 	to	と	JA尾EN
+設定は Notion 	ni	に	JA尾EN
+この issue 	wa	は	JA尾EN
+その branch 	ni	に	JA尾EN
+今日の API 	ha	は	JA尾EN
+日本語の長い文章をここまで書いて最後に PR 	wo	を	長JA尾EN	20 文字の中の日本語が多い
+お客様からいただいたご要望をまとめた Notion 	no	の	長JA尾EN
+先週のミーティングで決まった内容を共有した Slack 	de	で	長JA尾EN
+今日はとても忙しくて朝から晩まで Zoom 	ga	が	長JA尾EN
+先ほどお送りしたファイルは Google Drive 	ni	に	長JA尾EN
+I want 	to	to	EN続	本家 QualityTests と同じ形
+Please 	make	make	EN続	本家と同じ形
+This is a pull request 	to	to	EN続
+Let's go 	to	to	EN続
+I think we can 	go	go	EN続
+Can you check if it is 	ok	ok	EN続
+I will 	do	do	EN続
+We need to merge this into 	main	main	EN続
+Thanks for the quick review. I will 	go	go	EN続
+Please see the 	note	note	EN続
+Hey 	yo	yo	EN続	行頭のあいさつ
+Dear 田中さん, I want 	to	to	ENの中のJA
+Please send 資料 to 	me	me	ENの中のJA
+Meeting with 田中 and I will 	go	go	ENの中のJA
+I love 寿司 and I want 	to	to	ENの中のJA
+Thanks 山田さん, please 	make	make	ENの中のJA
+Thank you very much for 資料 	to	to	ENの中のJA	英文の途中に日本語 1 語。末尾は日本語で英語が多い
+https://github.com/foo/bar 	wo	を	コード後JA
+README.md 	wo	を	コード後JA
+git push origin main 	wo	を	コード後JA
+npm install express 	de	で	コード後JA
+$ ls -la ~/Documents 	wo	を	コード後JA
+今日は	sushi	すし	JA続	本家と同じ形
+日本語の文です。	kyouha	きょうは	JA続
+明日は	tenki	てんき	JA続
+会議の資料を	tsukuru	つくる	JA続
+お疲れ様です。	osusume	おすすめ	JA続
+お願いします。	arigatou	ありがとう	JA続
+# 分岐: 末尾の 1 文字の向きと、前 20 文字の多数派の向きが逆の文脈 (現行と案が分かれる所)。期待は人の判断
+# 日本語が多く末尾だけ英語: 続きが日本語の語なら日本語、英語の文なら英語
+日本語の長い文章をここまで書いて最後に PR 	sushi	すし	分岐 JA多数-EN尾	日本語の語
+日本語の長い文章をここまで書いて最後に PR 	kanji	かんじ	分岐 JA多数-EN尾	日本語の語
+日本語の長い文章をここまで書いて最後に PR 	sake	さけ	分岐 JA多数-EN尾	日本語の語
+日本語の長い文章をここまで書いて最後に PR 	mine	みね	分岐 JA多数-EN尾	日本語の語
+日本語の長い文章をここまで書いて最後に PR 	we need to fix the bug	we need to fix the bug	分岐 JA多数-EN尾	英語の文
+日本語の長い文章をここまで書いて最後に PR 	devote	devote	分岐 JA多数-EN尾	英語の語
+日本語の長い文章をここまで書いて最後に PR 	morally	morally	分岐 JA多数-EN尾	英語の語
+日本語の長い文章をここまで書いて最後に PR 	i18n	i18n	分岐 JA多数-EN尾	英語の語
+日本語の長い文章をここまで書いて最後に PR 	repo	repo	分岐 JA多数-EN尾	コード用語。日本語文中でも英語のまま使う人が多い
+お客様からいただいたご要望をまとめた Notion 	pull request	pull request	分岐 JA多数-EN尾	英語の句
+お客様からいただいたご要望をまとめた Notion 	make	make	分岐 JA多数-EN尾	英語の語
+お客様からいただいたご要望をまとめた Notion 	sake	さけ	分岐 JA多数-EN尾	日本語の語
+# 英語が多く末尾だけ日本語: 続きが英語の語なら英語、日本語の語なら日本語
+We should ask 田中さん 	to	to	分岐 EN多数-JA尾	英語の語
+We should ask 田中さん 	so	so	分岐 EN多数-JA尾	英語の語
+Please send the file to 田中 	and	and	分岐 EN多数-JA尾	英語の語
+Please send the file to 田中 	go	go	分岐 EN多数-JA尾	英語の語
+Please send the file to 田中 	tomorrow	tomorrow	分岐 EN多数-JA尾	英語の語
+Please send the file to 田中 	kanji	kanji	分岐 EN多数-JA尾	英語の文中の語 (日本語の語を英語で書くことも多い。判断が割れる)
+We should ask 田中さん 	arigatou	ありがとう	分岐 EN多数-JA尾	日本語の語
+Meeting with 山田さん 	sushi	すし	分岐 EN多数-JA尾	日本語の語
