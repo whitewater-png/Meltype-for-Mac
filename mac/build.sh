@@ -158,6 +158,11 @@ cp Resources/Licenses/Mozc-LICENSE.txt "$LICENSES/Mozc-LICENSE.txt"
 # (xcframework には LICENSE が入っていないので、mac/Resources/Licenses に置いてある)
 [[ -f Resources/Licenses/llama.cpp-LICENSE.txt ]] || { echo "llama.cpp のライセンスファイル (mac/Resources/Licenses/llama.cpp-LICENSE.txt) が見つかりません。" >&2; exit 1; }
 cp Resources/Licenses/llama.cpp-LICENSE.txt "$LICENSES/llama.cpp-LICENSE.txt"
+# marisa-trie (BSD 2-clause と LGPL のデュアル。Meltype は BSD 2-clause で使う)。SwiftyMarisa は marisa-trie のソースだけを写していて、
+# 本家の COPYING.md (Susumu Yata の著作権表示) を含まない。BSD 2-clause の条件どおり著作権表示を一緒に渡すため、
+# SwiftyMarisa の中のソースと一致する本家のコミット (ca82cf6) の COPYING.md を mac/Resources/Licenses に置いてある
+[[ -f Resources/Licenses/marisa-trie-COPYING.md ]] || { echo "marisa-trie のライセンスファイル (mac/Resources/Licenses/marisa-trie-COPYING.md) が見つかりません。" >&2; exit 1; }
+cp Resources/Licenses/marisa-trie-COPYING.md "$LICENSES/marisa-trie-COPYING.md"
 # 実行ファイルの RPATH に、ビルドしたマシンの絶対パス (/Library/Developer/CommandLineTools/... など) が残っていると、
 # 配布先の Mac でそのパスを探しに行く (ビルドした人の環境が漏れ、同じパスに置かれたライブラリを読み込まされる余地も残る)。
 # 署名すると中身を変えられなくなるので、署名の前に外す。無いときに失敗しないよう || true。
