@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Yukishiro
 
 using Meltype.Composition;
+using Meltype.Config;
 using Meltype.Input;
 
 namespace Meltype.Tests;
@@ -104,6 +105,35 @@ internal static class PredictionDeleteTests
         Assert.True(k.Host.View?.Predictions?.Contains("今日") != true,
             "同じ読みを打ち直しても消した語は出ない: " + string.Join("|", k.Host.View?.Predictions ?? []));
         Assert.True(k.Host.View?.Predictions?.Contains("京都") == true, "ほかの予測は出る");
+    }
+
+    [Test]
+    public static void DeleteOnPrediction_Session_RemovesEnginePredictionThatKeepsReturningIt()
+    {
+        // Mac と同じ MeltypeSession 経由でも、Delete の後にもう一度打ったときにエンジン候補が戻らない。
+        var forgotten = new List<string>();
+        var session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(),
+            new CompositionOptions
+            {
+                Predictions = _ => ["脅威", "脅威アクター"],
+                ForgetPrediction = forgotten.Add,
+            }, () => new Settings());
+        SessionResult TypeKyou()
+        {
+            SessionResult? result = null;
+            foreach (var (vk, ch) in new[] { (0x4B, 'k'), (0x59, 'y'), (0x4F, 'o'), (0x55, 'u') })
+                result = session.HandleKey(vk, ch, false, false, false, false);
+            return result!;
+        }
+        TypeKyou();
+        Assert.True(session.HandleKey(VirtualKeys.Tab, null, false, false, false, false).View?.SelectedPrediction == 0, "Tab で選ぶ");
+        var deleted = session.HandleKey(0x2E, null, false, false, false, false);
+        Assert.True(deleted.Consumed, "Delete を使う");
+        Assert.True(deleted.View?.Predictions?.Contains("脅威") != true, "Delete の直後に消える");
+        session.HandleKey(VirtualKeys.Return, null, false, false, false, false); // 読みを確定
+        var after = TypeKyou();
+        Assert.True(after.View?.Predictions?.Contains("脅威") != true, "打ち直しても戻らない");
+        Assert.True(forgotten.SequenceEqual(["脅威"]), "エンジンにも忘れるよう伝える");
     }
 
     [Test]
