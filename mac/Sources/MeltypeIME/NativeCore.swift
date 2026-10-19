@@ -11,8 +11,9 @@ typealias IsWordCallback = @convention(c) (UnsafePointer<CChar>?) -> Int32
 typealias LearnCallback = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> Void
 typealias PredictionsCallback = @convention(c) (UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 typealias ReadingCallback = @convention(c) (UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+typealias ClipboardCallback = @convention(c) () -> UnsafeMutablePointer<CChar>?
 
-private typealias InitFunction = @convention(c) (ClausesCallback, CandidatesCallback, IsWordCallback, LearnCallback, PredictionsCallback) -> Int32
+private typealias InitFunction = @convention(c) (ClausesCallback, CandidatesCallback, IsWordCallback, LearnCallback, PredictionsCallback, ClipboardCallback) -> Int32
 private typealias SetReaderFunction = @convention(c) (ReadingCallback) -> Void
 private typealias CreateFunction = @convention(c) () -> UnsafeMutableRawPointer?
 private typealias DestroyFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
@@ -63,6 +64,17 @@ private let predictionsCallback: PredictionsCallback = { reading in
     guard let reading else { return nil }
     let predictions = MeltypeConverter.shared.predictions(for: String(cString: reading))
     return strdup(predictions.joined(separator: "\n"))
+}
+
+/// クリップボードの 1 行 (設定「クリップボードの文字を候補に出す」が ON のときだけ本体が呼ぶ)。
+/// パスワード管理ソフトなど「履歴に残さない」印 (Concealed/Transient) があれば nil。
+private let clipboardCallback: ClipboardCallback = {
+    let pasteboard = NSPasteboard.general
+    let types = pasteboard.types ?? []
+    if types.contains(NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")) ||
+        types.contains(NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) { return nil }
+    guard let text = pasteboard.string(forType: .string) else { return nil }
+    return strdup(text)
 }
 
 /// 漢字混じりの文字列 → 読み (ひらがな)。確定後の再変換用 (他の読みが分からなかったときの最後の手段)。
@@ -170,7 +182,7 @@ final class NativeCore {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion と、
     /// 辞書の管理画面の NativeDictionary.expectedAbiVersion (Sources/MeltypeDictionaryKit) と必ず同じにする。
     /// 食い違う dylib (別の版が混ざった) を読むと関数の引数が合わずに落ちるので、食い違ったら初期化を止める。
-    static let expectedAbiVersion: Int32 = 11
+    static let expectedAbiVersion: Int32 = 12
 
     /// dylib の版数が expectedAbiVersion と合っているか (initialize で確かめる)。合わなければ入力を一切扱わない (キーはアプリに渡る)。
     private(set) var isCompatible = false
@@ -300,7 +312,7 @@ final class NativeCore {
             return
         }
         isCompatible = true
-        _ = initFunction?(clausesCallback, candidatesCallback, isWordCallback, learnCallback, predictionsCallback)
+        _ = initFunction?(clausesCallback, candidatesCallback, isWordCallback, learnCallback, predictionsCallback, clipboardCallback)
         setReaderFunction?(readingCallback)
     }
 

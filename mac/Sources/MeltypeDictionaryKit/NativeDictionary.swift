@@ -59,7 +59,7 @@ public protocol DictionaryOperations: AnyObject {
 /// ただし explainDetection だけはメインスレッド専用 (NSSpellChecker を呼ぶため)。
 public final class NativeDictionary: DictionaryOperations, LearnedWordOperations, DetectionExplainOperations {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion・IME の NativeCore.expectedAbiVersion と必ず同じにする。
-    public static let expectedAbiVersion: Int32 = 11
+    public static let expectedAbiVersion: Int32 = 12
 
     /// 読み込めなかった理由 (画面に出す)。
     public enum LoadError: Error, CustomStringConvertible {

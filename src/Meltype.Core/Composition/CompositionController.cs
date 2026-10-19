@@ -51,6 +51,9 @@ public interface ICompositionHost
     /// <summary>今 Shift キーが押されているか (かな入力の小書き文字・句読点の判定に使う)。</summary>
     bool IsShiftDown() => false;
 
+    /// <summary>クリップボードの文字 (設定「クリップボードの文字を候補に出す」が ON のときだけ読む)。読めなければ null。</summary>
+    string? ClipboardText => null;
+
     /// <summary>
     /// 入力欄のキャレットの前後の文字列 (確定済みの文字) を取りに行く。結果は後から UI スレッドで callback(前, 後ろ) に渡す。
     /// 取れなければ null を渡す。
@@ -179,6 +182,9 @@ public sealed class CompositionOptions
 
     /// <summary>1 文字のかなの後ろの w を笑いにするか (設定。本家 #799)。</summary>
     public Func<bool> LaughterAfterKana { get; init; } = () => false;
+
+    /// <summary>クリップボードの文字を変換候補に出すか (設定。本家 #807)。</summary>
+    public Func<bool> ClipboardCandidates { get; init; } = () => false;
 
     /// <summary>候補の日本語の意味 (ウィクショナリー)。null なら英訳だけ。</summary>
     public MeaningDictionary? Meanings { get; init; }
@@ -2248,6 +2254,27 @@ public sealed class CompositionController
 
     private static readonly string[] WeekDays = ["日", "月", "火", "水", "木", "金", "土"];
 
+    /// <summary>クリップボードの文字を候補に出す読み (本家 #807)。</summary>
+    // 長音は、- を打ったとき (ぼーど) と o を続けたとき (ぼおど) の両方がある。
+    private static readonly HashSet<string> ClipboardReadings = ["くりっぷぼーど", "くりっぷぼおど", "ぺーすと", "ぺえすと"];
+
+    /// <summary>
+    /// クリップボードの文字から、候補に出せる 1 行を取り出す。先頭の改行を飛ばし、次の改行までを前後の空白を除いて返す。
+    /// 空・200 文字より長い・制御文字を含むときは null (本家 #807)。
+    /// </summary>
+    internal static string? ClipboardLine(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var start = 0;
+        while (start < text.Length && (text[start] == '\r' || text[start] == '\n')) start++;
+        var end = start;
+        while (end < text.Length && text[end] != '\r' && text[end] != '\n') end++;
+        var line = text[start..end].Trim();
+        if (line.Length == 0 || line.Length > 200) return null;
+        foreach (var c in line) if (char.IsControl(c)) return null;
+        return line;
+    }
+
     /// <summary>
     /// いま・なう の文節に今の日時、きょう の文節に今日の日付を候補として出す (本家 #208。書式は本家と同じ)。
     /// いま → 17:22 / 17時22分 / 午後5時22分 / 2026年10月9日(金) 17時22分 / 10月9日(金) 17時22分 / 2026年10月9日(金) 17:22 / 2026/10/09 17:22
@@ -2256,6 +2283,8 @@ public sealed class CompositionController
     /// </summary>
     private IEnumerable<string> TimeCandidates(string reading)
     {
+        // クリップボードの文字 (設定「クリップボードの文字を候補に出す」: 本家 #807)。変換した瞬間に 1 回だけ読む。
+        if (ClipboardReadings.Contains(reading) && _options.ClipboardCandidates() && ClipboardLine(_host.ClipboardText) is { } clip) return [clip];
         if (EraToYear(reading) is { } year) return year;
         if (TypedUnitCandidates(reading) is { } units) return units;
         if (reading is "じこう" or "じこうのあいさつ") return SeasonalGreetings(_options.Now().Month);

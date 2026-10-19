@@ -253,6 +253,10 @@ public sealed class Settings
      Description("ね・さ などの 1 文字のかなの後ろの w を、英単語 (new・saw) にせず笑いの w にします (なるほどnew → なるほどねw)。英単語の new や saw を打つ人は OFF のままにしてください。")]
     public bool LaughterAfterKana { get; set; }
 
+    [Category("1. 全般"), DisplayName("クリップボードの文字を候補に出す"),
+     Description("くりっぷぼーど・ぺーすと を変換したときに、クリップボードの 1 行 (200 文字まで) を候補に出します。変換した瞬間に 1 回だけ読み、保存も送信もしません。パスワード管理ソフトなど「履歴に残さない」印のある内容は読みません。既定は OFF です。")]
+    public bool ClipboardCandidates { get; set; }
+
     [Category("1. 全般"), DisplayName("候補の意味を表示"),
      Description("変換中に同じ候補で少し (約 1.5 秒) 止まると、その候補の意味をウィクショナリー日本語版から候補の一覧の横に出します (日本語の意味が無い語は JMdict の英訳: 橋 → bridge)。同音異義語を選ぶときの手がかりに。")]
     public bool ShowCandidateMeanings { get; set; } = true;

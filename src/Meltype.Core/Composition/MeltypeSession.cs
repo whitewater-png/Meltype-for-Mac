@@ -140,10 +140,12 @@ public sealed class MeltypeSession
     // ユーザー辞書への登録 (AddUserWord) のために、受け取った options を持っておく。
     private readonly CompositionOptions _options;
 
-    public MeltypeSession(CompositionDetector detector, IKanjiConverter converter, CompositionOptions options, Func<Settings> settings)
+    public MeltypeSession(CompositionDetector detector, IKanjiConverter converter, CompositionOptions options, Func<Settings> settings,
+        Func<string?>? clipboard = null)
     {
         _settings = settings;
         _options = options;
+        _host.Clipboard = clipboard;
         _gate = new CaptureGate(() => { });
         _controller = new CompositionController(_gate, detector, converter, _host, options);
     }
@@ -153,7 +155,7 @@ public sealed class MeltypeSession
     /// moreCandidates は読みに対する候補の一覧 (無ければ null)、predictions は読みに対する予測候補 (無ければ null)、wordChecker は OS のスペルチェッカー (無ければ null)。
     /// </summary>
     public static MeltypeSession CreateDefault(IKanjiConverter converter, Func<string, IReadOnlyList<string>>? moreCandidates, IWordChecker? wordChecker,
-        Func<string, IReadOnlyList<string>>? predictions = null, Func<string, string?>? reader = null)
+        Func<string, IReadOnlyList<string>>? predictions = null, Func<string, string?>? reader = null, Func<string?>? clipboard = null)
     {
         AppPaths.MigrateFromOldName();
         Config.SafeFile.EnsureDirectory(AppPaths.DataDirectory);
@@ -205,6 +207,7 @@ public sealed class MeltypeSession
             ConsonantAbbreviations = () => shared.Current.ConsonantAbbreviations,
             ContextualLearning = () => shared.Current.ContextualLearning,
             LaughterAfterKana = () => shared.Current.LaughterAfterKana,
+            ClipboardCandidates = () => shared.Current.ClipboardCandidates,
             Meanings = MeaningDictionary.Load(),
             CandidateMeanings = () => shared.Current.ShowCandidateMeanings,
             RomajiTypos = RomajiTypoCorrector.Load(detector.Romaji),
@@ -216,7 +219,7 @@ public sealed class MeltypeSession
             Braces = () => shared.Current.Braces,
             TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
-        return session = new MeltypeSession(detector, converter, options, () => shared.Current) { ReadingProvider = reader };
+        return session = new MeltypeSession(detector, converter, options, () => shared.Current, clipboard) { ReadingProvider = reader };
     }
 
     /// <summary>英数 (直接入力) か。true の間はキーをすべてアプリに渡す (Mac の「英数」キー、「かな」キーで戻す)。</summary>
@@ -575,6 +578,10 @@ public sealed class MeltypeSession
     /// <summary>変換ボックスからの指示を集めて、1 回のキー入力の結果にまとめる。</summary>
     private sealed class Host : ICompositionHost
     {
+        /// <summary>クリップボードの文字を読む関数 (設定が ON のときだけ本体が呼ぶ)。</summary>
+        public Func<string?>? Clipboard { get; set; }
+        public string? ClipboardText => Clipboard?.Invoke();
+
         private readonly List<TextEdit> _commits = [];
         private int _pendingDelete;
         private string? _pendingDeleteText;

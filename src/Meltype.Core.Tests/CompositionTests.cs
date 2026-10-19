@@ -67,6 +67,9 @@ internal static class CompositionTests
         /// <summary>入力欄のキャレットの後ろにある (と見なす) 文字列。</summary>
         public string? FollowingText { get; set; }
 
+        /// <summary>クリップボードの文字 (テスト用)。</summary>
+        public string? ClipboardText { get; set; }
+
         public void RequestSurroundingText(Action<string?, string?> callback) => callback(PrecedingText ?? (Document.Length > 0 ? Document : null), FollowingText);
 
         /// <summary>入力欄の中身 (確定した文字列と、確定し直すときの削除を反映したもの)。</summary>
@@ -182,6 +185,9 @@ internal static class CompositionTests
         /// <summary>かな + w を笑いにするか (CompositionOptions.LaughterAfterKana)。既定は OFF。</summary>
         public bool LaughterAfterKana { get; set; }
 
+        /// <summary>クリップボードの文字を候補に出すか (CompositionOptions.ClipboardCandidates)。既定は OFF。</summary>
+        public bool ClipboardCandidates { get; set; }
+
         /// <summary>かな入力で、仮想キーを順に打つ (shift: その打鍵で Shift を押す)。</summary>
         public void TypeKeys(params (int Vk, bool Shift)[] keys)
         {
@@ -247,6 +253,7 @@ internal static class CompositionTests
                 ConsonantAbbreviations = () => ConsonantAbbreviations,
                 ContextualLearning = () => ContextualLearning,
                 LaughterAfterKana = () => LaughterAfterKana,
+                ClipboardCandidates = () => ClipboardCandidates,
                 RomajiTypos = Typos,
                 CorrectTypos = () => CorrectTypos,
                 SpaceAroundEnglish = () => SpaceAroundEnglish,
