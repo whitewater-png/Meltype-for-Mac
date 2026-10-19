@@ -170,6 +170,9 @@ internal static class CompositionTests
 
         public bool SuggestEnabled { get; set; } = true;
 
+        /// <summary>計算式を変換したときに結果を候補に出すか (CompositionOptions.CalculatorCandidates)。既定は OFF。</summary>
+        public bool CalculatorCandidates { get; set; }
+
         /// <summary>かな入力で、仮想キーを順に打つ (shift: その打鍵で Shift を押す)。</summary>
         public void TypeKeys(params (int Vk, bool Shift)[] keys)
         {
@@ -231,6 +234,7 @@ internal static class CompositionTests
                 Languages = languages,
                 Translations = translations,
                 TranslationHistory = translationHistory,
+                CalculatorCandidates = () => CalculatorCandidates,
                 RomajiTypos = Typos,
                 CorrectTypos = () => CorrectTypos,
                 SpaceAroundEnglish = () => SpaceAroundEnglish,

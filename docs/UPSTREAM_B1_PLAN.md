@@ -49,7 +49,7 @@
    - `ConversionHistory.Remember`（`Learn()` 内）
    - `DictionarySuggestions.Record`（`RecordSuggestions()`。Mac 独自）
    - 変換エンジンへの学習（`LearnConversion()`。数字を含む読みは既に除外）
-4. 1 項目 1 コミット。辞書語は **1 語 1 コミット**。
+4. 1 項目 1 コミット。辞書語は**ファイル単位**（`english.txt` / `propernouns.txt` / `candidates.txt`）でコミットし、語ごとにテストを分ける（各コミットで赤→緑を確かめる）。
 5. 先にテストを書き、**修正前に赤**になることを確かめる（辞書語は「語を足す前の赤」）。
 6. 前後比較は **BI（同梱の英単語表）と NS（NSSpellChecker 相当）の両方**。`tools/eval-compare.sh` の **broken 0** を条件にする。
 7. 実機確認は最後にまとめて行い、それまでは「実機確認待ち」として残す。
@@ -79,6 +79,12 @@
 - `mozc` は `propernouns.txt` の `Mozc` と重複しない（大文字は固有名詞、小文字は英単語として後ろを日本語にする）。
 - `docs` は P42 の保護区間（`./docs/` など）を壊さない。
 - `ext` は `text`・`next`・`context` などの一部と誤認しない（単語境界で判定されること）。
+
+**実機の NSSpellChecker の答え (2026-10-19、開発機、language: "en")**
+- `word`: `whois`・`docs`・`ext`・`who`・`is`・`t`・`ver`・`mo`・`de`・`auto`・`clicker`・`click`・`er`・`doc`・`e`
+- `not-word`: `tver`・`mozc`・`zc`・`devito`・`vito`・`autoclicker`・`cs`・`xt`
+- このため `whois`・`docs`・`ext` は NS では既に単語。同梱の表 (`BuiltIn`) では崩れるので、`english.txt` への追加は BI のためと、NS でも語の途中で割れないようにするために行う。
+- **`mozc` は Mac では既に期待どおり**（`propernouns.txt` の `Mozc` が効いている。`mozcde` → `mozcで` を確認済み）。テストは guard とし、本家とそろえるために `english.txt` にも足す。
 
 **対象外**
 - Windows/Linux の辞書ファイル（Core 共通のため結果は届くが、検証は Mac のみ）。
@@ -278,7 +284,8 @@
       return;
   }
   ```
-- 学習除外: `private static bool IsCalculatorChoice(Clause clause)` を追加し、`Learn()` の `History` と `RecordSuggestions()` の条件に加える（本家には無い Mac 側の追加。理由をコメントに残す）。
+- 学習除外は**追加しない**: 計算式の文節は `new Clause(..., true, ...)`（英語扱い）で作るので、`Learn()`（`!c.IsEnglish`）・`RecordSuggestions()`・`LearnConversion()` のすべてで既に対象外になる。テストで固定する。
+- 本家との違い: 本家は半角の数字だけだが、Mac では全角の数字 (１＋２) も受ける（本家で null だった入力だけが対象なので、既存の結果は変わらない）。
 - テストファイル: `CalculatorTests.cs`（Evaluate 単体）、`CalculatorCandidatesTests.cs`（統合）。
 
 ### 6.3 P50 数字
@@ -406,7 +413,7 @@ foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Changed &&
 
 | 順 | 項目 | コミット数 | 理由 |
 | --- | --- | --- | --- |
-| 1 | P48 辞書語 | 9（1 語 1 コミット） | 依存なし・最も安全 |
+| 1 | P48 辞書語 | 3（`english.txt`・`propernouns.txt`・`candidates.txt`） | 依存なし・最も安全 |
 | 2 | P54 1 文字読み | 1 | 独立。P55 の前提になる |
 | 3 | P55 数字・記号の学習 | 1 | P54 と独立だが、学習の条件をそろえる |
 | 4 | P49 計算式 | 2（Core + 設定） | 独立・既定 OFF |

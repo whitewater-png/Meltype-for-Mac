@@ -237,6 +237,10 @@ public sealed class Settings
      Description("変換の候補の後ろに英訳も出します (複雑な → complex, complicated)。JMdict のよく使う語から。選んだ英訳は少しずつ前に出ます。")]
     public bool TranslationCandidates { get; set; } = true;
 
+    [Category("1. 全般"), DisplayName("計算式を変換すると結果を候補に出す"),
+     Description("数字と + - * / ( ) だけの式を打って Space で変換すると、計算した結果 (1+2*3 → 7) と「式=結果」を候補に出します。")]
+    public bool CalculatorCandidates { get; set; }
+
     [Category("1. 全般"), DisplayName("候補の意味を表示"),
      Description("変換中に同じ候補で少し (約 1.5 秒) 止まると、その候補の意味をウィクショナリー日本語版から候補の一覧の横に出します (日本語の意味が無い語は JMdict の英訳: 橋 → bridge)。同音異義語を選ぶときの手がかりに。")]
     public bool ShowCandidateMeanings { get; set; } = true;

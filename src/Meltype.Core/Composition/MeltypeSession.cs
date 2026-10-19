@@ -201,6 +201,7 @@ public sealed class MeltypeSession
             Languages = languages,
             Translations = TranslationDictionary.Load(),
             TranslationCandidates = () => shared.Current.TranslationCandidates,
+            CalculatorCandidates = () => shared.Current.CalculatorCandidates,
             Meanings = MeaningDictionary.Load(),
             CandidateMeanings = () => shared.Current.ShowCandidateMeanings,
             RomajiTypos = RomajiTypoCorrector.Load(detector.Romaji),

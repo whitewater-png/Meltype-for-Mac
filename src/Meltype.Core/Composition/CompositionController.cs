@@ -168,6 +168,9 @@ public sealed class CompositionOptions
     /// <summary>英訳の候補を出すか (設定)。</summary>
     public Func<bool> TranslationCandidates { get; init; } = () => true;
 
+    /// <summary>計算式 (1+2*3) を変換したときに、計算した結果と「式=結果」を候補に出すか (設定。本家 #796)。</summary>
+    public Func<bool> CalculatorCandidates { get; init; } = () => false;
+
     /// <summary>候補の日本語の意味 (ウィクショナリー)。null なら英訳だけ。</summary>
     public MeaningDictionary? Meanings { get; init; }
 
@@ -1608,6 +1611,15 @@ public sealed class CompositionController
     private void StartConversion(bool preferJapanese = false)
     {
         _tabStartedConversion = false;
+        // 設定「計算式を変換すると結果を候補に出す」: 数字と + - * / ( ) だけの式 (本家 #796)
+        if (_options.CalculatorCandidates() && !_text.KanaInput && _text.Mode == DisplayMode.Auto && Calculator.Evaluate(_text.Raw) is { } result)
+        {
+            var expression = _text.Raw.TrimEnd('=');
+            _clauses = [new Clause(_text.Raw, true, Distinct([_text.Raw, result, $"{expression}={result}"])) { Raw = _text.Raw }];
+            _selectedClause = 0;
+            _converting = true;
+            return;
+        }
         // 固定した文節があるときは、未変換の文節だけを変換して、固定した文節の後ろにつなぐ。
         TrimToFixedClauses();
         var clauses = new List<Clause>();
