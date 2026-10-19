@@ -177,6 +177,9 @@ public sealed class CompositionOptions
     /// <summary>英語 / 日本語の学習を、直前の文脈 (英語の後か日本語の後か) ごとに分けるか (設定。本家 #800)。</summary>
     public Func<bool> ContextualLearning { get; init; } = () => false;
 
+    /// <summary>1 文字のかなの後ろの w を笑いにするか (設定。本家 #799)。</summary>
+    public Func<bool> LaughterAfterKana { get; init; } = () => false;
+
     /// <summary>候補の日本語の意味 (ウィクショナリー)。null なら英訳だけ。</summary>
     public MeaningDictionary? Meanings { get; init; }
 
@@ -1179,6 +1182,7 @@ public sealed class CompositionController
     private void BeginComposition()
     {
         _text.KanaInput = _options.KanaInput();
+        _text.LaughterAfterKana = _options.LaughterAfterKana();
         ResetPrediction();
         _reconvertOriginal = null;
         _reconvertRomaji = false;

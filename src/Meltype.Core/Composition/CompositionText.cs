@@ -808,8 +808,33 @@ public sealed class CompositionText
             return cached.Segments;
         }
         var result = ComputeSegments(final);
+        if (LaughterAfterKana) result = SplitLaughter(result);
         _segmentsCache[slot] = (key, _detector.Memory, _detector.SpellChecker, result);
         return result;
+    }
+
+    /// <summary>
+    /// 設定「かな + w を笑いにする」: 英語の区間が、1 つのかなの音 + w (new・saw) だけなら、かな (ね・さ) と笑いの w に分ける (本家 #799)。
+    /// 前が日本語 (またはなにも無い) ときだけ。前が英語の文 (I saw) のときは、英単語のまま。
+    /// </summary>
+    private IReadOnlyList<CompositionSegment> SplitLaughter(IReadOnlyList<CompositionSegment> segments)
+    {
+        List<CompositionSegment>? changed = null;
+        for (var i = 0; i < segments.Count; i++)
+        {
+            var segment = segments[i];
+            if (segment.IsEnglish && segment.Raw.Length == 3 && segment.Raw[2] is 'w' && !(i > 0 ? segments[i - 1].IsEnglish : PrecedingEnglishSentence) &&
+                char.IsAsciiLetterLower(segment.Raw[0]) && char.IsAsciiLetterLower(segment.Raw[1]) &&
+                _detector.Romaji.Analyze(segment.Raw[..2]) is { IsValid: true, Partial: "" } reading && reading.Kana.Length == 1)
+            {
+                // 前の分割で要素が増えた分、元の i とずれる。ずれ込んだ位置で書き換える (2 つ目以降が別の区間を書き換えていた)
+                changed ??= [.. segments];
+                var at = i + (changed.Count - segments.Count);
+                changed[at] = new CompositionSegment(false, reading.Kana, segment.Raw[..2]);
+                changed.Insert(at + 1, new CompositionSegment(true, "w", "w"));
+            }
+        }
+        return changed ?? segments;
     }
 
     private readonly (string Key, LanguageMemory? Memory, Detection.IWordChecker? SpellChecker, IReadOnlyList<CompositionSegment> Segments)?[] _segmentsCache = new (string, LanguageMemory?, Detection.IWordChecker?, IReadOnlyList<CompositionSegment>)?[2];
@@ -825,7 +850,7 @@ public sealed class CompositionText
         key.Append('\u0003').Append(_pending).Append('\u0003')
             .Append(PrecedingEnglish switch { true => 'E', false => 'J', null => '-' })
             .Append(FollowingEnglish switch { true => 'E', false => 'J', null => '-' })
-            .Append(PrecedingEnglishSentence ? 'S' : '-').Append(PrecedingWordStart ? 'W' : '-').Append(CompositionDetector.IsNewlineAfter(PrecedingTail) ? 'N' : '-').Append(PrecedingOpener ?? "-").Append(KanaInput ? 'K' : '-').Append(CodeApp() ? 'C' : '-').Append(final ? 'F' : '-')
+            .Append(PrecedingEnglishSentence ? 'S' : '-').Append(PrecedingWordStart ? 'W' : '-').Append(CompositionDetector.IsNewlineAfter(PrecedingTail) ? 'N' : '-').Append(PrecedingOpener ?? "-").Append(KanaInput ? 'K' : '-').Append(CodeApp() ? 'C' : '-').Append(final ? 'F' : '-').Append(LaughterAfterKana ? 'L' : '-')
             .Append((int)EffectiveLevel).Append(':').Append(_detector.Memory?.Version ?? -1);
         return key.ToString();
     }
@@ -1141,6 +1166,9 @@ public sealed class CompositionText
     /// <summary>日本語の中で打った ( ) の幅 (設定)。</summary>
     public Func<ParenthesisWidth> Parentheses { get; set; } = () => ParenthesisWidth.HalfWidth;
 
+    /// <summary>1 つのかなの音の後ろの w を笑いにするか (設定)。</summary>
+    public bool LaughterAfterKana { get; set; }
+
     /// <summary>日本語の中で打った { } の幅 (設定)。</summary>
     public Func<BraceWidth> Braces { get; set; } = () => BraceWidth.FullWidth;
 
@@ -1258,9 +1286,12 @@ public sealed class CompositionText
         // (スペルチェッカーの短い語が音の途中から見つかる kiyagat|taw の taw で、笑いの w を英字にしていた)
         var letters = string.Concat(_units.Skip(start).Take(end - start).Select(u => u.Raw)) + pending;
         var laugh = letters;
+        // 設定「かな + w を笑いにする」: 1 つのかなの音 (ね・さ) だけの後ろの w は、その 2 つで英単語 (new・saw) にしない (本家 #799)。
+        var soleSyllable = LaughterAfterKana && start > 0 && _units[start - 1].Kana is [>= 'ぁ' and <= 'ん'] && _units[start - 1].Raw.All(char.IsAsciiLetter);
         for (var i = start - 1; i >= 0 && _units[i].Raw.Length > 0 && _units[i].Raw.All(char.IsAsciiLetter); i--)
         {
             letters = _units[i].Raw + letters;
+            if (soleSyllable && i == start - 1) continue;
             var runStart = i == 0 || !IsLetters(_units[i - 1].Raw);
             if (letters.Length >= 3 && (runStart ? _detector.IsKnownEnglishWord(letters) : _detector.IsListedEnglishWord(letters.ToLowerInvariant()))) return end;
         }

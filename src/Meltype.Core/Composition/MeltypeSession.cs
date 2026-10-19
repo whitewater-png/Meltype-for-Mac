@@ -204,6 +204,7 @@ public sealed class MeltypeSession
             CalculatorCandidates = () => shared.Current.CalculatorCandidates,
             ConsonantAbbreviations = () => shared.Current.ConsonantAbbreviations,
             ContextualLearning = () => shared.Current.ContextualLearning,
+            LaughterAfterKana = () => shared.Current.LaughterAfterKana,
             Meanings = MeaningDictionary.Load(),
             CandidateMeanings = () => shared.Current.ShowCandidateMeanings,
             RomajiTypos = RomajiTypoCorrector.Load(detector.Romaji),

@@ -179,6 +179,9 @@ internal static class CompositionTests
         /// <summary>英語 / 日本語の学習を前の文脈ごとに分けるか (CompositionOptions.ContextualLearning)。既定は OFF。</summary>
         public bool ContextualLearning { get; set; }
 
+        /// <summary>かな + w を笑いにするか (CompositionOptions.LaughterAfterKana)。既定は OFF。</summary>
+        public bool LaughterAfterKana { get; set; }
+
         /// <summary>かな入力で、仮想キーを順に打つ (shift: その打鍵で Shift を押す)。</summary>
         public void TypeKeys(params (int Vk, bool Shift)[] keys)
         {
@@ -243,6 +246,7 @@ internal static class CompositionTests
                 CalculatorCandidates = () => CalculatorCandidates,
                 ConsonantAbbreviations = () => ConsonantAbbreviations,
                 ContextualLearning = () => ContextualLearning,
+                LaughterAfterKana = () => LaughterAfterKana,
                 RomajiTypos = Typos,
                 CorrectTypos = () => CorrectTypos,
                 SpaceAroundEnglish = () => SpaceAroundEnglish,
