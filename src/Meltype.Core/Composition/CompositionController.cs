@@ -1633,7 +1633,7 @@ public sealed class CompositionController
                 var romaji = RomajiCandidates(segment.Raw);
                 clauses.Add(new Clause(segment.Raw, true, preferJapanese && romaji.Count > 0
                     ? Distinct([.. romaji, .. english])
-                    : Distinct([.. english, .. romaji])));
+                    : Distinct([.. english, .. romaji, .. NumberCandidates.For(segment.Raw)])));
                 continue;
             }
             if (segment.Kana.Length == 0) continue;
@@ -1692,6 +1692,11 @@ public sealed class CompositionController
         }
         if (clause.Raw is not { } raw || !raw.Any(c => c is >= '!' and <= '~')) return;
         foreach (var candidate in new[] { raw, CompositionText.ToFullWidth(raw) })
+        {
+            if (!clause.Candidates.Contains(candidate)) clause.Candidates.Add(candidate);
+        }
+        // 数字だけなら、漢数字 (二〇二六・二千二十六) と元号 (令和8年) も出す (本家 #769・#786)
+        foreach (var candidate in NumberCandidates.For(raw))
         {
             if (!clause.Candidates.Contains(candidate)) clause.Candidates.Add(candidate);
         }
@@ -2186,6 +2191,7 @@ public sealed class CompositionController
     /// </summary>
     private IEnumerable<string> TimeCandidates(string reading)
     {
+        if (EraToYear(reading) is { } year) return year;
         var isNow = NowReadings.Contains(reading);
         if (!isNow && reading != "きょう") return [];
         var now = _options.Now();
@@ -2200,6 +2206,41 @@ public sealed class CompositionController
         var time = $"{now.Hour}時{now.Minute}分";
         return [clock, time, $"{(now.Hour < 12 ? "午前" : "午後")}{now.Hour % 12}時{now.Minute}分",
             $"{date}({day}) {time}", $"{monthDay}({day}) {time}", $"{date}({day}) {clock}", $"{slashDate} {clock}"];
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex EraReading =
+        new("^(?<e>れいわ|へいせい|しょうわ|たいしょう|めいじ)(?<n>[0-9０-９]{1,2}|がん)ねん$");
+
+    /// <summary>
+    /// 元号の年 (れいわ8ねん・へいせいがんねん) を西暦にした候補 (2026年 / 2026)。元号の範囲 (明治 〜 令和) の外なら null (本家 #786)。
+    /// </summary>
+    internal static IEnumerable<string>? EraToYear(string reading)
+    {
+        if (EraReading.Match(reading) is not { Success: true } match) return null;
+        var number = match.Groups["n"].Value;
+        var n = number == "がん" ? 1 : int.Parse(new string(number.Select(c => c is >= '０' and <= '９' ? (char)(c - '０' + '0') : c).ToArray()));
+        (int Start, int Last) range = match.Groups["e"].Value switch
+        {
+            "れいわ" => (2019, 2100),
+            "へいせい" => (1989, 2019),
+            "しょうわ" => (1926, 1989),
+            "たいしょう" => (1912, 1926),
+            _ => (1868, 1912),
+        };
+        var year = range.Start + n - 1;
+        if (n < 1 || year > range.Last) return null;
+        return [$"{year}年", year.ToString()];
+    }
+
+    /// <summary>
+    /// 数字の漢数字・元号 (2026 → 二千二十六・令和8年) と、元号の年 → 西暦 (れいわ8ねん → 2026年) の候補か。
+    /// 1 文字の数字は P55 で学習するので含めない。2 文字以上の漢数字・元号は学習しない (次からその候補が先頭に出ないように)。
+    /// </summary>
+    private static bool IsNumberChoice(Clause clause)
+    {
+        if (clause.Reading.Length >= 2 && clause.Reading.All(c => char.IsAsciiDigit(c) || c is >= '０' and <= '９') &&
+            NumberCandidates.For(clause.Reading).Contains(clause.Text)) return true;
+        return EraToYear(clause.Reading)?.Contains(clause.Text) == true;
     }
 
     /// <summary>
@@ -3057,7 +3098,7 @@ public sealed class CompositionController
             // 英訳は上で英訳の記録に入れた (ここで覚えると次から 1 番目に出てしまう)。
             if (clause.Translations.Contains(clause.Text)) continue;
             // 計算の記号 (かける → ×)・日付と時刻 (いま → 17:22) も覚えない
-            if (IsMathSymbolChoice(clause) || IsDateTimeChoice(clause)) continue;
+            if (IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause)) continue;
             history.Remember(clause.Reading, clause.Text);
         }
     }
@@ -3073,7 +3114,7 @@ public sealed class CompositionController
         if (_options.Suggestions is not { } suggestions || !_options.DictionarySuggest()) return;
         var threshold = _options.DictionarySuggestThreshold();
         // 日付・時刻 (きょう → 金曜日) も数えない (学習しないのと同じ理由。登録すると、次から古い日付が出る)
-        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c)))
+        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c) && !IsNumberChoice(c)))
         {
             // 学習済みの語を最初の候補としてそのまま確定した場合 (History はこの後の Remember で更新されるので、ここで先に見る)。
             if (clause.Changed || _options.History?.Get(clause.Reading) == clause.Text)
@@ -3113,7 +3154,7 @@ public sealed class CompositionController
         }
         foreach (var clause in _clauses)
         {
-            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause) || IsDateTimeChoice(clause))
+            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause))
             {
                 Flush();
                 continue;
