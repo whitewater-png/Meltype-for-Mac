@@ -219,3 +219,7 @@ website websites campsite worksite onsite offsite
 infobesity
 # --- 本家の誤判定報告 (#683 guesstimation、#692 greedflation、#730 adtech、#731 robonomics、#733 netizenry、#689 finfluencer、#726 malvertising、#686 enshittification) ---
 guesstimation greedflation adtech robonomics netizenry finfluencer malvertising enshittification
+# --- B-1/P48 (本家 2026-10-18): #616 whois・#735 tver・#249 mozc ---
+whois
+tver
+mozc
