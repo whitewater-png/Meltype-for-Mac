@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Yukishiro
 
+using Meltype.Composition;
 using Meltype.Detection;
 
 namespace Meltype.Tests;
@@ -102,5 +103,45 @@ internal static class UpstreamB1Tests
         // 本家 #792 (#268): devito が でゔぃと になっていた。固有名詞として英字のまま出す。
         // 打ったままの小文字はそのまま (devito)、大文字で打った形は正しい形 (DeVito) を保つ (本家のテストと同じ DeVitode)。
         ExpectCommitted(("devito", "devito"), ("devitowo", "devitoを"), ("kyouhadevito", "きょうはdevito"), ("DeVitode", "DeVitoで"));
+    }
+
+    [Test]
+    public static void P48_ShotaAndLattice_AreOffered()
+    {
+        // 本家 #756 (#653) しょた → ショタ、#758 (#654) らてぃす → ラティス。
+        // カタカナの候補は JapaneseCandidates が元から出すので、補助辞書 (candidates.txt) に載ったことを直接確かめる
+        // (辞書の候補は、かな・カタカナより前の位置に入る)。
+        var dictionary = CandidateDictionary.Load(null);
+        Assert.Equal("ショタ", string.Join("|", dictionary.Lookup("しょた")));
+        Assert.Equal("ラティス", string.Join("|", dictionary.Lookup("らてぃす")));
+    }
+
+    /// <summary>
+    /// 実機の NSSpellChecker (2026-10-19、language: "en") の答えのうち、P48 の語と断片だけをまねた判定器。
+    /// 同梱の表も併せて見る。NS が語の途中の断片 (who・is・t・ver・de・auto・click など) を知っていても、
+    /// 辞書に足した語が 1 語として残ることを確かめる。
+    /// </summary>
+    private sealed class NsLikeChecker : IWordChecker
+    {
+        private static readonly HashSet<string> Words =
+            ["whois", "who", "is", "t", "ver", "mo", "de", "auto", "clicker", "click", "er", "docs", "doc", "ext", "e", "text", "next", "context"];
+
+        public bool IsAvailable => true;
+
+        public bool IsWord(string lower) => Words.Contains(lower) || BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    [Test]
+    public static void P48_DictionaryAdditions_AlsoHoldWithNsLikeChecker()
+    {
+        // 実機の NSSpellChecker は whois・docs・ext を知っているが、tver・mozc・devito・autoclicker は知らない。
+        // NS が断片を知っている語 (whois = who + is、tver = t + ver) でも、追加した語が 1 語のまま残ることを確かめる。
+        ExpectCommitted(new NsLikeChecker(),
+            ("whois", "whois"), ("whoiswo", "whoisを"),
+            ("tver", "tver"), ("mozc", "mozc"), ("mozcde", "mozcで"),
+            ("devito", "devito"), ("DeVitode", "DeVitoで"),
+            ("autoclicker", "autoclicker"), ("clicker", "clicker"),
+            ("docs", "docs"), ("ext", "ext"),
+            ("text", "text"), ("next", "next"), ("context", "context"));
     }
 }
