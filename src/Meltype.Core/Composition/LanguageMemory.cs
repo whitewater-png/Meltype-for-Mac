@@ -53,7 +53,7 @@ public sealed class LanguageMemory
     internal sealed record RememberUndo(string Word, Entry? Previous);
 
     /// <summary>学習した語 (設定の「学習した語」の一覧に出す)。Active は今効いているか (2 回目を待っている語は false)。</summary>
-    public sealed record Learned(string Word, bool English, int Count, DateTime Used, bool Active);
+    public sealed record Learned(string Word, bool English, int Count, DateTime Used, bool Active, bool? Context = null);
 
     /// <summary>
     /// ローマ字としてよく使う日本語になる語か (kyouha = 今日は、sushi = すし)。こういう語は、一度英字にして確定しただけでは
@@ -134,8 +134,12 @@ public sealed class LanguageMemory
         }
     }
 
-    private static bool IsValidWord(string? word) =>
-        word is { Length: >= 2 and <= Detection.WordList.MaxWordLength } && word.All(char.IsAsciiLetterLower);
+    private static bool IsValidWord(string? word)
+    {
+        if (word is null) return false;
+        var baseWord = BaseWord(word);
+        return baseWord.Length is >= 2 and <= Detection.WordList.MaxWordLength && baseWord.All(char.IsAsciiLetterLower);
+    }
 
     // ---- ほかのプロセスの変更の反映 ----
     // Mac では IME と「Meltype 辞書」の画面が別のプロセスで、それぞれが languages.json をメモリに持つ。保存はファイル全体の書き直しなので、
@@ -261,14 +265,14 @@ public sealed class LanguageMemory
     /// </summary>
     internal LanguageMemory CopyWithout(Func<string, bool> exclude)
     {
-        var copy = new LanguageMemory(null) { IsCommonJapanese = IsCommonJapanese, IsReadableRomaji = IsReadableRomaji };
+        var copy = new LanguageMemory(null) { IsCommonJapanese = IsCommonJapanese, IsReadableRomaji = IsReadableRomaji, ContextSensitive = ContextSensitive, Context = Context };
         lock (_gate)
         {
             // 写す前に読み直す (画面が Entries で見た内容と、判定に使う内容を揃える)。Get と同じく読むだけでファイルは変えない。
             RefreshCore();
             foreach (var (word, entry) in _entries)
             {
-                if (!exclude(word)) copy._entries[word] = Copy(entry);
+                if (!exclude(BaseWord(word))) copy._entries[word] = Copy(entry);
             }
         }
         return copy;
@@ -277,6 +281,19 @@ public sealed class LanguageMemory
     private static Entry Copy(Entry entry) => new() { English = entry.English, Used = entry.Used, Count = entry.Count, Explicit = entry.Explicit, Reverse = entry.Reverse, ReverseAt = entry.ReverseAt };
 
     public int Count { get { lock (_gate) return _entries.Count; } }
+
+    /// <summary>学習を前の文脈 (英語の後か日本語の後か) ごとに分けるか (設定「英語 / 日本語の学習を前の文脈ごとに分ける」: 本家 #800)。</summary>
+    public bool ContextSensitive { get; set; }
+
+    /// <summary>今の入力の前が英語か (true)、日本語か (false)、分からないか (null)。</summary>
+    public bool? Context { get; set; }
+
+    /// <summary>文脈ごとに分けるときの、語の後ろにつける印 (分けないときは空)。</summary>
+    private string ContextSuffix => ContextSensitive && Context is { } english ? (english ? "@e" : "@j") : "";
+
+    /// <summary>文脈の印 (@e・@j) を外した語。</summary>
+    private static string BaseWord(string key) =>
+        key.EndsWith("@e", StringComparison.Ordinal) || key.EndsWith("@j", StringComparison.Ordinal) ? key[..^2] : key;
 
     /// <summary>覚えている内容が変わるたびに増える (判定の結果を使い回してよいかを見るのに使う。ほかのプロセスの変更を読み直したときも)。</summary>
     public int Version { get; private set; }
@@ -314,6 +331,10 @@ public sealed class LanguageMemory
 
     private bool? GetCore(string word)
     {
+        // 文脈ごとに分けているときは、その文脈の項目を先に見る (無ければ、分ける前に覚えた項目).
+        var suffix = ContextSuffix;
+        if (suffix.Length > 0 && _entries.TryGetValue(word + suffix, out var contextual))
+            return NeedsTwice(word, contextual) ? null : contextual.English;
         if (!_entries.TryGetValue(word, out var entry)) return null;
         if (NeedsTwice(word, entry)) return null;
         return entry.English;
@@ -334,11 +355,12 @@ public sealed class LanguageMemory
     {
         word = word.ToLowerInvariant();
         if (word.Length < 2 || !word.All(char.IsAsciiLetterLower)) return null;
+        var entryKey = word + ContextSuffix;
         Entry? previous = null;
         if (Edit(fromApp: false, () =>
             {
-                previous = _entries.TryGetValue(word, out var existing) ? Copy(existing) : null;
-                RememberCore(word, english, explicitChoice);
+                previous = _entries.TryGetValue(entryKey, out var existing) ? Copy(existing) : null;
+                RememberCore(word, entryKey, english, explicitChoice);
                 return (null, true);
             }) is { } failure)
         {
@@ -347,7 +369,7 @@ public sealed class LanguageMemory
                 Diagnostics.Log.Warn($"英語 / 日本語の学習を保存できなかったので、今回の学習は取り消しました: {failure}");
             return null;
         }
-        return new RememberUndo(word, previous);
+        return new RememberUndo(entryKey, previous);
     }
 
     /// <summary><see cref="RememberUndoable"/> で覚えたことを、覚える前の項目に戻す。保存できなければログに残すだけ。</summary>
@@ -364,11 +386,11 @@ public sealed class LanguageMemory
         }
     }
 
-    private void RememberCore(string word, bool english, bool explicitChoice)
+    private void RememberCore(string word, string entryKey, bool english, bool explicitChoice)
     {
-        if (!_entries.TryGetValue(word, out var old))
+        if (!_entries.TryGetValue(entryKey, out var old))
         {
-            AddEntry(word, english, explicitChoice);
+            AddEntry(entryKey, word, english, explicitChoice);
             return;
         }
         if (old.English == english)
@@ -390,7 +412,7 @@ public sealed class LanguageMemory
         var reverse = old.Reverse > 0 && now - old.ReverseAt <= ReverseWindow ? old.Reverse : 0;
         if (explicitChoice || reverse + 1 >= ReverseToFlip)
         {
-            AddEntry(word, english, explicitChoice, count: explicitChoice && english && IsCommonJapanese?.Invoke(word) == true ? 1 : 2);
+            AddEntry(entryKey, word, english, explicitChoice, count: explicitChoice && english && IsCommonJapanese?.Invoke(word) == true ? 1 : 2);
             return;
         }
         old.Reverse = reverse + 1;
@@ -398,10 +420,10 @@ public sealed class LanguageMemory
         Diagnostics.Log.Decision($"{Diagnostics.Log.Text(word)}は逆向きの選択を {old.Reverse} 回見ましたが、向きは変えません (あと {ReverseToFlip - old.Reverse} 回続いたら変えます)。");
     }
 
-    private void AddEntry(string word, bool english, bool explicitChoice, int count = 1)
+    private void AddEntry(string entryKey, string word, bool english, bool explicitChoice, int count = 1)
     {
         var entry = new Entry { English = english, Used = DateTime.UtcNow, Count = count, Explicit = explicitChoice };
-        _entries[word] = entry;
+        _entries[entryKey] = entry;
         Diagnostics.Log.Decision(NeedsTwice(word, entry)
             ? $"{Diagnostics.Log.Text(word)}はローマ字としても読めるので、もう一度英字にして確定したら英語にします (学習)。"
             : $"{Diagnostics.Log.Text(word)}は次から{(english ? "英語" : "日本語")}にします (学習)。");
@@ -414,7 +436,13 @@ public sealed class LanguageMemory
         {
             RefreshCore();
             return _entries.OrderByDescending(e => e.Value.Used)
-                .Select(e => new Learned(e.Key, e.Value.English, Math.Max(1, e.Value.Count), e.Value.Used, !NeedsTwice(e.Key, e.Value)))
+                .Select(e =>
+                {
+                    var word = BaseWord(e.Key);
+                    var context = e.Key.EndsWith("@e", StringComparison.Ordinal) ? true
+                        : e.Key.EndsWith("@j", StringComparison.Ordinal) ? false : (bool?)null;
+                    return new Learned(word, e.Value.English, Math.Max(1, e.Value.Count), e.Value.Used, !NeedsTwice(word, e.Value), context);
+                })
                 .ToList();
         }
     }

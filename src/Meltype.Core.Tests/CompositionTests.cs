@@ -176,6 +176,9 @@ internal static class CompositionTests
         /// <summary>子音の略入力 (ast → 明日) を候補に出すか (CompositionOptions.ConsonantAbbreviations)。既定は OFF。</summary>
         public bool ConsonantAbbreviations { get; set; }
 
+        /// <summary>英語 / 日本語の学習を前の文脈ごとに分けるか (CompositionOptions.ContextualLearning)。既定は OFF。</summary>
+        public bool ContextualLearning { get; set; }
+
         /// <summary>かな入力で、仮想キーを順に打つ (shift: その打鍵で Shift を押す)。</summary>
         public void TypeKeys(params (int Vk, bool Shift)[] keys)
         {
@@ -239,6 +242,7 @@ internal static class CompositionTests
                 TranslationHistory = translationHistory,
                 CalculatorCandidates = () => CalculatorCandidates,
                 ConsonantAbbreviations = () => ConsonantAbbreviations,
+                ContextualLearning = () => ContextualLearning,
                 RomajiTypos = Typos,
                 CorrectTypos = () => CorrectTypos,
                 SpaceAroundEnglish = () => SpaceAroundEnglish,

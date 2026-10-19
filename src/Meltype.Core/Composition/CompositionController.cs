@@ -174,6 +174,9 @@ public sealed class CompositionOptions
     /// <summary>子音だけの略入力 (ast → 明日) を候補に出すか (設定。本家 #795)。</summary>
     public Func<bool> ConsonantAbbreviations { get; init; } = () => false;
 
+    /// <summary>英語 / 日本語の学習を、直前の文脈 (英語の後か日本語の後か) ごとに分けるか (設定。本家 #800)。</summary>
+    public Func<bool> ContextualLearning { get; init; } = () => false;
+
     /// <summary>候補の日本語の意味 (ウィクショナリー)。null なら英訳だけ。</summary>
     public MeaningDictionary? Meanings { get; init; }
 
@@ -1188,6 +1191,7 @@ public sealed class CompositionController
         _precedingText = _lastCommitEnglish is null ? null : _lastCommitText;
         _followingText = null;
         _text.PrecedingEnglish = _lastCommitEnglish;
+        UpdateLearningContext();
         _text.PrecedingEnglishSentence = _lastCommitEnglish == true && IsEnglishSentence(_lastCommitText);
         // 保護区間 (/tmp/foo) を始めてよいか: 自分の確定の末尾で決める (日本語を確定した直後の /fuka は守らない)。確定が無い・分からなければ語の頭
         _text.PrecedingTail = _precedingText;
@@ -1200,6 +1204,7 @@ public sealed class CompositionController
             {
                 _precedingText = before;
                 if (LanguageOf(before) is { } english) _text.PrecedingEnglish = english;
+                UpdateLearningContext();
                 _text.PrecedingEnglishSentence = IsEnglishSentence(before);
                 _text.PrecedingTail = before;
             }
@@ -1554,6 +1559,14 @@ public sealed class CompositionController
             return char.IsAsciiLetter(c);
         }
         return false;
+    }
+
+    /// <summary>設定「英語 / 日本語の学習を前の文脈ごとに分ける」: 学習の文脈 (前が英語か日本語か) を今の入力に合わせる。</summary>
+    private void UpdateLearningContext()
+    {
+        if (_options.Languages is not { } memory) return;
+        memory.ContextSensitive = _options.ContextualLearning();
+        memory.Context = _text.PrecedingEnglish;
     }
 
     /// <summary>未変換の文節の変換結果 (_clauses の固定した文節より後ろ) を捨てる。</summary>
