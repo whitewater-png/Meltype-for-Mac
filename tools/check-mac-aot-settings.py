@@ -423,7 +423,9 @@ def child_dict_ops(lib):
     out["add2"] = text(lib, lib.meltype_userdict_add(u("めるたいぷ"), u("Meltype")))
     out["version_moved"] = lib.meltype_userdict_version() != v0
     out["duplicate"] = text(lib, lib.meltype_userdict_add(u("きごうとう"), u("記号等")))
-    out["invalid"] = text(lib, lib.meltype_userdict_check(u("き"), u("記"), None, None))
+    out["invalid"] = text(lib, lib.meltype_userdict_check(u(""), u("記"), None, None))
+    # P54 (本家 #763): 1 文字の読みは登録できる
+    out["one_char_ok"] = text(lib, lib.meltype_userdict_check(u("き"), u("記"), None, None)) is None
     out["check_except"] = text(lib, lib.meltype_userdict_check(u("きごうとう"), u("記号等"), u("きごうとう"), u("記号等")))
     out["update"] = text(lib, lib.meltype_userdict_update(u("きごうとう"), u("記号等"), u("きごうとう"), u("記号党")))
     removed = ctypes.c_void_p()
@@ -941,7 +943,8 @@ def check_dictionary(lib_path, failures):
         expect(ops["add1"] is None and ops["add2"] is None, f"登録できない: {ops['add1']} / {ops['add2']}")
         expect(ops["version_moved"], "登録しても版が進まない")
         expect(ops["duplicate"] is not None and "すでに" in ops["duplicate"], f"重複の理由が返らない: {ops['duplicate']}")
-        expect(ops["invalid"] is not None and "2 文字以上" in ops["invalid"], f"短い読みの理由が返らない: {ops['invalid']}")
+        expect(ops["invalid"] is not None and "読みを入力してください" in ops["invalid"], f"空の読みの理由が返らない: {ops['invalid']}")
+        expect(ops["one_char_ok"], "1 文字の読みを登録できない")
         expect(ops["check_except"] is None, "編集中の元の語が重複扱いになる")
         expect(ops["update"] is None, f"編集できない: {ops['update']}")
         expect(ops["remove"] is None and ops["removed"] == "0\tきごうとう\t記号党", f"削除の結果が違う: {ops['remove']} / {ops['removed']}")
