@@ -190,7 +190,7 @@ internal static class SuggestionTests
         Assert.Equal(null, session.AcceptSuggestion("きごう", "記号"), "登録できる");
         Assert.True(dictionary.Lookup("きごう").Contains("記号"), "ユーザー辞書に入る");
         Assert.True(!session.PendingSuggestions().Any(w => w.Word == "記号"), "登録したら提案待ちから消える");
-        Assert.True(session.AcceptSuggestion("あ", "亜") is not null, "登録できないときは理由を返す");
+        Assert.True(session.AcceptSuggestion("", "亜") is not null, "登録できないときは理由を返す");
 
         session.RejectSuggestion("こーひー", "珈琲");
         Assert.True(!session.PendingSuggestions().Any(w => w.Word == "珈琲"), "却下したら出ない");

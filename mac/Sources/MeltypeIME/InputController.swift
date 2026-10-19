@@ -506,7 +506,7 @@ final class MeltypeInputController: IMKInputController {
         // 待っている間も、ダイアログへ打つキーをこの IME が処理する必要があるので、メインスレッドは止めない (非同期で順に聞く)。
         askText(prompt: "登録する単語を入力してください", defaultText: selected) { [weak self] word in
             guard let self, let word, !word.isEmpty else { return }
-            self.askText(prompt: "「\(word)」の読み (ひらがな 2 文字以上) を入力してください", defaultText: "") { [weak self] reading in
+            self.askText(prompt: "「\(word)」の読み (ひらがな 1 文字以上) を入力してください", defaultText: "") { [weak self] reading in
                 guard let self, let reading else { return }
                 if let error = NativeCore.shared.addUserWord(self.session, reading: reading, word: word) {
                     self.showSelectionError(error)

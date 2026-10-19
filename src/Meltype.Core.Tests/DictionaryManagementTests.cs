@@ -439,7 +439,7 @@ internal static class DictionaryManagementTests
     {
         var dictionary = new UserDictionary(null, builtIn: false);
         dictionary.AddNew("あいう", "愛");
-        Assert.True(dictionary.AddMany([new UserWord("あいう", "愛"), new UserWord("かきく", "書"), new UserWord("き", "短"), new UserWord("かきく", "書")], out var added) is null, "確認");
+        Assert.True(dictionary.AddMany([new UserWord("あいう", "愛"), new UserWord("かきく", "書"), new UserWord("", "短"), new UserWord("かきく", "書")], out var added) is null, "確認");
         Assert.Equal("かきく=書", string.Join(",", added.Select(w => $"{w.Reading}={w.Word}")), "登録済み・不正・重複を除いた、新しく登録した語だけ");
         Assert.Equal(2, dictionary.Count, "確認");
     }
@@ -512,7 +512,7 @@ internal static class DictionaryManagementTests
     public static void UserDict_Check_SameRulesAsValidate_PlusDuplicates()
     {
         var dictionary = new UserDictionary(null, builtIn: false);
-        Assert.Equal(UserDictionary.Validate("き", "記"), dictionary.AddNew("き", "記"), "読みが短い");
+        Assert.Equal(UserDictionary.Validate("", "記"), dictionary.AddNew("", "記"), "読みが空");
         Assert.Equal(UserDictionary.Validate("きごう", ""), dictionary.AddNew("きごう", " "), "単語が空 (空白だけも)");
         Assert.Equal(UserDictionary.Validate(new string('あ', 101), "語"), dictionary.Check(new string('あ', 101), "語"), "長すぎる");
         Assert.Equal(UserDictionary.Validate("き\tごう", "記号"), dictionary.Check("き\tごう", "記号"), "タブ");
@@ -538,7 +538,7 @@ internal static class DictionaryManagementTests
             Assert.Equal("一番,二番目,三番", string.Join(",", dictionary.Words.Select(w => w.Word)), "位置はそのまま (同じ読みの中の優先順を変えない)");
             Assert.Equal(UserDictionary.DuplicateMessage, dictionary.Update(new UserWord("にばんめ", "二番目"), "さんばん", "三番"), "ほかの語と重なる");
             Assert.Equal(UserDictionary.NotFoundMessage, dictionary.Update(new UserWord("ないもの", "無い"), "ないもの", "無"), "元の語が無い");
-            Assert.Equal(UserDictionary.Validate("に", "二"), dictionary.Update(new UserWord("にばんめ", "二番目"), "に", "二"), "不正な入力");
+            Assert.Equal(UserDictionary.Validate("", "二"), dictionary.Update(new UserWord("にばんめ", "二番目"), "", "二"), "不正な入力");
             Assert.True(dictionary.Update(new UserWord("にばんめ", "二番目"), "にばんめ", "二番目") is null, "変えなければ何もしない");
             Assert.True(File.ReadAllText(path + ".bak").Contains("にばん\t二番\n") || File.ReadAllText(path + ".bak").Contains("にばん\t二番\r\n"), "編集の直前の内容が .bak に残る");
             if (!OperatingSystem.IsWindows()) Assert.Equal(0x180, Mode(path + ".bak"), ".bak も 0600");
@@ -751,7 +751,7 @@ internal static class DictionaryManagementTests
 
             // 不正な入力なら何も変えない
             var count = gui.Count;
-            Assert.Equal(UserDictionary.Validate("こ", "x"), DictionaryManagement.EditTerm(gui, new UserWord("ほそう", "舗装"), "こ", "x", out _), "不正");
+            Assert.Equal(UserDictionary.Validate("", "x"), DictionaryManagement.EditTerm(gui, new UserWord("ほそう", "舗装"), "", "x", out _), "不正");
             Assert.True(gui.Count == count && !TermDomains.Excluded().Contains(("ほそう", "舗装")), "何も変えない");
         }
         finally { restore(); }

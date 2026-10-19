@@ -47,8 +47,8 @@ final class WordEditor: NSObject, NSTextFieldDelegate {
         title.font = .boldSystemFont(ofSize: NSFont.systemFontSize + 1)
 
         readingField.stringValue = configuration.key.reading
-        readingField.placeholderString = "ひらがな 2 文字以上"
-        readingField.setAccessibilityLabel("読み (ひらがな 2 文字以上)")
+        readingField.placeholderString = "ひらがな 1 文字以上"
+        readingField.setAccessibilityLabel("読み (ひらがな 1 文字以上)")
         readingField.delegate = self
         wordField.stringValue = configuration.key.word
         wordField.placeholderString = "変換したときに出す語"

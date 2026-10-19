@@ -1986,7 +1986,7 @@ internal static class CompositionTests
     {
         var dictionary = new UserDictionary(null);
         Assert.True(dictionary.Add("きごうとう", "記号等") is null, "登録できる");
-        Assert.True(dictionary.Add("き", "記") is not null, "1 文字の読みは登録できない");
+        Assert.True(dictionary.Add("", "記") is not null, "空の読みは登録できない");
 
         var k = new Keyboard(userDictionary: dictionary);
         k.Host.PrecedingText = "文章を「記号等」含め、"; // 変換エンジンが き|ごうとう と区切ってしまう文脈

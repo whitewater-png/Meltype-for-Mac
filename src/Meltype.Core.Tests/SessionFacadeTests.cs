@@ -515,7 +515,7 @@ internal static class SessionFacadeTests
         var session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(), new CompositionOptions { UserDictionary = dictionary }, () => new Settings());
         Assert.True(session.AddUserWord("ゆきしろ", "雪代") is null, "登録できたら null");
         Assert.Equal("雪代", dictionary.Lookup("ゆきしろ").Single());
-        Assert.True(session.AddUserWord("あ", "亜") is not null, "1 文字の読みは理由を返す");
+        Assert.True(session.AddUserWord("", "亜") is not null, "空の読みは理由を返す");
         Assert.True(Create().AddUserWord("ゆきしろ", "雪代") is null, "辞書が無ければ何もしない");
     }
 

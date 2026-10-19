@@ -195,7 +195,8 @@ internal static partial class TermDomains
     {
         var targets = items
             .Select(i => (Reading: TermDictionary.Normalize(i.Reading.Trim()), Word: i.Word.Trim()))
-            .Where(i => UserDictionary.Validate(i.Reading, i.Word) is null)
+            // 専門用語集の除外は、今までどおり 2 文字以上の読みだけ (1 文字の登録を許すのはユーザー辞書だけ。本家 #763)。
+            .Where(i => i.Reading.Length >= UserDictionary.MinReadingLength && UserDictionary.Validate(i.Reading, i.Word) is null)
             .ToList();
         if (targets.Count == 0) return null;
         lock (Lock)

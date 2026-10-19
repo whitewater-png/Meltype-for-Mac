@@ -27,8 +27,17 @@ public sealed record UserWord(string Reading, string Word);
 /// </summary>
 public sealed class UserDictionary
 {
-    /// <summary>1 文字の読みは、ほかの語の中にも現れやすく巻き込みが大きいので登録させない。</summary>
+    /// <summary>ほかの辞書 (Microsoft IME・Google 日本語入力・macOS の plist) から取り込む読みの最小の長さ。</summary>
     public const int MinReadingLength = 2;
+
+    /// <summary>自分で登録する (画面・userdict.txt) 読みの最小の長さ (本家 #763)。</summary>
+    public const int MinRegisteredReadingLength = 1;
+
+    /// <summary>
+    /// 読みの途中に見つけて使える読みの最小の長さ。1 文字の読み (お → お父さん) は、ほかの語の中にも現れやすく巻き込みが大きいので、
+    /// 変換する読みが 1 文字だけのとき (その文字だけを変換するとき) にだけ使う (本家 #763)。
+    /// </summary>
+    private const int MinSplitReadingLength = 2;
 
     /// <summary>読み・語の長さの上限。選択範囲をそのまま登録できるので、段落全体のような巨大な語が入って変換のたびに照合されるのを防ぐ。</summary>
     public const int MaxLength = 100;
@@ -45,7 +54,7 @@ public sealed class UserDictionary
     /// <summary>読みと語として登録してよいか。だめなら理由を返す (Add / AddRange / 画面の入力チェックで共通)。</summary>
     public static string? Validate(string reading, string word)
     {
-        if (reading.Length < MinReadingLength) return $"読みは {MinReadingLength} 文字以上にしてください。";
+        if (reading.Length < MinRegisteredReadingLength) return "読みを入力してください。";
         if (word.Length == 0) return "単語を入力してください。";
         if (reading.Length > MaxLength || word.Length > MaxLength) return $"読みも単語も {MaxLength} 文字までにしてください。";
         // 変換はひらがなで引くので、ひらがなを 1 文字も含まない読み (ローマ字・カタカナだけ) は、登録しても変換に一度も出ない。
@@ -242,7 +251,7 @@ public sealed class UserDictionary
             if (line.StartsWith('#')) continue;
             var parts = line.TrimEnd('\r').Split('\t');
             // 取り込み・登録は Validate を通るが、ファイルを直接編集・復元した場合はここが唯一の入口なので、制御文字・書式文字の語は読み込まない。
-            if (parts.Length >= 2 && parts[0].Trim().Length >= MinReadingLength && parts[1].Trim().Length > 0
+            if (parts.Length >= 2 && parts[0].Trim().Length >= MinRegisteredReadingLength && parts[1].Trim().Length > 0
                 && !HasUnsafeText(parts[0]) && !HasUnsafeText(parts[1]))
             {
                 words.Add(new UserWord(parts[0].Trim(), parts[1].Trim()));
@@ -563,7 +572,9 @@ public sealed class UserDictionary
         var index = Current;
         var maxReadingLength = index.MaxReadingLength;
         var lookup = index.Lookup;
-        if ((index.ByReading.Count == 0 && terms.ForcedCount == 0 && terms.UserForcedCount == 0 && _builtInByReading.Count == 0) || kana.Length < MinReadingLength) return null;
+        if ((index.ByReading.Count == 0 && terms.ForcedCount == 0 && terms.UserForcedCount == 0 && _builtInByReading.Count == 0) || kana.Length < MinRegisteredReadingLength) return null;
+        // 1 文字の読みは、変換する読みが 1 文字だけのときにだけ使う (わたし の わ に 輪 を当てない)。
+        var minLength = kana.Length == 1 ? MinRegisteredReadingLength : MinSplitReadingLength;
         var pieces = new List<(string Reading, string? Word)>();
         var plain = new StringBuilder();
         var found = false;
@@ -576,7 +587,7 @@ public sealed class UserDictionary
             var matchedLength = 0;
             string? matchedWord = null;
             var longest = Math.Max(Math.Max(maxReadingLength, _builtInMaxLength), Math.Max(termMax, userTermMax));
-            for (var length = Math.Min(longest, kana.Length - i); length >= MinReadingLength; length--)
+            for (var length = Math.Min(longest, kana.Length - i); length >= minLength; length--)
             {
                 var span = kana.AsSpan(i, length);
                 // 同じ長さなら: ユーザーの登録 → 自作の専門用語集 → 組み込み語句 → 同梱の専門用語集
