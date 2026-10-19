@@ -80,4 +80,54 @@ internal static class CalculatorCandidatesTests
         Assert.Equal("7", k.Host.Document);
         Assert.True(history.Get("1+2*3") is null, "計算結果は学習しない: " + history.Get("1+2*3"));
     }
+
+    [Test]
+    public static void AfterPreviousExpression_StillCalculates()
+    {
+        // 計算式の文節は学習しないために英語扱い (IsEnglish = true) で作る。そのため確定直後は
+        // PrecedingEnglish = true になるが、直前の文字が数字なら「英文の後ろ」ではないので計算を続ける。
+        var k = new CompositionTests.Keyboard { CalculatorCandidates = true };
+        k.Type("10/4 ");
+        for (var i = 0; i < 10 && k.Showing != "2.5"; i++) k.Type(" ");
+        Assert.Equal("2.5", k.Showing, "10/4 の結果: " + string.Join("|", k.Host.View?.Candidates ?? []));
+        k.Type("\n");
+        Assert.Equal("2.5", k.Host.Document, "10/4 を確定");
+
+        k.Type("1/3 ");
+        var candidates = k.Host.View?.Candidates.ToList() ?? [];
+        Assert.True(candidates.Contains("0.3333333333"), "続けて 1/3: " + string.Join("|", candidates));
+    }
+
+    [Test]
+    public static void AfterJapanese_StillCalculates()
+    {
+        // 日本語の後ろは今までどおり計算する (直前が英字でない)。
+        var k = new CompositionTests.Keyboard { CalculatorCandidates = true };
+        k.Host.PrecedingText = "今日は";
+        k.Type("1/3 ");
+        var candidates = k.Host.View?.Candidates.ToList() ?? [];
+        Assert.True(candidates.Contains("0.3333333333"), "日本語の後ろ: " + string.Join("|", candidates));
+    }
+
+    [Test]
+    public static void AfterEnglishWord_DoesNotCalculate()
+    {
+        // 英文の後ろは今までどおり (計算しない)。
+        var k = new CompositionTests.Keyboard { CalculatorCandidates = true };
+        k.Host.PrecedingText = "I have ";
+        k.Type("10/4 ");
+        var candidates = k.Host.View?.Candidates.ToList() ?? [];
+        Assert.True(!candidates.Any(c => c.Contains('=')), "英文の後ろでは計算しない: " + string.Join("|", candidates));
+    }
+
+    [Test]
+    public static void AfterEnglishSentenceWithPeriod_DoesNotCalculate()
+    {
+        // 句点を挟んでも、直前の語が英字なら英文の後ろ。
+        var k = new CompositionTests.Keyboard { CalculatorCandidates = true };
+        k.Host.PrecedingText = "I have. ";
+        k.Type("10/4 ");
+        var candidates = k.Host.View?.Candidates.ToList() ?? [];
+        Assert.True(!candidates.Any(c => c.Contains('=')), "英文＋句点の後ろでは計算しない: " + string.Join("|", candidates));
+    }
 }

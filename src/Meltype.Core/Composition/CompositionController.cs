@@ -1009,7 +1009,8 @@ public sealed class CompositionController
                 // 設定「計算式を変換すると結果を候補に出す」: 10/4 のような / を含む式は、
                 // 下の「英数字は確定して空白」の経路に流れるため、ここで変換を始める (本家 #796 の Mac 側の補正)。
                 if (_options.CalculatorCandidates() && !_text.KanaInput && _text.Mode == DisplayMode.Auto &&
-                    _text.PrecedingEnglish != true && Calculator.Evaluate(_text.Raw) is not null)
+                    !(_text.PrecedingEnglish == true && PrecededByEnglishLetter()) &&
+                    Calculator.Evaluate(_text.Raw) is not null)
                 {
                     _spaceStartedConversion = true;
                     StartConversion();
@@ -1537,6 +1538,23 @@ public sealed class CompositionController
 
     /// <summary>変換の文脈にする、キャレットの前の文字列。固定した文節があれば、その分も含める。</summary>
     private string? PrecedingForConversion => _headCount == 0 ? _precedingText : (_precedingText ?? "") + FixedText;
+
+    /// <summary>
+    /// 直前の確定済みテキストの、空白・句読点を除いた最後の文字が英字か。
+    /// 計算式を確定した後ろ (最後が数字) と、英文の後ろ (最後が英字) を区別する。
+    /// </summary>
+    private bool PrecededByEnglishLetter()
+    {
+        var text = _precedingText;
+        if (string.IsNullOrEmpty(text)) return false;
+        for (var i = text.Length - 1; i >= 0; i--)
+        {
+            var c = text[i];
+            if (char.IsWhiteSpace(c) || c is ',' or '.' or '!' or '?' or ';' or ':' or '、' or '。') continue;
+            return char.IsAsciiLetter(c);
+        }
+        return false;
+    }
 
     /// <summary>未変換の文節の変換結果 (_clauses の固定した文節より後ろ) を捨てる。</summary>
     private void TrimToFixedClauses()
