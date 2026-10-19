@@ -171,6 +171,9 @@ public sealed class CompositionOptions
     /// <summary>計算式 (1+2*3) を変換したときに、計算した結果と「式=結果」を候補に出すか (設定。本家 #796)。</summary>
     public Func<bool> CalculatorCandidates { get; init; } = () => false;
 
+    /// <summary>子音だけの略入力 (ast → 明日) を候補に出すか (設定。本家 #795)。</summary>
+    public Func<bool> ConsonantAbbreviations { get; init; } = () => false;
+
     /// <summary>候補の日本語の意味 (ウィクショナリー)。null なら英訳だけ。</summary>
     public MeaningDictionary? Meanings { get; init; }
 
@@ -1620,6 +1623,16 @@ public sealed class CompositionController
             _converting = true;
             return;
         }
+        // 設定「子音の略入力を候補に出す」: ast → 明日 (本家 #795)
+        if (_options.ConsonantAbbreviations() && !_text.KanaInput && _text.Mode == DisplayMode.Auto &&
+            _text.Raw is { Length: >= 2 } typedRaw && typedRaw.All(char.IsAsciiLetter) &&
+            _options.Candidates?.Lookup(typedRaw.ToLowerInvariant()) is { Count: > 0 } abbreviation)
+        {
+            _clauses = [new Clause(typedRaw, true, Distinct([.. abbreviation, typedRaw, .. EnglishCandidates(typedRaw)])) { Raw = typedRaw }];
+            _selectedClause = 0;
+            _converting = true;
+            return;
+        }
         // 固定した文節があるときは、未変換の文節だけを変換して、固定した文節の後ろにつなぐ。
         TrimToFixedClauses();
         var clauses = new List<Clause>();
@@ -1682,8 +1695,16 @@ public sealed class CompositionController
         clause.Candidates.AddRange(words);
     }
 
-    private static void AddRawCandidates(Clause clause)
+    private void AddRawCandidates(Clause clause)
     {
+        // 子音の略入力 (ast → 明日): 打った英字を読みとする候補 (candidates.txt の英字の読み) を足す (本家 #795)
+        if (clause.Raw is { Length: >= 2 } abbreviation && abbreviation.All(char.IsAsciiLetter) && _options.Candidates is { } abbreviations)
+        {
+            foreach (var word in abbreviations.Lookup(abbreviation.ToLowerInvariant()))
+            {
+                if (!clause.Candidates.Contains(word)) clause.Candidates.Add(word);
+            }
+        }
         // 全角にした記号 (＃ （ ％) は、半角に戻した候補も出す (Space を続けて押すと半角の # ( %)。
         if (clause.Candidates.Count > 0 && CompositionText.SymbolsToHalfWidth(clause.Candidates[0]) is var half && half != clause.Candidates[0] &&
             !clause.Candidates.Contains(half))
