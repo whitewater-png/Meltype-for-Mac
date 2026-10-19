@@ -773,7 +773,7 @@ def check_settings_tab(lib_path, failures):
         if not ops["safe"]:
             failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
             return
-        expect(ops["abi"] == 11, f"FFI の版数が 11 でない: {ops['abi']}")
+        expect(ops["abi"] == 13, f"FFI の版数が 13 でない: {ops['abi']}")
         expect(len(ops["keys"]) >= 15 and ops["keys"][0] == "LiveConversion" and "DetectionLevel" in ops["keys"], f"設定の一覧が違う: {ops['keys']}")
         expect(not {"Mode", "AutoUpdate", "AppRules", "Profiles"} & set(ops["keys"]), "Mac で効かない設定が一覧にある")
         # 入力方式 (かな入力 JIS) は Mac でも効く設定として一覧に出る。「両方を判定」(Both) は Windows の IME 自動切替用なので選択肢に出さない
@@ -864,7 +864,7 @@ def check_user_terms(lib_path, failures):
             failures.append(f"保存場所が一時フォルダーの外: {ops['data_directory']}")
             return
         data = ops["data_directory"]
-        expect(ops["abi"] == 11, f"FFI の版数が 11 でない: {ops['abi']}")
+        expect(ops["abi"] == 13, f"FFI の版数が 13 でない: {ops['abi']}")
         expect(len(ops["user_before"]) == 4, f"前提: ユーザー辞書に 4 語: {ops['user_before']}")
         expect(ops["create_bad"], "空の名前を断らない")
         expect(ops["create"] is None and ops["id"] and ops["id"].startswith("user-") and len(ops["id"]) == 13, f"自作の専門用語集を作れない: {ops['create']} / {ops['id']}")

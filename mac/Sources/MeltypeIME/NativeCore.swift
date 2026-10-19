@@ -12,8 +12,9 @@ typealias LearnCallback = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<C
 typealias PredictionsCallback = @convention(c) (UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 typealias ReadingCallback = @convention(c) (UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 typealias ClipboardCallback = @convention(c) () -> UnsafeMutablePointer<CChar>?
+typealias ForgetCallback = @convention(c) (UnsafePointer<CChar>?) -> Void
 
-private typealias InitFunction = @convention(c) (ClausesCallback, CandidatesCallback, IsWordCallback, LearnCallback, PredictionsCallback, ClipboardCallback) -> Int32
+private typealias InitFunction = @convention(c) (ClausesCallback, CandidatesCallback, IsWordCallback, LearnCallback, PredictionsCallback, ClipboardCallback, ForgetCallback) -> Int32
 private typealias SetReaderFunction = @convention(c) (ReadingCallback) -> Void
 private typealias CreateFunction = @convention(c) () -> UnsafeMutableRawPointer?
 private typealias DestroyFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
@@ -75,6 +76,12 @@ private let clipboardCallback: ClipboardCallback = {
         types.contains(NSPasteboard.PasteboardType("org.nspasteboard.TransientType")) { return nil }
     guard let text = pasteboard.string(forType: .string) else { return nil }
     return strdup(text)
+}
+
+/// 予測候補を選んでいる間の Delete。azooKey の学習からも消す (本家 #788)。
+private let forgetCallback: ForgetCallback = { text in
+    guard let text else { return }
+    MeltypeConverter.shared.forgetMemory(for: String(cString: text))
 }
 
 /// 漢字混じりの文字列 → 読み (ひらがな)。確定後の再変換用 (他の読みが分からなかったときの最後の手段)。
@@ -182,7 +189,7 @@ final class NativeCore {
     /// この Swift が前提にしている FFI の版数。src/Meltype.Mac.Native/Exports.cs の AbiVersion と、
     /// 辞書の管理画面の NativeDictionary.expectedAbiVersion (Sources/MeltypeDictionaryKit) と必ず同じにする。
     /// 食い違う dylib (別の版が混ざった) を読むと関数の引数が合わずに落ちるので、食い違ったら初期化を止める。
-    static let expectedAbiVersion: Int32 = 12
+    static let expectedAbiVersion: Int32 = 13
 
     /// dylib の版数が expectedAbiVersion と合っているか (initialize で確かめる)。合わなければ入力を一切扱わない (キーはアプリに渡る)。
     private(set) var isCompatible = false
@@ -312,7 +319,7 @@ final class NativeCore {
             return
         }
         isCompatible = true
-        _ = initFunction?(clausesCallback, candidatesCallback, isWordCallback, learnCallback, predictionsCallback, clipboardCallback)
+        _ = initFunction?(clausesCallback, candidatesCallback, isWordCallback, learnCallback, predictionsCallback, clipboardCallback, forgetCallback)
         setReaderFunction?(readingCallback)
     }
 

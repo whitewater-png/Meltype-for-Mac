@@ -186,6 +186,9 @@ public sealed class CompositionOptions
     /// <summary>クリップボードの文字を変換候補に出すか (設定。本家 #807)。</summary>
     public Func<bool> ClipboardCandidates { get; init; } = () => false;
 
+    /// <summary>予測候補を選んでいる間の Delete で、その語を学習から消す (azooKey の予測も消す。本家 #788)。</summary>
+    public Action<string>? ForgetPrediction { get; init; }
+
     /// <summary>候補の日本語の意味 (ウィクショナリー)。null なら英訳だけ。</summary>
     public MeaningDictionary? Meanings { get; init; }
 
@@ -3582,6 +3585,17 @@ public sealed class CompositionController
                 if (_predictionIndex == 0) _predicting = false;
                 else _predictionIndex--;
                 return true;
+            case 0x2E when _predictionIndex >= 0: // Delete (予測を選んでいるときだけ)
+                {
+                    var text = _predictions[_predictionIndex];
+                    _options.ForgetPrediction?.Invoke(text);
+                    _options.History?.ForgetText(text);
+                    // 同じ読みの予測を引き直す。ユーザー辞書・専門用語集の語は消さない (限界) ので、残ることがある。
+                    RefreshPredictions();
+                    if (_predictions.Count == 0) _predicting = false;
+                    else _predictionIndex = Math.Min(_predictionIndex, _predictions.Count - 1);
+                    return true;
+                }
             case VirtualKeys.Return:
                 CommitPrediction(_predictions[_predictionIndex]);
                 return true;

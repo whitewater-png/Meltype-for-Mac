@@ -155,7 +155,8 @@ public sealed class MeltypeSession
     /// moreCandidates は読みに対する候補の一覧 (無ければ null)、predictions は読みに対する予測候補 (無ければ null)、wordChecker は OS のスペルチェッカー (無ければ null)。
     /// </summary>
     public static MeltypeSession CreateDefault(IKanjiConverter converter, Func<string, IReadOnlyList<string>>? moreCandidates, IWordChecker? wordChecker,
-        Func<string, IReadOnlyList<string>>? predictions = null, Func<string, string?>? reader = null, Func<string?>? clipboard = null)
+        Func<string, IReadOnlyList<string>>? predictions = null, Func<string, string?>? reader = null, Func<string?>? clipboard = null,
+        Action<string>? forgetPrediction = null)
     {
         AppPaths.MigrateFromOldName();
         Config.SafeFile.EnsureDirectory(AppPaths.DataDirectory);
@@ -208,6 +209,7 @@ public sealed class MeltypeSession
             ContextualLearning = () => shared.Current.ContextualLearning,
             LaughterAfterKana = () => shared.Current.LaughterAfterKana,
             ClipboardCandidates = () => shared.Current.ClipboardCandidates,
+            ForgetPrediction = forgetPrediction,
             Meanings = MeaningDictionary.Load(),
             CandidateMeanings = () => shared.Current.ShowCandidateMeanings,
             RomajiTypos = RomajiTypoCorrector.Load(detector.Romaji),

@@ -277,6 +277,24 @@ public sealed class ConversionHistory
         }
     }
 
+    /// <summary>
+    /// 選んだ語 (text) を、学習した変換から消す (同じ語の読みをすべて)。予測候補を選んでいる間の Delete 用 (本家 #788)。
+    /// ユーザー辞書・専門用語集は消さない。
+    /// </summary>
+    public void ForgetText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        lock (_gate)
+        {
+            var keys = _entries.Where(e => e.Value.Text == text).Select(e => e.Key).ToList();
+            if (keys.Count == 0) return;
+            foreach (var key in keys) _entries.Remove(key);
+            _usageCache = null;
+            Version++;
+            Save();
+        }
+    }
+
     /// <summary>学習した変換 (読み → 選んだ語) の一覧 (新しく使ったものから)。設定の「学習した語」に出す。</summary>
     public IReadOnlyList<(string Reading, string Text, DateTime Used)> Entries()
     {

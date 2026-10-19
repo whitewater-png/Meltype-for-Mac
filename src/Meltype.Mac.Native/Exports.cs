@@ -39,6 +39,9 @@ public static unsafe class Exports
     /// <summary>クリップボードの 1 行 (UTF-8)。読めなければ NULL。設定が ON のときだけ呼ぶ。</summary>
     private static delegate* unmanaged<byte*> s_clipboard;
 
+    /// <summary>予測候補を選んでいる間の Delete で、azooKey の学習から語を消す。</summary>
+    private static delegate* unmanaged<byte*, void> s_forget;
+
     /// <summary>漢字混じりの文字列 → 読み (ひらがな)。読めなければ NULL。確定後の再変換用 (macOS の CFStringTokenizer)。</summary>
     private static delegate* unmanaged<byte*, byte*> s_reading;
 
@@ -57,8 +60,9 @@ public static unsafe class Exports
     /// 10: 判定を調べる (meltype_explain_detection と、画面のプロセスで英単語を調べる関数を登録する meltype_set_word_checker) を足した。
     /// 11: 確定した直後の語の F10 / F6 の取消 (meltype_cancel_toggle) を足し、結果の JSON にトグル由来の印 (toggle) を足した。
     /// 12: クリップボードの文字 (meltype_init の clipboard) を足した。
+    /// 13: 予測の Delete で azooKey の学習を消す (meltype_init の forget) を足した。
     /// </summary>
-    public const int AbiVersion = 12;
+    public const int AbiVersion = 13;
 
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
@@ -168,7 +172,7 @@ public static unsafe class Exports
 
     /// <summary>Swift 側の関数を登録する (最初に 1 回)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_init")]
-    public static int Init(delegate* unmanaged<byte*, byte*, byte*> clauses, delegate* unmanaged<byte*, byte*> candidates, delegate* unmanaged<byte*, int> isWord, delegate* unmanaged<byte*, byte*, void> learn, delegate* unmanaged<byte*, byte*> predictions, delegate* unmanaged<byte*> clipboard)
+    public static int Init(delegate* unmanaged<byte*, byte*, byte*> clauses, delegate* unmanaged<byte*, byte*> candidates, delegate* unmanaged<byte*, int> isWord, delegate* unmanaged<byte*, byte*, void> learn, delegate* unmanaged<byte*, byte*> predictions, delegate* unmanaged<byte*> clipboard, delegate* unmanaged<byte*, void> forget)
     {
         s_clauses = clauses;
         s_candidates = candidates;
@@ -176,6 +180,7 @@ public static unsafe class Exports
         s_learn = learn;
         s_predictions = predictions;
         s_clipboard = clipboard;
+        s_forget = forget;
         return 1;
     }
 
@@ -214,7 +219,7 @@ public static unsafe class Exports
         {
             var session = s_mozc is { } mozc
                 ? MeltypeSession.CreateDefault(mozc, mozc.Candidates, s_isWord == null ? null : new CallbackWordChecker())
-                : MeltypeSession.CreateDefault(new CallbackConverter(), MoreCandidates, s_isWord == null ? null : new CallbackWordChecker(), Predictions, s_reading == null ? null : ReadingOf, ClipboardText);
+                : MeltypeSession.CreateDefault(new CallbackConverter(), MoreCandidates, s_isWord == null ? null : new CallbackWordChecker(), Predictions, s_reading == null ? null : ReadingOf, ClipboardText, ForgetPrediction);
             return GCHandle.ToIntPtr(GCHandle.Alloc(session));
         }
         catch (Exception ex)
@@ -1194,6 +1199,15 @@ public static unsafe class Exports
     /// <summary>Swift 側が malloc した文字列を読んで解放する。</summary>
     /// <summary>Swift 側からクリップボードの 1 行を読む (設定が ON のときだけ)。</summary>
     private static string? ClipboardText() => s_clipboard == null ? null : TakeUtf8(s_clipboard());
+
+    /// <summary>Swift 側の azooKey の予測からも、その語を消す (予測の Delete)。</summary>
+    private static void ForgetPrediction(string text)
+    {
+        if (s_forget == null) return;
+        var pointer = ToUtf8(text);
+        try { s_forget(pointer); }
+        finally { NativeMemory.Free(pointer); }
+    }
 
     private static string? TakeUtf8(byte* text)
     {

@@ -188,6 +188,9 @@ internal static class CompositionTests
         /// <summary>クリップボードの文字を候補に出すか (CompositionOptions.ClipboardCandidates)。既定は OFF。</summary>
         public bool ClipboardCandidates { get; set; }
 
+        /// <summary>予測の Delete で呼ばれる、エンジンの予測を消す関数 (CompositionOptions.ForgetPrediction)。</summary>
+        public Action<string>? ForgetPrediction { get; set; }
+
         /// <summary>かな入力で、仮想キーを順に打つ (shift: その打鍵で Shift を押す)。</summary>
         public void TypeKeys(params (int Vk, bool Shift)[] keys)
         {
@@ -254,6 +257,7 @@ internal static class CompositionTests
                 ContextualLearning = () => ContextualLearning,
                 LaughterAfterKana = () => LaughterAfterKana,
                 ClipboardCandidates = () => ClipboardCandidates,
+                ForgetPrediction = text => ForgetPrediction?.Invoke(text),
                 RomajiTypos = Typos,
                 CorrectTypos = () => CorrectTypos,
                 SpaceAroundEnglish = () => SpaceAroundEnglish,

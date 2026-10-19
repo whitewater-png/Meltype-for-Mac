@@ -17,6 +17,9 @@ final class MeltypeConverter {
     /// Zenzai を使わない (.off) 基本の変換オプション。Zenzai を使うときは、要求ごとに zenzaiMode (左文脈を含む) だけ差し替えた複製を使う (requestCandidates)。
     private let options: ConvertRequestOptions
 
+    /// 直近の予測候補 (語 → azooKey の候補)。予測の Delete で、azooKey の学習から消すのに使う。
+    private var predictionCandidates: [String: Candidate] = [:]
+
     /// true のとき、変換のたびに azooKey の組版 (stopComposition) を終えず、差分変換 (kana2lattice_changed / no_change) を使う。
     /// 毎回 stopComposition すると、1 キーごとに読み全体を全計算してしまう (false は従来の動き。ベンチの比較用)。
     private let incremental: Bool
@@ -347,11 +350,19 @@ final class MeltypeConverter {
         let results = requestCandidates(composing, reading: hiragana, context: nil, prediction: true)
         var seen = Set<String>()
         var list: [String] = []
+        predictionCandidates.removeAll(keepingCapacity: true)
         for candidate in results.predictionResults where candidate.text != hiragana && seen.insert(candidate.text).inserted {
             list.append(candidate.text)
+            predictionCandidates[candidate.text] = candidate
             if list.count >= 8 { break }
         }
         return list
+    }
+
+    /// 予測候補を選んでいる間の Delete。azooKey の学習からその語を消す (本家 #788)。
+    func forgetMemory(for text: String) {
+        guard let candidate = predictionCandidates[text] else { return }
+        converter.forgetMemory(candidate)
     }
 
     /// 読みに対する候補の一覧 (重複なし、30 個まで)。
