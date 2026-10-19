@@ -219,7 +219,7 @@ final class MeltypeInputController: IMKInputController {
             hideComposition(client: client)
             return false
         }
-        Self.trace("handleKey consumed=\(result.consumed) commits=\(result.commits.map { "(del=\($0.deleteBefore) orig=\(Self.cut($0.original)) text=\(Self.cut($0.text)))" }.joined()) view=\(result.view.map { "text=\(Self.cut($0.text)) converting=\($0.converting) clauses=\($0.clauses.map { Self.cut($0) }) selectedClause=\($0.selectedClause)" } ?? "nil")")
+        Self.trace("handleKey consumed=\(result.consumed) commits=\(result.commits.map { "(del=\($0.deleteBefore) orig=\(Self.cut($0.original)) text=\(Self.cut($0.text)))" }.joined()) view=\(result.view.map { "text=\(Self.cut($0.text)) converting=\($0.converting) clauses=\($0.clauses.map { Self.cut($0) }) selectedClause=\($0.selectedClause) selectedPrediction=\($0.selectedPrediction) predictions=\($0.predictions.map { Self.cut($0) })" } ?? "nil")")
         // 確定後の F10 / F6 の書き換えを飛ばして取り消したときは、キーを飲み込まずアプリに渡す
         let cancelledToggle = apply(result, to: client)
         return result.consumed && !cancelledToggle
@@ -766,6 +766,13 @@ final class MeltypeInputController: IMKInputController {
         }
     }
 
+    /// IMKCandidates は既定ではキーを候補ウィンドウへ先に送る。Space・Tab・Enter・矢印・Delete を
+    /// 本体 (Core) に処理させるため、キーをコントローラーへ先に送る属性を付ける。
+    /// update() / show() で属性が既定に戻ることがあるので、ウィンドウを出し直した後にもう一度付ける。
+    private func sendKeyEventsToServerFirst(_ window: IMKCandidates) {
+        window.setAttributes([IMKCandidatesSendServerKeyEventFirst as String: true])
+    }
+
     private func updateCandidates(_ view: CompositionView) {
         lastView = view
         guard let window = candidatesWindow else { return }
@@ -774,7 +781,7 @@ final class MeltypeInputController: IMKInputController {
         } else if view.converting && view.candidates.count > 1 {
             // IMKCandidates は標準では Space を候補確定に使い、コントローラーに渡さない。
             // Space で本体の次候補処理を呼べるよう、キーイベントを先にコントローラーへ配送する。
-            window.setAttributes([IMKCandidatesSendServerKeyEventFirst as String: true])
+            sendKeyEventsToServerFirst(window)
             if view.candidates != candidateList || !window.isVisible() {
                 // 候補が変わったときだけ、IMKCandidates に候補一覧を再取得させる (選択は先頭に戻る)。
                 // 候補ウィンドウを出し直すので、出していた意味は捨てる。
@@ -783,6 +790,7 @@ final class MeltypeInputController: IMKInputController {
                 window.update()
                 window.show(kIMKLocateCandidatesBelowHint)
                 shownIndex = 0
+                sendKeyEventsToServerFirst(window)
             }
             // 本体側で選んでいる候補に、候補ウィンドウの選択 (青いバー) を合わせる。
             // candidateIdentifier(atLineNumber:) は 0 しか返さず使えないので、候補ウィンドウ自身の上下移動で動かす。
@@ -794,6 +802,7 @@ final class MeltypeInputController: IMKInputController {
                 // 先頭に近い候補へ戻るとき (最後の候補から先頭に戻ったときなど) は、上へ何十回も動かさずに一覧を読み直す
                 window.update()
                 shownIndex = 0
+                sendKeyEventsToServerFirst(window)
             }
             while shownIndex < target { window.moveDown(nil); shownIndex += 1 }
             while shownIndex > target { window.moveUp(nil); shownIndex -= 1 }
@@ -811,13 +820,17 @@ final class MeltypeInputController: IMKInputController {
     /// (IMKCandidates に「非選択」は無いので先頭に青いバーが乗る)。
     private func updatePredictions(_ view: CompositionView, window: IMKCandidates) {
         meaningKey = nil
-        // Tab・Enter・矢印を、候補ウィンドウより先に本体へ渡す (変換中と同じ)。
-        window.setAttributes([IMKCandidatesSendServerKeyEventFirst as String: true])
+        // Tab・Enter・矢印・Delete を、候補ウィンドウより先に本体へ渡す (変換中と同じ)。
+        sendKeyEventsToServerFirst(window)
         if view.predictions != candidateList || !window.isVisible() {
             candidateList = view.predictions
             window.update()
             window.show(kIMKLocateCandidatesBelowHint)
             shownIndex = 0
+            // update() / show() が属性を既定 (候補ウィンドウ優先) に戻すことがあるので、出し直した後にもう一度付ける。
+            // これが無いと、直前の 1 文字で一覧を出し直した直後の Tab を候補ウィンドウが処理してしまい、
+            // 本体が予測の選択 (_predicting) に入らない (Fn+Delete も届かない)。
+            sendKeyEventsToServerFirst(window)
         }
         guard view.selectedPrediction >= 0 else { return }
         let target = min(view.selectedPrediction, candidateList.count - 1)
@@ -826,6 +839,7 @@ final class MeltypeInputController: IMKInputController {
         if target < shownIndex - target {
             window.update()
             shownIndex = 0
+            sendKeyEventsToServerFirst(window)
         }
         while shownIndex < target { window.moveDown(nil); shownIndex += 1 }
         while shownIndex > target { window.moveUp(nil); shownIndex -= 1 }

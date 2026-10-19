@@ -4,8 +4,8 @@
 
 ## 0. 前提: 新しいビルドが動いているか
 
-- インストール先: `~/Library/Input Methods/Meltype.app`。dylib は **2026-10-19 14:43**、SHA-256 は `14959dd1866fffbc404fec43ab8a55a6718223100f2ef590a0b40a9fc2accec8`（ビルド成果物と一致）。
-- 稼働中の IME: `ps -axo pid,lstart,command | grep 'Input Methods/Meltype.app/Contents/MacOS/Meltype'` で起動時刻を見る。**14:43 より後**なら新しい dylib。前なら IME を再起動する（ログアウト/ログイン、または入力ソースを切り替える）。
+- インストール先: `~/Library/Input Methods/Meltype.app`。dylib は **2026-10-19 15:54:59**、SHA-256 は `b02314dec68d517c59626075b9aff42097e9e6dc40ba90ec55ff20184485eb54`（ビルド成果物と一致）。B2-7 の原因調査後の修正版。
+- 稼働中の IME: `ps -axo pid,lstart,command | grep 'Input Methods/Meltype.app/Contents/MacOS/Meltype'` で起動時刻を見る。**15:54:59 より後**なら新しい dylib。前なら IME を再起動する（ログアウト/ログイン、または入力ソースを切り替える）。
 - 設定: 「Meltype 辞書」→「設定」タブ（⌘4）。B2-4・B2-5・B2-6 は**既定 OFF**。検証する項目だけ ON にし、終わったら OFF に戻す。
 - 入力先: TextEdit の新規書類など、Meltype が有効なプレーンテキスト。ほかの IME に切り替わっていないことを確認する。
 - 候補の確定は Space / Enter。候補の並びも見たいときは、確定せずに Space を押したままにする。
@@ -126,6 +126,32 @@
 | 7-6 | ユーザー辞書に `今日`（読み `きょう`）を登録 → 予測で選び **Fn+Delete** | ユーザー辞書の語は残る（方針。一覧に残ることがある） | |
 
 補足: 7-3 は「予測を選んでいる間」の Delete です。Tab を押す前（`SelectedPrediction = -1`）は 7-5 の動きになります。7-6 はユーザー辞書・同梱の専門用語集を消さない方針の確認です。
+
+### 8.1 2026-10-19 の修正（実機で 7-3 が効かなかった原因）
+
+実機で「Tab で青いバーは動くのに、Fn+Delete で何も消えない」ことを確認した。原因は 2 つ。
+
+1. **Tab が Core に届いていなかった。** `IMKCandidatesSendServerKeyEventFirst` を `window.update()` / `window.show()` の**前**に設定していたため、一覧を出し直した直後は属性が既定（候補ウィンドウが先）に戻り、Tab を候補ウィンドウ自身が処理して 2 番目へ動かしていた。Core は `_predicting` に入らず、Fn+Delete も予測削除の分岐に届かなかった。
+   - 修正: `InputController` で属性を `update()` / `show()` の**後**にも設定する（予測・変換の両方）。
+2. **azooKey の辞書予測が同じ語を返していた。** `forgetMemory` は学習メモリだけを消し、辞書の語は消さない。`RefreshPredictions` が引き直すと「今日」が復活していた。
+   - 修正: `CompositionController` に `_forgottenPredictions` を追加し、Delete した語を**変換エンジンと変換履歴の予測からだけ**除く。ユーザー辞書・専門用語集は残す。
+   - Delete の後は `_predicting = false` / `_predictionIndex = -1` に戻す（本家と同じ。次の Delete で別の語を消さない）。
+
+**再確認（trace）**: 次のように trace を ON にして IME を再起動し、7-2〜7-5 を行う。
+
+```bash
+defaults write io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK -bool true
+# IME を再起動してから、TextEdit などで再現する
+tail -f ~/Library/Application\ Support/Meltype/imk-trace.log
+```
+
+期待:
+- Tab: `handle keyCode=48` の行で `consumed=true`、`selectedPrediction=0`。バーは先頭のまま（Core が先頭を選ぶ）。
+- Fn+Delete: `handle keyCode=117` の行で `consumed=true`。`conversions.json` の `きょう→今日` が消える。
+- 7-4: もう一度 `kyou` と打っても「今日」が出ない（azooKey の辞書予測からも除く。IME を再起動すると戻る）。
+- 7-6: ユーザー辞書の「今日」は残る。
+
+Tab の trace が**出ない**／`consumed=false` のままなら、属性がまだ効いていない。次の候補は、候補ウィンドウの選択変更を Core に伝える FFI を足すか、予測用の候補ウィンドウを自前にする（今回はまず属性の再設定で確認する）。
 
 ## 9. 結果の記録
 

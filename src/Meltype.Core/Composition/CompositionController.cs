@@ -318,6 +318,10 @@ public sealed class CompositionController
     private bool _predicting;
     private int _predictionIndex;
     private List<string> _predictions = [];
+    // 予測の Delete で消した語。変換エンジン (azooKey) は辞書の語を忘れないので、同じ読みを引き直しても
+    // 一覧に戻ってくる。ユーザー辞書・専門用語集は消さない方針なので、エンジンと履歴の予測だけを除く。
+    // IME のセッション中だけ覚える (再起動すると辞書の予測は戻る)。
+    private readonly HashSet<string> _forgottenPredictions = [];
     private bool? _lastCommitEnglish;
     private string? _lastCommitText;
     private string? _precedingText;
@@ -3545,11 +3549,11 @@ public sealed class CompositionController
             }
             if (reading.Length <= MaxPredictionReadingLength && _options.Predictions?.Invoke(reading) is { } engine)
             {
-                foreach (var word in engine.OrderByDescending(Used)) yield return word;
+                foreach (var word in engine.OrderByDescending(Used).Where(w => !_forgottenPredictions.Contains(w))) yield return word;
             }
             if (_options.History is { } history)
             {
-                foreach (var (_, text) in history.StartingWith(reading)) yield return text;
+                foreach (var (_, text) in history.StartingWith(reading).Where(e => !_forgottenPredictions.Contains(e.Text))) yield return text;
             }
         }
         return Sources().Where(w => w.Length > 0 && w != reading).Distinct().Take(MaxPredictions).ToList();
@@ -3588,12 +3592,15 @@ public sealed class CompositionController
             case 0x2E when _predictionIndex >= 0: // Delete (予測を選んでいるときだけ)
                 {
                     var text = _predictions[_predictionIndex];
+                    _forgottenPredictions.Add(text);
                     _options.ForgetPrediction?.Invoke(text);
                     _options.History?.ForgetText(text);
                     // 同じ読みの予測を引き直す。ユーザー辞書・専門用語集の語は消さない (限界) ので、残ることがある。
+                    // 変換エンジンは辞書の語を忘れないため、消した語は _forgottenPredictions で除く。
                     RefreshPredictions();
-                    if (_predictions.Count == 0) _predicting = false;
-                    else _predictionIndex = Math.Min(_predictionIndex, _predictions.Count - 1);
+                    // 本家と同じ: Delete の後は予測の選択から抜ける (次の Delete で別の語を消さない)。
+                    _predicting = false;
+                    _predictionIndex = -1;
                     return true;
                 }
             case VirtualKeys.Return:

@@ -183,11 +183,16 @@
   - `History`（Core の学習）: 消す。
   - `Predictions`（azooKey）: 消す（コールバック）。
   - `UserDictionary`・`PredictTerm`/`PredictTerms`: **消さない**（限界として記録）。
+  - **2026-10-19 の実機修正**: azooKey の `forgetMemory` は学習メモリだけを消し、辞書の語は同じ読みで返し続ける。このため `CompositionController` に `_forgottenPredictions` を足し、Delete した語を**変換エンジンと変換履歴の予測からだけ**除く（ユーザー辞書・専門用語集は除かない）。Delete 後は `_predicting = false` / `_predictionIndex = -1` に戻す。
+- Mac 側のキー配送（同じ実機修正）: `IMKCandidatesSendServerKeyEventFirst` を `window.update()` / `window.show()` の**前**に設定すると、出し直した直後は既定（候補ウィンドウ優先）に戻り、Tab が Core に届かない。`update()` / `show()` の**後**にも設定する（予測・変換の両方）。
 
 **テスト**
 - `ConversionHistory.Forget` の単体。
 - 予測を Tab で選び、Delete → 一覧から消える。ユーザー辞書の語は残る。
 - エンジンの forget コールバックが呼ばれること（偽のコールバック）。
+- 同じ語を返し続ける偽エンジンでも一覧から消える（`_forgottenPredictions`）。
+- Delete の後に選択が -1 に戻り、2 回目の Delete で別の語を消さない。
+- Delete の後に同じ読みを打ち直しても出ない（セッション中）。
 
 **リスク**: 中。予測源の違い（Mac は `Predictor` ではなく `History` + azooKey）、FFI、Swift。ユーザー辞書を消さない方針を明記する。
 
@@ -316,23 +321,24 @@
 | B2-4 #800 | 完了（画面の文脈ラベルは未対応） | 958dccb | 設定 OFF 既定。`@e`/`@j` の保存・読み直し・Undo・一覧の印外し。`Learned` に `Context` を追加。画面は同じ語が 2 行出る |
 | B2-5 #799 | 完了 | c1b94ba | 設定 OFF 既定。`naruhodonew` → `なるほどねw`。英文の中の `saw` はそのまま。`おnew` の限界は ON のときだけ |
 | B2-6 #807 | 完了 | 2d3eaa3 | 設定 OFF 既定。ABI 12。Concealed/Transient は読まない。Core の `ClipboardLine` が 1 行・200 文字・制御文字を検証 |
-| B2-7 #788 | 完了 | 5eb9422 | ABI 13。Core の変換履歴と azooKey の予測から消す。ユーザー辞書・専門用語集は消さない。未選択の Delete は安全 |
+| B2-7 #788 | 完了（実機修正） | 5eb9422 + 本修正 | ABI 13。Core の変換履歴と azooKey の予測から消す。ユーザー辞書・専門用語集は消さない。未選択の Delete は安全。実機で Tab が Core に届かない問題を修正し、エンジンの辞書予測の復活も抑制 |
 | B2-8 #806 | 見送り | - | 通信・プライバシー方針の変更が必要 |
 | B2-9 #842 | 見送り | - | Mac の「英数 (Meltype)」と役割が重なる |
 | B2-10 #738 | 見送り | - | 工数大・今は不要 |
 
 **検証**
-- Core のテスト: 905 → **927 件**（B2-1 2、B2-2 2、B2-3 2、B2-4 6、B2-5 4、B2-6 3、B2-7 3）。
+- Core のテスト: 905 → **931 件**（B2-1 2、B2-2 2、B2-3 2、B2-4 6、B2-5 4、B2-6 3、B2-7 7）。
 - `--eval`: 1269/1271 のまま（変更前と同じ）。
 - AOT チェッカー: PASS（FFI 版数を 13 に更新）。
-- 辞書アプリの self-test: 213 PASS。`mac/build.sh` で build/install、インストール済み dylib のハッシュ一致。
+- 辞書アプリの self-test: 213 PASS。`mac/build.sh` で build/install、インストール済み dylib のハッシュ `b02314de…` がビルド成果物と一致（2026-10-19 15:54:59、プロセスは 15:55:24 起動）。
 - `eval-compare`（基準 `51512b7`）: **broken 0 / fixed 0 / added 0 / removed 0**。合計 278/310 で前後同じ（回帰ゲート PASS）。
-- 実機確認: 未。§8 の入力で確認する（B2-2 は Shift+Space、B2-1 は CompositionTable のみ）。
+- 実機確認: 修正版で 7-3〜7-6 を再確認中（`B2_DEVICE_CHECK.md` §8.1）。trace を ON にし、Tab の `consumed=true` と Fn+Delete の `consumed=true` を確認する。
 
 **残っている限界・後続**
 - B2-4: 画面（「学習した語」）の文脈ラベルは未対応。同じ語が 2 行出る。`Learned` の `Context` は JSON にある。
 - B2-6: Swift 側の Concealed/Transient の自己テストは無い。実機でパスワード管理ソフトの内容が候補に出ないことを確認する。
 - B2-7: ユーザー辞書・同梱の専門用語集の予測は消さない（Delete しても一覧に残ることがある）。
+- B2-7: エンジンの辞書予測の抑制は **IME のセッション中だけ**。IME を再起動すると辞書の予測は戻る。
 - B2-5: `おnewの新品` は ON のとき壊れる（既知の限界）。
 
 
