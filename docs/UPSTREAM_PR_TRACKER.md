@@ -78,7 +78,7 @@
 | B2-4 | #800 (`9368c98d`) | 英語 / 日本語の学習を前の文脈ごとに分ける（既定 OFF）。要件と設計は [UPSTREAM_B2_PLAN.md](UPSTREAM_B2_PLAN.md) | 低〜中 | 完了 (設定 OFF 既定、Core 927/927、--eval 不変。画面の文脈ラベルは未対応。実機未確認) | 958dccb | 同じ語を英語の後ろ / 日本語の後ろで確定。古い学習データ |
 | B2-5 | #799 (`02743917` `60f75b07`) | かな + w を笑いにする（既定 OFF）。要件と設計は [UPSTREAM_B2_PLAN.md](UPSTREAM_B2_PLAN.md) | 中 | 完了 (設定 OFF 既定、Core 927/927、--eval 不変。実機未確認) | c1b94ba | `naruhodonew` → なるほどねw、`おnew` の限界 |
 | B2-6 | #807 (`ae9e64bc`) | クリップボードの文字を変換候補に出す（既定 OFF）。要件と設計は [UPSTREAM_B2_PLAN.md](UPSTREAM_B2_PLAN.md) | 中 | 完了 (設定 OFF 既定、ABI 12、Core 927/927、AOT PASS、self-test 213 PASS、build/install 済み。実機未確認) | 2d3eaa3 | `くりっぷぼーど` + Space。Concealed/Transient は読まない |
-| B2-7 | #788 (`335e15d4`) | 予測候補を選んでいる間の Delete で学習から消す。要件と設計は [UPSTREAM_B2_PLAN.md](UPSTREAM_B2_PLAN.md) | 中 | 完了・実機修正済み (ABI 13、Core 931/931、AOT PASS、self-test 213 PASS、build/install 済み。修正版で実機再確認待ち) | 5eb9422 + 本修正 | 予測を Tab で選び Delete。ユーザー辞書は消さない。Tab が Core に届かない問題と azooKey 辞書予測の復活を修正 |
+| B2-7 | #788 (`335e15d4`) | 予測候補を選んでいる間の Delete で学習から消す。要件と設計は [UPSTREAM_B2_PLAN.md](UPSTREAM_B2_PLAN.md) | 中 | 完了・実機修正済み (ABI 13、Core 931/931、AOT PASS、self-test 213 PASS、build/install 済み。修正版で実機再確認待ち) | 5eb9422 + f810b64 | 予測を Tab で選び Delete。ユーザー辞書は消さない。Tab が Core に届かない問題と azooKey 辞書予測の復活を修正 |
 | B2-8 | #806 (`1d476464` ほか) | #番号で GitHub の Issue/PR タイトルを候補に出す | 低〜中 | 見送り（リョウさんの決定 2026-10-19: 通信・プライバシー方針の変更が必要） | - | - |
 | B2-9 | #842 (`e15165d5`) | 英字を主に入力 | 低 | 見送り（Mac の「英数 (Meltype)」と役割が重なる） | - | - |
 | B2-10 | #738（一連の refactor） | Core の重複整理 | 低 | 見送り（工数大・今は不要） | - | - |
