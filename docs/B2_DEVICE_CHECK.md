@@ -4,8 +4,8 @@
 
 ## 0. 前提: 新しいビルドが動いているか
 
-- インストール先: `~/Library/Input Methods/Meltype.app`。dylib は **2026-10-19 15:54:59**、SHA-256 は `b02314dec68d517c59626075b9aff42097e9e6dc40ba90ec55ff20184485eb54`（ビルド成果物と一致）。B2-7 の原因調査後の修正版。
-- 稼働中の IME: `ps -axo pid,lstart,command | grep 'Input Methods/Meltype.app/Contents/MacOS/Meltype'` で起動時刻を見る。**15:54:59 より後**なら新しい dylib。前なら IME を再起動する（ログアウト/ログイン、または入力ソースを切り替える）。
+- インストール先: `~/Library/Input Methods/Meltype.app`。dylib は **2026-10-19 16:20:21**、SHA-256 は `680eecd119b1eb042c06564d094851b78f804affa950184f5529146fb510b92e`（ビルド成果物と一致）。B2-7 の原因調査後の修正版。
+- 稼働中の IME: `ps -axo pid,lstart,command | grep 'Input Methods/Meltype.app/Contents/MacOS/Meltype'` で起動時刻を見る。**16:20:21 より後**なら新しい dylib。前なら IME を再起動する（ログアウト/ログイン、または入力ソースを切り替える）。
 - 設定: 「Meltype 辞書」→「設定」タブ（⌘4）。B2-4・B2-5・B2-6 は**既定 OFF**。検証する項目だけ ON にし、終わったら OFF に戻す。
 - 入力先: TextEdit の新規書類など、Meltype が有効なプレーンテキスト。ほかの IME に切り替わっていないことを確認する。
 - 候補の確定は Space / Enter。候補の並びも見たいときは、確定せずに Space を押したままにする。
@@ -111,6 +111,8 @@
 補足: 6-5 は 1Password など「履歴に残さない」印（`org.nspasteboard.ConcealedType` / `TransientType`）を付けるソフトが必要です。無い場合は「未確認」と記録してください。設定 ON は変換した瞬間に 1 回だけ読み、保存・送信はしません。
 
 ## 8. B2-7 #788 予測候補の Delete
+
+専用の検証表: [B2-7_DEVICE_VERIFY.md](B2-7_DEVICE_VERIFY.md)（入れ替え結果・記入用の表・trace の確認方法）
 
 設定: 予測変換 ON（既定）。**Mac の前方削除 = Fn+Delete** です（`KeyMapping.swift` で `kVK_ForwardDelete` → `0x2E`）。通常の Delete / Backspace は `0x08` なので、予測の削除にはなりません。
 
