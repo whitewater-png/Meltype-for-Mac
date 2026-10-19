@@ -1006,6 +1006,15 @@ public sealed class CompositionController
                 return;
             case VirtualKeys.Space:
                 _text.FixTypos();
+                // 設定「計算式を変換すると結果を候補に出す」: 10/4 のような / を含む式は、
+                // 下の「英数字は確定して空白」の経路に流れるため、ここで変換を始める (本家 #796 の Mac 側の補正)。
+                if (_options.CalculatorCandidates() && !_text.KanaInput && _text.Mode == DisplayMode.Auto &&
+                    _text.PrecedingEnglish != true && Calculator.Evaluate(_text.Raw) is not null)
+                {
+                    _spaceStartedConversion = true;
+                    StartConversion();
+                    return;
+                }
                 // 英語と判定した語で終わっているなら、変換ではなく確定して空白を入れる
                 // (日本語の部分は、ライブ変換が ON なら漢字にして、OFF なら見えているかなのまま確定)。
                 // 数字だけ (1、12) は、前が英文なら確定して空白 (I have 2 cats)。それ以外は変換して ① 一 Ⅰ などの候補を出す。
