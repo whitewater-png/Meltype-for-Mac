@@ -322,6 +322,8 @@ public sealed class CompositionController
     // 一覧に戻ってくる。ユーザー辞書・専門用語集は消さない方針なので、エンジンと履歴の予測だけを除く。
     // IME のセッション中だけ覚える (再起動すると辞書の予測は戻る)。
     private readonly HashSet<string> _forgottenPredictions = [];
+    /// <summary>この入力でクリップボードから出した候補 (1 つ)。選んで確定しても学習しないために使う。</summary>
+    private string? _clipboardCandidate;
     private bool? _lastCommitEnglish;
     private string? _lastCommitText;
     private string? _precedingText;
@@ -351,6 +353,9 @@ public sealed class CompositionController
 
         /// <summary>この文節の読みを打ったときの英字 (あぴ → api)。分からなければ null。</summary>
         public string? Raw { get; set; }
+
+        /// <summary>この文節の候補に、クリップボードから出した文字があればその文字。選んで確定しても学習しない。</summary>
+        public string? ClipboardText { get; set; }
 
         /// <summary>候補のうち英訳 (複雑な → complex) のもの。</summary>
         public HashSet<string> Translations { get; } = new(StringComparer.Ordinal);
@@ -823,6 +828,7 @@ public sealed class CompositionController
     /// <summary>ローマ字の再変換をやめて、選んでいた元の文字を書き戻す (変換ボックスは閉じる)。</summary>
     private void CancelRomajiReconversion()
     {
+        _clipboardCandidate = null;
         _text.Clear();
         _converting = false;
         _clauses = [];
@@ -866,6 +872,7 @@ public sealed class CompositionController
     /// <summary>例外からの復旧用。未確定の内容と追跡中の状態をすべて捨てる (次の入力で同じ例外を繰り返さないように)。</summary>
     public void Reset()
     {
+        _clipboardCandidate = null;
         _text.Clear();
         _reconvertOriginal = null;
         _reconvertRomaji = false;
@@ -1194,6 +1201,7 @@ public sealed class CompositionController
     /// </summary>
     private void BeginComposition()
     {
+        _clipboardCandidate = null;
         _text.KanaInput = _options.KanaInput();
         _text.LaughterAfterKana = _options.LaughterAfterKana();
         ResetPrediction();
@@ -1647,6 +1655,7 @@ public sealed class CompositionController
         _text.PrecedingTail = _basePrecedingTail;
         _headCount = 0;
         _clauses = [];
+        _clipboardCandidate = null;
         _converting = false;
         ResetPrediction();
     }
@@ -1725,6 +1734,7 @@ public sealed class CompositionController
         if (clauses.Count == 0) return;
         if (_headCount > 0) clauses.InsertRange(0, _clauses.Take(_headCount));
         _clauses = clauses;
+        foreach (var clause in _clauses) MarkClipboardChoice(clause);
         _selectedClause = _headCount;
         _converting = true;
         _candidatesMoved = false;
@@ -2256,6 +2266,16 @@ public sealed class CompositionController
         return candidates;
     }
 
+    /// <summary>文節の候補に、この入力でクリップボードから出した文字があれば、その文節に印を付ける。</summary>
+    private void MarkClipboardChoice(Clause clause)
+    {
+        if (_clipboardCandidate is not { } clip) return;
+        if (clause.Candidates.Contains(clip)) clause.ClipboardText = clip;
+    }
+
+    /// <summary>この文節で、クリップボードから出した候補を選んでいるか (選んだ候補は学習しない)。</summary>
+    private static bool IsClipboardChoice(Clause clause) => clause.ClipboardText is { } clip && clause.Text == clip;
+
     /// <summary>今の時刻を表す読み (本家 #208)。</summary>
     private static readonly HashSet<string> NowReadings = ["いま", "なう"];
 
@@ -2291,7 +2311,11 @@ public sealed class CompositionController
     private IEnumerable<string> TimeCandidates(string reading)
     {
         // クリップボードの文字 (設定「クリップボードの文字を候補に出す」: 本家 #807)。変換した瞬間に 1 回だけ読む。
-        if (ClipboardReadings.Contains(reading) && _options.ClipboardCandidates() && ClipboardLine(_host.ClipboardText) is { } clip) return [clip];
+        if (ClipboardReadings.Contains(reading) && _options.ClipboardCandidates() && ClipboardLine(_host.ClipboardText) is { } clip)
+        {
+            _clipboardCandidate = clip;
+            return [clip];
+        }
         if (EraToYear(reading) is { } year) return year;
         if (TypedUnitCandidates(reading) is { } units) return units;
         if (reading is "じこう" or "じこうのあいさつ") return SeasonalGreetings(_options.Now().Month);
@@ -2565,6 +2589,8 @@ public sealed class CompositionController
         clause.Candidates = JapaneseCandidates(clause.Reading, null);
         clause.Index = 0;
         clause.Changed = false;
+        clause.ClipboardText = null;
+        MarkClipboardChoice(clause);
         if (_options.History?.Get(clause.Reading) is { } learned) Prefer(clause, learned);
     }
 
@@ -3232,17 +3258,17 @@ public sealed class CompositionController
     {
         if (_firstSoundCommitted) return;
         // 変換の候補から打ったままの英字 (api) を選んで確定したら、その語は次から英字にする (F10 と同じ)。
-        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Changed && c.Raw is { } raw && c.Text == raw))
+        foreach (var clause in _clauses.Where(c => !IsClipboardChoice(c) && !c.IsEnglish && c.Changed && c.Raw is { } raw && c.Text == raw))
         {
             _options.Languages?.Remember(clause.Raw!, english: true);
         }
         // 英語と判定した語で日本語の候補 (go → 語) を選んだら、その語は次から日本語にする (F6 と同じ)。
-        foreach (var clause in _clauses.Where(c => c.IsEnglish && IsJapaneseText(c.Text) && c.Reading.All(char.IsAsciiLetter)))
+        foreach (var clause in _clauses.Where(c => !IsClipboardChoice(c) && c.IsEnglish && IsJapaneseText(c.Text) && c.Reading.All(char.IsAsciiLetter)))
         {
             _options.Languages?.Remember(clause.Reading, english: false);
         }
         // 英訳を選んだら、英訳の記録に (普通の変換の学習より弱く効く)。
-        foreach (var clause in _clauses.Where(c => c.Translations.Contains(c.Text)))
+        foreach (var clause in _clauses.Where(c => !IsClipboardChoice(c) && c.Translations.Contains(c.Text)))
         {
             _options.TranslationHistory?.Remember(clause.Reading, clause.Text);
         }
@@ -3250,13 +3276,13 @@ public sealed class CompositionController
         RecordSuggestions();
         if (_options.History is not { } history) return;
         // 学習済みの語をそのまま確定したときも、回数と新しさを更新する (予測を使用頻度で並べるため。並びは変わらない)。
-        foreach (var clause in _clauses.Where(c => !c.IsEnglish && !c.Changed && c.Reading.Length >= 2))
+        foreach (var clause in _clauses.Where(c => !IsClipboardChoice(c) && !c.IsEnglish && !c.Changed && c.Reading.Length >= 2))
         {
             history.Touch(clause.Reading, clause.Text);
         }
         // 1 文字の読み (き → 記) を覚えると、関係ない変換 (き + ごうとう) まで巻き込むので 2 文字以上だけ。
         // ただし数字・記号の 1 文字 (1 → ①、( → （) は、かなの途中に巻き込まれないので覚える (本家 #801)。
-        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Changed &&
+        foreach (var clause in _clauses.Where(c => !IsClipboardChoice(c) && !c.IsEnglish && c.Changed &&
             (c.Reading.Length >= 2 ||
              c.Reading.Length == 1 && (c.Reading[0] < 'ぁ' || c.Reading[0] > 'ヿ') && !char.IsAsciiLetter(c.Reading[0]))))
         {
@@ -3282,7 +3308,7 @@ public sealed class CompositionController
         if (_options.Suggestions is not { } suggestions || !_options.DictionarySuggest()) return;
         var threshold = _options.DictionarySuggestThreshold();
         // 日付・時刻 (きょう → 金曜日) も数えない (学習しないのと同じ理由。登録すると、次から古い日付が出る)
-        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c) && !IsNumberChoice(c) && !IsUnitChoice(c) && !IsSeasonalChoice(c)))
+        foreach (var clause in _clauses.Where(c => !IsClipboardChoice(c) && !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c) && !IsNumberChoice(c) && !IsUnitChoice(c) && !IsSeasonalChoice(c)))
         {
             // 学習済みの語を最初の候補としてそのまま確定した場合 (History はこの後の Remember で更新されるので、ここで先に見る)。
             if (clause.Changed || _options.History?.Get(clause.Reading) == clause.Text)
@@ -3322,7 +3348,7 @@ public sealed class CompositionController
         }
         foreach (var clause in _clauses)
         {
-            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause) || IsUnitChoice(clause) || IsSeasonalChoice(clause))
+            if (IsClipboardChoice(clause) || clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause) || IsUnitChoice(clause) || IsSeasonalChoice(clause))
             {
                 Flush();
                 continue;
@@ -3363,6 +3389,7 @@ public sealed class CompositionController
         _clauses = [];
         _headCount = 0;
         _fixedUnits = [];
+        _clipboardCandidate = null;
         ResetPrediction();
         if (text.Length == 0) return;
         // 保護区間を含む確定も、設定どおり空白を入れる (./build.sh を。本家は末尾が保護区間のときは入れないが、Mac 版は設定どおり。パスそのものは崩れない)

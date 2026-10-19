@@ -38,6 +38,14 @@ internal static class LaughterAfterKanaTests
     }
 
     [Test]
+    public static void EnglishContextWithSpace_StaysEnglish()
+    {
+        // I と saw の間に空白があっても、英文の中の saw は笑いの w にしない
+        // (Isaw は 4 文字なので SplitLaughter の対象にならず、この不具合を検出できない)。
+        Assert.Equal("I saw", Committed(true, "I saw"), "空白で区切った英文の中の saw も英単語のまま");
+    }
+
+    [Test]
     public static void KnownLimit_Onew_IsRecorded()
     {
         // ON のときの既知の限界 (おnewの新品)。今の結果を記録する (期待値を固定しない)。

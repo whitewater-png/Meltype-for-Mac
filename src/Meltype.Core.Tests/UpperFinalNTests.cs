@@ -7,7 +7,7 @@ namespace Meltype.Tests;
 
 /// <summary>
 /// B2-2 (本家 #841): 大文字で打った英字の最後の n を ん と読む（TEN → てん）。
-/// 小文字の英文の中の語（pen）は日本語にしない。
+/// 小文字の英文の中の語（pen）は日本語にしない。単独の pen は今までどおり ぺん。
 /// </summary>
 internal static class UpperFinalNTests
 {
@@ -33,5 +33,14 @@ internal static class UpperFinalNTests
         Assert.True(!candidates.Contains("てん"), "pen に てん は出さない: " + string.Join("|", candidates));
         // 小文字の pen は、今までどおり ぺん が先頭 (この変更では変えない)。
         Assert.Equal("ぺん", k.Showing, "pen の先頭: " + string.Join("|", candidates));
+    }
+
+    [Test]
+    public static void LowerPenInEnglishSentence_StaysEnglish()
+    {
+        // 英文の中の pen は日本語にしない (単独の pen が ぺん になるのは今までどおり)。
+        var k = new CompositionTests.Keyboard();
+        k.Type("I have a pen\n");
+        Assert.Equal("I have a pen", k.Host.Document);
     }
 }

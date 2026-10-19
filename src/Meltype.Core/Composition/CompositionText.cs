@@ -823,7 +823,7 @@ public sealed class CompositionText
         for (var i = 0; i < segments.Count; i++)
         {
             var segment = segments[i];
-            if (segment.IsEnglish && segment.Raw.Length == 3 && segment.Raw[2] is 'w' && !(i > 0 ? segments[i - 1].IsEnglish : PrecedingEnglishSentence) &&
+            if (segment.IsEnglish && segment.Raw.Length == 3 && segment.Raw[2] is 'w' && !PrecededByEnglish(segments, i) &&
                 char.IsAsciiLetterLower(segment.Raw[0]) && char.IsAsciiLetterLower(segment.Raw[1]) &&
                 _detector.Romaji.Analyze(segment.Raw[..2]) is { IsValid: true, Partial: "" } reading && reading.Kana.Length == 1)
             {
@@ -835,6 +835,50 @@ public sealed class CompositionText
             }
         }
         return changed ?? segments;
+    }
+
+    /// <summary>
+    /// この区間の直前が英語の文脈か。空白の区間は読み飛ばす (I saw の I と saw の間の空白で、
+    /// 英文の中の saw を さw にしない)。空白以外の区間が無ければ、入力欄の前の文を見る。
+    /// </summary>
+    private bool PrecededByEnglish(IReadOnlyList<CompositionSegment> segments, int index)
+    {
+        for (var i = index - 1; i >= 0; i--)
+        {
+            if (string.IsNullOrWhiteSpace(segments[i].Raw)) continue;
+            return segments[i].IsEnglish;
+        }
+        // 空白で区切った 1 語 (I ) の後ろは、文とまでは判定されないことがある。
+        // 直前が英語の語なら英語の文脈として扱う (I saw の saw を さw にしない)。
+        return PrecedingEnglishSentence || PrecedingEnglish == true;
+    }
+
+    /// <summary>
+    /// この単位を含む区間の、前の空白でない区間が英語か (KeepLaughterAt 用)。
+    /// 区間の表示 (SplitLaughter 後) をそのまま使い、単位の位置から区間をたどる。
+    /// </summary>
+    private bool PreviousSegmentIsEnglish(int unitIndex)
+    {
+        var segments = Segments();
+        var unit = 0;
+        for (var s = 0; s < segments.Count; s++)
+        {
+            var first = unit;
+            var remaining = segments[s].Raw.Length;
+            while (unit < _units.Count && remaining > 0)
+            {
+                remaining -= _units[unit].Raw.Length;
+                unit++;
+            }
+            if (unitIndex < first || unitIndex >= unit) continue;
+            for (var p = s - 1; p >= 0; p--)
+            {
+                if (string.IsNullOrWhiteSpace(segments[p].Raw)) continue;
+                return segments[p].IsEnglish;
+            }
+            return PrecedingEnglishSentence || PrecedingEnglish == true;
+        }
+        return PrecedingEnglishSentence || PrecedingEnglish == true;
     }
 
     private readonly (string Key, LanguageMemory? Memory, Detection.IWordChecker? SpellChecker, IReadOnlyList<CompositionSegment> Segments)?[] _segmentsCache = new (string, LanguageMemory?, Detection.IWordChecker?, IReadOnlyList<CompositionSegment>)?[2];
@@ -1282,6 +1326,9 @@ public sealed class CompositionText
         if (count == 0) return end;
         // 1 つだけの w は、日本語のかなの後ろ (きた + w) のときだけ笑いとみなす
         if (count == 1 && !(start > 0 && _units[start - 1].Kana is [var kana, ..] && kana is >= 'ぁ' and <= 'ヺ')) return end;
+        // 直前の区間が英語なら、この w は英単語の一部 (I saw の saw)。空白を挟んでいても
+        // 英文の続きなので、笑いの w にしない (SplitLaughter と同じ判定)。
+        if (start > 0 && PreviousSegmentIsEnglish(start - 1)) return end;
         // 前から続く英単語の終わり (aww・new・show) なら笑いではない。英単語とみなすのは、英字の並びの頭から始まる語か、同梱の辞書の語だけ
         // (スペルチェッカーの短い語が音の途中から見つかる kiyagat|taw の taw で、笑いの w を英字にしていた)
         var letters = string.Concat(_units.Skip(start).Take(end - start).Select(u => u.Raw)) + pending;
