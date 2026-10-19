@@ -71,4 +71,28 @@ internal static class UpstreamB1Tests
         // Mac は propernouns の Mozc で既に期待どおり (guard)。本家とそろえるために english.txt にも足す。
         ExpectCommitted(("mozc", "mozc"), ("mozcde", "mozcで"), ("mozcniha", "mozcには"));
     }
+
+    [Test]
+    public static void P48_AutoclickerAndClicker_StayEnglish()
+    {
+        // 本家 #830 (#822): autoclicker・clicker が あうとclicけr・clicけr になっていた。
+        ExpectCommitted(("autoclicker", "autoclicker"), ("autoclickerwo", "autoclickerを"),
+            ("clicker", "clicker"), ("clickerwo", "clickerを"));
+    }
+
+    [Test]
+    public static void P48_Docs_StaysEnglish()
+    {
+        // 本家 #840 (#835): docs が どか になっていた。守り: ./docs/ は保護区間で今までどおり。
+        ExpectCommitted(("docs", "docs"), ("docswo", "docsを"), ("kyouhadocs", "きょうはdocs"));
+        ExpectCommitted(("./docs/", "./docs/"));
+    }
+
+    [Test]
+    public static void P48_Ext_StaysEnglish()
+    {
+        // 本家 #831 (#826): ext が えxt になっていた。守り: ext を含む英単語は今までどおり。
+        // extwo は追加前 extwo (1 語)・追加後 extを (ext + 助詞) に変わる。英単語 ext として自然な分割なので記録する。
+        ExpectCommitted(("ext", "ext"), ("extwo", "extを"), ("text", "text"), ("next", "next"), ("context", "context"));
+    }
 }

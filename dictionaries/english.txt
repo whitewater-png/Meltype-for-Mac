@@ -223,3 +223,8 @@ guesstimation greedflation adtech robonomics netizenry finfluencer malvertising 
 whois
 tver
 mozc
+# --- B-1/P48 (本家 2026-10-18): #822 autoclicker・clicker、#835 docs、#826 ext ---
+autoclicker
+clicker
+docs
+ext
