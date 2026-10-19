@@ -45,7 +45,7 @@ cp "$HOME/Library/Application Support/Meltype/conversions.json" /tmp/conversions
 | 9 | もう一度 `kyouha` と打つ | `今日は` が一覧に出ない（IME を再起動するまで） | | |
 | 10 | `kyou` と打ち、**Tab を押さずに Fn+Delete** | 例外にならない。履歴は消えない（選んでいないため） | | |
 | 11 | `kyou` と打ち、**Tab** で先頭（例: `脅威`）を選び **Fn+Delete** | 専門用語集の語は消えない（方針）。一覧に残る | | |
-| 12 | ユーザー辞書に `今日`（読み `きょう`）を登録して予測で選び **Fn+Delete** | ユーザー辞書の語は残る（方針） | | |
+| 12 | ユーザー辞書に `今日`（読み `きょう`）を登録して予測で選び **Fn+Delete** | ユーザー辞書の語は残る（方針） | OK（仕様どおり。見た目の変化なし） | Delete は `consumed=true`、`selectedPrediction=-1`。一覧には `今日` が残る |
 
 ### 補足（重要）
 
@@ -53,6 +53,7 @@ cp "$HOME/Library/Application Support/Meltype/conversions.json" /tmp/conversions
 - 用語集・ユーザー辞書の語は Delete の対象外です。一覧に出ている語が用語集由来かどうかは、候補の並び（`脅威` など）で判断してください。
 - Delete 後に **書類を閉じる／アプリを切り替える**と、未確定の読みが確定されて履歴に学習し直されます。履歴から消えたことを確認するときは、必ず先に **Esc** を押してください。
 - エンジンの辞書予測の抑制（`_forgottenPredictions`）は **IME のセッション中だけ**です。IME を再起動すると、azooKey の辞書予測は戻ります。
+- **No.12 で「反応がない」のは仕様どおりです。** ユーザー辞書・専門用語集の語は消さないため、Delete を押しても一覧が変わりません。Core はキーを消費し、選択を `-1` に戻しています（trace では `consumed=true`、`selectedPrediction=-1`、`predictions` にその語が残る）。IMKCandidates には「非選択」の表示がないため、青いバーは先頭に残ったままに見えます。
 
 ## 3. trace の確認方法
 
@@ -95,13 +96,18 @@ defaults write io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK -bool fal
 - 検証用の TextEdit 書類は保存せずに閉じる。
 - trace を ON にしたままにしない（打った内容が `imk-trace.log` に残ります）。
 
-## 6. 結果のまとめ
+## 6. 実機結果（2026-10-19）
+
+- No.1〜11: 期待どおり。
+- No.12: 仕様どおり（ユーザー辞書の `今日` は一覧に残る。Delete は消費され、選択は -1 に戻るが、一覧が変わらないため「無反応」に見える）。
+
+## 7. 結果のまとめ
 
 | 項目 | 結果 | メモ |
 | --- | --- | --- |
-| キー配送（No.2〜3） | | |
-| 履歴の Delete（No.5〜8） | | |
-| 打ち直し（No.9） | | |
-| 未選択 Delete（No.10） | | |
-| 用語集・ユーザー辞書（No.11〜12） | | |
-| 総合 | | |
+| キー配送（No.2〜3） | OK | Tab: `consumed=true / selectedPrediction=0`、Fn+Delete: `consumed=true` |
+| 履歴の Delete（No.5〜8） | OK | `kyouha` の `今日は` が一覧と `conversions.json` から消えた（Esc 後） |
+| 打ち直し（No.9） | OK | Delete 後に同じ読みを打っても出ない |
+| 未選択 Delete（No.10） | OK | 例外なし。履歴は消えない |
+| 用語集・ユーザー辞書（No.11〜12） | OK | どちらも残る。No.12 は見た目が変わらない（仕様） |
+| 総合 | OK | キー配送・履歴削除とも期待どおり |
