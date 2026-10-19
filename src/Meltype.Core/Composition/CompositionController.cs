@@ -2193,6 +2193,7 @@ public sealed class CompositionController
     {
         if (EraToYear(reading) is { } year) return year;
         if (TypedUnitCandidates(reading) is { } units) return units;
+        if (reading is "じこう" or "じこうのあいさつ") return SeasonalGreetings(_options.Now().Month);
         var isNow = NowReadings.Contains(reading);
         if (!isNow && reading != "きょう") return [];
         var now = _options.Now();
@@ -2263,6 +2264,37 @@ public sealed class CompositionController
 
     /// <summary>尺貫法の単位の候補 (3しゃく → 3尺・約90.91cm) か。学習しない (次からその候補が先頭に出ないように)。</summary>
     private static bool IsUnitChoice(Clause clause) => TypedUnitCandidates(clause.Reading)?.Contains(clause.Text) == true;
+
+    /// <summary>月ごとの時候の挨拶 (「〜の候」の〜)。手紙・メールの書き出しに使う。</summary>
+    private static readonly string[][] SeasonalTerms =
+    [
+        ["新春", "初春", "厳寒", "大寒"],
+        ["余寒", "立春", "春寒", "梅花"],
+        ["早春", "春分", "春暖", "浅春"],
+        ["桜花", "陽春", "春暖", "晩春"],
+        ["新緑", "薫風", "若葉", "立夏"],
+        ["入梅", "梅雨", "向暑", "初夏"],
+        ["盛夏", "猛暑", "大暑", "酷暑"],
+        ["晩夏", "残暑", "立秋", "暮夏"],
+        ["初秋", "新秋", "秋晴", "野分"],
+        ["秋冷", "紅葉", "秋涼", "寒露"],
+        ["晩秋", "霜降", "向寒", "初霜"],
+        ["初冬", "師走", "寒冷", "歳晩"],
+    ];
+
+    /// <summary>
+    /// じこう / じこうのあいさつ の文節に、今の月に合う時候の挨拶 (秋冷の候 / 拝啓　秋冷の候、…) を候補として出す (本家 #785)。
+    /// 今の月を先に、続けて前後の月のものも出す。
+    /// </summary>
+    internal static IEnumerable<string> SeasonalGreetings(int month)
+    {
+        var months = new[] { month, (month + 10) % 12 + 1, month % 12 + 1 };
+        var terms = months.SelectMany(m => SeasonalTerms[m - 1]).Distinct().ToList();
+        return terms.Select(t => $"{t}の候").Concat([$"拝啓　{terms[0]}の候、"]);
+    }
+
+    /// <summary>時候の挨拶の候補 (じこう → 秋冷の候) か。学習しない (次から古い挨拶が先頭に出ないように)。</summary>
+    private static bool IsSeasonalChoice(Clause clause) => clause.Reading is "じこう" or "じこうのあいさつ";
 
     /// <summary>
     /// 数字の漢数字・元号 (2026 → 二千二十六・令和8年) と、元号の年 → 西暦 (れいわ8ねん → 2026年) の候補か。
@@ -3130,7 +3162,7 @@ public sealed class CompositionController
             // 英訳は上で英訳の記録に入れた (ここで覚えると次から 1 番目に出てしまう)。
             if (clause.Translations.Contains(clause.Text)) continue;
             // 計算の記号 (かける → ×)・日付と時刻 (いま → 17:22) も覚えない
-            if (IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause) || IsUnitChoice(clause)) continue;
+            if (IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause) || IsUnitChoice(clause) || IsSeasonalChoice(clause)) continue;
             history.Remember(clause.Reading, clause.Text);
         }
     }
@@ -3146,7 +3178,7 @@ public sealed class CompositionController
         if (_options.Suggestions is not { } suggestions || !_options.DictionarySuggest()) return;
         var threshold = _options.DictionarySuggestThreshold();
         // 日付・時刻 (きょう → 金曜日) も数えない (学習しないのと同じ理由。登録すると、次から古い日付が出る)
-        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c) && !IsNumberChoice(c) && !IsUnitChoice(c)))
+        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c) && !IsNumberChoice(c) && !IsUnitChoice(c) && !IsSeasonalChoice(c)))
         {
             // 学習済みの語を最初の候補としてそのまま確定した場合 (History はこの後の Remember で更新されるので、ここで先に見る)。
             if (clause.Changed || _options.History?.Get(clause.Reading) == clause.Text)
@@ -3186,7 +3218,7 @@ public sealed class CompositionController
         }
         foreach (var clause in _clauses)
         {
-            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause) || IsUnitChoice(clause))
+            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause) || IsUnitChoice(clause) || IsSeasonalChoice(clause))
             {
                 Flush();
                 continue;
