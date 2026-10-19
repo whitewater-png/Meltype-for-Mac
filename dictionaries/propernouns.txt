@@ -90,3 +90,5 @@ Cline CrewAI ComfyUI OpenRouter OpenWebUI Cerebras Civitai Unsloth
 Xcode DeepSeek Mozc
 # 本家 #690 (Datamation)・#725 (OpenStreetMap)
 Datamation OpenStreetMap
+# --- B-1/P48 (本家 2026-10-18): #268 DeVito ---
+DeVito

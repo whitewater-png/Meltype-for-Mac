@@ -95,4 +95,12 @@ internal static class UpstreamB1Tests
         // extwo は追加前 extwo (1 語)・追加後 extを (ext + 助詞) に変わる。英単語 ext として自然な分割なので記録する。
         ExpectCommitted(("ext", "ext"), ("extwo", "extを"), ("text", "text"), ("next", "next"), ("context", "context"));
     }
+
+    [Test]
+    public static void P48_DeVito_IsProperNoun()
+    {
+        // 本家 #792 (#268): devito が でゔぃと になっていた。固有名詞として英字のまま出す。
+        // 打ったままの小文字はそのまま (devito)、大文字で打った形は正しい形 (DeVito) を保つ (本家のテストと同じ DeVitode)。
+        ExpectCommitted(("devito", "devito"), ("devitowo", "devitoを"), ("kyouhadevito", "きょうはdevito"), ("DeVitode", "DeVitoで"));
+    }
 }
