@@ -330,7 +330,7 @@
 - Core のテスト: 905 → **931 件**（B2-1 2、B2-2 2、B2-3 2、B2-4 6、B2-5 4、B2-6 3、B2-7 7）。
 - `--eval`: 1269/1271 のまま（変更前と同じ）。
 - AOT チェッカー: PASS（FFI 版数を 13 に更新）。
-- 辞書アプリの self-test: 213 PASS。`mac/build.sh` で build/install、インストール済み dylib のハッシュ `b02314de…` がビルド成果物と一致（2026-10-19 15:54:59、プロセスは 15:55:24 起動）。
+- 辞書アプリの self-test: 213 PASS。`mac/build.sh` で build/install、インストール済み dylib のハッシュ `b02314de…` がビルド成果物と一致（2026-10-19 15:54:59、IME は trace を有効にして 15:57:14 に再起動）。
 - `eval-compare`（基準 `51512b7`）: **broken 0 / fixed 0 / added 0 / removed 0**。合計 278/310 で前後同じ（回帰ゲート PASS）。
 - 実機確認: 修正版で 7-3〜7-6 を再確認中（`B2_DEVICE_CHECK.md` §8.1）。trace を ON にし、Tab の `consumed=true` と Fn+Delete の `consumed=true` を確認する。
 
