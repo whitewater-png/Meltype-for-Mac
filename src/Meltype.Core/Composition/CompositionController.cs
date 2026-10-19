@@ -2192,6 +2192,7 @@ public sealed class CompositionController
     private IEnumerable<string> TimeCandidates(string reading)
     {
         if (EraToYear(reading) is { } year) return year;
+        if (TypedUnitCandidates(reading) is { } units) return units;
         var isNow = NowReadings.Contains(reading);
         if (!isNow && reading != "きょう") return [];
         var now = _options.Now();
@@ -2231,6 +2232,37 @@ public sealed class CompositionController
         if (n < 1 || year > range.Last) return null;
         return [$"{year}年", year.ToString()];
     }
+
+    /// <summary>尺貫法の単位 (読み → 単位の字、メートル法での大きさ、メートル法の単位)。</summary>
+    private static readonly (string Reading, string Unit, double Size, string Metric, string Name)[] TraditionalUnits =
+    [
+        ("しゃく", "尺", 100.0 / 3.3, "cm", "尺"), ("すん", "寸", 10.0 / 3.3, "cm", "寸"), ("けん", "間", 200.0 / 110.0, "m", "間"),
+        ("じょう", "丈", 100.0 / 33.0, "m", "丈"), ("つぼ", "坪", 400.0 / 121.0, "㎡", "坪"),
+        ("ごう", "合", 180.39, "mL", "合"), ("しょう", "升", 1.8039, "L", "升"), ("と", "斗", 18.039, "L", "斗"),
+        ("かん", "貫", 3.75, "kg", "貫"), ("もんめ", "匁", 3.75, "g", "匁"), ("きん", "斤", 600, "g", "斤"), ("りょう", "両", 37.5, "g", "両"),
+    ];
+
+    private static readonly System.Text.RegularExpressions.Regex UnitReading =
+        new("^(?<n>[0-9０-９]{1,6}(?:[.．][0-9０-９]{1,3})?)(?<u>しゃく|すん|けん|じょう|つぼ|ごう|しょう|と|かん|もんめ|きん|りょう)$");
+
+    /// <summary>
+    /// 数字 + 尺貫法の単位の読み (3しゃく) の文節に、単位の字 (3尺) と、メートル法に直した大きさ (約90.91cm) を出す (本家 #787)。
+    /// 尺貫法でなければ null。
+    /// </summary>
+    internal static IEnumerable<string>? TypedUnitCandidates(string reading)
+    {
+        if (UnitReading.Match(reading) is not { Success: true } match) return null;
+        var digits = new string(match.Groups["n"].Value.Select(c => c switch { >= '０' and <= '９' => (char)(c - '０' + '0'), '．' => '.', _ => c }).ToArray());
+        if (!double.TryParse(digits, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value)) return null;
+        var unit = TraditionalUnits.First(u => u.Reading == match.Groups["u"].Value);
+        var size = value * unit.Size;
+        var text = size >= 100 ? Math.Round(size).ToString("0", System.Globalization.CultureInfo.InvariantCulture)
+            : Math.Round(size, 2).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        return [$"{digits}{unit.Unit}", $"約{text}{unit.Metric}"];
+    }
+
+    /// <summary>尺貫法の単位の候補 (3しゃく → 3尺・約90.91cm) か。学習しない (次からその候補が先頭に出ないように)。</summary>
+    private static bool IsUnitChoice(Clause clause) => TypedUnitCandidates(clause.Reading)?.Contains(clause.Text) == true;
 
     /// <summary>
     /// 数字の漢数字・元号 (2026 → 二千二十六・令和8年) と、元号の年 → 西暦 (れいわ8ねん → 2026年) の候補か。
@@ -3098,7 +3130,7 @@ public sealed class CompositionController
             // 英訳は上で英訳の記録に入れた (ここで覚えると次から 1 番目に出てしまう)。
             if (clause.Translations.Contains(clause.Text)) continue;
             // 計算の記号 (かける → ×)・日付と時刻 (いま → 17:22) も覚えない
-            if (IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause)) continue;
+            if (IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause) || IsUnitChoice(clause)) continue;
             history.Remember(clause.Reading, clause.Text);
         }
     }
@@ -3114,7 +3146,7 @@ public sealed class CompositionController
         if (_options.Suggestions is not { } suggestions || !_options.DictionarySuggest()) return;
         var threshold = _options.DictionarySuggestThreshold();
         // 日付・時刻 (きょう → 金曜日) も数えない (学習しないのと同じ理由。登録すると、次から古い日付が出る)
-        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c) && !IsNumberChoice(c)))
+        foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c) && !IsNumberChoice(c) && !IsUnitChoice(c)))
         {
             // 学習済みの語を最初の候補としてそのまま確定した場合 (History はこの後の Remember で更新されるので、ここで先に見る)。
             if (clause.Changed || _options.History?.Get(clause.Reading) == clause.Text)
@@ -3154,7 +3186,7 @@ public sealed class CompositionController
         }
         foreach (var clause in _clauses)
         {
-            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause))
+            if (clause.IsEnglish || clause.Text == clause.Raw || clause.Translations.Contains(clause.Text) || clause.Reading.Any(char.IsAsciiLetterOrDigit) || IsMathSymbolChoice(clause) || IsDateTimeChoice(clause) || IsNumberChoice(clause) || IsUnitChoice(clause))
             {
                 Flush();
                 continue;
