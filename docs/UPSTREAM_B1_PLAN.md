@@ -477,7 +477,10 @@ foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Changed &&
   - テスト: `10/4`・`1/3`・設定 OFF の `10/4` を追加。修正前に `10/4` が赤になることを確認。
   - 検証: 全テスト 901/901、`--eval` 1269/1271、`eval-compare`（base `5f9967b`）broken 0 / fixed 0 / added 0 / removed 0、AOT PASS、Mac ビルド成功、辞書アプリ自己テスト 213 件 PASS。
 - **P55 の記号**: `(`→`（` は「丸括弧 ( ) の幅」が半角（既定）では出ない（画像の候補は `(`・`<`・`{`・`[` など）。仕様どおり。記号の学習は `!`→`！`（「記号を全角にする」既定 ON）または丸括弧を全角にして再確認する（未確認）。
-- **実機で残っている確認**: `10/4`・`1/3` の候補（修正後）。P55 の記号学習（`!`→`！` または全角の丸括弧）。
+- **P49 の 2 回目の修正 (`1af7dde`)**: 実機で `10/4` は OK、`1/3` だけ候補が出なかった。原因は、`10/4` を確定した直後は `PrecedingEnglish = true` になり（計算式の文節を学習しないために `IsEnglish = true` で作るため）、Space の早期チェックの `PrecedingEnglish != true` が `1/3` を弾いていたこと。`PrecededByEnglishLetter()` を追加し、「`PrecedingEnglish` が true でも、直前の確定済みテキストの空白・句読点を除いた最後の文字が英字でなければ計算する」に変えた。英文の後ろ (`I have 10/4`) は今までどおり確定する。
+  - テスト: `AfterPreviousExpression_StillCalculates`（`10/4` → `2.5` を確定 → `1/3`）を追加。修正前に赤、修正後に緑。英文の後ろ・英文＋句点・日本語の後ろの guard も追加。
+  - 検証: 全テスト 905/905、`--eval` 1269/1271、`eval-compare` broken 0、AOT PASS、Mac ビルド成功、辞書アプリ自己テスト 213 件 PASS。
+- **実機で残っている確認**: `10/4` → `1/3` の順（修正後）。P55 の記号学習（`!`→`！` または全角の丸括弧）。
 
 ### 査読メモ (P49 の追加修正)
 
@@ -487,3 +490,11 @@ foreach (var clause in _clauses.Where(c => !c.IsEnglish && c.Changed &&
 - `10/4` を英文の後ろで打った場合は、既存の「英文の後ろの数字はそのまま」に合わせて `PrecedingEnglish != true` で早期チェックを止める。
 - 既存の `1+2*3`・`(1+2)*3`・`1＋2`・`1/0`・`1+`・設定 OFF のテストがすべて通る。全テスト 901/901、`--eval` 変化なし、`eval-compare` broken 0。
 - 追加したテストは、修正前に `10/4` が赤・修正後に緑になることを確認済み。
+
+### 査読メモ (P49 の 2 回目の修正)
+
+- 変更は Space の早期チェックの条件と、`PrecededByEnglishLetter()` の追加だけ。計算式の文節・通常の変換・学習の経路は変えていない。
+- `PrecedingEnglish` が true でも、直前の文字が数字・記号・日本語なら計算する。英文の語尾（句点を含む）は今までどおり確定する。
+- `1+2*3` は `PrecedingEnglish` の判定に関係なく後段で `StartConversion` に進むため、候補の並びは変わらない。
+- 査読で、ヘルパーが `StartConversion` のドキュメントコメントとメソッドの間に入っていたのを見つけ、`PrecedingForConversion` の後ろへ移した（動作は変わらない）。`git diff --check` も clean。
+- 追加テストは `AfterPreviousExpression_StillCalculates` が修正前に赤、修正後に緑。英文の後ろ・英文＋句点・日本語の後ろの guard も通る。全テスト 905/905、`eval-compare` broken 0。
