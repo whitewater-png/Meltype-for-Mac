@@ -228,3 +228,5 @@ autoclicker
 clicker
 docs
 ext
+# --- 本家 #895 (2026-10-19): #887 exe (xe = ぇ と読めて えぇ になっていた) ---
+exe
