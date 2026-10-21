@@ -25,6 +25,9 @@ internal static class Program
         switch (args.FirstOrDefault())
         {
             case "--eval":
+                // アプリ (と --repro) と同じく、同梱の英単語 (english-words.txt) をスペルチェッカーとして使う。
+                // 本家 #965 と同じ。既定の 1292/1294 は変わらないが、英単語の判定を実際と同じ条件で測れる。
+                CompositionTests.Detector.SpellChecker ??= Detection.BuiltInWordChecker.Shared;
                 Quality.Print(Quality.Run());
                 return 0;
             case "--repro":

@@ -571,7 +571,7 @@ public sealed class CompositionDetector
     }
 
     /// <summary>スペルチェッカーが正しいと言う英単語か、よくある打ち間違い (teh、recieve) か。</summary>
-    private bool IsSpellWord(string lower) =>
+    internal bool IsSpellWord(string lower) =>
         // macOS の NSSpellChecker は 73 文字以上の未知の文字列を検査せず「誤りなし」(= 語) と返す (実測 60〜72 文字は語でない、73 文字以上は全部語)。
         // 長いローマ字の文を 1 語の英単語とみなさない (本家 PR #709)。
         lower.Length <= 72 && SpellChecker is { } checker && (checker.IsWord(lower) || checker.AutoCorrection(lower) is not null);
@@ -779,8 +779,11 @@ public sealed class CompositionDetector
         // (ある程度は の teido|ha を tei|doha = Doha にしない)。慎重なら、ローマ字として読めないものだけ。
         // ただし、ローマ字として最後まで読める固有名詞 (korea = これあ) の後ろに、助詞でない日本語が続くなら、日本語の語の途中
         // (korea|reka → これあれか。Korea|reka にしない)。助詞が続くなら固有名詞 (korea|de → Koreaで)。
+        // 「n」で終わる語 (karen) は Analyze の Partial が "n" になる。続きと合わせて日本語の語になるなら、
+        // 固有名詞ではなく日本語の語の途中 (karenda- → カレンダー。本家 #920・#965)。
         if (lower.Length >= 4 && _proper.Contains(lower) && next is { Length: > 0 } && char.IsAsciiLetter(next[0]) &&
-            _romaji.Analyze(lower) is { IsValid: true, Partial: "" } && Detection.DictionaryDetector.StartsWithParticle(next.ToLowerInvariant()) is null)
+            (_romaji.Analyze(lower) is { IsValid: true, Partial: "" } || _japanese.IsPrefix(lower + next.ToLowerInvariant())) &&
+            Detection.DictionaryDetector.StartsWithParticle(next.ToLowerInvariant()) is null)
         {
             return false;
         }

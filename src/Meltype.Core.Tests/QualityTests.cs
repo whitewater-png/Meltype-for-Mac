@@ -202,6 +202,33 @@ internal static class Quality
         new("綴り", "xa", "ぁ"),
         new("綴り", "la", "ぁ"),
         new("綴り", "mala", "まぁ"),
+        // 報告のあった入力 (本家 #960・#920 / PR #965)
+        new("綴り", "kwo", "くぉ"),
+        new("綴り", "kwo-to", "くぉーと"),
+        // kwo の前が日本語の綴りのときは分けない (あkを にしない)
+        new("綴り", "akwo", "あくぉ"),
+        new("綴り", "ikwo", "いくぉ"),
+        new("綴り", "ukwo", "うくぉ"),
+        new("綴り", "ekwo", "えくぉ"),
+        // 英単語の最後の k + を は分ける (back|wo・ink|wo)
+        new("混在", "backwo", "backを"),
+        new("混在", "taskwo", "taskを"),
+        new("混在", "inkwo", "inkを"),
+        new("混在", "okwo", "okを"),
+        new("混在", "bankwo", "bankを"),
+        new("混在", "gakkouwo", "がっこうを"),
+        // 英単語を english-readable に入れると、日本語の語の先頭と重なる綴りが壊れる (本家 #852・#918 は未修正)
+        new("日本語", "purezento", "ぷれぜんと"),
+        new("日本語", "watashihapurezento", "わたしはぷれぜんと"),
+        new("日本語", "pureha", "ぷれは"),
+        new("日本語", "imageru", "いまげる"),
+        new("日本語", "imagenai", "いまげない"),
+        new("日本語", "imagewo", "いまげを"),
+        // カタカナ語: karen は英語の固有名詞だが、続きと合わせて カレンダー になる (本家 #920)
+        new("カタカナ語", "karenda-", "かれんだー"),
+        new("カタカナ語", "karendaa", "かれんだあ"),
+        new("カタカナ語", "karendaha", "かれんだは"),
+        new("英語", "karen", "karen"),
         new("綴り", "ltu", "っ"),
         new("綴り", "moraltute", "もらって"),
         new("綴り", "moraltsute", "もらって"),
