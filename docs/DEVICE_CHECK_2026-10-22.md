@@ -1,7 +1,12 @@
 # 実機チェック 1 枚 (2026-10-22)
 
-対象: main `4838212` のビルド (W0 の文書・#895 `exe`・#965 `kwo`/`karenda-` を含む)。
+対象: **2026-10-22 00:41 に実機へ入れ替えたビルド** (main `1353bfd` 相当。v1.2.2、#895 `exe`・#965 `kwo`/`karenda-` を含む)。
 所要 **5〜10 分**。記入は「打った > 結果」の形でお願いします。
+
+> 入れ替えの記録: `~/Library/Input Methods/Meltype.app` の `Contents/MacOS/Meltype` と
+> `Contents/Frameworks/libMeltypeNative.dylib` が、作業用 worktree (`w2`、HEAD `1353bfd`) の作りたてと **SHA-256 で一致**。
+> 辞書 `karendaa` が dylib に含まれることも確認済み。**次にキーを打ったときから新しい Meltype** になります
+> (`Info.plist` の版は 1.2.2 のまま。版上げは別途)。
 
 ## 0. 準備 (2 分)
 
