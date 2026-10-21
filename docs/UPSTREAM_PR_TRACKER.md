@@ -85,6 +85,7 @@
 | W1-1 | #895 (`b342f65`) | `exe` を英字のままにする (本家 #887)。`dictionaries/english.txt` に語を 1 つ足すだけ (判定の規則は変えない)。詳細は [W1_UPTAKE_2026-10-21.md](W1_UPTAKE_2026-10-21.md) | 中 | **完了 (実機確認済み 2026-10-22: DEVICE_CHECK の A1〜A4 OK)**。Core 941/941、`--eval` 1269/1271 で前後同一、eval-compare broken 0 | 5fc68de | TextEdit で `exe`・`exewo`・`exehitotu`・`.exe`・`exercise` を打って確定。**NS (実機のスペルチェッカー) は未使用** |
 | W1-2 | #965 (`98a2933` 系。未マージ PR の考え方を移植) | 英字判定の小さな穴: `kwo`→くぉ、`karenda-`→カレンダー、`karendaa`。`pure`・`image` は本家も範囲外なので触らない。詳細は [W1_UPTAKE_2026-10-21.md](W1_UPTAKE_2026-10-21.md) | 中 | **完了 (実機確認済み 2026-10-22: DEVICE_CHECK の A5〜A12 OK)**。Core 941/941、`--eval` 1292/1294 (99.8%)、eval-compare broken 0、広い比較 368 入力で悪化 0 | 023f9bb | `kwo`→くぉ、`backwo`→backを、`karenda-`→カレンダー、`karen` 単体は英字のまま、`akwo`→あくぉ |
 | W1-3 | #896 (`386d35f`) | 設定「スペースを全角で入力」(K40 の緩和)。詳細は [W1_UPTAKE_2026-10-21.md](W1_UPTAKE_2026-10-21.md) | - | 見送り（リョウさんの決定 2026-10-22: 全角スペースには使い道がないので、打つ手段を作らない。K40 を KNOWN_LIMITS で「仕様」へ移した） | - | - |
+| W2-1 | #1008 | 設定「z + 記号を変換する」を追加 (既定オン)。オフで `1000Hz.` が `1000H…` にならない。オフのときも日本語はかなのまま、英単語 (`jazz`・`10oz`) は打った綴りで残す。詳細は [W2_UPTAKE_2026-10-22.md](W2_UPTAKE_2026-10-22.md) | 中 | **完了 (2026-10-22、Core 954/954、`--eval` 1292/1294 前後同一、eval-compare broken 0)。実機確認待ち** | b50587a | 設定タブでオン/オフ → `kyouz.`・`1000hz.`・`kazoekataz.desu`・`jazz.`・`10oz.`・`zh`/`zl` |
 
 
 
