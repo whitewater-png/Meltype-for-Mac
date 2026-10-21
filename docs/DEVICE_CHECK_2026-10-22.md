@@ -109,3 +109,29 @@ TextEdit で打って Enter。**先に期待を見ずに打ってから**、右�
 4. Meltype の版 (入力メニュー → 「Meltype について」) と、打ったアプリ名
 
 **次に決めること**: C の結果 → アイコンを 18pt 化するか (原版があるか) / B の結果 → PageUp/Down をこのまま完了にするか、青いバーの追従を直すか。
+
+---
+
+## 結果 (2026-10-22、リョウさんの実機)
+
+| 区分 | 結果 | メモ |
+| --- | --- | --- |
+| A 入力の判定 (14) | **OK** | #895 `exe`・#965 `kwo`/`karenda-` は実機でも期待どおり |
+| B PageUp/PageDown (6) | **未実施** | JIS のキーボードに PageDown キーが無い。→ 下の「B の代替手順」 |
+| C アイコン (4) | **OK** | 16pt のままで小さすぎ・ずれは無しと判断 → **18pt 化はしない** (2026-10-22 決定) |
+| D 更新通知 (2) | **OK** | 文言・ボタンとも期待どおり (「更新する」は押していない) |
+
+### B の代替手順 (キーが無い場合)
+
+1. **`fn` + `↓`** を変換中に押す (Apple のキーボードでは PageDown と同じキーコード 121 が送られる。ノート型は `fn+↓`、Magic Keyboard も `fn+↓`)。
+2. それでも動かない・押せない場合は、**原因調査用のトレース**を短時間だけ ON にして、押したキーが何として届くかを確かめる:
+   ```
+   defaults write io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK -bool true
+   # IME を再起動 (入力ソースを 1 回切り替える) → 変換中に fn+↓ を押す
+   tail -5 "$HOME/Library/Application Support/Meltype/imk-trace.log"
+   # 終わったら必ず OFF と後片付け
+   defaults delete io.github.yksr-melt.inputmethod.Meltype MeltypeTraceIMK
+   rm -f "$HOME/Library/Application Support/Meltype/imk-trace.log"*
+   ```
+   **注意**: trace は打った文字と前後の文字も残す。短時間だけ ON にし、終わったら消す。同意が要る作業。
+3. どちらも不可なら、B は「**コード上は実装済み (Core が 9 個送り、Swift が 0x21/0x22 にマップ)・実機の青いバー追従だけ未確認**」として残し、PageDown のあるキーボードが使えるときに確認する。
