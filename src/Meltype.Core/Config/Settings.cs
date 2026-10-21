@@ -269,6 +269,10 @@ public sealed class Settings
      Description("日本語の中で , と . を打ったときの句読点。技術文書・論文で「，．」を指定されるときに使います。変換ボックスに入っている間の入力から変わります。")]
     public PunctuationStyle Punctuation { get; set; } = PunctuationStyle.Japanese;
 
+    [Category("1. 全般"), DisplayName("z + 記号を変換する"),
+     Description("z の直後に / . , - [ ] を打つと ・ … ‥ ～ 『 』 にします。OFF にすると打ったまま (z/ → z/) になります。z + h j k l の矢印 (← ↓ ↑ →) は、この設定にかかわらず今までどおりです。")]
+    public bool ZSymbolConversion { get; set; } = true;
+
     [Category("1. 全般"), DisplayName("記号を全角にする"),
      Description("日本語の中で打った ! ? ~ などの記号を全角 (！？～) にします。OFF にすると、打ったままの半角で入ります (チャットで !? を半角にしたいとき)。")]
     public bool FullWidthSymbols { get; set; } = true;

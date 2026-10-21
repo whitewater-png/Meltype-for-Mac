@@ -219,6 +219,7 @@ public sealed class MeltypeSession
             FullWidthSymbols = () => shared.Current.FullWidthSymbols,
             Parentheses = () => shared.Current.Parentheses,
             Braces = () => shared.Current.Braces,
+            ZSymbolConversion = () => shared.Current.ZSymbolConversion,
             TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
         return session = new MeltypeSession(detector, converter, options, () => shared.Current, clipboard) { ReadingProvider = reader };

@@ -231,6 +231,9 @@ public sealed class CompositionOptions
     /// <summary>日本語の中で打った { } の幅 (設定)。</summary>
     public Func<BraceWidth> Braces { get; init; } = () => BraceWidth.FullWidth;
 
+    /// <summary>z + 記号 (/ . , - [ ]) を ・ … ‥ ～ 『 』 にするか (設定、本家 #1008)。OFF なら打ったまま。既定は ON。</summary>
+    public Func<bool> ZSymbolConversion { get; init; } = () => true;
+
     /// <summary>確定するときに、日本語と英単語の間に半角スペースを入れるか (設定)。</summary>
     public Func<bool> SpaceAroundEnglish { get; init; } = () => false;
 
@@ -381,6 +384,7 @@ public sealed class CompositionController
         _text.FullWidthSymbols = () => _options.FullWidthSymbols();
         _text.Parentheses = () => _options.Parentheses();
         _text.Braces = () => _options.Braces();
+        _text.ZSymbolConversion = () => _options.ZSymbolConversion();
     }
 
     /// <summary>変換ボックスに入力中か、英数状態で打ち始めの語を判定中か。</summary>
@@ -685,6 +689,7 @@ public sealed class CompositionController
                 FullWidthSymbols = () => _options.FullWidthSymbols(),
                 Parentheses = () => _options.Parentheses(),
                 Braces = () => _options.Braces(),
+                ZSymbolConversion = () => _options.ZSymbolConversion(),
                 PrecedingEnglish = previousEnglish == true ? true : null,
                 PrecedingEnglishSentence = previousEnglish == true && AfterSingleEnglishWord(JoinForJudgment(parts)) && IsEnglishSentence(JoinForJudgment(parts) + " "),
             };

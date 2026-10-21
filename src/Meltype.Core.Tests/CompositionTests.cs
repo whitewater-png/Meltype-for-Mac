@@ -151,6 +151,9 @@ internal static class CompositionTests
         public bool FullWidthSymbols { get; set; } = true;
         public ParenthesisWidth Parentheses { get; set; } = ParenthesisWidth.HalfWidth;
         public BraceWidth Braces { get; set; } = BraceWidth.FullWidth;
+
+        /// <summary>z + 記号 (/ . , - [ ]) を ・ … ‥ ～ 『 』 にするか (CompositionOptions.ZSymbolConversion)。既定は ON。</summary>
+        public bool ZSymbolConversion { get; set; } = true;
         public bool Prediction { get; set; } = true;
 
         /// <summary>変換中の Shift+Enter で確定してキーをアプリに渡すか (CompositionOptions.ShiftEnterNewline)。既定は ON。</summary>
@@ -265,6 +268,7 @@ internal static class CompositionTests
                 FullWidthSymbols = () => FullWidthSymbols,
                 Parentheses = () => Parentheses,
                 Braces = () => Braces,
+                ZSymbolConversion = () => ZSymbolConversion,
                 Prediction = () => Prediction,
                 Suggestions = suggestions,
                 DictionarySuggest = () => SuggestEnabled,

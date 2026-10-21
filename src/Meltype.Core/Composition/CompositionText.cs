@@ -177,6 +177,47 @@ public sealed class CompositionText
         }
         if (_pending.Length > 0 && char.ToLowerInvariant(_pending[^1]) == 'z' && ZSymbol(c) is { } z)
         {
+            // 設定で OFF にできる (本家 #1008)。OFF のときは記号を変換せず、直前の英字 (jazz の zz) も
+            // 打ったまま残す (1000Hz. → 1000H… ではなく 1000Hz.)。z + h j k l の矢印はこの設定を使わない。
+            if (!ZSymbolConversion())
+            {
+                // 直前の英字は、もうかなに読んであっても打った綴りに戻す (じゃ + zz → jazz)。
+                // ただし戻すのは、直前の英字の並び (単位の Raw + 保留中の文字) の末尾が知っている英単語のときだけ。
+                // 日本語 (きょう + z、ずっと + z) はかなのまま残す (本家 #1008 の OFF の副作用を直す)。
+                // 矢印 (zh = ←) はさかのぼらない。
+                var start = _units.Count;
+                while (start > 0 && _units[start - 1].Raw.Length > 0 && _units[start - 1].Raw.All(char.IsAsciiLetter) && !IsArrowUnit(_units[start - 1])) start--;
+                var wordStart = -1;
+                var tail = _pending.ToString();
+                for (var i = _units.Count - 1; i >= start; i--)
+                {
+                    tail = _units[i].Raw + tail;
+                    if (IsEnglishWordEnding(tail)) wordStart = i;
+                }
+                // 数字のすぐ後ろの短い英字は、単位・略語 (10oz・3rd・5kg)。打ったまま残す。
+                var run = string.Concat(_units.Skip(start).Select(u => u.Raw));
+                if (wordStart < 0 && start > 0 && _units[start - 1].Raw is [var unitDigit] && char.IsAsciiDigit(unitDigit) && run.Length is > 0 and <= 2)
+                    wordStart = start;
+                if (wordStart >= 0)
+                {
+                    // 英単語 (jazz・1000hz・10oz) は、打った綴りの英字のまま残す (1 文字ずつ。英単語として
+                    // 見えている間は、打ち間違いの直しも対象にしない)。記号は別の単位。
+                    var letters = string.Concat(_units.Skip(wordStart).Select(u => u.Raw)) + _pending;
+                    _units.RemoveRange(wordStart, _units.Count - wordStart);
+                    foreach (var letter in letters) _units.Add(new CompositionUnit(letter.ToString(), letter.ToString()));
+                    _pending.Clear();
+                    _units.Add(new CompositionUnit(c.ToString(), c.ToString()));
+                    return;
+                }
+                // 英単語にならない英字 (kazoekata の z) は、記号と合わせて 1 つの単位にする。
+                // 別々の単位にすると英字の並びが z で終わり、確定の直前の打ち間違いの直しが次の打鍵で z を落とす
+                // (かぞえかたz.です が かぞえかた.です になっていた)。Raw に記号を含む単位は
+                // 英字の並び (Raw が全部英字) の外になるので、直しは触らない。印を持つ必要がない。
+                var typed = _pending.ToString() + c;
+                _pending.Clear();
+                _units.Add(new CompositionUnit(typed, typed));
+                return;
+            }
             var raw = _pending[^1].ToString() + c;
             _pending.Length--;
             Normalize(final: true);
@@ -336,6 +377,17 @@ public sealed class CompositionText
         return false;
     }
 
+    /// <summary>
+    /// 英字の並び (打った綴り) の末尾が、知っている英単語か (jazz・quiz・jazz の前の ずっと は語ではない)。
+    /// z + 記号を OFF にしたとき、かなに読んだ直前の英字を打った綴りに戻してよいかの判定に使う。
+    /// </summary>
+    private bool IsEnglishWordEnding(string letters)
+    {
+        if (letters.Length < 3 || !letters.All(char.IsAsciiLetter)) return false;
+        var lower = letters.ToLowerInvariant();
+        return _detector.IsListedEnglishWord(lower) || _detector.IsKnownEnglishWord(lower) || _detector.IsSpellWord(lower);
+    }
+
     /// <summary>英字の並びの最後が、4 文字以上の知っている英単語で終わっているか (… hotel)。</summary>
     private bool EndsWithEnglishWord(string letters)
     {
@@ -458,6 +510,13 @@ public sealed class CompositionText
                               (Mode == DisplayMode.Auto && Segments() is { Count: > 0 } segments && segments[^1].IsEnglish);
             if (_frozen is not null) _frozen = _frozen.Take(Math.Min(FrozenCount(_units), _units.Count - 1)).ToList();
             var last = _units[^1];
+            // z + 記号を OFF にしたときの、打った英字 + 記号の単位 (かぞえかたz. の z.) は 1 文字ずつ消す
+            // (BackSpace 1 回で . だけ消す。単位ごと消すと、打ち直したい記号で z まで消えていた)。
+            if (!KanaInput && last.Raw.Length > 1 && last.Kana == last.Raw && !last.Raw.All(char.IsAsciiLetter))
+            {
+                _units[^1] = last with { Kana = last.Kana[..^1], Raw = last.Raw[..^1] };
+                return;
+            }
             _units.RemoveAt(_units.Count - 1);
             // 英字として見せている部分は 1 文字ずつ消す (google の "le" のように 1 音にまとまった単位を丸ごと消さない)。
             if (englishTail && last.Raw.Length > 1 && !KanaInput)
@@ -1241,6 +1300,9 @@ public sealed class CompositionText
 
     /// <summary>日本語の中で打った { } の幅 (設定)。</summary>
     public Func<BraceWidth> Braces { get; set; } = () => BraceWidth.FullWidth;
+
+    /// <summary>z + 記号 (/ . , - [ ]) を ・ … ‥ ～ 『 』 にするか (設定、本家 #1008)。OFF なら打ったまま。</summary>
+    public Func<bool> ZSymbolConversion { get; set; } = () => true;
 
     /// <summary>
     /// 英字を続けて打った部分 (ローマ字) の打ち間違いを直す (onegaishimsu → onegaishimasu)。直したら true。
