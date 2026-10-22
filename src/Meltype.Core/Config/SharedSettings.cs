@@ -62,7 +62,11 @@ internal sealed class SharedSettings(Func<string> configPath, Action<Settings>? 
                 {
                     _path = path;
                     _watch.Poll(path, force: true);
-                    return Publish(Settings.Load(path));
+                    var loaded = Publish(Settings.Load(path));
+                    // 起動時に 1 回だけ、config.json の隣へ config.schema.json を書く (本家 #1073)。
+                    // 設定を読んだ後に行い、失敗しても読み込み・入力を止めない (中で例外を握る)。
+                    ConfigSchema.WriteNextTo(path);
+                    return loaded;
                 }
                 if (_watch.Poll(path) && Settings.LoadForUpdate(path) is { } fresh) return Publish(fresh);
                 return _current;
