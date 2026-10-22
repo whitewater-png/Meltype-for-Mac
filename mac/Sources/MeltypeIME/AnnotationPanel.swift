@@ -95,7 +95,9 @@ final class AnnotationPanel {
         var y = frame.maxY - size.height   // 上端をそろえる
         y = min(max(y, area.minY), area.maxY - size.height)
 
-        panel.level = NSWindow.Level(rawValue: host.level.rawValue + 1)
+        // Spotlight (macOS 27) は layer 23 にあり、候補ウィンドウのレベル (通常 3) より上に来る。
+        // host.level + 1 だけだと Spotlight の下に隠れるため、下限を .popUpMenu (101) にして前面に出す。
+        panel.level = NSWindow.Level(rawValue: max(host.level.rawValue + 1, NSWindow.Level.popUpMenu.rawValue))
         panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: true)
         panel.invalidateShadow()
         panel.orderFrontRegardless()
