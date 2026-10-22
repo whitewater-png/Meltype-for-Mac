@@ -154,6 +154,9 @@ internal static class CompositionTests
 
         /// <summary>z + 記号 (/ . , - [ ]) を ・ … ‥ ～ 『 』 にするか (CompositionOptions.ZSymbolConversion)。既定は ON。</summary>
         public bool ZSymbolConversion { get; set; } = true;
+
+        /// <summary>日本語を確定した直後の / を中黒 (・) にするか (CompositionOptions.SlashAsNakaguro)。既定は OFF。</summary>
+        public bool SlashAsNakaguro { get; set; }
         public bool Prediction { get; set; } = true;
 
         /// <summary>変換中の Shift+Enter で確定してキーをアプリに渡すか (CompositionOptions.ShiftEnterNewline)。既定は ON。</summary>
@@ -269,6 +272,7 @@ internal static class CompositionTests
                 Parentheses = () => Parentheses,
                 Braces = () => Braces,
                 ZSymbolConversion = () => ZSymbolConversion,
+                SlashAsNakaguro = () => SlashAsNakaguro,
                 Prediction = () => Prediction,
                 Suggestions = suggestions,
                 DictionarySuggest = () => SuggestEnabled,

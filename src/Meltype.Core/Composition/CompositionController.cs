@@ -234,6 +234,9 @@ public sealed class CompositionOptions
     /// <summary>z + 記号 (/ . , - [ ]) を ・ … ‥ ～ 『 』 にするか (設定、本家 #1008)。OFF なら打ったまま。既定は ON。</summary>
     public Func<bool> ZSymbolConversion { get; init; } = () => true;
 
+    /// <summary>日本語を確定した直後に打った / を中黒 (・) にするか (設定、本家 #990)。既定は OFF (今までの挙動)。</summary>
+    public Func<bool> SlashAsNakaguro { get; init; } = () => false;
+
     /// <summary>確定するときに、日本語と英単語の間に半角スペースを入れるか (設定)。</summary>
     public Func<bool> SpaceAroundEnglish { get; init; } = () => false;
 
@@ -385,6 +388,7 @@ public sealed class CompositionController
         _text.Parentheses = () => _options.Parentheses();
         _text.Braces = () => _options.Braces();
         _text.ZSymbolConversion = () => _options.ZSymbolConversion();
+        _text.SlashAsNakaguro = () => _options.SlashAsNakaguro();
     }
 
     /// <summary>変換ボックスに入力中か、英数状態で打ち始めの語を判定中か。</summary>
@@ -690,6 +694,7 @@ public sealed class CompositionController
                 Parentheses = () => _options.Parentheses(),
                 Braces = () => _options.Braces(),
                 ZSymbolConversion = () => _options.ZSymbolConversion(),
+                SlashAsNakaguro = () => _options.SlashAsNakaguro(),
                 PrecedingEnglish = previousEnglish == true ? true : null,
                 PrecedingEnglishSentence = previousEnglish == true && AfterSingleEnglishWord(JoinForJudgment(parts)) && IsEnglishSentence(JoinForJudgment(parts) + " "),
             };

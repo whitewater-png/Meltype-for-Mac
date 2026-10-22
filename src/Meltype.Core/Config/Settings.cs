@@ -273,6 +273,10 @@ public sealed class Settings
      Description("z の直後に / . , - [ ] を打つと ・ … ‥ ～ 『 』 にします。OFF にすると打ったまま (z/ → z/) になります。z + h j k l の矢印 (← ↓ ↑ →) は、この設定にかかわらず今までどおりです。")]
     public bool ZSymbolConversion { get; set; } = true;
 
+    [Category("1. 全般"), DisplayName("日本語の直後の / を ・ にする"),
+     Description("日本語を確定した直後に / を打つと、スラッシュではなく中黒 (・) を入れます。URL やパスを打つときは OFF のままにしてください。")]
+    public bool SlashAsNakaguro { get; set; }
+
     [Category("1. 全般"), DisplayName("記号を全角にする"),
      Description("日本語の中で打った ! ? ~ などの記号を全角 (！？～) にします。OFF にすると、打ったままの半角で入ります (チャットで !? を半角にしたいとき)。")]
     public bool FullWidthSymbols { get; set; } = true;

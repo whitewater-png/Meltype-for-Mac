@@ -90,6 +90,16 @@ public sealed class CompositionText
             if (acronym || knownUnambiguous || properNoun || _units[^1].Raw == "-" && loneConsonant)
                 _units[^1] = _units[^1] with { Kana = _units[^1].Raw };
         }
+        // 日本語を確定した直後に打った / を中黒 (・) にする (本家 #990、設定で ON/OFF)。
+        // 行頭・空白の直後・英語の直後は、URL やパスを打てるように打ったままの / にする。
+        // 変換ボックスの最初の打鍵 (直前の確定が日本語) のときだけ。途中の / は今までどおり半角。
+        if (c == '/' && SlashAsNakaguro() && _units.Count == 0 && _pending.Length == 0 &&
+            PrecedingEnglish == false && !PrecedingWordStart && PrecedingTail is { Length: > 0 } precedingTail &&
+            IsJapaneseLetter(precedingTail[^1]))
+        {
+            _units.Add(new CompositionUnit("・", "/"));
+            return;
+        }
         // / を 3 つ続けて打ったら … (三点リーダー)。URL (file:///) の : の後ろは除く。
         if (c == '/' && _pending.Length == 0 && _units.Count >= 2 && _units[^1].Raw == "/" && _units[^2].Raw == "/" &&
             !(_units.Count >= 3 && _units[^3].Raw == ":"))
@@ -1304,6 +1314,9 @@ public sealed class CompositionText
     /// <summary>z + 記号 (/ . , - [ ]) を ・ … ‥ ～ 『 』 にするか (設定、本家 #1008)。OFF なら打ったまま。</summary>
     public Func<bool> ZSymbolConversion { get; set; } = () => true;
 
+    /// <summary>日本語を確定した直後に打った / を中黒 (・) にするか (設定、本家 #990)。既定は OFF (今までの挙動)。</summary>
+    public Func<bool> SlashAsNakaguro { get; set; } = () => false;
+
     /// <summary>
     /// 英字を続けて打った部分 (ローマ字) の打ち間違いを直す (onegaishimsu → onegaishimasu)。直したら true。
     /// 確定・変換の直前 (Space・Enter・記号) に呼ぶ。打っている途中は続きを打つと読めることがあり、
@@ -1530,6 +1543,10 @@ public sealed class CompositionText
         if (pending.Length == 0) return "";
         return _detector.Romaji.ConvertLenient(pending.ToLowerInvariant(), final);
     }
+
+    /// <summary>日本語の文字 (かな・漢字) か。日本語を確定した直後の / を中黒にするかの判定に使う (本家 #990)。</summary>
+    private static bool IsJapaneseLetter(char c) =>
+        c is (>= '\u3040' and <= '\u30FF') or (>= '\u3400' and <= '\u4DBF') or (>= '\u4E00' and <= '\u9FFF') or (>= '\uF900' and <= '\uFAFF');
 
     /// <summary>日本語の中で打った記号 (Microsoft IME と同じく全角)。英語の区間では打ったままの半角で出す。数字と括弧は半角のまま。</summary>
     private char Symbol(char c) => c switch

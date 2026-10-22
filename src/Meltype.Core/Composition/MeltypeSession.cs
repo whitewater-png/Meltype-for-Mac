@@ -220,6 +220,7 @@ public sealed class MeltypeSession
             Parentheses = () => shared.Current.Parentheses,
             Braces = () => shared.Current.Braces,
             ZSymbolConversion = () => shared.Current.ZSymbolConversion,
+            SlashAsNakaguro = () => shared.Current.SlashAsNakaguro,
             TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
         return session = new MeltypeSession(detector, converter, options, () => shared.Current, clipboard) { ReadingProvider = reader };
