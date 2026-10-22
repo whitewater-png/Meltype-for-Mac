@@ -29,6 +29,8 @@ python3 tools/update-cask.py <version> <sha256>      # 例: 1.1.8 と、zip の 
 
 そのあと tap 側へコピーし、上の audit / style を通します。`livecheck` は GitHub の Release のタグ (`v<version>-mac`) を見ます。
 
+同じ版の ZIP を差し替えるときは、版を上げてください (同じ版のまま sha256 を変えると Homebrew のキャッシュと食い違い、SHA-256 不一致が再発します)。`update-cask.py` は同じ版の sha256 の書き換えを拒否します (どうしても必要なときだけ `--force`)。
+
 ## 公開 tap (作成済み)
 
 `whitewater-png/homebrew-meltype-for-mac` は 2026-10-14 に作成済みです。版を上げたあとの反映 (tap の `Casks/` に同じファイルを写してコミットし、push する) は、Release の公開と同時に行います。手順は [docs/RELEASE.md](../../docs/RELEASE.md) の「Mac 版: cask の更新 (Homebrew)」にあります。**push は公開行為なので、事前に許可を取ります。** 入れ方は本体の README.md の入れ方の節にも書いてあります。

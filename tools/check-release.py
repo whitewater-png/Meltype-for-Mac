@@ -908,7 +908,7 @@ def check_cask(ref, app_versions):
         skip("cask の sha256 が mac/dist/Meltype-mac-%s.zip と同じ" % cask_ver, "zip が無い (make-zip.sh のあとに実行する)")
     else:
         h = sha256(zpath)
-        check(h == cask_sha, "cask の sha256 が mac/dist/Meltype-mac-%s.zip と同じ" % cask_ver, "一致", "cask は %s…、zip は %s… (python3 tools/update-cask.py <版> <zip の sha256> で直す)" % (cask_sha[:12], h[:12]))
+        check(h == cask_sha, "cask の sha256 が mac/dist/Meltype-mac-%s.zip と同じ" % cask_ver, "一致", "cask は %s…、zip は %s… (版を上げるか、同じ版で直すなら python3 tools/update-cask.py <版> <zip の sha256> --force)" % (cask_sha[:12], h[:12]))
 
 
 def check_open_text(ref):

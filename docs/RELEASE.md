@@ -19,6 +19,8 @@ pkg は、Scripts が postinstall の 1 つだけであること (root で走る
 
 `make-zip.sh` で zip を作ったあと、リリースを公開する前後で行う (cask は zip の URL と SHA-256 を指すので、zip が決まってからでないと書けない)。
 
+**同じ版の ZIP を差し替えない。** 作り直した ZIP を同じタグ・同じ URL のまま公開すると、Homebrew のキャッシュと食い違い、SHA-256 不一致が再発する。作り直すときは版を上げる (`tools/update-cask.py` は同じ版の sha256 の書き換えを拒否する。どうしても同じ版で直すときだけ `--force` を付ける)。
+
 1. `python3 tools/update-cask.py <版> <zip の sha256>` (`shasum -a 256 mac/dist/Meltype-mac-<版>.zip`)。`mac/homebrew/Casks/meltype-for-mac.rb` の `version` と `sha256` が変わる
 2. 本体リポジトリにコミットする。`python3 tools/check-release.py` が、cask の `version` と `sha256` が built app・zip と一致するかを見る
 3. tap リポジトリ (`/opt/homebrew/Library/Taps/whitewater-png/homebrew-meltype-for-mac`、または clone) の `Casks/` に同じファイルを写してコミットし、push する。tap で commit するときの `git config user.email` は本体リポジトリと同じ noreply にする

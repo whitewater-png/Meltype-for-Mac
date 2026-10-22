@@ -31,4 +31,23 @@ with tempfile.TemporaryDirectory() as tmp:
         assert result.returncode != 0, args
     assert copy.read_text(encoding="utf-8") == before
 
+    # 同じ版の sha256 だけを変える書き換えは拒否する (同じ版の ZIP の差し替えを防ぐ)
+    before = copy.read_text(encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(HERE / "update-cask.py"), "9.8.7", "b" * 64, str(copy)],
+        capture_output=True,
+    )
+    assert result.returncode != 0, "同じ版の sha256 の書き換えは拒否するはず"
+    assert "版を上げてください" in result.stderr.decode("utf-8", "replace"), result.stderr
+    assert copy.read_text(encoding="utf-8") == before
+
+    # --force を付ければ同じ版でも sha256 を変えられる
+    subprocess.run(
+        [sys.executable, str(HERE / "update-cask.py"), "9.8.7", "b" * 64, str(copy), "--force"],
+        check=True,
+    )
+    forced = copy.read_text(encoding="utf-8")
+    assert 'version "9.8.7"' in forced
+    assert f'sha256 "{"b" * 64}"' in forced
+
 print("OK")
