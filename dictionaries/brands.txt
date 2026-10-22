@@ -158,6 +158,7 @@
 たうり Tauri
 ごどー Godot
 ごーらんぐ Golang
+めるたいぷ Meltype
 # 会社・ブランド
 しゃおみ Xiaomi
 しゃおみー Xiaomi

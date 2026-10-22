@@ -481,6 +481,15 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Candidates_IncludeMeltypeForItsReading()
+    {
+        // 本家 #1040: 辞書に めるたいぷ → Meltype を足す (brands.txt)。変換の候補に出る。
+        var k = new Keyboard();
+        k.Type("merutaipu ");
+        Assert.True(k.Host.View!.Candidates.Contains("Meltype"), "めるたいぷ の候補に Meltype がある: " + string.Join(",", k.Host.View.Candidates));
+    }
+
+    [Test]
     public static void CorpusContextRules_PreferChatFormsWhenCued()
     {
         var rules = ContextRules.Load(null);
