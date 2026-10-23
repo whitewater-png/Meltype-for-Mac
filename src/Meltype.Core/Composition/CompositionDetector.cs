@@ -67,7 +67,10 @@ public sealed class CompositionDetector
         var japanese = new DictionaryDetector(japaneseWords, romaji);
         var proper = ProperNouns.Load(userDictionaryDirectory);
         var english = new EnglishDetector(DictionarySource.Load("english.txt", userDictionaryDirectory).Concat(proper.LowercaseWords));
-        return new CompositionDetector(romaji, japanese, english, new TypoDetector(japanese.Words), proper, new KanaDetector(japaneseWords, romaji));
+        var detector = new CompositionDetector(romaji, japanese, english, new TypoDetector(japanese.Words), proper, new KanaDetector(japaneseWords, romaji));
+        // 設定「日本語入力中は一覧の語をかなで変換する」(本家 #1023) の語。ユーザー辞書の japanese-mode.txt も足せる。
+        foreach (var word in DictionarySource.Load("japanese-mode.txt", userDictionaryDirectory)) detector.KanaInJapaneseModeWords.Add(word);
+        return detector;
     }
 
     /// <summary>
@@ -183,6 +186,16 @@ public sealed class CompositionDetector
 
     /// <summary>英字の並びが、ローマ字としてよく使う日本語になるか (kyouha = 今日は、tomato = とまと)。無ければ使わない。</summary>
     public Func<string, bool>? IsCommonJapanese { get; set; }
+
+    /// <summary>
+    /// 日本語入力中に、一覧の語 (<see cref="KanaInJapaneseModeWords"/>) を英語ではなく かな として変換するか (本家 #1023)。
+    /// 既定は false (今までどおり)。英語の文の中 (前が英単語) とファイルの拡張子は、ON でも英字のまま。
+    /// 英数 (直接入力) では変換ボックスを通らないので、この設定に関係なく英字で入る。
+    /// </summary>
+    public Func<bool> KanaInJapaneseMode { get; set; } = () => false;
+
+    /// <summary>日本語入力中に かな として変換する語 (dictionaries/japanese-mode.txt)。CreateDefault が読み込む。</summary>
+    public WordList KanaInJapaneseModeWords { get; } = new();
 
     public ProperNouns ProperNouns => _proper;
 
@@ -565,6 +578,9 @@ public sealed class CompositionDetector
     {
         if (level == DetectionLevel.Manual || raw.Length < 2 || !raw.All(char.IsAsciiLetter)) return false;
         var lower = raw.ToLowerInvariant();
+        // 設定「日本語入力中は一覧の語をかなで変換する」(本家 #1023): 一覧の語は、Space でも英語として確定しない
+        // (変換を始めて かな の候補を出す)。英語の文の中は、このメソッドに来る前に英語の区間として確定する。
+        if (KanaInJapaneseMode() && KanaInJapaneseModeWords.ContainsWord(lower)) return false;
         var analysis = _romaji.Analyze(lower);
         if (!analysis.IsValid || analysis.Partial.Length == 0 || analysis.Partial is "n" or "nn") return false;
         return _english.Words.ContainsWord(lower) || IsSpellWord(lower);
@@ -645,7 +661,7 @@ public sealed class CompositionDetector
         // 1 キー打つたびに、ほぼ同じ区間 (前のキーまでに調べた区間) を何度も判定するので、結果を覚えておく。
         // 判定は引数と、学習した語 (Memory) とスペルチェッカーだけで決まる。それらが変わったら捨てる。
         var flags = (atEnd ? 1 : 0) | (startOfInput ? 2 : 0) | (final ? 4 : 0) | (unreadable ? 8 : 0) | (endsWord ? 16 : 0) |
-                    ((after is null ? 0 : after.Value ? 1 : 2) << 5) | ((int)level << 7) | ((before + 8) << 10);
+                    ((after is null ? 0 : after.Value ? 1 : 2) << 5) | ((int)level << 7) | (KanaInJapaneseMode() ? 1 << 9 : 0) | ((before + 8) << 10);
         if (ReferenceMode) return IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord);
         var key = (span, next, flags);
         lock (_spanCache)
@@ -728,6 +744,9 @@ public sealed class CompositionDetector
         if (char.IsAsciiLetterUpper(span[0]) && span.Length >= 3 && next is [var closing, ..] && closing is (':' or ';') &&
             !(_romaji.AnalyzeFragment(lower) is { IsValid: true, Partial: "" or "n" }) && !(Memory?.Get(lower) is false)) return true;
         if (level == DetectionLevel.Manual) return false;
+        // 設定「日本語入力中は一覧の語をかなで変換する」(本家 #1023): 英語の辞書にある語でも、
+        // 前が英語でない (日本語の続き・入力の先頭) なら日本語として扱う。英語の文の中と .exe は今までどおり英語。
+        if (KanaInJapaneseMode() && before <= 0 && KanaInJapaneseModeWords.ContainsWord(lower)) return false;
         // ユーザーが英字 / かなに直して覚えた語。ただし短くてローマ字として読める語 (go、no) は、日本語のすぐ後ろ
         // (nihon|go) では使わない (一度 go を英字で確定しただけで、日本語 が にほんgo になっていた)。
         // english-readable.txt の語 (main) を英字で覚えていても、続く 1 音とでよく使う語・ブランド名の頭になる (main + do = マインド) ときは、覚えた英字を使わない (Q11 の実機確認)。

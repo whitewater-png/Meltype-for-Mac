@@ -351,6 +351,10 @@ public sealed class Settings
     [Category("2. 判定"), DisplayName("Typo 判定を使う"), Description("辞書語との編集距離 1 以内を補助的な日本語スコアとして加点します。Typo 一致だけでは切り替えません。")]
     public bool TypoEnabled { get; set; } = true;
 
+    [Category("2. 判定"), DisplayName("日本語入力中は一覧の語をかなで変換"),
+     Description("dictionaries/japanese-mode.txt に書いた語 (exe など) を、日本語の文脈で打ったときは英字ではなく かな (えぇ) として変換します。英語の文の中 (前が英単語) とファイルの拡張子 (.exe) は今までどおり英字のままです。")]
+    public bool KanaInJapaneseMode { get; set; }
+
     [Category("3. 保留"), DisplayName("最大保留キー数"), Description("判定のために保留する文字数の上限。超えたら判定不能としてそのまま出力します。")]
     public int MaxPendingKeys { get; set; } = 6;
 

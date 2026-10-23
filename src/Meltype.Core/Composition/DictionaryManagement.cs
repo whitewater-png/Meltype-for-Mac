@@ -163,6 +163,8 @@ internal static class DictionaryManagement
     {
         var detector = CompositionDetector.CreateDefault(AppPaths.UserDictionaryDirectory);
         detector.IsCommonJapanese ??= RomajiTypoCorrector.Load(detector.Romaji).IsCommonJapanese;
+        // IME と同じく、設定「日本語入力中は一覧の語をかなで変換する」(本家 #1023) を反映する (共有の設定を毎回見る)。
+        detector.KanaInJapaneseMode = () => SharedSettings.Shared.Current.KanaInJapaneseMode;
         return detector;
     });
 
