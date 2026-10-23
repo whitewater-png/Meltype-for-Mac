@@ -369,6 +369,10 @@ public sealed class Settings
      Description("dictionaries/japanese-mode.txt に書いた語 (exe など) を、日本語の文脈で打ったときは英字ではなく かな (えぇ) として変換します。英語の文の中 (前が英単語) とファイルの拡張子 (.exe) は今までどおり英字のままです。")]
     public bool KanaInJapaneseMode { get; set; }
 
+    [Category("2. 判定"), DisplayName("英単語の後ろの英字の名前を英語にする"),
+     Description("英単語 (Koki など) のすぐ後ろに続けて打った大文字の英字 (Ogawa など) を、日本語の文の中でも英字のまま確定します。OFF のときは今までどおり、O|gawa のように 1 文字の大文字と助詞で始まる語に分かれます。")]
+    public bool KeepEnglishNameAfterEnglish { get; set; }
+
     [Category("3. 保留"), DisplayName("最大保留キー数"), Description("判定のために保留する文字数の上限。超えたら判定不能としてそのまま出力します。")]
     public int MaxPendingKeys { get; set; } = 6;
 

@@ -194,6 +194,12 @@ public sealed class CompositionDetector
     /// </summary>
     public Func<bool> KanaInJapaneseMode { get; set; } = () => false;
 
+    /// <summary>
+    /// 英単語のすぐ後ろに続けて打った大文字の英字 (Koki Ogawa の Ogawa) を、日本語の文の中でも英語にするか (本家 #1039)。
+    /// 既定は false (今までどおり、O|gawa のように 1 文字の大文字 + 助詞で始まる語に分かれる)。
+    /// </summary>
+    public Func<bool> KeepEnglishNameAfterEnglish { get; set; } = () => false;
+
     /// <summary>日本語入力中に かな として変換する語 (dictionaries/japanese-mode.txt)。CreateDefault が読み込む。</summary>
     public WordList KanaInJapaneseModeWords { get; } = new();
 
@@ -352,7 +358,10 @@ public sealed class CompositionDetector
             if (found < 0 && !kanaInput && i != bracketCloser && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && !(i == 0 && afterNewline && units[i].Raw == "-") && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&
                 japanesePunctuation?.Contains(i) != true) found = i + 1;
             if (!kanaInput && found < 0) found = UserNameEnd(units, i, pending);
-            if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = CapitalizedWordEnd(units, i, pending, final);
+            // 設定「英単語の後ろの英字の名前を英語にする」(本家 #1039): 前が英語の語 (Koki Ogawa の Ogawa) は、
+            // 1 文字の大文字 + 助詞で始まる語 (O|gawa) に分けない。英語の文脈の続きなので、そのまま英語の区間として見る。
+            if (!kanaInput && found < 0 && level != DetectionLevel.Manual && !(KeepEnglishNameAfterEnglish() && table.StartsWithUpper(i) && PrecededByEnglish(i) == true))
+                found = CapitalizedWordEnd(units, i, pending, final);
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = HyphenatedWordEnd(units, i, pending);
             // 英語の語 + 数字のすぐ後ろの英単語 (part1026|beta、win11|pro) は、ローマ字として読めても英語 (ベタ にしない)。
             // 助詞で始まるなら日本語 (PS5|wokaitai)。
