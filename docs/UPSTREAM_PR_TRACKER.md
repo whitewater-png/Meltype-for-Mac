@@ -92,6 +92,7 @@
 | W3-4 | #1040 | 辞書 `brands.txt` に「めるたいぷ → Meltype」を足す | 低 | **完了・実機確認済み (2026-10-23)**。Core 975/975、変換候補に Meltype が出ることを確認 | 56e68e0 | TextEdit で `merutaipu` → Space で Meltype |
 | W3-5 | #1024 | `update-cask.py` が同じ版の sha256 を黙って書き換えないようにする (Homebrew の SHA-256 不一致の再発防止) | 中 | **完了 (2026-10-23、テスト OK・exit 0)**。配布手順の確認は次のリリース時 | 5bf21c5 | 同じ版で update-cask.py を再実行 → 拒否されること |
 | W4-1 | #1023 | 設定「日本語入力中は一覧の語をかなで変換」を追加 (既定オフ)。`dictionaries/japanese-mode.txt` の語 (`exe`) を、日本語の文脈 (前が英語でない) では かな として変換する。英語の文の中と拡張子 (`.exe`) は英字のまま。詳細は [W4_UPTAKE_2026-10-23.md](W4_UPTAKE_2026-10-23.md) | 中 | **完了・実機確認待ち**。Core 985/985 + 新規 1 件、`--eval` 1292/1294 前後同一、eval-compare broken 0 | 本文書と同一コミット | 設定タブ「入力」→ オン/オフで `exe`・`.exe`・`hello exe`・`korehaexe` を打ち比べる。ON で `exe` → Space の候補の先頭が `えぇ`、`exe` も候補にあること |
+| W4-2 | #1016 | 設定「Tab で候補を格子状に広げる」を追加 (既定オフ)。ON のとき、変換中の Tab で確定せず次の候補へ移り、候補ウィンドウを 5 列の格子 (`kIMKScrollingGridCandidatePanel`) に広げる | 中 | **完了・実機確認待ち**。Core 992/992、Mac ビルド成功、eval-compare broken 0 | 3381aea | 設定タブ「入力」→ オンで `こうせい` → Space → Tab (格子・確定しない)。オフで今までどおり |
 
 
 
