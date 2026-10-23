@@ -68,6 +68,8 @@ public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commit
         builder.Append(",\"selectedPrediction\":").AppendInt(view.SelectedPrediction);
         // 格子状に広げて出すときだけ書く (Swift は無いキーを false として読む。ふつうの結果の JSON は今までと同じ形のまま)
         if (view.Grid) builder.Append(",\"grid\":true");
+        // 打ち直す位置 (本家 #972) を書くときだけ書く。Swift は無いキーを nil として読む (末尾)。
+        if (view.Caret >= 0) builder.Append(",\"caret\":").AppendInt(view.Caret);
         AppendNotes(builder, view);
         builder.Append("}}");
         return builder.ToString();
@@ -189,6 +191,8 @@ public sealed class MeltypeSession
             TabConversion = () => shared.Current.TabConversion,
             // 入力中の ↓ で予測候補を選ぶ (本家 #993)。既定は OFF (今までどおり Space と同じく変換を始める)。
             DownSelectsPrediction = () => shared.Current.DownSelectsPrediction,
+            // 変換中の BackSpace で選んだ文節を消して打ち直す (本家 #972)。既定は OFF (今までどおり変換を取り消す)。
+            DeleteClauseOnBackspace = () => shared.Current.DeleteClauseOnBackspace,
             // 変換中の Tab で候補を格子状 (5 列) に広げる (本家 #1016)。既定は OFF (今までどおり確定して Tab をアプリに渡す)。
             TabGrid = () => shared.Current.TabGridCandidates,
             // コード系アプリ (ターミナルなど) の行頭では、コマンド名 (cd・ls・make) を確定で英字にする。設定ではなくアプリの種類で決まる。

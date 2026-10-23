@@ -24,7 +24,12 @@ public sealed record CompositionView(
     string? Suggestion = null,
     IReadOnlyList<string>? Predictions = null,
     int SelectedPrediction = -1,
-    bool Grid = false);
+    bool Grid = false,
+    /// <summary>
+    /// 変換ボックスの中で文字を打つ位置 (Text の先頭からの文字数)。-1 なら末尾 (今までどおり)。
+    /// 文節を消して打ち直すとき (本家 #972) に、消した文節の位置を指す。ホストが対応していなければ末尾のまま。
+    /// </summary>
+    int Caret = -1);
 
 /// <summary>CompositionController が外界とやり取りする口。テストでは偽物に差し替える。</summary>
 public interface ICompositionHost
@@ -111,6 +116,13 @@ public sealed class CompositionOptions
     /// 既定は false (今までどおり Space と同じく変換を始める)。
     /// </summary>
     public Func<bool> DownSelectsPrediction { get; init; } = () => false;
+
+    /// <summary>
+    /// 変換中に文節を選んでから BackSpace を押したら、その文節を消して、消した位置から打ち直せるようにするか
+    /// (本家 #972 の Mac 版)。前の文節は変換したまま固定し、後ろの文節は変換したまま打ち直した文節の後ろに付ける。
+    /// 既定は false (今までどおり、変換を取り消してかなに戻る)。
+    /// </summary>
+    public Func<bool> DeleteClauseOnBackspace { get; init; } = () => false;
 
     /// <summary>
     /// 変換中に Tab を押したら、確定せずに次の候補へ移り、候補の一覧を格子状 (5 列) に広げて出すか
@@ -330,6 +342,10 @@ public sealed class CompositionController
     // 変換していない間 (_converting == false) の _clauses は、固定した文節だけ。
     private int _headCount;
     private List<CompositionUnit> _fixedUnits = [];
+    // 設定「変換中の BackSpace で選んだ文節を消す」(本家 #972): 消した文節より後ろの文節 (変換した文字と読み)。
+    // 変換ボックスはキャレットを 1 つ (末尾) しか持てないので、後ろの文節は表示に出すが文節の選択には入れず、
+    // 打ち直した文節の後ろに付けて確定する (消した文節の位置で打ち直せる)。null なら今までどおり。
+    private List<(string Text, string Reading, bool IsEnglish)>? _retypeSuffix;
     // 固定する前の、_text の前の文字の英語/日本語の手がかり (読みに戻すときに戻す)。
     private bool? _basePrecedingEnglish;
     private bool _basePrecedingSentence;
@@ -416,6 +432,44 @@ public sealed class CompositionController
 
     /// <summary>変換中の文節があるか。</summary>
     internal bool IsConverting => _converting && _clauses.Count > 0;
+
+    /// <summary>消した文節より後ろの文節の文字 (打ち直しの位置より後ろに付ける)。無ければ空。</summary>
+    private string SuffixText => _retypeSuffix is { } suffix ? string.Concat(suffix.Select(s => s.Text)) : "";
+
+    /// <summary>消した文節より後ろの文節の文字の一覧 (変換ボックスの文節の表示用)。</summary>
+    private IEnumerable<string> SuffixTexts => _retypeSuffix?.Select(s => s.Text) ?? [];
+
+    /// <summary>
+    /// 変換中に選んでいる文節を消す (本家 #972)。前の文節は変換したまま固定し、後ろの文節は変換したまま
+    /// 打ち直した文節の後ろに付ける。消した文節の読みは捨てる (打ち直す)。
+    /// </summary>
+    private void DeleteSelectedClause()
+    {
+        var prefix = _clauses.Take(_selectedClause).ToList();
+        var suffix = _clauses.Skip(_selectedClause + 1).Select(c => (c.Text, c.Reading, c.IsEnglish)).ToList();
+        // 前の文節の単位 (打った英字つき) を覚えておく (Esc で変換前の読みに戻すときに使う)。
+        var units = _text.Units.ToList();
+        _fixedUnits = _text.RemoveLeading(prefix.Select(c => (c.Reading, c.IsEnglish)))
+            ? units.Take(units.Count - _text.Units.Count).ToList()
+            : [];
+        _text.Clear();
+        _retypeSuffix = suffix.Count > 0 ? suffix : null;
+        _clauses = prefix;
+        _headCount = prefix.Count;
+        _selectedClause = 0;
+        _converting = false;
+        _candidatesMoved = false;
+        _gridCandidates = false;
+        _tabStartedConversion = false;
+        _spaceStartedConversion = false;
+        _basePrecedingEnglish = _text.PrecedingEnglish;
+        _basePrecedingSentence = _text.PrecedingEnglishSentence;
+        _basePrecedingTail = _text.PrecedingTail;
+        _text.PrecedingEnglish = LanguageOf(FixedText);
+        _text.PrecedingEnglishSentence = IsEnglishSentence(PrecedingForConversion);
+        _text.PrecedingTail = FixedText;
+        ResetPrediction();
+    }
 
     /// <summary>
     /// ATOK スタイル (TokMode) の Ctrl+← / Ctrl+→: 先頭 / 最後の文節を選ぶ (MeltypeSession が呼ぶ。Ctrl は
@@ -858,6 +912,9 @@ public sealed class CompositionController
         _converting = false;
         _clauses = [];
         _selectedClause = 0;
+        _headCount = 0;
+        _fixedUnits = [];
+        _retypeSuffix = null;
         _reconvertRomaji = false;
         ResetPrediction();
         if (_reconvertOriginal is { } original)
@@ -911,6 +968,7 @@ public sealed class CompositionController
         _clauses = [];
         _headCount = 0;
         _fixedUnits = [];
+        _retypeSuffix = null;
         ClearConversionCaches();
         ResetPrediction();
         ClearHeld();
@@ -1086,6 +1144,12 @@ public sealed class CompositionController
                 }
                 return;
             case VirtualKeys.Back:
+                // 打ち直す文字が無い (消した文節の位置に何も打っていない) ときは、変換前の読みに戻す (消した文節は消えたまま)。
+                if (_retypeSuffix is not null && _text.IsEmpty)
+                {
+                    UnfixClauses();
+                    return;
+                }
                 _text.RemoveLast();
                 // 未変換の文節を消し切ったら、前の文節の選択に戻る。
                 if (_headCount > 0 && _text.IsEmpty) SelectLastFixedClause();
@@ -1529,6 +1593,15 @@ public sealed class CompositionController
             case VirtualKeys.Back:
             case VirtualKeys.Escape:
                 _tabStartedConversion = false;
+                // 設定「変換中の BackSpace で選んだ文節を消す」(本家 #972): ← → で文節を選んでから BackSpace を押したら、
+                // その文節を消して、消した位置から打ち直す。文節を選ばずに押したときは、今までどおり変換を取り消す
+                // (Space を押した直後に間違えて BackSpace を押したときに、打った読みが消えないように)。
+                if (vk == VirtualKeys.Back && _options.DeleteClauseOnBackspace() &&
+                    _headCount == 0 && _selectedClause > 0 && _clauses.Count > 1)
+                {
+                    DeleteSelectedClause();
+                    return true;
+                }
                 if (_headCount > 0)
                 {
                     // 未変換の文節の変換だけを取り消す (Backspace)。Esc、または未変換の文節が無いときは、固定した文節も変換前の読みに戻す。
@@ -1677,6 +1750,26 @@ public sealed class CompositionController
     /// <summary>固定した文節を、変換前の読みに戻して、未変換の文節の前に付ける (変換前に打っていた状態に戻る)。</summary>
     private void UnfixClauses()
     {
+        // 打ち直しの位置より後ろの文節があれば、それも読みに戻して 1 つの読みにする (消した文節は消えたまま)。
+        if (_retypeSuffix is { } retypeSuffix)
+        {
+            var prefixReading = string.Concat(_clauses.Take(_headCount).Select(c => c.Reading));
+            var all = prefixReading + _text.AllKana(final: false) + string.Concat(retypeSuffix.Select(s => s.Reading));
+            _retypeSuffix = null;
+            _fixedUnits = [];
+            _text.SetKana(all);
+            _text.Mode = DisplayMode.Auto;
+            _text.PrecedingEnglish = _basePrecedingEnglish;
+            _text.PrecedingEnglishSentence = _basePrecedingSentence;
+            _text.PrecedingTail = _basePrecedingTail;
+            _headCount = 0;
+            _clauses = [];
+            _selectedClause = 0;
+            _clipboardCandidate = null;
+            _converting = false;
+            ResetPrediction();
+            return;
+        }
         var reading = string.Concat(_clauses.Take(_headCount).Select(c => c.Reading));
         // 固定する前に打っていた単位 (打った英字つき) があれば、それを戻す (F10 で打ったままの英字に戻せる)。読みが合わなければ読みだけ。
         if (string.Concat(_fixedUnits.Select(u => u.Kana)) == reading) _text.PrependUnits(_fixedUnits);
@@ -2688,12 +2781,19 @@ public sealed class CompositionController
         // 変換後も続けて入力: 固定した文節 + 未変換の文節 (変換していなければ、表示のまま)。
         var fixedOnly = !converting && _headCount > 0;
         if (fixedOnly) TrimToFixedClauses();
-        var text = converting ? string.Concat(_clauses.Select(c => c.Text)) : fixedOnly ? FixedText + CurrentDisplay(final: true) : CurrentDisplay(final: true);
+        var text = converting ? string.Concat(_clauses.Select(c => c.Text)) + SuffixText : fixedOnly ? FixedText + CurrentDisplay(final: true) + SuffixText : CurrentDisplay(final: true);
         if (fixEnglish && !converting && _text.Mode == DisplayMode.Auto) text = FixEnglishTypo(text);
         var english = converting ? _clauses.All(c => c.IsEnglish) : _text.IsAlphanumericAt(final: true);
         // 確定後の F10 / F6 の対象: 英語の区間・日本語の区間があるか (確定 1 回分まるごと)
         var hasEnglish = english || (converting ? _clauses.Any(c => c.IsEnglish) : _text.Mode == DisplayMode.Auto && _text.Segments(final: true).Any(s => s.IsEnglish));
         var hasJapanese = !english && (converting ? _clauses.Any(c => !c.IsEnglish) : _text.Mode != DisplayMode.Auto || _text.Segments(final: true).Any(s => !s.IsEnglish));
+        // 打ち直しの後ろに残した文節 (本家 #972) も、確定後の F6 / F10 の対象に含める。
+        if (_retypeSuffix is { } retypeSuffix)
+        {
+            if (retypeSuffix.Any(s => s.IsEnglish)) hasEnglish = true;
+            if (retypeSuffix.Any(s => !s.IsEnglish)) hasJapanese = true;
+            if (retypeSuffix.Any(s => !s.IsEnglish)) english = false;
+        }
         // 利用者がはっきり決めた確定 (候補を選び直した・F6〜F10 で表示を変えた・Tab で手動の提案を受けた) は、後ろの語を見て自動で確定し直さない
         // (sushi を F10 で英字にして確定したのに、次の「です」で「すし」に書き戻されていた)
         var chosen = ChosenByUser(converting || fixedOnly);
@@ -3073,6 +3173,7 @@ public sealed class CompositionController
             _selectedClause = 0;
             _headCount = 0;
             _fixedUnits = [];
+            _retypeSuffix = null;
             _reconvertOriginal = null;
             _toggleBox = null;
             ResetPrediction();
@@ -3430,6 +3531,7 @@ public sealed class CompositionController
         _clauses = [];
         _headCount = 0;
         _fixedUnits = [];
+        _retypeSuffix = null;
         _clipboardCandidate = null;
         ResetPrediction();
         if (text.Length == 0) return;
@@ -3535,20 +3637,24 @@ public sealed class CompositionController
             var selected = _clauses[_selectedClause];
             // 選んでいる文節は、最初から候補の一覧をすべて出す (Space を 1 回押しただけでは一部しか出ず、選び間違えやすかった)。
             if (!selected.IsEnglish && !selected.Expanded) Expand(selected);
+            var convertedText = string.Concat(_clauses.Select(c => c.Text));
+            var convertingHint = _options.TokMode()
+                ? "←→ 区切り　Shift+←→ 文節　Space 候補　↓ 部分確定　Enter 確定　Esc 戻る"
+                : "←→ 文節　Space/↓ 候補　Shift+←→ 区切り　Enter 確定　Esc 戻る";
+            if (_retypeSuffix is not null) convertingHint = $"消した文節の後ろは「{SuffixText}」のまま　" + convertingHint;
             _host.Show(new CompositionView(
-                string.Concat(_clauses.Select(c => c.Text)),
+                convertedText + SuffixText,
                 selected.Candidates,
                 selected.Index,
                 true,
-                _options.TokMode()
-                    ? "←→ 区切り　Shift+←→ 文節　Space 候補　↓ 部分確定　Enter 確定　Esc 戻る"
-                    : "←→ 文節　Space/↓ 候補　Shift+←→ 区切り　Enter 確定　Esc 戻る",
-                _clauses.Select(c => c.Text).ToList(),
+                convertingHint,
+                [.. _clauses.Select(c => c.Text), .. SuffixTexts],
                 _selectedClause,
                 CandidateNotes(selected),
                 _options.CandidateMeanings() ? CandidateMeaning(selected) : null,
                 MisspellingSuggestion(),
-                Grid: _gridCandidates));
+                Grid: _gridCandidates,
+                Caret: _retypeSuffix is null ? -1 : convertedText.Length));
         }
         else
         {
@@ -3562,8 +3668,11 @@ public sealed class CompositionController
                 // 固定した文節 (選んだ変換結果) + 未変換の文節。文節ごとの表示で、最後の 1 つが未変換 (選択中の文節は無し)。
                 var fixedTexts = _clauses.Take(_headCount).Select(c => c.Text).ToList();
                 hint = "Space 変換　←→ 文節　Enter 確定　Esc 変換前の読みに戻す";
+                if (_retypeSuffix is not null) hint = $"消した文節の位置に打ち直す (後ろは「{SuffixText}」のまま)　" + hint;
                 if (_text.Suggestion() is { } fixedSuggestion) hint = $"Tab → {fixedSuggestion} (英字に)　" + hint;
-                _host.Show(new CompositionView(string.Concat(fixedTexts) + tail, [], -1, false, hint, [.. fixedTexts, tail], -1, Suggestion: MisspellingSuggestion()));
+                var retypeText = string.Concat(fixedTexts) + tail;
+                _host.Show(new CompositionView(retypeText + SuffixText, [], -1, false, hint, [.. fixedTexts, tail, .. SuffixTexts], -1, Suggestion: MisspellingSuggestion(),
+                    Caret: _retypeSuffix is null ? -1 : retypeText.Length));
                 return;
             }
             _host.Show(new CompositionView(tail, [], -1, false, hint, Suggestion: MisspellingSuggestion(),

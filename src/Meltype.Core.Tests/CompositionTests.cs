@@ -171,6 +171,9 @@ internal static class CompositionTests
         /// <summary>入力中の ↓ で予測候補を選ぶか (CompositionOptions.DownSelectsPrediction)。既定は OFF (今までの動作)。</summary>
         public bool DownSelectsPrediction { get; set; }
 
+        /// <summary>変換中に文節を選んでから BackSpace を押したら、その文節を消して打ち直すか (CompositionOptions.DeleteClauseOnBackspace)。既定は OFF (今までの動作)。</summary>
+        public bool DeleteClauseOnBackspace { get; set; }
+
         /// <summary>変換中の Tab で候補を格子状に広げるか (CompositionOptions.TabGrid)。既定は OFF (今までの動作)。</summary>
         public bool TabGrid { get; set; }
 
@@ -248,6 +251,7 @@ internal static class CompositionTests
                 TokMode = () => TokMode,
                 TabConversion = () => TabConversion,
                 DownSelectsPrediction = () => DownSelectsPrediction,
+                DeleteClauseOnBackspace = () => DeleteClauseOnBackspace,
                 TabGrid = () => TabGrid,
                 CodeApp = () => CodeApp,
                 TypeDigitsAfterConversion = () => TypeDigits,
