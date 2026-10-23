@@ -219,7 +219,7 @@ final class MeltypeInputController: IMKInputController {
             hideComposition(client: client)
             return false
         }
-        Self.trace("handleKey consumed=\(result.consumed) commits=\(result.commits.map { "(del=\($0.deleteBefore) orig=\(Self.cut($0.original)) text=\(Self.cut($0.text)))" }.joined()) view=\(result.view.map { "text=\(Self.cut($0.text)) converting=\($0.converting) clauses=\($0.clauses.map { Self.cut($0) }) selectedClause=\($0.selectedClause) selectedPrediction=\($0.selectedPrediction) predictions=\($0.predictions.map { Self.cut($0) })" } ?? "nil")")
+        Self.trace("handleKey consumed=\(result.consumed) commits=\(result.commits.map { "(del=\($0.deleteBefore) orig=\(Self.cut($0.original)) text=\(Self.cut($0.text)))" }.joined()) view=\(result.view.map { "text=\(Self.cut($0.text)) converting=\($0.converting) clauses=\($0.clauses.map { Self.cut($0) }) selectedClause=\($0.selectedClause) selectedPrediction=\($0.selectedPrediction) predictions=\($0.predictions.map { Self.cut($0) }) grid=\($0.grid == true)" } ?? "nil")")
         // 確定後の F10 / F6 の書き換えを飛ばして取り消したときは、キーを飲み込まずアプリに渡す
         let cancelledToggle = apply(result, to: client)
         return result.consumed && !cancelledToggle
