@@ -70,6 +70,19 @@ final class AnnotationPanel {
         NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).contains("IMKUIPanel") }
     }
 
+    /// 候補ウィンドウ自体のレベルを上げる (本家 #976)。
+    /// 候補ウィンドウ (IMKCandidates) は IMKit が作り、既定のレベルは低い (通常 3)。
+    /// Spotlight (macOS 27) の検索バー・結果はそれより上の層にあり、候補が裏に隠れる。
+    /// 意味のパネルだけを上げても候補本体は隠れたままなので、候補ウィンドウも同じ下限 (.popUpMenu = 101) に合わせる。
+    /// IMKit が後からレベルを戻すことがあるため、出すたびに呼ぶ。触るのはレベルだけで、位置・大きさは変えない。
+    static func raiseCandidateWindow() {
+        guard let host = candidateWindow() else { return }
+        if host.level.rawValue < NSWindow.Level.popUpMenu.rawValue {
+            host.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue)
+        }
+        host.orderFrontRegardless()
+    }
+
     /// 出せなかったときは隠して、理由を返す。
     @discardableResult
     func show(_ text: String) -> ShowResult {

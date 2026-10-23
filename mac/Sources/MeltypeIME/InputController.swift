@@ -789,6 +789,7 @@ final class MeltypeInputController: IMKInputController {
                 candidateList = view.candidates
                 window.update()
                 window.show(kIMKLocateCandidatesBelowHint)
+                AnnotationPanel.raiseCandidateWindow()
                 shownIndex = 0
                 sendKeyEventsToServerFirst(window)
             }
@@ -826,6 +827,7 @@ final class MeltypeInputController: IMKInputController {
             candidateList = view.predictions
             window.update()
             window.show(kIMKLocateCandidatesBelowHint)
+            AnnotationPanel.raiseCandidateWindow()
             shownIndex = 0
             // update() / show() が属性を既定 (候補ウィンドウ優先) に戻すことがあるので、出し直した後にもう一度付ける。
             // これが無いと、直前の 1 文字で一覧を出し直した直後の Tab を候補ウィンドウが処理してしまい、
