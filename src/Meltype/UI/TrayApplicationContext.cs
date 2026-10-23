@@ -49,6 +49,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             ShiftEnterNewline = () => _engine.AppSettings.ShiftEnterNewline,
             TokMode = () => _engine.AppSettings.TokMode,
             TabConversion = () => _engine.AppSettings.TabConversion,
+            DownSelectsPrediction = () => _engine.AppSettings.DownSelectsPrediction,
             DirectMode = () => _engine.KeyboardDirect,
             ClassifyDirect = _engine.ClassifyDirect,
             DirectDecided = _engine.OnDirectDecided,

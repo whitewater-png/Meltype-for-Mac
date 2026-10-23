@@ -47,6 +47,7 @@ internal sealed class CompositionService : ICompositionHost, IDisposable
             ShiftEnterNewline = options.ShiftEnterNewline,
             TokMode = options.TokMode,
             TabConversion = options.TabConversion,
+            DownSelectsPrediction = options.DownSelectsPrediction,
             DirectMode = options.DirectMode,
             ClassifyDirect = options.ClassifyDirect,
             DirectDecided = options.DirectDecided,

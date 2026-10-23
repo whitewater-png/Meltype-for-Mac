@@ -221,6 +221,10 @@ public sealed class Settings
      Description("打っている途中に Tab を押すと、Space と同じく変換を始めます (Microsoft IME と同じ)。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、今までどおり確定してから Tab をアプリに渡します。")]
     public bool TabConversion { get; set; }
 
+    [Category("1. 全般"), DisplayName("↓ で予測候補を選ぶ"),
+     Description("入力中に ↓ を押したとき、予測候補が出ていれば Tab と同じく予測の選択に入ります。OFF のときは、今までどおり Space と同じく変換を始めます (本家 #993)。")]
+    public bool DownSelectsPrediction { get; set; }
+
     /// <summary>
     /// 変換中に Tab を押したら、候補の一覧を格子状 (5 列) に広げて出すか (本家 #1016 の Mac 版)。
     /// 変換中は Tab で確定せず、次の候補へ移る (Shift+Tab は前の候補)。既定は OFF (今までどおり確定して Tab をアプリに渡す)。

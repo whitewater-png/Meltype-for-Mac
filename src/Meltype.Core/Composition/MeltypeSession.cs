@@ -185,6 +185,8 @@ public sealed class MeltypeSession
             // ATOK スタイルのキー操作。config.json の変更 (「Meltype 辞書」の「設定」タブ) がすぐ効くよう、共有の値を毎回見る。
             TokMode = () => shared.Current.TokMode,
             TabConversion = () => shared.Current.TabConversion,
+            // 入力中の ↓ で予測候補を選ぶ (本家 #993)。既定は OFF (今までどおり Space と同じく変換を始める)。
+            DownSelectsPrediction = () => shared.Current.DownSelectsPrediction,
             // 変換中の Tab で候補を格子状 (5 列) に広げる (本家 #1016)。既定は OFF (今までどおり確定して Tab をアプリに渡す)。
             TabGrid = () => shared.Current.TabGridCandidates,
             // コード系アプリ (ターミナルなど) の行頭では、コマンド名 (cd・ls・make) を確定で英字にする。設定ではなくアプリの種類で決まる。

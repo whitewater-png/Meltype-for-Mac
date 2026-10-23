@@ -168,6 +168,9 @@ internal static class CompositionTests
         /// <summary>入力中の Tab で変換を始めるか (CompositionOptions.TabConversion)。既定は OFF (今までの動作)。</summary>
         public bool TabConversion { get; set; }
 
+        /// <summary>入力中の ↓ で予測候補を選ぶか (CompositionOptions.DownSelectsPrediction)。既定は OFF (今までの動作)。</summary>
+        public bool DownSelectsPrediction { get; set; }
+
         /// <summary>変換中の Tab で候補を格子状に広げるか (CompositionOptions.TabGrid)。既定は OFF (今までの動作)。</summary>
         public bool TabGrid { get; set; }
 
@@ -244,6 +247,7 @@ internal static class CompositionTests
                 ShiftEnterNewline = () => ShiftEnterNewline,
                 TokMode = () => TokMode,
                 TabConversion = () => TabConversion,
+                DownSelectsPrediction = () => DownSelectsPrediction,
                 TabGrid = () => TabGrid,
                 CodeApp = () => CodeApp,
                 TypeDigitsAfterConversion = () => TypeDigits,

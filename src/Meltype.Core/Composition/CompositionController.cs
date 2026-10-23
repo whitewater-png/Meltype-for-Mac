@@ -107,6 +107,12 @@ public sealed class CompositionOptions
     public Func<bool> TabConversion { get; init; } = () => false;
 
     /// <summary>
+    /// 入力中に ↓ を押したとき、予測候補があれば予測の選択に入るか (本家 #993 の Mac 版)。
+    /// 既定は false (今までどおり Space と同じく変換を始める)。
+    /// </summary>
+    public Func<bool> DownSelectsPrediction { get; init; } = () => false;
+
+    /// <summary>
     /// 変換中に Tab を押したら、確定せずに次の候補へ移り、候補の一覧を格子状 (5 列) に広げて出すか
     /// (本家 #1016 の Mac 版)。既定は false (今までどおり確定して Tab をアプリに渡す)。
     /// ON のときは View の Grid が true になり、Mac 版が IMKCandidates を格子状のパネルで出す。
@@ -1132,6 +1138,11 @@ public sealed class CompositionController
                 // ATOK スタイル (TokMode) の Shift+↓: 先頭の 1 音だけ確定し、残りは入力のまま (1 音確定)。
                 // OFF のとき・変換中・固定した文節があるとき・確定後の F6 で開いた変換ボックスの中 (F10 / Esc で元の語に戻すので、一部だけ確定すると二重になる。R47-1) は今までどおり。
                 CommitFirstSound();
+                return;
+            case VirtualKeys.Down when _options.DownSelectsPrediction() && !_converting && _predictions.Count > 0 && !_text.IsCommandName && !_text.IsAlphanumeric:
+                // 本家 #993: ↓ で予測候補を選ぶ。Tab と同じく予測の選択に入る (Shift で最後の候補)。
+                _predicting = true;
+                _predictionIndex = _swallowedShift.Count > 0 || _host.IsShiftDown() ? _predictions.Count - 1 : 0;
                 return;
             case VirtualKeys.Left or VirtualKeys.Right or VirtualKeys.Up or VirtualKeys.Down when !_text.IsAlphanumeric:
                 // 変換前でも矢印キーで文節の選択に入る (Mac のライブ変換と同じ)。

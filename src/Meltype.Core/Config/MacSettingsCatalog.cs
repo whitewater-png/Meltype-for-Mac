@@ -77,6 +77,7 @@ internal static class MacSettingsCatalog
         [nameof(Settings.CorrectTypos)] = "Space・Enter で変換・確定するときに打ち間違いを直します。ローマ字: 読めない子音が残ったとき、隣のキーの押し間違い・入れ替わり・抜けを 1 文字だけ直します (onegaishimsu → お願いします、sumimasne → すみません。よく使う語の読みになるときだけ)。英語: 同梱のよくある打ち間違いの一覧にある語を直します (teh → the、recieve → receive)。",
         [nameof(Settings.FileLog)] = "~/Library/Application Support/Meltype/meltype.log にログを書きます (OFF のときは書きません)。判定した語の先頭の数文字・アプリ名・入力欄の名前が含まれます。確定した文字列などは「ログに入力した文字を残す」が ON のときだけ残ります。",
         [nameof(Settings.TabConversion)] = "打っている途中に Tab を押すと、Space と同じく変換を始めます。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、確定してから Tab をアプリに渡します。OFF のときは、今までどおり確定して Tab をアプリに渡します (フォームで日本語を打って Tab で次の欄へ移る操作が変わらないよう、Mac 版は既定 OFF。本家 Windows 版は既定 ON)。",
+        [nameof(Settings.DownSelectsPrediction)] = "入力中に ↓ を押したとき、予測候補が出ていれば Tab と同じく予測の選択に入ります。OFF のときは、今までどおり Space と同じく変換を始めます (本家 #993)。",
     };
 
     private static MacSettingItem WithMac(MacSettingItem item)
@@ -110,6 +111,9 @@ internal static class MacSettingsCatalog
         Bool(nameof(Settings.TabConversion), "Tab で変換",
             "打っている途中に Tab を押すと、Space と同じく変換を始めます (Microsoft IME と同じ)。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、今までどおり確定してから Tab をアプリに渡します。",
             InputGroup, s => s.TabConversion, (s, v) => s.TabConversion = v),
+        Bool(nameof(Settings.DownSelectsPrediction), "↓ で予測候補を選ぶ",
+            "入力中に ↓ を押したとき、予測候補が出ていれば Tab と同じく予測の選択に入ります。OFF のときは、今までどおり Space と同じく変換を始めます (本家 #993)。",
+            InputGroup, s => s.DownSelectsPrediction, (s, v) => s.DownSelectsPrediction = v),
         Bool(nameof(Settings.TabGridCandidates), "Tab で候補を格子状に広げる",
             "変換中に Tab を押すと、候補の一覧を格子状 (5 列) に広げて出します (本家 #1016)。変換中は Tab で確定せず、次の候補へ移ります (Shift+Tab は前の候補、Enter で確定)。候補が 10 件以上あるときも、ページ送りをせずに一覧を見渡せます。OFF のときは、今までどおり変換中の Tab で確定してアプリに渡します。",
             InputGroup, s => s.TabGridCandidates, (s, v) => s.TabGridCandidates = v),
