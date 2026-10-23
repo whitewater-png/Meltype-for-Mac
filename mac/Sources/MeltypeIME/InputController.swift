@@ -809,7 +809,7 @@ final class MeltypeInputController: IMKInputController {
             meaningKey = nil
             let panelName = wantGrid ? "grid" : "column"
             let count = view.converting ? view.candidates.count : view.predictions.count
-            Self.trace("panel=\(panelName) count=\(count)")
+            Self.trace("panel=\(panelName) count=\(count)" + (wantGrid ? " grid=showCandidates" : ""))
         }
         if !view.converting && !view.predictions.isEmpty {
             updatePredictions(view, window: window)
@@ -824,6 +824,11 @@ final class MeltypeInputController: IMKInputController {
                 candidateList = view.candidates
                 window.update()
                 window.show(kIMKLocateCandidatesBelowHint)
+                // 下向き三角 (格子表示) と同じ経路で出し直す。show(_:) は位置を合わせるだけなので、
+                // パネルの種別を反映した表示は showCandidates (Swift では show()) に任せる。
+                if wantGrid {
+                    window.show()
+                }
                 sendKeyEventsToServerFirst(window)
                 AnnotationPanel.raiseCandidateWindow()
                 shownIndex = 0
