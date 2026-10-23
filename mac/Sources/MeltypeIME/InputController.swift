@@ -798,11 +798,18 @@ final class MeltypeInputController: IMKInputController {
         // 変換が終わったとき・予測候補のときは 1 列に戻す (次の変換は今までどおり 1 列から見せる)。
         // パネルの種類を変えたら候補を作り直して出し直す (選択は先頭に戻る)。
         let wantGrid = view.converting && view.grid == true
-        if wantGrid != candidatesGridPanelShown {
+        let panelTypeChanged = wantGrid != candidatesGridPanelShown
+        if panelTypeChanged {
+            // 可視のまま setPanelType しても再レイアウトされず、横一列のままになる (実機で確認)。
+            // いったん隠してから種別を変え、候補を入れ直して出し直す。
+            window.hide()
             window.setPanelType(wantGrid ? kIMKScrollingGridCandidatePanel : kIMKSingleColumnScrollingCandidatePanel)
             candidatesGridPanelShown = wantGrid
             candidateList = []
             meaningKey = nil
+            let panelName = wantGrid ? "grid" : "column"
+            let count = view.converting ? view.candidates.count : view.predictions.count
+            Self.trace("panel=\(panelName) count=\(count)")
         }
         if !view.converting && !view.predictions.isEmpty {
             updatePredictions(view, window: window)
@@ -810,16 +817,16 @@ final class MeltypeInputController: IMKInputController {
             // IMKCandidates は標準では Space を候補確定に使い、コントローラーに渡さない。
             // Space で本体の次候補処理を呼べるよう、キーイベントを先にコントローラーへ配送する。
             sendKeyEventsToServerFirst(window)
-            if view.candidates != candidateList || !window.isVisible() {
+            if panelTypeChanged || view.candidates != candidateList || !window.isVisible() {
                 // 候補が変わったときだけ、IMKCandidates に候補一覧を再取得させる (選択は先頭に戻る)。
                 // 候補ウィンドウを出し直すので、出していた意味は捨てる。
                 meaningKey = nil
                 candidateList = view.candidates
                 window.update()
                 window.show(kIMKLocateCandidatesBelowHint)
+                sendKeyEventsToServerFirst(window)
                 AnnotationPanel.raiseCandidateWindow()
                 shownIndex = 0
-                sendKeyEventsToServerFirst(window)
             }
             // 本体側で選んでいる候補に、候補ウィンドウの選択 (青いバー) を合わせる。
             // candidateIdentifier(atLineNumber:) は 0 しか返さず使えないので、候補ウィンドウ自身の上下移動で動かす。
