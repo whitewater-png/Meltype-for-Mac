@@ -808,6 +808,26 @@ final class MeltypeInputController: IMKInputController {
         while shown % columns > target % columns { window.moveLeft(nil); shown -= 1 }
     }
 
+    /// 診断: 候補ウィンドウの実体 (クラス・位置・大きさ・view 階層・ボタン) を 1 行で書き出す。
+    /// 「格子に広げる」下向き三角が NSButton として存在するかを確かめるため (語は書かない)。
+    private func traceCandidateWindows(_ label: String) {
+        guard Self.trace else { return }
+        for window in NSApp.windows {
+            let cls = NSStringFromClass(type(of: window))
+            guard cls.contains("IMK") || cls.contains("Candidate") || cls.contains("Meltype") else { continue }
+            var parts: [String] = []
+            func walk(_ view: NSView, _ depth: Int) {
+                let f = view.frame
+                var desc = "\(depth):\(NSStringFromClass(type(of: view)))[\(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height))]"
+                if let button = view as? NSButton { desc += "{btn:\(button.title)}" }
+                parts.append(desc)
+                for sub in view.subviews { walk(sub, depth + 1) }
+            }
+            if let content = window.contentView { walk(content, 0) }
+            Self.trace("\(label) win=\(cls) visible=\(window.isVisible) frame=\(Int(window.frame.minX)),\(Int(window.frame.minY)) \(Int(window.frame.width))x\(Int(window.frame.height)) :: \(parts.joined(separator: " | "))")
+        }
+    }
+
     private func updateCandidates(_ view: CompositionView) {
         lastView = view
         guard let columnWindow = candidatesWindow else { return }
@@ -861,6 +881,11 @@ final class MeltypeInputController: IMKInputController {
                 sendKeyEventsToServerFirst(activeWindow)
                 AnnotationPanel.raiseCandidateWindow()
                 shownIndex = 0
+                // 診断: 格子のときに候補ウィンドウの実体 (サイズ・view 階層・ボタン) を残す。
+                // macOS 26 の IMKit は IMKCandidatePanelType を無視して 1 行の候補バーで描き、
+                // 右端の IMKUICandidateArrowButton を押したときだけ展開する (実測)。
+                // そのボタンをプログラムから押すと IME が SIGTRAP で落ちるため、押さずに記録だけ残す。
+                if usingGrid { traceCandidateWindows("grid-panel") }
             }
             // 本体側で選んでいる候補に、候補ウィンドウの選択 (青いバー) を合わせる。
             // candidateIdentifier(atLineNumber:) は 0 しか返さず使えないので、候補ウィンドウ自身の上下移動で動かす。
