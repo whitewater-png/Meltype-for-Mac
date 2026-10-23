@@ -336,6 +336,9 @@ public sealed class CompositionController
     private readonly HashSet<int> _capturedDown = [];
     private List<Clause> _clauses = [];
     private int _selectedClause;
+    // 変換中に ← → などで文節の選択を動かしたか (本家 #972: 動かしてから BackSpace を押したら、選んだ文節を消す)。
+    // 動かしていない (変換を始めた直後の) BackSpace は、今までどおり未変換の文節の変換を取り消す。
+    private bool _clauseMoved;
     private bool _converting;
     // 変換後も続けて入力 (ContinueAfterConversion): _clauses の先頭 _headCount 個は、選んだ候補のまま固定した文節。
     // 続けて打った文字は、固定した文節とは別の _text (未変換の文節) に入る。0 なら今までどおり。
@@ -447,10 +450,15 @@ public sealed class CompositionController
     {
         var prefix = _clauses.Take(_selectedClause).ToList();
         var suffix = _clauses.Skip(_selectedClause + 1).Select(c => (c.Text, c.Reading, c.IsEnglish)).ToList();
+        // 前の文節が固定済み (_headCount > 0) でも、固定した文節の単位と未変換の文節の単位を
+        // まとめて扱う (固定した文節は _fixedUnits にあり、_text には無いため)。
+        var units = _fixedUnits.Concat(_text.Units).ToList();
+        _text.Clear();
+        _text.PrependUnits(units);
         // 前の文節の単位 (打った英字つき) を覚えておく (Esc で変換前の読みに戻すときに使う)。
-        var units = _text.Units.ToList();
+        var allUnits = _text.Units.ToList();
         _fixedUnits = _text.RemoveLeading(prefix.Select(c => (c.Reading, c.IsEnglish)))
-            ? units.Take(units.Count - _text.Units.Count).ToList()
+            ? allUnits.Take(allUnits.Count - _text.Units.Count).ToList()
             : [];
         _text.Clear();
         _retypeSuffix = suffix.Count > 0 ? suffix : null;
@@ -459,6 +467,7 @@ public sealed class CompositionController
         _selectedClause = 0;
         _converting = false;
         _candidatesMoved = false;
+        _clauseMoved = false;
         _gridCandidates = false;
         _tabStartedConversion = false;
         _spaceStartedConversion = false;
@@ -479,12 +488,20 @@ public sealed class CompositionController
     {
         if (!IsConverting) return;
         _candidatesMoved = true;
-        _selectedClause = last ? _clauses.Count - 1 : 0;
+        var next = last ? _clauses.Count - 1 : 0;
+        if (next != _selectedClause) _clauseMoved = true;
+        _selectedClause = next;
         UpdateView();
     }
 
     /// <summary>選んでいる文節を delta だけ動かす (端では止まる)。</summary>
-    private void MoveClauseBy(int delta) => _selectedClause = Math.Clamp(_selectedClause + delta, 0, _clauses.Count - 1);
+    private void MoveClauseBy(int delta)
+    {
+        var next = Math.Clamp(_selectedClause + delta, 0, _clauses.Count - 1);
+        if (next == _selectedClause) return;
+        _selectedClause = next;
+        _clauseMoved = true;
+    }
 
     /// <summary>
     /// ATOK スタイル (TokMode) の ↓ (部分確定): 先頭から選んでいる文節までを確定し、残りの文節は変換中のまま残して先頭を選ぶ。
@@ -910,6 +927,7 @@ public sealed class CompositionController
         _clipboardCandidate = null;
         _text.Clear();
         _converting = false;
+        _clauseMoved = false;
         _clauses = [];
         _selectedClause = 0;
         _headCount = 0;
@@ -963,6 +981,7 @@ public sealed class CompositionController
         _toggleUndo = null;
         _lastWord = null;
         _converting = false;
+        _clauseMoved = false;
         _tabStartedConversion = false;
         _gridCandidates = false;
         _clauses = [];
@@ -1565,11 +1584,25 @@ public sealed class CompositionController
                 Resize(-1);
                 return true;
             case VirtualKeys.Right:
-                _selectedClause = Math.Min(_selectedClause + 1, _clauses.Count - 1);
+            {
+                var next = Math.Min(_selectedClause + 1, _clauses.Count - 1);
+                if (next != _selectedClause)
+                {
+                    _selectedClause = next;
+                    _clauseMoved = true;
+                }
                 return true;
+            }
             case VirtualKeys.Left:
-                _selectedClause = Math.Max(_selectedClause - 1, 0);
+            {
+                var prev = Math.Max(_selectedClause - 1, 0);
+                if (prev != _selectedClause)
+                {
+                    _selectedClause = prev;
+                    _clauseMoved = true;
+                }
                 return true;
+            }
             case VirtualKeys.Return:
                 Commit();
                 return true;
@@ -1597,7 +1630,7 @@ public sealed class CompositionController
                 // その文節を消して、消した位置から打ち直す。文節を選ばずに押したときは、今までどおり変換を取り消す
                 // (Space を押した直後に間違えて BackSpace を押したときに、打った読みが消えないように)。
                 if (vk == VirtualKeys.Back && _options.DeleteClauseOnBackspace() &&
-                    _headCount == 0 && _selectedClause > 0 && _clauses.Count > 1)
+                    _selectedClause > 0 && _clauses.Count > 1 && (_headCount == 0 || _clauseMoved))
                 {
                     DeleteSelectedClause();
                     return true;
@@ -1654,7 +1687,9 @@ public sealed class CompositionController
         StartConversion();
         if (!_converting) return;
         var shift = _swallowedShift.Count > 0;
-        _selectedClause = vk == VirtualKeys.Left ? _clauses.Count - 1 : _headCount;
+        var next = vk == VirtualKeys.Left ? _clauses.Count - 1 : _headCount;
+        if (next != _selectedClause) _clauseMoved = true;
+        _selectedClause = next;
         if (shift && vk is VirtualKeys.Left or VirtualKeys.Right) Resize(vk == VirtualKeys.Left ? -1 : +1);
         else if (vk == VirtualKeys.Up) NextCandidate(-1);
     }
@@ -1744,6 +1779,7 @@ public sealed class CompositionController
     {
         TrimToFixedClauses();
         _selectedClause = _headCount - 1;
+        _clauseMoved = false;
         _converting = true;
     }
 
@@ -1808,6 +1844,7 @@ public sealed class CompositionController
     {
         _tabStartedConversion = false;
         _gridCandidates = false;
+        _clauseMoved = false;
         // 設定「計算式を変換すると結果を候補に出す」: 数字と + - * / ( ) だけの式 (本家 #796)
         if (_options.CalculatorCandidates() && !_text.KanaInput && _text.Mode == DisplayMode.Auto && Calculator.Evaluate(_text.Raw) is { } result)
         {

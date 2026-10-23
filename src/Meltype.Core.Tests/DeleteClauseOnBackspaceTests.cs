@@ -135,6 +135,42 @@ internal static class DeleteClauseOnBackspaceTests
     }
 
     [Test]
+    public static void On_AfterContinueAfterConversion_DeletesTheMiddleClause()
+    {
+        // 変換後も続けて入力 (ContinueAfterConversion) で前の文節が固定された状態でも、
+        // ← → で真ん中の文節を選んで BackSpace を押したら、その文節だけを消せる (全体を取り消さない)。
+        var k = new CompositionTests.Keyboard { DeleteClauseOnBackspace = true, Continue = true };
+        k.Type("tanniwotoru ");
+        Assert.Equal("単位を|取る", Clauses(k), "前提: 2 文節");
+        k.Type("koto "); // Continue: 「単位を取る」を固定して「こと」を変換
+        Assert.Equal("単位を|取る|こと", Clauses(k), "前提: 固定 + 未変換");
+        // 変換を始めた直後は「こと」(index 2) を選んでいる。← で真ん中の「取る」を選ぶ。
+        k.Press(VirtualKeys.Left);
+        Assert.Equal(1, k.Host.View!.SelectedClause, "前提: 真ん中 (取る) を選んだ");
+        k.Press(VirtualKeys.Back);
+        Assert.Equal("単位をこと", k.Host.View!.Text, "前の文節 (単位を) と後ろの文節 (こと) はそのまま、真ん中 (取る) だけ消える");
+        Assert.True(!k.Host.View!.Converting, "打ち直しの入力中 (変換中ではない)");
+    }
+
+    [Test]
+    public static void On_AfterContinueAfterConversion_DeletesTheMiddleFixedClause_WhenAllFixed()
+    {
+        // 全部の文節が固定された状態 (未変換の文節が無い) でも、真ん中の文節を選んで BackSpace で 1 つだけ消せる。
+        var k = new CompositionTests.Keyboard { DeleteClauseOnBackspace = true, Continue = true };
+        k.Type("e,shiran ");
+        Assert.Equal("え|、|知らん", Clauses(k), "前提: 3 文節");
+        k.Type("ka"); // Continue: 「え、知らん」を固定して「か」を未変換で持つ
+        k.Press(VirtualKeys.Back); // 「か」を消して、最後の固定した文節の選択に戻す
+        Assert.True(k.Host.View!.Converting, "前提: 固定した文節の選択に戻った");
+        Assert.Equal(2, k.Host.View!.SelectedClause, "前提: 最後の文節を選んでいる");
+        k.Press(VirtualKeys.Left); // 真ん中 (、) を選ぶ
+        Assert.Equal(1, k.Host.View!.SelectedClause, "前提: 真ん中を選んだ");
+        k.Press(VirtualKeys.Back);
+        Assert.Equal("え知らん", k.Host.View!.Text, "前の文節 (え) と後ろの文節 (知らん) はそのまま、真ん中 (、) だけ消える");
+        Assert.True(!k.Host.View!.Converting, "打ち直しの入力中 (変換中ではない)");
+    }
+
+    [Test]
     public static void Caret_IsSetToTheRetypePosition()
     {
         var k = new CompositionTests.Keyboard { DeleteClauseOnBackspace = true };
