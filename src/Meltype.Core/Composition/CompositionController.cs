@@ -23,7 +23,8 @@ public sealed record CompositionView(
     string? Meaning = null,
     string? Suggestion = null,
     IReadOnlyList<string>? Predictions = null,
-    int SelectedPrediction = -1);
+    int SelectedPrediction = -1,
+    bool Grid = false);
 
 /// <summary>CompositionController が外界とやり取りする口。テストでは偽物に差し替える。</summary>
 public interface ICompositionHost
@@ -104,6 +105,13 @@ public sealed class CompositionOptions
     /// 既定は false (今までどおり、確定して Tab をアプリに渡す)。
     /// </summary>
     public Func<bool> TabConversion { get; init; } = () => false;
+
+    /// <summary>
+    /// 変換中に Tab を押したら、確定せずに次の候補へ移り、候補の一覧を格子状 (5 列) に広げて出すか
+    /// (本家 #1016 の Mac 版)。既定は false (今までどおり確定して Tab をアプリに渡す)。
+    /// ON のときは View の Grid が true になり、Mac 版が IMKCandidates を格子状のパネルで出す。
+    /// </summary>
+    public Func<bool> TabGrid { get; init; } = () => false;
 
     /// <summary>
     /// 今のアプリがコード系 (ターミナル・エディタ。AppProfile.Code) か。コード系の語の頭では、コマンド名 (cd・ls・make) を確定で英字にする (K79)。
@@ -606,6 +614,7 @@ public sealed class CompositionController
         _reconvertOriginal = text;
         _reconvertRomaji = true;
         _tabStartedConversion = false;
+        _gridCandidates = false;
         foreach (var c in converted) _text.AppendKana(c, c);
         _text.Mode = DisplayMode.Hiragana;
         // 候補を開くだけなので、Expanded にして変換エンジンの追加候補 (読み = 日本語にした文) を引かない
@@ -892,6 +901,7 @@ public sealed class CompositionController
         _lastWord = null;
         _converting = false;
         _tabStartedConversion = false;
+        _gridCandidates = false;
         _clauses = [];
         _headCount = 0;
         _fixedUnits = [];
@@ -1494,8 +1504,11 @@ public sealed class CompositionController
                 FixMisspelling(typo);
                 StartConversion();
                 return true;
-            case VirtualKeys.Tab when _tabStartedConversion:
+            case VirtualKeys.Tab when _tabStartedConversion || _options.TabGrid():
                 // Tab で始めた変換の中では、Tab が次の候補、Shift+Tab が前の候補 (issue #219)。Space で始めた変換の中の Tab は今までどおり (確定して Tab を渡す)。
+                // 「Tab で候補を格子状に広げる」が ON のときは、Space で始めた変換でも Tab で確定せずに次の候補へ移り、
+                // 格子状の候補ウィンドウを出す (本家 #1016)。
+                if (_options.TabGrid()) _gridCandidates = true;
                 NextCandidate(shift || _host.IsShiftDown() ? -1 : +1);
                 return true;
             case VirtualKeys.Escape when _toggleBox is { } toggleBox && _headCount == 0:
@@ -1690,6 +1703,7 @@ public sealed class CompositionController
     private void StartConversion(bool preferJapanese = false)
     {
         _tabStartedConversion = false;
+        _gridCandidates = false;
         // 設定「計算式を変換すると結果を候補に出す」: 数字と + - * / ( ) だけの式 (本家 #796)
         if (_options.CalculatorCandidates() && !_text.KanaInput && _text.Mode == DisplayMode.Auto && Calculator.Evaluate(_text.Raw) is { } result)
         {
@@ -2914,6 +2928,12 @@ public sealed class CompositionController
     /// <summary>今の変換を Tab で始めたか (変換中の Tab で候補を送るため。issue #219)。</summary>
     private bool _tabStartedConversion;
 
+    /// <summary>
+    /// この変換で「Tab で格子状に広げる」(TabGrid) が効いたか。ON のとき、変換中の Tab で候補ウィンドウを
+    /// 格子状 (5 列) に広げる。変換を始め直すと false に戻す (本家 #1016)。
+    /// </summary>
+    private bool _gridCandidates;
+
     /// <summary>変換を始めてから、候補を動かす操作 (Space・↓・↑・PageUp/Down・← →) をしたか。TypeDigitsAfterConversion が ON のとき、動かす前の数字は入力になる。</summary>
     private bool _candidatesMoved;
 
@@ -3516,7 +3536,8 @@ public sealed class CompositionController
                 _selectedClause,
                 CandidateNotes(selected),
                 _options.CandidateMeanings() ? CandidateMeaning(selected) : null,
-                MisspellingSuggestion()));
+                MisspellingSuggestion(),
+                Grid: _gridCandidates));
         }
         else
         {

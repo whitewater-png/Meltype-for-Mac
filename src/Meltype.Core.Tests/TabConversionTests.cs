@@ -300,4 +300,77 @@ internal static class TabConversionTests
         Assert.Equal(Run(false, true), Run(true, true), "Esc: 設定 ON でも OFF と同じ");
         Assert.Equal("amazon", Run(true, true).Doc, "Esc 1 回で元の語に戻る");
     }
+
+    // ---- 「Tab で候補を格子状に広げる」(本家 #1016 の Mac 版) ----
+
+    [Test]
+    public static void TabGridDefaultIsOff()
+    {
+        // Mac 版は既定 OFF (今までどおり、変換中の Tab で確定してアプリに渡す)
+        Assert.True(!new Meltype.Config.Settings().TabGridCandidates, "設定の既定は OFF");
+        Assert.True(!new CompositionOptions().TabGrid(), "CompositionOptions の既定も OFF");
+    }
+
+    [Test]
+    public static void TabGridInSpaceConversion_MovesNextAndShowsGrid()
+    {
+        var k = new CompositionTests.Keyboard { TabGrid = true };
+        k.Type("kana ");
+        Assert.True(k.Host.View?.Converting == true, "前提: Space で変換が始まる");
+        Assert.True(k.Host.View?.Grid != true, "前提: 最初は 1 列");
+        var first = k.Showing;
+        k.Press(VirtualKeys.Tab);
+        Assert.True(k.Host.View?.Converting == true, "Tab で確定しない (変換のまま)");
+        Assert.True(k.Host.View?.Grid == true, "格子状に広げる");
+        Assert.True(k.Showing != first, "次の候補へ移る");
+        Assert.True(!k.Host.Events.Any(e => e == "down:09"), "Tab はアプリに渡さない: " + string.Join("|", k.Host.Events));
+    }
+
+    [Test]
+    public static void TabGrid_ShiftTabMovesPreviousAndKeepsGrid()
+    {
+        var k = new CompositionTests.Keyboard { TabGrid = true };
+        k.Type("kana ");
+        k.Press(VirtualKeys.Tab);
+        var second = k.Showing;
+        ShiftTab(k);
+        Assert.True(k.Host.View?.Grid == true, "Shift+Tab でも格子のまま");
+        Assert.True(k.Showing != second, "前の候補へ戻る");
+        Assert.True(!k.Host.Events.Any(e => e == "down:09"), "Tab はアプリに渡さない: " + string.Join("|", k.Host.Events));
+    }
+
+    [Test]
+    public static void TabGrid_ResetsOnNextConversion()
+    {
+        var k = new CompositionTests.Keyboard { TabGrid = true };
+        k.Type("kana ");
+        k.Press(VirtualKeys.Tab);
+        Assert.True(k.Host.View?.Grid == true, "前提: 格子状");
+        k.Press(VirtualKeys.Return);
+        Assert.True(k.Host.View?.Converting != true, "前提: 確定した");
+        k.Type("sushi ");
+        Assert.True(k.Host.View?.Converting == true, "次の変換が始まる");
+        Assert.True(k.Host.View?.Grid != true, "次の変換は 1 列から (格子を引きずらない)");
+    }
+
+    [Test]
+    public static void TabGridOff_ConvertsAndPassesTab_AsBefore()
+    {
+        var k = new CompositionTests.Keyboard();
+        k.Type("kana ");
+        Assert.True(k.Host.View?.Converting == true, "前提: Space で変換が始まる");
+        Assert.True(k.Host.View?.Grid != true, "格子状にはしない");
+        k.Press(VirtualKeys.Tab);
+        Assert.True(k.Host.View?.Converting != true, "確定する (今までどおり)");
+        Assert.True(k.Host.Events.Contains("down:09"), "Tab はアプリに渡す: " + string.Join("|", k.Host.Events));
+    }
+
+    [Test]
+    public static void Json_WritesGridOnlyWhenSet()
+    {
+        var grid = new CompositionView("テスト", ["テスト", "手すと"], 0, true, "", Grid: true);
+        Assert.True(new SessionResult(true, [], grid).ToJson().Contains("\"grid\":true"), "格子のときは書く");
+        var single = new CompositionView("テスト", ["テスト", "手すと"], 0, true, "");
+        Assert.True(!new SessionResult(true, [], single).ToJson().Contains("\"grid\""), "1 列のときは書かない");
+    }
 }

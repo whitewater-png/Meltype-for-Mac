@@ -773,9 +773,37 @@ final class MeltypeInputController: IMKInputController {
         window.setAttributes([IMKCandidatesSendServerKeyEventFirst as String: true])
     }
 
+    /// 候補ウィンドウの選択 (青いバー) を、本体 (Core) が選んでいる候補へ合わせる。
+    /// 1 列のときは上下だけ。格子 (kIMKScrollingGridCandidatePanel は 5 列) のときは、行を上下・列を左右で動かす。
+    /// moveDown / moveUp / moveRight / moveLeft は NSResponder の標準の動作メソッドで、IMKCandidates が受け取る。
+    private func moveSelection(of window: IMKCandidates, from shown: inout Int, to target: Int, grid: Bool) {
+        guard shown != target else { return }
+        guard grid else {
+            while shown < target { window.moveDown(nil); shown += 1 }
+            while shown > target { window.moveUp(nil); shown -= 1 }
+            return
+        }
+        // 格子は 5 列 (IMKCandidates.h の kIMKScrollingGridCandidatePanel の説明)。行は上下、列は左右で動かす。
+        let columns = 5
+        while shown / columns < target / columns { window.moveDown(nil); shown += columns }
+        while shown / columns > target / columns { window.moveUp(nil); shown -= columns }
+        while shown % columns < target % columns { window.moveRight(nil); shown += 1 }
+        while shown % columns > target % columns { window.moveLeft(nil); shown -= 1 }
+    }
+
     private func updateCandidates(_ view: CompositionView) {
         lastView = view
         guard let window = candidatesWindow else { return }
+        // 設定「Tab で候補を格子状に広げる」: 本体 (Core) が格子を求めているときだけ格子状 (5 列) のパネルにする。
+        // 変換が終わったとき・予測候補のときは 1 列に戻す (次の変換は今までどおり 1 列から見せる)。
+        // パネルの種類を変えたら候補を作り直して出し直す (選択は先頭に戻る)。
+        let wantGrid = view.converting && view.grid == true
+        if wantGrid != candidatesGridPanelShown {
+            window.setPanelType(wantGrid ? kIMKScrollingGridCandidatePanel : kIMKSingleColumnScrollingCandidatePanel)
+            candidatesGridPanelShown = wantGrid
+            candidateList = []
+            meaningKey = nil
+        }
         if !view.converting && !view.predictions.isEmpty {
             updatePredictions(view, window: window)
         } else if view.converting && view.candidates.count > 1 {
@@ -805,8 +833,13 @@ final class MeltypeInputController: IMKInputController {
                 shownIndex = 0
                 sendKeyEventsToServerFirst(window)
             }
-            while shownIndex < target { window.moveDown(nil); shownIndex += 1 }
-            while shownIndex > target { window.moveUp(nil); shownIndex -= 1 }
+            moveSelection(of: window, from: &shownIndex, to: target, grid: wantGrid)
+            // 格子状のときは、行 (上下) と列 (左右) で動かしている。動かし方が IMK の実装と合っているかを
+            // 実機で確かめられるよう、Core の選択と候補ウィンドウの選択がずれていたら番号だけを残す (語は書かない)。
+            if wantGrid, let selected = window.selectedCandidateString()?.string,
+               let actual = candidateList.firstIndex(of: selected), actual != target {
+                Self.trace("格子の候補の選択が Core とずれた: core=\(target) window=\(actual)")
+            }
             scheduleMeaning(view)
         } else {
             meaningKey = nil

@@ -221,6 +221,16 @@ public sealed class Settings
      Description("打っている途中に Tab を押すと、Space と同じく変換を始めます (Microsoft IME と同じ)。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、今までどおり確定してから Tab をアプリに渡します。")]
     public bool TabConversion { get; set; }
 
+    /// <summary>
+    /// 変換中に Tab を押したら、候補の一覧を格子状 (5 列) に広げて出すか (本家 #1016 の Mac 版)。
+    /// 変換中は Tab で確定せず、次の候補へ移る (Shift+Tab は前の候補)。既定は OFF (今までどおり確定して Tab をアプリに渡す)。
+    /// Windows 版の設定画面には出さない (Windows 版は格子状の表示に対応していないため。[Browsable(false)] で隠す)。
+    /// </summary>
+    [Category("1. 全般"), DisplayName("Tab で候補を格子状に広げる"),
+     Description("変換中に Tab を押すと、候補の一覧を格子状 (5 列) に広げて出します (本家 #1016)。変換中は Tab で確定せず、次の候補へ移ります (Shift+Tab は前の候補、Enter で確定)。候補が 10 件以上あるときも、ページ送りをせずに一覧を見渡せます。OFF のときは、今までどおり変換中の Tab で確定してアプリに渡します。")]
+    [Browsable(false)]
+    public bool TabGridCandidates { get; set; }
+
     [Category("1. 全般"), DisplayName("確定した直後の語を Ctrl+' / Ctrl+J で直す"),
      Description("確定した直後の語を Ctrl+' で英字に、Ctrl+J でかなに直します (F10 / F6 と同じ)。ターミナルの Ctrl+J (改行) と重なるので既定は OFF。現在は Mac 版だけで動きます。")]
     public bool ToggleLastWordCtrlKeys { get; set; }

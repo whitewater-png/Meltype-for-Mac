@@ -66,6 +66,8 @@ public sealed record SessionResult(bool Consumed, IReadOnlyList<TextEdit> Commit
         builder.Append(",\"predictions\":");
         AppendArray(builder, view.Predictions ?? []);
         builder.Append(",\"selectedPrediction\":").AppendInt(view.SelectedPrediction);
+        // 格子状に広げて出すときだけ書く (Swift は無いキーを false として読む。ふつうの結果の JSON は今までと同じ形のまま)
+        if (view.Grid) builder.Append(",\"grid\":true");
         AppendNotes(builder, view);
         builder.Append("}}");
         return builder.ToString();
@@ -183,6 +185,8 @@ public sealed class MeltypeSession
             // ATOK スタイルのキー操作。config.json の変更 (「Meltype 辞書」の「設定」タブ) がすぐ効くよう、共有の値を毎回見る。
             TokMode = () => shared.Current.TokMode,
             TabConversion = () => shared.Current.TabConversion,
+            // 変換中の Tab で候補を格子状 (5 列) に広げる (本家 #1016)。既定は OFF (今までどおり確定して Tab をアプリに渡す)。
+            TabGrid = () => shared.Current.TabGridCandidates,
             // コード系アプリ (ターミナルなど) の行頭では、コマンド名 (cd・ls・make) を確定で英字にする。設定ではなくアプリの種類で決まる。
             CodeApp = () => session?.AppProfile == AppProfile.Code,
             // 確定した直後の語を直す Ctrl+' / Ctrl+J。既定は OFF (Ctrl+J はターミナルの改行と重なる)。

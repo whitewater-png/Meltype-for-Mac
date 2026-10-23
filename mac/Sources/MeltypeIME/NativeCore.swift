@@ -163,6 +163,9 @@ struct CompositionView: Decodable {
     /// 予測変換の候補と、Tab で入って選んでいる位置 (入っていなければ -1)。
     let predictions: [String]
     let selectedPrediction: Int
+    /// 候補の一覧を格子状 (5 列) に広げて出すか (設定「Tab で候補を格子状に広げる」で、変換中に Tab を押したとき)。
+    /// 無いキーは nil として読み、false と同じに扱う (古い本体の JSON でも読める。本家 #1016)。
+    let grid: Bool?
 }
 
 /// 専門用語集の分野 (meltype_term_domains の 1 行: ID・名称・語数・有効か・自作か)。

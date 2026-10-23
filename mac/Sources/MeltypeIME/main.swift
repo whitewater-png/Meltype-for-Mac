@@ -29,6 +29,10 @@ guard let bundleIdentifier = Bundle.main.bundleIdentifier,
 /// 変換の候補の一覧 (すべての入力欄で共有する)。
 var candidatesWindow: IMKCandidates? = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
 
+/// 今 candidatesWindow を格子状 (5 列) のパネルで出しているか (設定「Tab で候補を格子状に広げる」)。
+/// 候補ウィンドウはすべての入力欄で共有なので、パネルの種類の印も共有する (入力欄ごとに持つと、別の入力欄で食い違う)。
+var candidatesGridPanelShown = false
+
 // 本体 (libMeltypeNative.dylib) を読み込み、漢字変換・英単語の判定の関数を登録しておく。
 NativeCore.shared.initialize()
 
