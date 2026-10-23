@@ -26,12 +26,31 @@ guard let bundleIdentifier = Bundle.main.bundleIdentifier,
     exit(1)
 }
 
-/// 変換の候補の一覧 (すべての入力欄で共有する)。
-var candidatesWindow: IMKCandidates? = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
+/// 格子の候補ウィンドウを作るときにも使う (main.swift の外から参照できるようにする)。
+/// トップレベル関数から guard の束縛 (server) を直接つかむと、ほかのファイルから呼んだときに
+/// 「closure captures 'server' before it is declared」になるため、モジュール全体で見える変数に入れる。
+let candidatesServer: IMKServer = server
 
-/// 今 candidatesWindow を格子状 (5 列) のパネルで出しているか (設定「Tab で候補を格子状に広げる」)。
-/// 候補ウィンドウはすべての入力欄で共有なので、パネルの種類の印も共有する (入力欄ごとに持つと、別の入力欄で食い違う)。
+/// 変換の候補の一覧 (すべての入力欄で共有する)。1 列の候補ウィンドウ。
+var candidatesWindow: IMKCandidates? = IMKCandidates(server: candidatesServer, panelType: kIMKSingleColumnScrollingCandidatePanel)
+
+/// 格子状 (5 列) の候補ウィンドウ。設定「Tab で候補を格子状に広げる」で初めて格子を出すときに作る (既定では作らない)。
+/// 候補ウィンドウはすべての入力欄で共有なので、2 つ目のウィンドウも共有する (入力欄ごとに持つと、別の入力欄で食い違う)。
+var candidatesGridWindow: IMKCandidates?
+
+/// 直前に出していた候補ウィンドウが格子か (設定「Tab で候補を格子状に広げる」)。
+/// 隠したあとも最後の種類を覚え、次に出すときに切り替えが必要かを見る。
+/// 候補ウィンドウはすべての入力欄で共有なので、どちらを出しているかの印も共有する (入力欄ごとに持つと、別の入力欄で食い違う)。
 var candidatesGridPanelShown = false
+
+/// 格子の候補ウィンドウを返す。初めて格子を出すときだけ作る (既定の 1 列のときは作らない)。
+/// 作成後の setPanelType は実機で再レイアウトに反映されないため、格子は最初から格子種別で作ったこのウィンドウで出す (経路3)。
+func gridCandidatesWindow() -> IMKCandidates? {
+    if candidatesGridWindow == nil {
+        candidatesGridWindow = IMKCandidates(server: candidatesServer, panelType: kIMKScrollingGridCandidatePanel)
+    }
+    return candidatesGridWindow
+}
 
 // 本体 (libMeltypeNative.dylib) を読み込み、漢字変換・英単語の判定の関数を登録しておく。
 NativeCore.shared.initialize()

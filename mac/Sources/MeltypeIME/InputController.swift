@@ -296,7 +296,7 @@ final class MeltypeInputController: IMKInputController {
         meaningKey = nil
         Self.trace("deactivateServer bundle=\(bundleID ?? "nil")")
         commitComposition(sender)
-        candidatesWindow?.hide()
+        hideCandidateWindows()
         AnnotationPanel.shared.hide()
         super.deactivateServer(sender)
     }
@@ -305,6 +305,21 @@ final class MeltypeInputController: IMKInputController {
 
     override func candidates(_ sender: Any!) -> [Any]! {
         candidateList
+    }
+
+    /// 候補ウィンドウ (1 列と格子の 2 つ) を両方隠す。可視なのは常に 1 つだが、切り替えの取りこぼしで
+    /// 隠し忘れたウィンドウが残らないよう、隠すときは両方 hide する。
+    private func hideCandidateWindows() {
+        candidatesWindow?.hide()
+        candidatesGridWindow?.hide()
+    }
+
+    /// 今 可視な候補ウィンドウ (格子か 1 列か)。見つからなければ nil。
+    /// 候補の意味を出すタイマーは、このウィンドウが可視のあいだだけ出す (切り替えで隠れたら出さない)。
+    private func visibleCandidatesWindow() -> IMKCandidates? {
+        if let grid = candidatesGridWindow, grid.isVisible() { return grid }
+        if let column = candidatesWindow, column.isVisible() { return column }
+        return nil
     }
 
     /// updateCandidates で候補ウィンドウの選択を合わせている間か (そのときの候補ウィンドウからの通知は無視する)。
@@ -702,7 +717,7 @@ final class MeltypeInputController: IMKInputController {
         shownIndex = 0
         lastView = nil
         AnnotationPanel.shared.hide()
-        candidatesWindow?.hide()
+        hideCandidateWindows()
     }
 
     private func addMark(_ style: Int, to text: NSMutableAttributedString, range: NSRange) {
@@ -741,13 +756,15 @@ final class MeltypeInputController: IMKInputController {
         guard key != nil else { return }
         let generation = meaningGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            guard let self, self.meaningGeneration == generation, let window = candidatesWindow, window.isVisible() else { return }
+            // 可視なのは格子か 1 列のどちらか 1 つ。切り替えで隠れたら意味を出さない (可視ウィンドウを基準にする)。
+            guard let self, self.meaningGeneration == generation, self.visibleCandidatesWindow() != nil else { return }
             if let meaning = view.meaning {
                 self.presentMeaning(meaning)
             } else if let dictionaryWord {
                 // 辞書は別のキューで引く。戻ってきたとき候補が変わっていなければ (meaningGeneration が同じ) 出す。
                 CandidateDictionary.lookup(dictionaryWord) { [weak self] summary in
-                    guard let self, self.meaningGeneration == generation, let summary, let window = candidatesWindow, window.isVisible() else { return }
+                    guard let self, self.meaningGeneration == generation, let summary,
+                          self.visibleCandidatesWindow() != nil else { return }
                     self.presentMeaning(summary)
                 }
             }
@@ -793,43 +810,55 @@ final class MeltypeInputController: IMKInputController {
 
     private func updateCandidates(_ view: CompositionView) {
         lastView = view
-        guard let window = candidatesWindow else { return }
+        guard let columnWindow = candidatesWindow else { return }
         // 設定「Tab で候補を格子状に広げる」: 本体 (Core) が格子を求めているときだけ格子状 (5 列) のパネルにする。
         // 変換が終わったとき・予測候補のときは 1 列に戻す (次の変換は今までどおり 1 列から見せる)。
-        // パネルの種類を変えたら候補を作り直して出し直す (選択は先頭に戻る)。
+        // 実機では作成後の setPanelType が再レイアウトに反映されず横一列のままになるため、格子は最初から格子種別で
+        // 作った 2 つ目のウィンドウ (gridCandidatesWindow) で出す (経路3)。1 列は今までどおり candidatesWindow を使う。
         let wantGrid = view.converting && view.grid == true
-        let panelTypeChanged = wantGrid != candidatesGridPanelShown
-        if panelTypeChanged {
-            // 可視のまま setPanelType しても再レイアウトされず、横一列のままになる (実機で確認)。
-            // いったん隠してから種別を変え、候補を入れ直して出し直す。
-            window.hide()
-            window.setPanelType(wantGrid ? kIMKScrollingGridCandidatePanel : kIMKSingleColumnScrollingCandidatePanel)
-            candidatesGridPanelShown = wantGrid
+        // 格子のときだけ 2 つ目のウィンドウを作る (格子 OFF の既定では作らない)。
+        // 作れなかったときは安全側に倒して 1 列のウィンドウで出す。
+        let gridWindow = wantGrid ? gridCandidatesWindow() : nil
+        let usingGrid = gridWindow != nil
+        let activeWindow = gridWindow ?? columnWindow
+        // 可視なのは常に 1 つ。切り替えるときは前のウィンドウを隠し、候補を作り直して選択を先頭に戻す。
+        let windowChanged = usingGrid != candidatesGridPanelShown
+        if windowChanged {
+            hideCandidateWindows()
+            candidatesGridPanelShown = usingGrid
+            // 種別の呼び出しは残す (格子の表示は 2 つ目のウィンドウで行うが、出し直す側の種別を明示しておく)。
+            activeWindow.setPanelType(usingGrid ? kIMKScrollingGridCandidatePanel : kIMKSingleColumnScrollingCandidatePanel)
             candidateList = []
             meaningKey = nil
-            let panelName = wantGrid ? "grid" : "column"
+            shownIndex = 0
+            let panelName = usingGrid ? "grid" : "column"
             let count = view.converting ? view.candidates.count : view.predictions.count
-            Self.trace("panel=\(panelName) count=\(count)" + (wantGrid ? " grid=showCandidates" : ""))
+            Self.trace("panel=\(panelName) count=\(count)" + (usingGrid ? " grid=secondWindow" : ""))
         }
+        // どちらのウィンドウも、キーをコントローラーへ先に送る属性を付けておく (update() / show() で戻ることがある)。
+        sendKeyEventsToServerFirst(columnWindow)
+        if let gridWindow { sendKeyEventsToServerFirst(gridWindow) }
         if !view.converting && !view.predictions.isEmpty {
-            updatePredictions(view, window: window)
+            updatePredictions(view, window: activeWindow)
         } else if view.converting && view.candidates.count > 1 {
             // IMKCandidates は標準では Space を候補確定に使い、コントローラーに渡さない。
             // Space で本体の次候補処理を呼べるよう、キーイベントを先にコントローラーへ配送する。
-            sendKeyEventsToServerFirst(window)
-            if panelTypeChanged || view.candidates != candidateList || !window.isVisible() {
+            sendKeyEventsToServerFirst(activeWindow)
+            if windowChanged || view.candidates != candidateList || !activeWindow.isVisible() {
                 // 候補が変わったときだけ、IMKCandidates に候補一覧を再取得させる (選択は先頭に戻る)。
                 // 候補ウィンドウを出し直すので、出していた意味は捨てる。
                 meaningKey = nil
                 candidateList = view.candidates
-                window.update()
-                window.show(kIMKLocateCandidatesBelowHint)
+                // 可視なのは常に 1 つ。出し直す前に、使わない側のウィンドウを隠しておく。
+                if usingGrid { columnWindow.hide() } else { candidatesGridWindow?.hide() }
+                activeWindow.update()
+                activeWindow.show(kIMKLocateCandidatesBelowHint)
                 // 下向き三角 (格子表示) と同じ経路で出し直す。show(_:) は位置を合わせるだけなので、
                 // パネルの種別を反映した表示は showCandidates (Swift では show()) に任せる。
-                if wantGrid {
-                    window.show()
+                if usingGrid {
+                    activeWindow.show()
                 }
-                sendKeyEventsToServerFirst(window)
+                sendKeyEventsToServerFirst(activeWindow)
                 AnnotationPanel.raiseCandidateWindow()
                 shownIndex = 0
             }
@@ -841,14 +870,14 @@ final class MeltypeInputController: IMKInputController {
             defer { isSelectingProgrammatically = false }
             if target < shownIndex - target {
                 // 先頭に近い候補へ戻るとき (最後の候補から先頭に戻ったときなど) は、上へ何十回も動かさずに一覧を読み直す
-                window.update()
+                activeWindow.update()
                 shownIndex = 0
-                sendKeyEventsToServerFirst(window)
+                sendKeyEventsToServerFirst(activeWindow)
             }
-            moveSelection(of: window, from: &shownIndex, to: target, grid: wantGrid)
+            moveSelection(of: activeWindow, from: &shownIndex, to: target, grid: usingGrid)
             // 格子状のときは、行 (上下) と列 (左右) で動かしている。動かし方が IMK の実装と合っているかを
             // 実機で確かめられるよう、Core の選択と候補ウィンドウの選択がずれていたら番号だけを残す (語は書かない)。
-            if wantGrid, let selected = window.selectedCandidateString()?.string,
+            if usingGrid, let selected = activeWindow.selectedCandidateString()?.string,
                let actual = candidateList.firstIndex(of: selected), actual != target {
                 Self.trace("格子の候補の選択が Core とずれた: core=\(target) window=\(actual)")
             }
@@ -858,7 +887,7 @@ final class MeltypeInputController: IMKInputController {
             candidateList = []
             shownIndex = 0
             AnnotationPanel.shared.hide()
-            window.hide()
+            hideCandidateWindows()
         }
     }
 
@@ -866,6 +895,8 @@ final class MeltypeInputController: IMKInputController {
     /// (IMKCandidates に「非選択」は無いので先頭に青いバーが乗る)。
     private func updatePredictions(_ view: CompositionView, window: IMKCandidates) {
         meaningKey = nil
+        // 予測候補は 1 列のウィンドウで出す。格子のウィンドウが残っていれば隠す (可視なのは常に 1 つ)。
+        candidatesGridWindow?.hide()
         // Tab・Enter・矢印・Delete を、候補ウィンドウより先に本体へ渡す (変換中と同じ)。
         sendKeyEventsToServerFirst(window)
         if view.predictions != candidateList || !window.isVisible() {
