@@ -12,6 +12,10 @@ import InputMethodKit
 final class MeltypeInputController: IMKInputController {
     private var session: UnsafeMutableRawPointer?
     private var candidateList: [String] = []
+    /// 格子 (5 列) を出す自前のパネル。設定「Tab で候補を格子状に広げる」で格子を出すまで作らない (既定 OFF では作らない)。
+    private var gridPanel: GridCandidatePanel?
+    /// 格子を出したときの左上 (画面座標)。IMK の候補バーは隠すので、2 回目以降は測り直さずこの位置に置き直す。
+    private var gridAnchor: NSPoint?
     /// 入力メニューの項目 (tag = 番号) ごとの引数。menu() を作るたびに作り直す。
     /// IMK はメニュー項目の action に NSMenuItem ではなく infoDictionary を渡すので、representedObject には頼らず、tag で引く。
     private var menuPayloads: [[String]] = []
@@ -307,17 +311,21 @@ final class MeltypeInputController: IMKInputController {
         candidateList
     }
 
-    /// 候補ウィンドウ (1 列と格子の 2 つ) を両方隠す。可視なのは常に 1 つだが、切り替えの取りこぼしで
-    /// 隠し忘れたウィンドウが残らないよう、隠すときは両方 hide する。
-    private func hideCandidateWindows() {
+    /// 候補ウィンドウを隠す (IMK の 1 行バーと、自前の格子のパネル)。
+    /// 格子を出し直すときだけ includingGrid = false にして、自前のパネルはそのまま使い回す (点滅させない)。
+    private func hideCandidateWindows(includingGrid: Bool = true) {
         candidatesWindow?.hide()
-        candidatesGridWindow?.hide()
+        if includingGrid {
+            gridPanel?.hide()
+            gridAnchor = nil
+        }
     }
 
-    /// 今 可視な候補ウィンドウ (格子か 1 列か)。見つからなければ nil。
+    /// 今 可視な候補ウィンドウ (IMK の 1 行バー)。見つからなければ nil。
     /// 候補の意味を出すタイマーは、このウィンドウが可視のあいだだけ出す (切り替えで隠れたら出さない)。
+    /// 格子は自前のパネルで出していて、そのあいだ IMK のバーは隠している。意味のパネルは候補バーの
+    /// 横に置くので、格子のあいだは意味を出さない (visible が nil になり、タイマーが止まる)。
     private func visibleCandidatesWindow() -> IMKCandidates? {
-        if let grid = candidatesGridWindow, grid.isVisible() { return grid }
         if let column = candidatesWindow, column.isVisible() { return column }
         return nil
     }
@@ -790,102 +798,99 @@ final class MeltypeInputController: IMKInputController {
         window.setAttributes([IMKCandidatesSendServerKeyEventFirst as String: true])
     }
 
-    /// 候補ウィンドウの選択 (青いバー) を、本体 (Core) が選んでいる候補へ合わせる。
-    /// 1 列のときは上下だけ。格子 (kIMKScrollingGridCandidatePanel は 5 列) のときは、行を上下・列を左右で動かす。
-    /// moveDown / moveUp / moveRight / moveLeft は NSResponder の標準の動作メソッドで、IMKCandidates が受け取る。
-    private func moveSelection(of window: IMKCandidates, from shown: inout Int, to target: Int, grid: Bool) {
-        guard shown != target else { return }
-        guard grid else {
-            while shown < target { window.moveDown(nil); shown += 1 }
-            while shown > target { window.moveUp(nil); shown -= 1 }
-            return
-        }
-        // 格子は 5 列 (IMKCandidates.h の kIMKScrollingGridCandidatePanel の説明)。行は上下、列は左右で動かす。
-        let columns = 5
-        while shown / columns < target / columns { window.moveDown(nil); shown += columns }
-        while shown / columns > target / columns { window.moveUp(nil); shown -= columns }
-        while shown % columns < target % columns { window.moveRight(nil); shown += 1 }
-        while shown % columns > target % columns { window.moveLeft(nil); shown -= 1 }
+    /// 可視の候補バー (IMK の IMKUIPanel) の frame (画面座標)。macOS 26 の IMK はここに 1 行のバーを出す。
+    /// 格子はこの左上に合わせて自前で描くので、隠す前に控える。見つからなければ nil。
+    private static func visibleCandidateBarFrame() -> NSRect? {
+        NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).contains("IMKUIPanel") }?.frame
     }
 
-    /// 診断: 候補ウィンドウの実体 (クラス・位置・大きさ・view 階層・ボタン) を 1 行で書き出す。
-    /// 「格子に広げる」下向き三角が NSButton として存在するかを確かめるため (語は書かない)。
-    private func traceCandidateWindows(_ label: String) {
-        guard Self.trace else { return }
-        for window in NSApp.windows {
-            let cls = NSStringFromClass(type(of: window))
-            guard cls.contains("IMK") || cls.contains("Candidate") || cls.contains("Meltype") else { continue }
-            var parts: [String] = []
-            func walk(_ view: NSView, _ depth: Int) {
-                let f = view.frame
-                var desc = "\(depth):\(NSStringFromClass(type(of: view)))[\(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height))]"
-                if let button = view as? NSButton { desc += "{btn:\(button.title)}" }
-                parts.append(desc)
-                for sub in view.subviews { walk(sub, depth + 1) }
-            }
-            if let content = window.contentView { walk(content, 0) }
-            Self.trace("\(label) win=\(cls) visible=\(window.isVisible) frame=\(Int(window.frame.minX)),\(Int(window.frame.minY)) \(Int(window.frame.width))x\(Int(window.frame.height)) :: \(parts.joined(separator: " | "))")
+    /// 入力欄のキャレットの左上 (画面座標)。候補バーがまだ出ていないときに、格子を出す位置の代わりに使う。
+    private func caretTopLeft(client: (any IMKTextInput)?) -> NSPoint? {
+        guard let client else { return nil }
+        var rect = NSRect.zero
+        client.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
+        guard rect.width > 0 || rect.height > 0 else { return nil }
+        return NSPoint(x: rect.minX, y: rect.maxY)
+    }
+
+    /// 格子 (5 列) を自前のパネルで出す。IMK の候補バーは隠す (バーと格子が二重に出ないように)。
+    /// 位置は控えたバーの左上に合わせ、2 回目以降は同じ位置へ置き直す (バーを隠したあとは測り直せない)。
+    private func showGrid(_ view: CompositionView) {
+        // 隠す前に候補バーの位置を控える (隠したあとでは枠が残らない)。
+        let barFrame = Self.visibleCandidateBarFrame()
+        hideCandidateWindows(includingGrid: false)
+        meaningKey = nil
+        candidateList = view.candidates
+        let selected = min(max(view.selectedIndex, 0), view.candidates.count - 1)
+        shownIndex = selected
+        let panel: GridCandidatePanel
+        if let existing = gridPanel {
+            panel = existing
+        } else {
+            let created = GridCandidatePanel()
+            created.onSelect = { [weak self] index in self?.selectFromGrid(index) }
+            gridPanel = created
+            panel = created
         }
+        panel.update(candidates: view.candidates, selected: selected)
+        let anchor: NSPoint
+        if panel.isVisible, let existing = gridAnchor {
+            anchor = existing
+        } else {
+            anchor = barFrame.map { NSPoint(x: $0.minX, y: $0.maxY) }
+                ?? caretTopLeft(client: client())
+                ?? NSEvent.mouseLocation
+        }
+        gridAnchor = anchor
+        panel.place(topLeft: anchor)
+        Self.trace("panel=custom count=\(view.candidates.count) rows=\((view.candidates.count + 4) / 5)")
+    }
+
+    /// 格子のセルが押された。候補ウィンドウのクリックと同じ経路 (candidateSelected) で確定する。
+    private func selectFromGrid(_ index: Int) {
+        guard candidateList.indices.contains(index) else { return }
+        candidateSelected(NSAttributedString(string: candidateList[index]))
+    }
+
+    /// 候補ウィンドウの選択 (青いバー) を、本体 (Core) が選んでいる候補へ合わせる (1 列のとき上下だけ)。
+    /// moveDown / moveUp は NSResponder の標準の動作メソッドで、IMKCandidates が受け取る。
+    private func moveSelection(of window: IMKCandidates, from shown: inout Int, to target: Int) {
+        guard shown != target else { return }
+        while shown < target { window.moveDown(nil); shown += 1 }
+        while shown > target { window.moveUp(nil); shown -= 1 }
     }
 
     private func updateCandidates(_ view: CompositionView) {
         lastView = view
         guard let columnWindow = candidatesWindow else { return }
-        // 設定「Tab で候補を格子状に広げる」: 本体 (Core) が格子を求めているときだけ格子状 (5 列) のパネルにする。
-        // 変換が終わったとき・予測候補のときは 1 列に戻す (次の変換は今までどおり 1 列から見せる)。
-        // 実機では作成後の setPanelType が再レイアウトに反映されず横一列のままになるため、格子は最初から格子種別で
-        // 作った 2 つ目のウィンドウ (gridCandidatesWindow) で出す (経路3)。1 列は今までどおり candidatesWindow を使う。
-        let wantGrid = view.converting && view.grid == true
-        // 格子のときだけ 2 つ目のウィンドウを作る (格子 OFF の既定では作らない)。
-        // 作れなかったときは安全側に倒して 1 列のウィンドウで出す。
-        let gridWindow = wantGrid ? gridCandidatesWindow() : nil
-        let usingGrid = gridWindow != nil
-        let activeWindow = gridWindow ?? columnWindow
-        // 可視なのは常に 1 つ。切り替えるときは前のウィンドウを隠し、候補を作り直して選択を先頭に戻す。
-        let windowChanged = usingGrid != candidatesGridPanelShown
-        if windowChanged {
-            hideCandidateWindows()
-            candidatesGridPanelShown = usingGrid
-            // 種別の呼び出しは残す (格子の表示は 2 つ目のウィンドウで行うが、出し直す側の種別を明示しておく)。
-            activeWindow.setPanelType(usingGrid ? kIMKScrollingGridCandidatePanel : kIMKSingleColumnScrollingCandidatePanel)
-            candidateList = []
-            meaningKey = nil
-            shownIndex = 0
-            let panelName = usingGrid ? "grid" : "column"
-            let count = view.converting ? view.candidates.count : view.predictions.count
-            Self.trace("panel=\(panelName) count=\(count)" + (usingGrid ? " grid=secondWindow" : ""))
+        // 設定「Tab で候補を格子状に広げる」: 本体 (Core) が格子を求めているときだけ、自前のパネルで 5 列に描く。
+        // macOS 26 の IMKit は IMKCandidatePanelType を無視して常に 1 行のバーで描き、右端の下向き三角
+        // (IMKUICandidateArrowButton) をプログラムから押すと SIGTRAP で落ちるため、IMK の候補ウィンドウは使わない。
+        // 変換が終わったとき・予測候補のときは今までどおり 1 行のバーに戻す。
+        let wantGrid = view.converting && view.grid == true && view.candidates.count > 1
+        if wantGrid {
+            showGrid(view)
+            return
         }
-        // どちらのウィンドウも、キーをコントローラーへ先に送る属性を付けておく (update() / show() で戻ることがある)。
-        sendKeyEventsToServerFirst(columnWindow)
-        if let gridWindow { sendKeyEventsToServerFirst(gridWindow) }
+        // 格子から戻るとき (変換の終わり・Tab の解除) は、自前のパネルを隠す。
+        gridPanel?.hide()
+        gridAnchor = nil
         if !view.converting && !view.predictions.isEmpty {
-            updatePredictions(view, window: activeWindow)
+            updatePredictions(view, window: columnWindow)
         } else if view.converting && view.candidates.count > 1 {
             // IMKCandidates は標準では Space を候補確定に使い、コントローラーに渡さない。
             // Space で本体の次候補処理を呼べるよう、キーイベントを先にコントローラーへ配送する。
-            sendKeyEventsToServerFirst(activeWindow)
-            if windowChanged || view.candidates != candidateList || !activeWindow.isVisible() {
+            sendKeyEventsToServerFirst(columnWindow)
+            if view.candidates != candidateList || !columnWindow.isVisible() {
                 // 候補が変わったときだけ、IMKCandidates に候補一覧を再取得させる (選択は先頭に戻る)。
                 // 候補ウィンドウを出し直すので、出していた意味は捨てる。
                 meaningKey = nil
                 candidateList = view.candidates
-                // 可視なのは常に 1 つ。出し直す前に、使わない側のウィンドウを隠しておく。
-                if usingGrid { columnWindow.hide() } else { candidatesGridWindow?.hide() }
-                activeWindow.update()
-                activeWindow.show(kIMKLocateCandidatesBelowHint)
-                // 下向き三角 (格子表示) と同じ経路で出し直す。show(_:) は位置を合わせるだけなので、
-                // パネルの種別を反映した表示は showCandidates (Swift では show()) に任せる。
-                if usingGrid {
-                    activeWindow.show()
-                }
-                sendKeyEventsToServerFirst(activeWindow)
+                columnWindow.update()
+                columnWindow.show(kIMKLocateCandidatesBelowHint)
+                sendKeyEventsToServerFirst(columnWindow)
                 AnnotationPanel.raiseCandidateWindow()
                 shownIndex = 0
-                // 診断: 格子のときに候補ウィンドウの実体 (サイズ・view 階層・ボタン) を残す。
-                // macOS 26 の IMKit は IMKCandidatePanelType を無視して 1 行の候補バーで描き、
-                // 右端の IMKUICandidateArrowButton を押したときだけ展開する (実測)。
-                // そのボタンをプログラムから押すと IME が SIGTRAP で落ちるため、押さずに記録だけ残す。
-                if usingGrid { traceCandidateWindows("grid-panel") }
             }
             // 本体側で選んでいる候補に、候補ウィンドウの選択 (青いバー) を合わせる。
             // candidateIdentifier(atLineNumber:) は 0 しか返さず使えないので、候補ウィンドウ自身の上下移動で動かす。
@@ -895,17 +900,11 @@ final class MeltypeInputController: IMKInputController {
             defer { isSelectingProgrammatically = false }
             if target < shownIndex - target {
                 // 先頭に近い候補へ戻るとき (最後の候補から先頭に戻ったときなど) は、上へ何十回も動かさずに一覧を読み直す
-                activeWindow.update()
+                columnWindow.update()
                 shownIndex = 0
-                sendKeyEventsToServerFirst(activeWindow)
+                sendKeyEventsToServerFirst(columnWindow)
             }
-            moveSelection(of: activeWindow, from: &shownIndex, to: target, grid: usingGrid)
-            // 格子状のときは、行 (上下) と列 (左右) で動かしている。動かし方が IMK の実装と合っているかを
-            // 実機で確かめられるよう、Core の選択と候補ウィンドウの選択がずれていたら番号だけを残す (語は書かない)。
-            if usingGrid, let selected = activeWindow.selectedCandidateString()?.string,
-               let actual = candidateList.firstIndex(of: selected), actual != target {
-                Self.trace("格子の候補の選択が Core とずれた: core=\(target) window=\(actual)")
-            }
+            moveSelection(of: columnWindow, from: &shownIndex, to: target)
             scheduleMeaning(view)
         } else {
             meaningKey = nil
@@ -920,8 +919,7 @@ final class MeltypeInputController: IMKInputController {
     /// (IMKCandidates に「非選択」は無いので先頭に青いバーが乗る)。
     private func updatePredictions(_ view: CompositionView, window: IMKCandidates) {
         meaningKey = nil
-        // 予測候補は 1 列のウィンドウで出す。格子のウィンドウが残っていれば隠す (可視なのは常に 1 つ)。
-        candidatesGridWindow?.hide()
+        // 予測候補は 1 行のバーで出す (自前の格子のパネルは updateCandidates が先に隠す)。
         // Tab・Enter・矢印・Delete を、候補ウィンドウより先に本体へ渡す (変換中と同じ)。
         sendKeyEventsToServerFirst(window)
         if view.predictions != candidateList || !window.isVisible() {
