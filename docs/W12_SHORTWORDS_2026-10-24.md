@@ -131,3 +131,23 @@ fixed = 変更前で外れ候補で当たる。broken = 変更前で当たり候
 - テスト 1045 → **1047/1047** (2 件追加)。修正を外すと赤: `What to do⏎⏎ko ni iku` が `What とどこにいく` (期待 `What to doこにいく`)、`what to do yo` が `what とどyo`。
 - `--eval` 1292/1294 (同じ)、`eval-compare` broken 0 / fixed 21。
 - 未確認: 実機の入力欄で改行・Backspace を挟んだ場合 (試験用ホストは Enter で改行を入れないため、実機の改行入りの記録では未実測)。
+
+
+## 9. 語末の記号 (W13-2)
+
+### 9.1 問題
+`What to do?`・`Where to?` のように、語末に記号がつくと (a)・(b)・(c) の判定に乗らず、`と` が残っていた。実際の英文は記号で終わることが多いため、実用上の穴だった。
+
+### 9.2 実装
+- `CompositionController.WordBeforeTrailingPunctuation` を追加し、語末の句読点・閉じ記号（半角・全角）を判定から外す。記号そのものは確定文字列に残す。
+- (a) 文末の `to`、(b) `to` + `do`/`go`/`be`、(c) 大文字始まりの固有名詞の前の `to` の各判定で、記号を除いた語を使う。
+- 取り消し (`_pairedRevert`) は、空白つきの語尾 (`to do ` など) という条件を保ったまま、語と空白の間の記号を許す。Enter 確定 (空白なし) は従来どおり戻さない。
+- `do-`・`do/path` のような語は記号扱いにしない (ハイフンとスラッシュは除外しない)。
+
+### 9.3 検証
+- 新しい正解表を `eval/cases/short-words-in-english.tsv` に 25 件追加 (英語 12・日本語対照 13)。
+- Core 全テスト **1072/1072** (1068 + 4)。記号を除く処理を無効にすると、記号つきの 3 テストが赤になることを確認。
+- `--eval`: **1292/1294** (変更前と同じ)。
+- `tools/eval-compare.sh` (base = main `78b9af5`): 500/626 → 513/626、**broken 0 / fixed 13 / added 0 / removed 0**。
+- 日本語の疑問形 (`masaka?`・`hontou?`・`nani?`) と、記号つきの組の後ろに日本語が続く例 (`what to do? ko ni iku`) を対照に入れ、日本語側の broken は 0。
+- 実機 (NSSpellChecker) は未確認。

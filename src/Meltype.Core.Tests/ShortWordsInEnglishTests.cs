@@ -60,6 +60,18 @@ internal static class ShortWordsInEnglishTests
     }
 
     [Test]
+    public static void PunctuatedInfinitives_StayEnglishAndKeepTypedSymbols()
+    {
+        foreach (var s in new[]
+        {
+            "What to do?", "Where to?", "What to do!", "Where to.",
+            "Ready to go,", "Going to be;", "Need to do:", "How to do)",
+            "Welcome to Tokyo.", "Welcome to Tokyo)", "Thanks to Google!",
+        })
+            Assert.Equal(s, Typed(s + "\n"), s);
+    }
+
+    [Test]
     public static void ToDo_AfterNoun_FollowedByJapanese_StaysJapanese()
     {
         Assert.Equal("Slack とどこにいく", Typed("Slack to do ko ni iku\n"));
@@ -115,6 +127,32 @@ internal static class ShortWordsInEnglishTests
     }
 
     [Test]
+    public static void PunctuatedInfinitive_FollowedByJapanese_RevertsOnlySpaceCommittedPair()
+    {
+        // 記号を確定に残したまま、Space で確定した to do / to go / to be は従来どおり日本語へ戻す。
+        Assert.Equal("what とど？こにいく", Typed("what to do? ko ni iku\n"));
+        Assert.Equal("what とど！こにいく", Typed("what to do! ko ni iku\n"));
+        Assert.Equal("what とど。こにいく", Typed("what to do. ko ni iku\n"));
+        Assert.Equal("what とど)こにいく", Typed("what to do) ko ni iku\n"));
+        Assert.Equal("what とご？じにあう", Typed("what to go? ji ni au\n"));
+        Assert.Equal("have とべ？つに", Typed("have to be? tsu ni\n"));
+        // Enter 確定では語尾に空白がないので、取り消しの対象を広げない。
+        Assert.Equal("What to do?こにいく", Typed("What to do?\nko ni iku\n"));
+    }
+
+    [Test]
+    public static void PunctuationStripping_CoversFullWidthAndClosingSymbols()
+    {
+        foreach (var (raw, word) in new[]
+        {
+            ("do？", "do"), ("to！", "to"), ("go。", "go"), ("be，", "be"), ("do、", "do"),
+            ("to　", "to"), ("do）", "do"), ("Tokyo」", "Tokyo"), ("do?!", "do"),
+            ("do-", "do-"), ("do/path", "do/path"),
+        })
+            Assert.Equal(word, Meltype.Composition.CompositionController.WordBeforeTrailingPunctuation(raw), raw);
+    }
+
+    [Test]
     public static void PairedRevert_DoesNotEatUserTypedText_AfterEnterBackspaceOrOtherKey()
     {
         // 「What to do」を Enter で確定した後、1.5 秒以内に改行・Backspace・別の文字を挟んでも、
@@ -161,6 +199,19 @@ internal static class ShortWordsInEnglishTests
     }
 
     // ---- 日本語の文は変わらない ----
+
+    [Test]
+    public static void JapaneseWordsAndTo_WithPunctuation_AreUnchanged()
+    {
+        foreach (var (typed, expected) in new[]
+        {
+            ("masaka?", "まさか？"), ("hontou?", "ほんとう？"), ("nani?", "なに？"),
+            ("masaka!", "まさか！"), ("hontou.", "ほんとう。"), ("nani)", "なに)"),
+            ("kyou to asobu?", "今日とあそぶ？"),
+            ("What to?", "What と？"), ("try to!", "try と！"), ("Slack to?", "Slack と？"),
+        })
+            Assert.Equal(expected, Typed(typed + "\n"), typed);
+    }
 
     [Test]
     public static void JapaneseSentences_WithToDoGo_AreUnchanged()

@@ -3509,13 +3509,26 @@ public sealed class CompositionController
         return EnglishWordBefore(preceding[..^original.Length]);
     }
 
+    /// <summary>語の判定から外す、語末の句読点・閉じ記号。記号そのものは確定文字列に残す。</summary>
+    private static bool IsTrailingWordPunctuation(char c) => c is
+        '?' or '!' or '.' or ',' or ';' or ':' or ')' or ']' or '}' or '>' or '\'' or '"' or
+        '？' or '！' or '。' or '，' or '、' or '；' or '：' or '）' or '］' or '｝' or '＞' or '」' or '』' or '】' or '》' or '〉' or '　';
+
+    /// <summary>語末の記号を除いた部分。do? を do、to。 を to として、既存の判定に渡す。</summary>
+    internal static string WordBeforeTrailingPunctuation(string raw)
+    {
+        var end = raw.Length;
+        while (end > 0 && IsTrailingWordPunctuation(raw[end - 1])) end--;
+        return raw[..end];
+    }
+
     /// <summary>
     /// (a) 文の終わりの to。直前が英単語 + 空白 1 つで、その語が <see cref="WordsBeforeToInEnglish"/> にあるとき英語にする (Where to・Going to)。
     /// 前の語を問わない案は、Slack to・Chrome to・Meeting to を壊したので採らなかった (docs/W12_SHORTWORDS_2026-10-24.md)。
     /// </summary>
     private bool PreferEnglishAtSentenceEnd(string raw)
     {
-        if (raw != "to") return false;
+        if (WordBeforeTrailingPunctuation(raw) != "to") return false;
         var word = EnglishWordBeforeCaret();
         return word is { Length: >= 2 } && EndsSentenceInEnglish(word);
     }
@@ -3526,7 +3539,7 @@ public sealed class CompositionController
     /// </summary>
     private bool TryPairToWithInfinitive(string raw, bool spaceIntended, ref string text)
     {
-        if (raw is not ("do" or "go" or "be") || _correctable.Count == 0) return false;
+        if (WordBeforeTrailingPunctuation(raw) is not ("do" or "go" or "be") || _correctable.Count == 0) return false;
         var previous = _correctable[^1];
         if (previous.English || previous.Raw != "to" || previous.Text != "と" || !previous.SpaceIntended) return false;
         var word = EnglishWordBeforeRecord(previous);
@@ -3555,7 +3568,9 @@ public sealed class CompositionController
     /// </summary>
     private bool TryRevertPairedInfinitive(string raw, bool english, (string English, string Japanese)? pending)
     {
-        if (pending is not { } p || !p.English.EndsWith("to do ", StringComparison.Ordinal) && !p.English.EndsWith("to go ", StringComparison.Ordinal) && !p.English.EndsWith("to be ", StringComparison.Ordinal)) return false;
+        if (pending is not { } p || !p.English.EndsWith(" ", StringComparison.Ordinal)) return false;
+        // Enter 確定 (末尾に空白がない) は従来どおり戻さない。Space 確定の組だけ、語と空白の間の記号を許す。
+        if (WordBeforeTrailingPunctuation(p.English[..^1]) is not ("to do" or "to go" or "to be")) return false;
         if (_precedingText is null || (!JapaneseParticles.Contains(raw) && (english || _detector.IsAmbiguousWord(raw))) || !raw.Any(char.IsAsciiLetter)) return false;
         if (!NoBreakToSpace(_precedingText).EndsWith(NoBreakToSpace(p.English), StringComparison.Ordinal)) return false;
         Diagnostics.Log.Decision($"後ろが日本語だったので、to を日本語のままに戻しました: {Diagnostics.Log.Text(p.English)}→{Diagnostics.Log.Text(p.Japanese)}");
@@ -3594,7 +3609,8 @@ public sealed class CompositionController
         var previous = _correctable[^1];
         List<CommitRecord> targets = [];
         string? replacement = null;
-        if (!previous.English && english && _detector.IsDefinitelyEnglish(raw))
+        if (!previous.English && english && (_detector.IsDefinitelyEnglish(raw) ||
+            previous.Raw == "to" && AllowToBeforeProperNoun(previous) && _detector.IsDefinitelyEnglish(WordBeforeTrailingPunctuation(raw))))
         {
             // 日本語で確定した語を英語に: 代名詞の i は I にし、Space で変換していたなら空白も入れる。
             // その前にも Space で区切って日本語にした語が続いていれば、まとめて英文に直す (make sure you have)。
