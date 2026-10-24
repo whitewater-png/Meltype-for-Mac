@@ -409,6 +409,45 @@ internal static class CompositionTests
         Assert.Equal("api,error", string.Join(",", english), "apinoerror の英語区間は api と error の 2 つ (間が の)");
     }
 
+    // 要件 001 の査読: 英字にするのは略語の形の語 (api) + の だけ。日本語の語・日本由来の語・英単語とも読めるローマ字は今までどおり
+    [Test]
+    public static void ShortEnglishWord_FollowedByNo_KeepsJapaneseWords()
+    {
+        var cases = new Dictionary<string, string>
+        {
+            // 日本語の語 (japanese.txt)
+            ["sorenoerror"] = "それのerror",
+            ["arewoupdate"] = "あれをupdate",
+            ["sorekaraerror"] = "それからerror",
+            // 日本由来の語・外来語として english.txt にもある語
+            ["sakenoerror"] = "さけのerror",
+            ["sushinoset"] = "すしのset",
+            ["kanjinoinput"] = "かんじのinput",
+            ["karaokenoset"] = "からおけのset",
+            // 英単語とも読めるローマ字
+            ["takenoset"] = "たけのset",
+            ["namenoset"] = "なめのset",
+            ["agonoset"] = "あごのset",
+            ["menunoupdate"] = "めぬのupdate",
+            // の 以外の助詞は、今回は変えない (要件は の だけ)
+            ["apiwaerror"] = "あぴわerror",
+            ["apikaraerror"] = "あぴからerror",
+            ["apitoerror"] = "あぴとerror",
+            // の の後ろがかなになる語なら、前も今までどおり
+            ["apinone"] = "あぴのね",
+            ["animenohero"] = "あにめのへろ",
+            ["ninjanogame"] = "にんじゃのがめ",
+            ["tokyonotime"] = "ときょのちめ",
+        };
+        // 打って Enter した結果 (eval/cases と同じ。set の t は Enter で英字に残る)
+        foreach (var (typed, expected) in cases)
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, $"「{typed}」");
+        }
+    }
+
     // 実機で報告: 「やあやあ、私だよ」→「やあやあ、だよ私」、「ところでgoogleって」→「ところでってgoogle」
     [Test]
     public static void ReportedOrderSwaps()
