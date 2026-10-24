@@ -67,33 +67,66 @@ public sealed class RomajiTable
     private static DateTime s_stamp;
     private static long s_length = -1;
     private static RomajiTable? s_table;
+    private static bool s_failureLogged;
+
+    public const int MaxFileBytes = 1_000_000;
 
     /// <summary>
     /// ファイルから読む (更新日時と大きさが同じなら前回の結果を使い回す)。無い・空・読めないときは null (従来どおりの動き)。
-    /// 読めない・無視した行は警告ログに 1 回だけ残す。
+    /// 入力スレッドから打鍵ごとに呼ばれるので、ブロックしうるものは読まない:
+    /// シンボリックリンクは辿った先を見て、通常ファイルでない (FIFO・デバイス・ディレクトリ・大きさ 0) ものは開かない。
+    /// 読むのは最大 1MB+1 バイトだけ。読み込みに失敗したら更新日時を覚えず、次の打鍵で再試行する (警告ログは連続で出さない)。
     /// </summary>
     public static RomajiTable? Load(string path)
     {
-        try
+        lock (Gate)
         {
-            var info = new FileInfo(path);
-            lock (Gate)
+            try
             {
-                if (!info.Exists) { s_path = null; s_table = null; return null; }
-                if (s_path == path && s_stamp == info.LastWriteTimeUtc && s_length == info.Length) return s_table;
-                s_path = path; s_stamp = info.LastWriteTimeUtc; s_length = info.Length; s_table = null;
-                if (info.Length > 1_000_000) { Log.Warn("カスタムローマ字表が大きすぎるので使わない (1MB まで)"); return null; }
+                FileSystemInfo info = new FileInfo(path);
+                if (info.LinkTarget is not null)
+                {
+                    var target = info.ResolveLinkTarget(returnFinalTarget: true);
+                    if (target is not FileInfo) { s_path = null; s_table = null; return null; }
+                    info = target;
+                }
+                if (info is not FileInfo file || !file.Exists) { s_path = null; s_table = null; return null; }
+                var length = file.Length;
+                var stamp = file.LastWriteTimeUtc;
+                if (s_path == path && s_stamp == stamp && s_length == length) return s_table;
+                // 大きさ 0 は空ファイルか FIFO・デバイス。開くと固まりうるので読まない。
+                if (length == 0) { Remember(path, stamp, length, null); return null; }
+                if (length > MaxFileBytes) { Remember(path, stamp, length, null); Log.Warn("カスタムローマ字表が大きすぎるので使わない (1MB まで)"); return null; }
+
+                var buffer = new byte[MaxFileBytes + 1];
+                var total = 0;
+                using (var stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    int read;
+                    while (total < buffer.Length && (read = stream.Read(buffer, total, buffer.Length - total)) > 0) total += read;
+                }
+                if (total > MaxFileBytes) { Remember(path, stamp, length, null); Log.Warn("カスタムローマ字表が大きすぎるので使わない (1MB まで)"); return null; }
+
                 var warnings = new List<string>();
-                s_table = Parse(File.ReadAllText(path, Encoding.UTF8), warnings);
+                var table = Parse(new UTF8Encoding(false).GetString(buffer, 0, total), warnings);
+                Remember(path, stamp, length, table);
+                s_failureLogged = false;
                 foreach (var warning in warnings) Log.Warn($"カスタムローマ字表 {warning}");
-                if (s_table is null) Log.Warn("カスタムローマ字表に有効な行が無いので使わない");
-                return s_table;
+                if (table is null) Log.Warn("カスタムローマ字表に有効な行が無いので使わない");
+                return table;
+            }
+            catch (Exception ex)
+            {
+                // 一時的な失敗 (アクセス拒否・保存途中) を固定しない: 更新日時を覚えず次の打鍵で再試行する。
+                s_path = null; s_table = null;
+                if (!s_failureLogged) { s_failureLogged = true; Log.Warn($"カスタムローマ字表を読めないので使わない (次の入力で再試行): {ex.Message}"); }
+                return null;
             }
         }
-        catch (Exception ex)
-        {
-            Log.Warn($"カスタムローマ字表を読めないので使わない: {ex.Message}");
-            return null;
-        }
+    }
+
+    private static void Remember(string path, DateTime stamp, long length, RomajiTable? table)
+    {
+        s_path = path; s_stamp = stamp; s_length = length; s_table = table;
     }
 }

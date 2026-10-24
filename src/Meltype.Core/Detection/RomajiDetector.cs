@@ -176,17 +176,23 @@ public sealed class RomajiDetector
     /// </summary>
     public Func<RomajiTable?>? CustomTable { get; set; }
 
-    private (RomajiTable Table, ConcurrentDictionary<string, RomajiAnalysis> Cache)? _customCache;
+    private sealed class CustomCache(RomajiTable table)
+    {
+        public RomajiTable Table { get; } = table;
+        public ConcurrentDictionary<string, RomajiAnalysis> Cache { get; } = new(StringComparer.Ordinal);
+    }
+
+    private volatile CustomCache? _customCache;
 
     private RomajiAnalysis AnalyzeCustom(string letters, bool strictStart, RomajiTable table)
     {
         var holder = _customCache;
-        if (holder is null || !ReferenceEquals(holder.Value.Table, table))
+        if (holder is null || !ReferenceEquals(holder.Table, table))
         {
-            holder = (table, new ConcurrentDictionary<string, RomajiAnalysis>(StringComparer.Ordinal));
+            holder = new CustomCache(table);
             _customCache = holder;
         }
-        var cache = holder.Value.Cache;
+        var cache = holder.Cache;
         var key = (strictStart ? "s:" : "l:") + letters;
         if (cache.TryGetValue(key, out var cached)) return cached;
         var result = AnalyzeCore(letters, strictStart, composition: true, table);
@@ -232,7 +238,8 @@ public sealed class RomajiDetector
                 }
                 if (customMatched) continue;
                 // 一致するキーが無く、残りが表のキーの先頭 (ngh に対する ng) なら、固定ルール (n+子音 → ん) を当てずに途中として待つ。
-                if (table.IsPartial(s[i..]))
+                // ただし標準の綴りで最後まで完結して読める残り (表に kak だけあるときの ka) は待たない。
+                if (table.IsPartial(s[i..]) && !ReadsCompletelyByStandard(s[i..], composition))
                     return new RomajiAnalysis(true, tokens.ToArray(), s[i..], null, strongYouon, tsu, sokuon, longVowels);
             }
 
@@ -283,6 +290,12 @@ public sealed class RomajiDetector
         }
 
         return new RomajiAnalysis(true, tokens.ToArray(), "", null, strongYouon, tsu, sokuon, longVowels);
+    }
+
+    private static bool ReadsCompletelyByStandard(string rest, bool composition)
+    {
+        var standard = AnalyzeCore(rest, strictStart: false, composition);
+        return standard.IsValid && standard.Partial.Length == 0;
     }
 
     private static bool EndsWithVowel(string romaji, char a, char b) =>

@@ -154,6 +154,10 @@ public sealed class MeltypeSession
         _controller = new CompositionController(_gate, detector, converter, _host, options);
     }
 
+    /// <summary>カスタムローマ字表の取得。設定が OFF のときは load を呼ばない (ファイルに触れない)。</summary>
+    internal static Func<RomajiTable?> CustomTableProvider(Func<bool> enabled, Func<string, RomajiTable?> load, string path) =>
+        () => enabled() ? load(path) : null;
+
     /// <summary>
     /// 既定の辞書・学習データ (保存場所は <see cref="AppPaths"/>) で作る。converter は OS 側の変換エンジン、
     /// moreCandidates は読みに対する候補の一覧 (無ければ null)、predictions は読みに対する予測候補 (無ければ null)、wordChecker は OS のスペルチェッカー (無ければ null)。
@@ -178,7 +182,7 @@ public sealed class MeltypeSession
         detector.KanaInJapaneseMode = () => shared.Current.KanaInJapaneseMode;
         // 設定「カスタムローマ字表を使う」(本家 #979)。OFF・表なし・空・読めないときは null (従来どおり)。
         var romajiTablePath = Path.Combine(userDirectory, RomajiTable.FileName);
-        detector.Romaji.CustomTable = () => shared.Current.CustomRomajiTable ? RomajiTable.Load(romajiTablePath) : null;
+        detector.Romaji.CustomTable = CustomTableProvider(() => shared.Current.CustomRomajiTable, RomajiTable.Load, romajiTablePath);
         // 設定「英単語の後ろの英字の名前を英語にする」(本家 #1039)。
         detector.KeepEnglishNameAfterEnglish = () => shared.Current.KeepEnglishNameAfterEnglish;
         MeltypeSession? session = null; // options は session より先に作るので、CodeApp は作ったあとの session を見る
