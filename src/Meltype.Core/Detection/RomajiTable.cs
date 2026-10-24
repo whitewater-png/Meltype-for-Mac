@@ -108,7 +108,9 @@ public sealed class RomajiTable
                 if (total > MaxFileBytes) { Remember(path, stamp, length, null); Log.Warn("カスタムローマ字表が大きすぎるので使わない (1MB まで)"); return null; }
 
                 var warnings = new List<string>();
-                var table = Parse(new UTF8Encoding(false).GetString(buffer, 0, total), warnings);
+                // UTF-8 BOM (メモ帳など) は読み飛ばす。残すと 1 行目のキーが非英字扱いで無視される。
+                var skip = total >= 3 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF ? 3 : 0;
+                var table = Parse(new UTF8Encoding(false).GetString(buffer, skip, total - skip), warnings);
                 Remember(path, stamp, length, table);
                 s_failureLogged = false;
                 foreach (var warning in warnings) Log.Warn($"カスタムローマ字表 {warning}");

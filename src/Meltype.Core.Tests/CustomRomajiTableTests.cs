@@ -282,6 +282,37 @@ internal static class CustomRomajiTableTests
     }
 
     [Test]
+    public static void Load_Utf8Bom_FirstLineStillWorks()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "meltype-romaji-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var path = Path.Combine(dir, "romaji.tsv");
+            File.WriteAllBytes(path, [0xEF, 0xBB, 0xBF, .. System.Text.Encoding.UTF8.GetBytes("ry\tらい\nst\tした\n")]);
+            var table = RomajiTable.Load(path);
+            Assert.True(table is { Count: 2 }, "BOM つきでも 1 行目が効く (2 行とも有効)");
+            Assert.True(table!.TryGet("ry", out var kana) && kana == "らい", "1 行目 ry が効く");
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Test]
+    public static void Limitation_Keyboard_KeyThatIsPrefixOfStandardSpelling_Unreachable()
+    {
+        // 表が kak だけ (ka 無し) のとき、キーボードでは ka が先に か になり kak の定義には届かない (制限。docs/W11 制限 1・4)。
+        // 一括 (ConvertForDisplay) なら かく。
+        // 保留機構 B1/B2 を実装したらキーボードでも かく になるので、この Assert は赤になる。そのとき期待値を "かく" に直すこと。
+        WithTable("kak\tかく\n", () =>
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type("kak");
+            Assert.Equal("かk", k.Showing, "現状の制限: ka が先に確定する (B1 実装時に赤→ かく に直す)");
+            Assert.Equal("かく", CompositionTests.Detector.Romaji.ConvertForDisplay("kak", true), "一括なら届く");
+        });
+    }
+
+    [Test]
     public static void Limitation_NoHold_ShorterKeyCommitsFirst()
     {
         // 表に ka と kak があるとき、保留しないので ka は先に確定する (制限。docs/W11 に記録)。

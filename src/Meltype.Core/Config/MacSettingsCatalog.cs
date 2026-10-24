@@ -134,7 +134,7 @@ internal static class MacSettingsCatalog
             "dictionaries/japanese-mode.txt に書いた語 (exe など) を、日本語の文脈で打ったときは英字ではなく かな (えぇ) として変換します。英語の文の中 (前が英単語) とファイルの拡張子 (.exe) は今までどおり英字のままです。",
             InputGroup, s => s.KanaInJapaneseMode, (s, v) => s.KanaInJapaneseMode = v),
         Bool(nameof(Settings.CustomRomajiTable), "カスタムローマ字表を使う",
-            "データフォルダー (Mac は ~/Library/Application Support/Meltype) の dictionaries/romaji.tsv に、1 行 1 定義で「入力(英字)[タブ]出力(かな)」を書くと (例: ry[タブ]らい)、変換ボックスのかな変換で標準の綴りより優先します (最長一致。キーが全部揃ったときだけ置換)。表が無い・空・OFF のときは今までと同じです。英語かどうかの判定には使いません。",
+            "データフォルダー (Mac は ~/Library/Application Support/Meltype) の dictionaries/romaji.tsv に、1 行 1 定義で「入力(英字)[タブ]出力(かな)」を書くと (例: ry[タブ]らい)、変換ボックスのかな変換で標準の綴りより優先します (最長一致。キーが全部揃ったときだけ置換。標準の綴りで先に読み終わるキー、たとえば ka があるのに kak だけ定義した場合は、キーボードで打つと ka が先に確定するので届きません)。表が無い・空・OFF のときは今までと同じです。英語かどうかの判定には使いません。",
             InputGroup, s => s.CustomRomajiTable, (s, v) => s.CustomRomajiTable = v),
         Bool(nameof(Settings.KeepEnglishNameAfterEnglish), "英単語の後ろの英字の名前を英語にする",
             "英単語 (Koki など) のすぐ後ろに続けて打った大文字の英字 (Ogawa など) を、日本語の文の中でも英字のまま確定します。OFF のときは今までどおり、O|gawa のように 1 文字の大文字と助詞で始まる語に分かれます。",
