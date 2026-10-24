@@ -49,7 +49,7 @@ fixed = base で外れ、候補で当たる。broken = base で当たり、候�
 - a2・b・c の一覧は、表の英語側を見たあとに作った。**表の「英語 (to + do/go/be)」「文末」「固有名詞」の fixed は、その分だけ楽観的**。独立に確かめるため、一覧を作った後に、一覧に無い前の語の文を 15 件追加した (`Ways to go`・`Eager to go`・`Moving to Berlin`・`Likely to`…)。結果は **15 件中 3 件だけ**直った (base は 2/15 → 3/15)。つまり一覧にある語の型は直るが、一覧に無い語の型 (`Ways`・`Eager`・`Fun`・`Moving` …) はこの変更では直らない。
 - 日本語対照の 70 件で broken 0 は、**今回の一覧の語を前に置いた日本語 (`Slack to` など)** で確かめている。一覧の名詞寄りの語 (`time`・`way`・`place`・`thing`) のあとに日本語の `to` を打つ例は表に無い。
 
-## 4. 採用したもの
+## 4. 採用したもの (最初の版。**§8 で狭めた**。この節の一覧・件数は最初の版のもの)
 
 a2 + b + c (すべて `CompositionController.cs`)。**設定は付けない。** 理由: 70 件の日本語対照 (a1 と `ing` が壊した型を含む) で broken 0、`eval-compare` で broken 0、`--eval` は前後同じ。効く条件が「前の語が一覧にある英語の機能語」と狭く、一覧の外は今までどおりなので、設定で分ける利点 (悪化を避ける) が見つからなかった。誤って効いたときは、確定後の F10 / F6 で直せる (既存)。逆に設定を付けると、既定オフでは誰も使わず本家 issue の (3) が満たされないままになる。
 
@@ -81,3 +81,47 @@ TextEdit で (設定の変更は不要):
 4. 対照 (変わらないこと): `Slack` Space `to` Enter → `Slack と`。`Google to Apple` → `Google とApple`。`kyou to asobu` → `今日とあそぶ`。
 5. 記号つき (`What to do?`) は**直らない**のが今の仕様。
 6. 直った語を BackSpace → F10/F6 で今までどおり直せること。
+
+## 8. 査読 (P1/P2) を受けた測り直しと、一覧の絞り込み (W12-2、2026-10-24)
+
+独立査読の指摘: 最初の版 (a2+b+c) は、一覧の語 (free・good・it・and・not・thing・place・way・up・hard・about・get・Happy …) を前に置いた日本語を壊す。表の日本語対照は前の語が一覧に無い Slack/Zoom/Notion だけだったので、§3 の「日本語対照で broken 0」は**一覧に無い名詞の範囲の話にすぎなかった**と訂正する。
+
+### 8.1 表への追加 (182 → 293 件。英語 142・日本語 151)
+- 日本語対照: 一覧の語 + `to do/go/be` + 日本語 24 件 (`free to do ko ni iku` → `free とどこにいく` など)、一覧の語 + 文末の `to` 24 件、一覧の語 + `to` + 大文字始まり 25 件、`What to do` + 助詞 7 件、P3 の記録 1 件 (`Trip to Tokyo ha`、変更前から外れ)。
+- 英語: 前の語が一覧に無い英文 30 件 (`Ways to go`・`Eager to go`・`Likely to be`・`Moving to Berlin` …)。変更前 0/30 → 変更後 0/30。一覧の外には効かない (一覧の偏りによる楽観を弱めるための測定)。
+- `time`・`nice`・`me`・`you` を前に置く日本語は、変更と関係なく変更前から別の読み (`ちめ`・`にせ`・`め`・`よう`) になるので日本語対照に入れていない。
+
+### 8.2 候補ごとの fixed / broken (同じ表 293 件、一時スイッチで測定。変更前 188/293)
+
+fixed = 変更前で外れ候補で当たる。broken = 変更前で当たり候補で外れる (すべて日本語対照)。
+
+| 候補 | 内容 | fixed | broken |
+| --- | --- | --- | --- |
+| 最初の版 (a2+b+c) | 広い一覧 (名詞・代名詞・接続詞・副詞を含む約 100 語) | 41 | **70** |
+| 広い一覧 a+c | (b) をやめる | 22 | 40 |
+| 広い一覧 b+c | (a) をやめる | 30 | 47 |
+| 広い一覧 + 取り消し | (b) の後ろが日本語なら戻す | 41 | 44 |
+| 狭い一覧 a+b+c | 疑問詞・to 不定詞を取る動詞・前置詞だけ | 21 | 11 |
+| 狭い一覧 a+c | (b) をやめる | 9 | 2 |
+| 狭い一覧 a+c、(a) から what/try を除く | (b) をやめる | 9 | 0 |
+| **採用: 狭い一覧 a+b+c + (b) の取り消し + (a) から what/try を除く** | | **21** | **0** |
+| (b) だけ広い一覧 + 同上 | (b) に not/about/plan/something などを戻す | 28 | 4 (`not to do u zo` など。次の語が `u` で戻せない) |
+
+- (iii) (b) をやめる = 狭い一覧 a+c (what/try 除く) は fixed 9 / broken 0。採用案より fixed が 12 少ない。
+- (ii) 「書き換えを遅らせる」: `do` を確定する時点で後ろは分からない。確定を保留するのは入力の流れ全体の変更になるので**見送り**。代わりに「いったん英語にして、次の語が日本語と分かったら戻す」を足した。広い一覧のままでは (a)(c) が名詞を拾うので broken 44 までしか減らず、一覧の絞り込みと両方が要る。
+
+### 8.3 採用した内容 (CompositionController.cs)
+- `WordsBeforeToInEnglish` を約 40 語に絞る。疑問詞 (what/where/how/who/whom/which/when/why)、to 不定詞を取る動詞・形容詞 (going/gonna/want 系/need 系/have 系/used/able/unable/ready/supposed/ought/try 系/hoping/planning/got/glad/sorry)、前置詞 (due/according/thanks/forward)、listening/talking。名詞・代名詞・接続詞・副詞・一般の形容詞は入れない (コードのコメントと一致させた)。
+- (a) 文末の to: 同じ一覧から what / try を除く。日本語対照の表に `What と`・`try と` を置いたため (実際の頻度は低いが、表で broken 0 を優先した)。`What to do` は (b) が直す。
+- (b) の取り消し: `to do ` に書き換えた直後の確定が日本語の語・助詞なら `とど` に戻す。入力欄のキャレット前が `to do ` のときだけ。分からなければ何もしない。
+- (c) 大文字始まりの前の to: 前の語を welcome / thanks / due / according / going だけに。Up・Back・Next・Trip・Way・Train・Flight などは外した。
+- 英語側の直る数は 41 → 21 件。外れたままの型: `Time to go`・`Nothing to do`・`Good to go`・`Place to go`・`Back to`・`Up to`・`Trip to London`・`Flight to Osaka`・`Back to Tokyo`・`Next to Google`。英語として正しくても、同じ並びの日本語を壊すため見送り。
+- **既知の穴 (表には入れていない。入れると採用案の broken になる)**: 戻す条件は、次の語が日本語と判定される、または助詞 (ga・wo・ni・de・mo・ka・ne・yo・wa・na・ze・zo) のとき。`What to do no`・`What to do to`・`What to do so ka`・`What to do u zo`・`What to do ha` は no/to/so/u/ha が英語とも読めるため**戻らず英語のまま** (変更前は日本語だった型)。実機での頻度は不明。
+- P3 (`Trip to Tokyo ha` の `ha` が `は` にならない): 変更前の main でも `ha` のまま (表の外れ、変更前後同じ)。記録のみ。
+
+### 8.4 検証
+- テスト: 1041 → **1045/1045** (`ShortWordsInEnglishTests` に 4 件追加、既存 2 件の例を新しい一覧に合わせて差し替え)。実装を HEAD に戻した状態で新しいテストは赤 (`free to do こにいく`・`free to`・`Up to Zoom`・`What to do こにいく`)、実装後に 12/12 緑。
+- `--eval`: 1292/1294 (変更前と同じ)。
+- `tools/eval-compare.sh` (base = main の `git archive`、cases = `eval/cases`): 466/603 → 487/603、**broken 0 / fixed 21 / added 0 / removed 0**。
+- `short-words-in-english.tsv`: 188/293 → 209/293 (英語 40/142 → 61/142、日本語 148/151 のまま。日本語の外れ 3 件は変更前から)。
+- 実機 (NSSpellChecker) は未確認。

@@ -3452,23 +3452,26 @@ public sealed class CompositionController
     // ---- W12: 前の英単語を根拠に to / do / go などを英語側にする (本家 #1029 (3)) ----
 
     /// <summary>
-    /// 英文の中で to の前に来る、疑問詞・助動詞的な動詞・前置詞・副詞など (What to do・Where to・Going to・Back to・Next to・Used to)。
-    /// 名詞 (Slack to Zoom の Slack) は入れない: 名詞のあとの to は「と」のつもりのことが多い。
+    /// 英文の中で to の前に来る、疑問詞・to 不定詞を取る動詞や形容詞・前置詞 (What to do・Going to be・Ready to go・Due to)。
+    /// 名詞・代名詞・接続詞・副詞・一般の形容詞 (free・good・it・and・not・thing・place・way・up・hard・about・get・back・next) は入れない:
+    /// 後ろに日本語が続く「と」のつもりのことがあり、W12-1 の最初の一覧 (名詞・副詞を含む) は、日本語対照で 63 件を壊した (docs/W12_SHORTWORDS_2026-10-24.md §8)。
     /// </summary>
     private static readonly HashSet<string> WordsBeforeToInEnglish = new(StringComparer.OrdinalIgnoreCase)
     {
-        "what", "where", "how", "who", "whom", "which", "when", "why", "nothing", "something", "anything", "everything", "nowhere", "somewhere", "anywhere",
-        "going", "gonna", "want", "wants", "wanted", "need", "needs", "needed", "have", "has", "had", "used", "able", "ready", "time", "chance", "way", "place", "things", "thing",
-        "back", "next", "up", "close", "closer", "due", "according", "thanks", "thank", "welcome", "listen", "listening", "talk", "talking", "ought", "try", "tried", "trying",
-        "hope", "hoping", "plan", "planning", "forward", "free", "good", "got", "get", "unable", "supposed", "about", "easy", "hard", "nice", "glad", "happy", "sorry",
-        "me", "us", "you", "them", "him", "her", "it", "and", "or", "but", "not", "never", "just", "only", "also", "always", "even", "still", "really",
+        "what", "where", "how", "who", "whom", "which", "when", "why", "going", "gonna", "want", "wants", "wanted", "need", "needs", "needed", "have", "has", "had", "used",
+        "able", "unable", "ready", "supposed", "ought", "try", "tried", "trying", "hoping", "planning", "got", "due", "according", "thanks", "forward", "glad", "sorry", "listening", "talking",
     };
 
-    /// <summary>"Welcome to Tokyo" のように、大文字始まりの固有名詞の前の to を英語にしてよい、前の語。</summary>
+    /// <summary>
+    /// (a) 文末の to を英語にしてよい前の語。<see cref="WordsBeforeToInEnglish"/> から what / try を除く:
+    /// 「What と」「try と」を日本語として打つ対照 (日本語対照の表) を壊さないため。後ろに do / go / be が続けば (b) が直す。
+    /// </summary>
+    private static bool EndsSentenceInEnglish(string word) => word is not ("what" or "try") && WordsBeforeToInEnglish.Contains(word);
+
+    /// <summary>"Welcome to Tokyo" のように、大文字始まりの固有名詞の前の to を英語にしてよい、前の語。Up・Back・Next・Trip・Way などの名詞・副詞は日本語の「と」とも読めるので入れない。</summary>
     private static readonly HashSet<string> WordsBeforeToBeforeProperNoun = new(StringComparer.OrdinalIgnoreCase)
     {
-        "welcome", "back", "next", "close", "closer", "thanks", "due", "according", "trip", "train", "flight", "bus", "ticket", "road", "way", "return", "travel", "move",
-        "fly", "drive", "go", "going", "come", "coming", "journey", "tour", "visit", "introduction", "guide", "key", "answer", "reply", "listen", "talk", "talking", "up",
+        "welcome", "thanks", "due", "according", "going",
     };
 
     /// <summary>
@@ -3510,7 +3513,7 @@ public sealed class CompositionController
     {
         if (raw != "to") return false;
         var word = EnglishWordBeforeCaret();
-        return word is { Length: >= 2 } && WordsBeforeToInEnglish.Contains(word);
+        return word is { Length: >= 2 } && EndsSentenceInEnglish(word);
     }
 
     /// <summary>
@@ -3526,6 +3529,28 @@ public sealed class CompositionController
         if (word is null || word.Length < 2 || !WordsBeforeToInEnglish.Contains(word)) return false;
         if (!ReplacePreviousWithEnglish(previous)) return false;
         text = raw + (spaceIntended ? " " : "");
+        return true;
+    }
+
+    /// <summary>後ろの語が日本語と分かる助詞 (ha・no・to・so は英語の語でもあるので入れない)。</summary>
+    private static readonly HashSet<string> JapaneseParticles = new(StringComparer.Ordinal) { "ga", "wo", "ni", "de", "mo", "ka", "ne", "yo", "wa", "na", "ze", "zo" };
+    /// <summary>(b) で書き換えた直後だけ持つ「to do 」(英語) と「とど」(日本語)。次の確定で後ろが日本語だったときに戻す。</summary>
+    private (string English, string Japanese)? _pairedRevert;
+
+    /// <summary>
+    /// (b) の取り消し。do / go / be を確定した時点では後ろの語が分からないので、いったん英語にしてから、
+    /// 次の語が日本語 (ko ni・助詞) と分かったら「to do 」を「とど」に戻す (free to do ko ni iku → free とどこにいく)。
+    /// 次の語が no・to・so・u のような英語とも読める語のときは戻せない (docs/W12_SHORTWORDS_2026-10-24.md §8)。
+    /// </summary>
+    private bool TryRevertPairedInfinitive(string raw, bool english, (string English, string Japanese)? pending)
+    {
+        if (pending is not { } p || _precedingText is null || (!JapaneseParticles.Contains(raw) && (english || _detector.IsAmbiguousWord(raw))) || !raw.Any(char.IsAsciiLetter)) return false;
+        if (!NoBreakToSpace(_precedingText).EndsWith(NoBreakToSpace(p.English), StringComparison.Ordinal)) return false;
+        Diagnostics.Log.Decision($"後ろが日本語だったので、to を日本語のままに戻しました: {Diagnostics.Log.Text(p.English)}→{Diagnostics.Log.Text(p.Japanese)}");
+        _host.DeleteBackward(p.English.Length, p.English);
+        _host.CommitText(p.Japanese);
+        _lastCommitText = p.Japanese;
+        _correctable.Clear();
         return true;
     }
 
@@ -3738,13 +3763,18 @@ public sealed class CompositionController
         if (text.Length == 0) return;
         // 保護区間を含む確定も、設定どおり空白を入れる (./build.sh を。本家は末尾が保護区間のときは入れないが、Mac 版は設定どおり。パスそのものは崩れない)
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, _followingText);
+        var jpText = text;
+        var pendingRevert = _pairedRevert;
+        _pairedRevert = null;
         if (!hadFixed && !fromToggle && !english && !chosen && !afterFirstSound && TryPairToWithInfinitive(raw, spaceIntended, ref text))
         {
+            _pairedRevert = ("to " + text, "と" + jpText);
             english = true;
             hasEnglish = true;
             hasJapanese = false;
             raws = new SegmentRawSet([raw], [], JapaneseWord: false);
         }
+        else if (!hadFixed && !fromToggle && TryRevertPairedInfinitive(raw, english, pendingRevert)) { /* 戻した。この語はふつうに日本語で確定する */ }
         else if (!hadFixed && !fromToggle) CorrectPreviousCommit(raw, english);
         // 英語とも日本語とも読める語を、文脈を決めずに (選び直さずに) 確定したときだけ、後で確定し直せるようにしておく。
         if (!hadFixed && !fromToggle && !chosen && !afterFirstSound && !commandName && _detector.IsAmbiguousWord(raw))
