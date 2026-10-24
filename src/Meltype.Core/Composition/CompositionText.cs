@@ -794,7 +794,7 @@ public sealed class CompositionText
         while (_pending.Length > 0)
         {
             var original = _pending.ToString();
-            var analysis = romaji.AnalyzeFragment(original.ToLowerInvariant());
+            var analysis = romaji.AnalyzeFragmentForKana(original.ToLowerInvariant());
             var position = 0;
             var tokens = analysis.Tokens;
             for (var i = 0; i < tokens.Count; i++)
@@ -1541,7 +1541,7 @@ public sealed class CompositionText
     {
         var pending = Pending;
         if (pending.Length == 0) return "";
-        return _detector.Romaji.ConvertLenient(pending.ToLowerInvariant(), final);
+        return _detector.Romaji.ConvertForDisplay(pending.ToLowerInvariant(), final);
     }
 
     /// <summary>日本語の文字 (かな・漢字) か。日本語を確定した直後の / を中黒にするかの判定に使う (本家 #990)。</summary>

@@ -151,8 +151,9 @@ public sealed class RomajiDetector
     /// 変換ボックス用なら true: "nn" を常に「ん」にし、小書き文字 (xa, ltu, xn …) や外来音 (vu, thi …) も読む。
     /// false ならヘボン式で "nni" を ん + に と読む (判定・辞書の見出し語用)。
     /// </param>
-    private RomajiAnalysis Analyze(string letters, bool strictStart, bool composition)
+    private RomajiAnalysis Analyze(string letters, bool strictStart, bool composition, RomajiTable? table = null)
     {
+        if (table is not null) return AnalyzeCustom(letters, strictStart, table);
         // 判定は 1 キーごとに、打った文字のあらゆる区間を何度も解析し直す (長い文では 1 文字で数万回)。
         // 結果は文字列と引数だけで決まるので、覚えておいて使い回す。
         var cache = composition ? _compositionCache : strictStart ? _strictCache : _looseCache;
@@ -169,7 +170,39 @@ public sealed class RomajiDetector
     private readonly ConcurrentDictionary<string, RomajiAnalysis> _looseCache = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, RomajiAnalysis> _compositionCache = new(StringComparer.Ordinal);
 
-    private static RomajiAnalysis AnalyzeCore(string letters, bool strictStart, bool composition)
+    /// <summary>
+    /// カスタムローマ字表 (本家 #979)。null なら従来どおり。変換ボックスの表示と単位の作成だけに使い、
+    /// 英語かどうかの判定 (Analyze / AnalyzeFragment) には使わない。
+    /// </summary>
+    public Func<RomajiTable?>? CustomTable { get; set; }
+
+    private (RomajiTable Table, ConcurrentDictionary<string, RomajiAnalysis> Cache)? _customCache;
+
+    private RomajiAnalysis AnalyzeCustom(string letters, bool strictStart, RomajiTable table)
+    {
+        var holder = _customCache;
+        if (holder is null || !ReferenceEquals(holder.Value.Table, table))
+        {
+            holder = (table, new ConcurrentDictionary<string, RomajiAnalysis>(StringComparer.Ordinal));
+            _customCache = holder;
+        }
+        var cache = holder.Value.Cache;
+        var key = (strictStart ? "s:" : "l:") + letters;
+        if (cache.TryGetValue(key, out var cached)) return cached;
+        var result = AnalyzeCore(letters, strictStart, composition: true, table);
+        if (cache.Count >= CacheLimit) cache.Clear();
+        cache[key] = result;
+        return result;
+    }
+
+    /// <summary>
+    /// 変換ボックスで かな にする側の解析。カスタム表が有効なら表を優先して重ねる (判定用の AnalyzeFragment とは別)。
+    /// 表が無い・無効なら AnalyzeFragment と完全に同じ。
+    /// </summary>
+    public RomajiAnalysis AnalyzeFragmentForKana(string letters) =>
+        Analyze(letters, strictStart: false, composition: true, CustomTable?.Invoke());
+
+    private static RomajiAnalysis AnalyzeCore(string letters, bool strictStart, bool composition, RomajiTable? table = null)
     {
         var tokens = new List<RomajiToken>();
         int strongYouon = 0, tsu = 0, sokuon = 0, longVowels = 0;
@@ -183,6 +216,25 @@ public sealed class RomajiDetector
         {
             var c = s[i];
             if (c is < 'a' or > 'z') return Invalid($"'{c}' は英字ではない");
+
+            // カスタム表: 位置 i から最長一致 (キーが完全に揃ったときだけ置換。保留はしない)。固定ルール (ん・っ) より優先。
+            if (table is not null)
+            {
+                var customMatched = false;
+                for (var length = Math.Min(table.MaxKeyLength, s.Length - i); length >= 1; length--)
+                {
+                    var piece = s.Substring(i, length);
+                    if (!table.TryGet(piece, out var custom)) continue;
+                    tokens.Add(new RomajiToken(piece, custom));
+                    i += length;
+                    customMatched = true;
+                    break;
+                }
+                if (customMatched) continue;
+                // 一致するキーが無く、残りが表のキーの先頭 (ngh に対する ng) なら、固定ルール (n+子音 → ん) を当てずに途中として待つ。
+                if (table.IsPartial(s[i..]))
+                    return new RomajiAnalysis(true, tokens.ToArray(), s[i..], null, strongYouon, tsu, sokuon, longVowels);
+            }
 
             // ん: "nn" / 子音の前の "n"。"nni" のように母音が続く場合は ん + に (ヘボン式 konnichiwa)。
             if (c == 'n' && i + 1 < s.Length && (s[i + 1] == 'n' || (IsConsonant(s[i + 1]) && s[i + 1] != 'y')))
@@ -223,7 +275,7 @@ public sealed class RomajiDetector
             if (matched) continue;
 
             var rest = s[i..];
-            if ((composition ? CompositionPartials : PartialSpellings).Contains(rest) || rest is "n" or "tc")
+            if ((composition ? CompositionPartials : PartialSpellings).Contains(rest) || rest is "n" or "tc" || (table?.IsPartial(rest) ?? false))
             {
                 return new RomajiAnalysis(true, tokens.ToArray(), rest, null, strongYouon, tsu, sokuon, longVowels);
             }
@@ -240,13 +292,18 @@ public sealed class RomajiDetector
     /// 変換ボックスの表示用。ローマ字として読めない文字はその文字だけ英字のまま残し、続きを変換する
     /// (MS-IME の「ごおｇ」と同じ振る舞い)。<paramref name="final"/> なら語末の n を ん にする。
     /// </summary>
-    public string ConvertLenient(string letters, bool final)
+    public string ConvertLenient(string letters, bool final) => ConvertLenient(letters, final, useTable: false);
+
+    /// <summary>変換ボックスの表示・変換用。カスタム表が有効なら表を優先する (校正・辞書登録は ConvertLenient で表を使わない)。</summary>
+    public string ConvertForDisplay(string letters, bool final) => ConvertLenient(letters, final, useTable: true);
+
+    private string ConvertLenient(string letters, bool final, bool useTable)
     {
         var builder = new StringBuilder();
         var rest = letters;
         while (rest.Length > 0)
         {
-            var analysis = Analyze(rest, strictStart: false, composition: true);
+            var analysis = useTable ? AnalyzeFragmentForKana(rest) : Analyze(rest, strictStart: false, composition: true);
             foreach (var token in analysis.Tokens) builder.Append(token.Kana);
             if (analysis.IsValid)
             {

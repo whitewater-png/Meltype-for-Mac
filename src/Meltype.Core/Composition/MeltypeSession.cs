@@ -176,6 +176,9 @@ public sealed class MeltypeSession
         detector.Memory = languages;
         // 設定「日本語入力中は一覧の語をかなで変換する」(本家 #1023)。設定タブの変更を次の打鍵から反映するため、共有の設定を毎回見る。
         detector.KanaInJapaneseMode = () => shared.Current.KanaInJapaneseMode;
+        // 設定「カスタムローマ字表を使う」(本家 #979)。OFF・表なし・空・読めないときは null (従来どおり)。
+        var romajiTablePath = Path.Combine(userDirectory, RomajiTable.FileName);
+        detector.Romaji.CustomTable = () => shared.Current.CustomRomajiTable ? RomajiTable.Load(romajiTablePath) : null;
         // 設定「英単語の後ろの英字の名前を英語にする」(本家 #1039)。
         detector.KeepEnglishNameAfterEnglish = () => shared.Current.KeepEnglishNameAfterEnglish;
         MeltypeSession? session = null; // options は session より先に作るので、CodeApp は作ったあとの session を見る

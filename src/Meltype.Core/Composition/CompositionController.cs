@@ -3217,7 +3217,7 @@ public sealed class CompositionController
             return true;
         }
 
-        var kana = _detector.Romaji.ConvertLenient(word.Raw.ToLowerInvariant(), final: true);
+        var kana = _detector.Romaji.ConvertForDisplay(word.Raw.ToLowerInvariant(), final: true);
         // かなに読めない語 (数字・記号・綴りがローマ字として成り立たない語) は直せないので、キーをそのまま通す
         if (kana.Length == 0 || kana.Any(char.IsAsciiLetter) || !kana.Any(c => c is >= 'ぁ' and <= 'ゖ')) return false;
         BeginComposition();
@@ -3468,7 +3468,7 @@ public sealed class CompositionController
             if (StaysEnglishAfterFunctionWord(previous)) return;
             // 英語で確定した語を日本語に (Space で空白を入れていたら取る)。
             targets = [previous];
-            replacement = _detector.Romaji.ConvertLenient(previous.Raw.ToLowerInvariant(), final: true);
+            replacement = _detector.Romaji.ConvertForDisplay(previous.Raw.ToLowerInvariant(), final: true);
         }
         var original = string.Concat(targets.Select(t => t.Text));
         if (replacement is null || replacement == original) return;
