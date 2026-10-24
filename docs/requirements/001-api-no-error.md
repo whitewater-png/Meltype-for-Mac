@@ -1,6 +1,6 @@
 ---
 title: 短い英単語の直後の「の」が英語に吸われる (apinoerror → apiのerror)
-status: approved   # 2026-10-24 リョウさんがループの通し検証の題材として選定
+status: done       # 2026-10-24 PR #5 を base ブランチにマージ (人の判断)。main へは PR #4 で
 source: 品質テスト (src/Meltype.Core.Tests/QualityTests.cs:140、本家 QualityTests の写し) で外れている例
 scope: core
 ---
@@ -50,4 +50,4 @@ scope: core
 - 結果: Core のテスト 940/940、品質テスト 1270/1271 (外れは `my name is taro` のみ)、eval-compare broken 0 / fixed 3。
 - 範囲を絞った理由: 1 周目の「辞書の英単語 + 助詞」全般への適用は `sorenoerror` などの回帰を出したため、「`loanwords.txt` の大文字略語 + の + 英字の残る英単語」に絞った。新しく英字になるのは `api`・`ide`・`uri`・`gui`・`who` の 5 語で、`uri` (売り・瓜) は人の判断待ち。
 - Mac 実機チェックリスト: 未確認。
-- PR の URL: (人が作成後に記入)
+- PR の URL: https://github.com/whitewater-png/Meltype-for-Mac/pull/5 (base = ccr-27ad1b0c-qzazzd、CI 緑、2026-10-24 マージ)
