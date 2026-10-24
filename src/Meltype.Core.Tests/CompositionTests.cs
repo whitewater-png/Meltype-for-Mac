@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Yukishiro
 
+using System.ComponentModel;
+using System.Reflection;
 using Meltype.Composition;
 using Meltype.Config;
 using Meltype.Input;
@@ -1877,6 +1879,54 @@ internal static class CompositionTests
         k.Press(VirtualKeys.Down);
         k.Press(0x32);
         Assert.Equal("皮", string.Concat(k.Host.Output), "候補を動かしたあとは、数字で候補を選んで確定する (2 番は 皮)");
+    }
+
+    /// <summary>ず→図・ひょう→表 だけを返す変換器 (#989 の「図1」「表3」)。</summary>
+    private sealed class FigureConverter : IKanjiConverter
+    {
+        public string? Convert(string hiragana) => hiragana switch { "ず" => "図", "ひょう" => "表", _ => null };
+
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null) => null;
+    }
+
+    [Test]
+    public static void Digits_Issue989_WhenSettingIsOn_FigureAndTableNumbersAreTyped()
+    {
+        foreach (var (typed, expected) in new[]
+        {
+            ("zu 1\n", "図1"), ("hyou 3\n", "表3"), ("hyou 10\n", "表10"),
+        })
+        {
+            var k = new Keyboard(converter: new FigureConverter()) { TypeDigits = true };
+            k.Type(typed);
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        var tab = new Keyboard(converter: new FigureConverter()) { TypeDigits = true, TabConversion = true };
+        tab.Type("zu");
+        tab.Press(VirtualKeys.Tab);
+        tab.Type("1\n");
+        Assert.Equal("図1", tab.Host.Document, "Tab で変換した直後の 1 も入力");
+    }
+
+    [Test]
+    public static void Digits_Issue989_WhenSettingIsOff_DigitSelectsCandidate()
+    {
+        // OFF (既定) は今までどおり、変換した直後の数字キーが候補の番号。1 番は変換結果の 図 そのもの
+        var k = new Keyboard(converter: new FigureConverter());
+        k.Type("zu ");
+        k.Press(0x31);
+        Assert.True(k.Showing is null && k.Host.Output.Count == 1, "OFF では Space の直後の 1 は候補の選択で確定する");
+        Assert.True(!k.Host.Document.Contains('1'), "1 は文字として入らない");
+    }
+
+    [Test]
+    public static void TypeDigitsAfterConversion_Description_HasConcreteExamples()
+    {
+        var property = typeof(Settings).GetProperty(nameof(Settings.TypeDigitsAfterConversion))!;
+        var description = property.GetCustomAttribute<DescriptionAttribute>()!.Description;
+        foreach (var example in new[] { "図1", "表3", "zu", "hyou" })
+            Assert.True(description.Contains(example), $"説明に「{example}」の例がある");
+        Assert.True(description.Contains("↓"), "ON のあとの選び方 (↓/Space で動かしてから) を書く");
     }
 
     [Test]

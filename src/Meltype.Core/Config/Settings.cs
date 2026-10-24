@@ -206,7 +206,7 @@ public sealed class Settings
     public bool ContinueAfterConversion { get; set; }
 
     [Category("1. 全般"), DisplayName("変換直後の数字は入力として打つ"),
-     Description("Space で変換した直後に打った数字を、候補の番号ではなく、そのまま数字として入力します (denwa wa 03-1234-5678 や kyou wa 12 の数字が候補の選択にならない)。候補を動かした後 (↓・もう一度 Space・PageDown・← →) は、今までどおり数字キーで候補を選んで確定します。OFF のときは、変換した直後から数字キーで候補を選びます。")]
+     Description("Space や Tab で変換した直後に打った数字を、候補の番号ではなく、そのまま数字として入力します。例: zu Space 1 → 図1、hyou Space 3 → 表3、hyou Space 10 → 表10、denwa wa 03-1234-5678。OFF のときは、変換した直後から数字キーで候補を選びます (Space の直後の 2 で 2 番の候補)。ON にすると、Space の直後の数字では候補を選べなくなります。候補を動かした後 (↓・もう一度 Space・PageDown・← →) は、今までどおり数字キーで候補を選んで確定できます。")]
     public bool TypeDigitsAfterConversion { get; set; }
 
     [Category("1. 全般"), DisplayName("Shift+Enter で確定して改行"),
