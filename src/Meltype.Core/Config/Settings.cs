@@ -295,6 +295,10 @@ public sealed class Settings
      Description("日本語を確定した直後に / を打つと、スラッシュではなく中黒 (・) を入れます。URL やパスを打つときは OFF のままにしてください。")]
     public bool SlashAsNakaguro { get; set; }
 
+    [Category("1. 全般"), DisplayName("英語の直後の Space 2 回で日本語に読み直す"),
+     Description("英語と判定された語を Space で確定して空白が入った直後に、Space をもう一度押すと、その空白を取り、直前の語だけを日本語として読み直して変換候補を開きます (man␣␣ → まん → 万)。Esc で元の英語に戻ります。英文の途中でも対象は直前の語だけです。英文で空白を 2 つ続けて打ちたい人は OFF のままにしてください。")]
+    public bool DoubleSpaceToJapanese { get; set; }
+
     [Category("1. 全般"), DisplayName("記号を全角にする"),
      Description("日本語の中で打った ! ? ~ などの記号を全角 (！？～) にします。OFF にすると、打ったままの半角で入ります (チャットで !? を半角にしたいとき)。")]
     public bool FullWidthSymbols { get; set; } = true;

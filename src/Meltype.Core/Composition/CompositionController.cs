@@ -263,6 +263,12 @@ public sealed class CompositionOptions
     /// <summary>日本語を確定した直後に打った / を中黒 (・) にするか (設定、本家 #990)。既定は OFF (今までの挙動)。</summary>
     public Func<bool> SlashAsNakaguro { get; init; } = () => false;
 
+    /// <summary>
+    /// 英語で確定して空白を入れた直後に Space をもう一度押したら、空白を取って直前の語だけを日本語として読み直し、変換候補を開くか
+    /// (設定、本家 #1029 の「Space 2 回で日本語に」。man␣␣ → まん → 万)。既定は OFF (今までは 2 回目の Space はそのまま空白になる)。
+    /// </summary>
+    public Func<bool> DoubleSpaceToJapanese { get; init; } = () => false;
+
     /// <summary>確定するときに、日本語と英単語の間に半角スペースを入れるか (設定)。</summary>
     public Func<bool> SpaceAroundEnglish { get; init; } = () => false;
 
@@ -3137,7 +3143,23 @@ public sealed class CompositionController
     /// かなにする: 入力欄の語を消し、打った英字を読みにした変換ボックスを開く。Enter で確定したときに日本語として学習し、Esc なら元の語を書き戻す。
     /// 記録の前後の空白 (確定の Space・英単語の前後の空白の設定) は直さずに残す。
     /// </summary>
-    public bool TryToggleLastWord(bool toEnglish, string? precedingText)
+    public bool TryToggleLastWord(bool toEnglish, string? precedingText) => TryToggleLastWord(toEnglish, precedingText, dropTail: false);
+
+    /// <summary>
+    /// 英語で確定して空白を入れた直後の 2 回目の Space (設定 DoubleSpaceToJapanese)。F6 と同じく直前の語だけを消して読みの変換ボックスを開くが、
+    /// 確定の空白も一緒に取り、Enter で確定しても空白は戻さない (Esc なら語も空白も書き戻す)。
+    /// 直前の確定が英語だけで、空白で終わり、空白を含まない 1 語のときだけ効く。そうでなければ何もせず false (Space はそのまま空白になる)。
+    /// </summary>
+    public bool TryDoubleSpaceToJapanese(string? precedingText)
+    {
+        if (!_options.DoubleSpaceToJapanese() || IsComposing) return false;
+        if (_lastWord is not { HasEnglish: true, HasJapanese: false } word) return false;
+        var trimmed = word.Text.TrimEnd(' ');
+        if (trimmed.Length == 0 || trimmed.Length == word.Text.Length || trimmed.Any(char.IsWhiteSpace) || word.Raw.Any(char.IsWhiteSpace)) return false;
+        return TryToggleLastWord(toEnglish: false, precedingText, dropTail: true);
+    }
+
+    private bool TryToggleLastWord(bool toEnglish, string? precedingText, bool dropTail)
     {
         _toggleUndo = null;
         _toggleNotice = null;
@@ -3215,7 +3237,7 @@ public sealed class CompositionController
         }
         Diagnostics.Log.Decision($"確定した直後の語をかなにして変換を始めました: {Diagnostics.Log.Text(body)}→{Diagnostics.Log.Text(kana)}");
         _host.DeleteBackward(body.Length, body);
-        _toggleBox = new ToggleBox(word.Raw, word.Text[..lead], tail, body, word);
+        _toggleBox = new ToggleBox(word.Raw, word.Text[..lead], dropTail ? "" : tail, body, word);
         _lastWord = null;
         _correctable.Clear();
         SetOwnContext(beforeBody, LanguageOf(beforeBody));
@@ -3298,7 +3320,11 @@ public sealed class CompositionController
     private void RestoreToggleBox(ToggleBox box)
     {
         _toggleBox = null;
-        _lastWord = box.Previous with { Time = Environment.TickCount64 };
+        // Space 2 回の読み直し (語 + 空白を取った) を Esc で戻したあと、続けて Space を押したら普通の空白にする
+        // (戻したのに、また読み直しが始まってしまうのを避ける。査読の指摘)。
+        _lastWord = _options.DoubleSpaceToJapanese() && box.Body.EndsWith(' ')
+            ? null
+            : box.Previous with { Time = Environment.TickCount64 };
         SetOwnContext((_precedingText ?? "") + box.Body, box.Previous.HasEnglish && !box.Previous.HasJapanese);
     }
 

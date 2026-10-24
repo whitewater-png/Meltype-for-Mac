@@ -235,6 +235,7 @@ public sealed class MeltypeSession
             Braces = () => shared.Current.Braces,
             ZSymbolConversion = () => shared.Current.ZSymbolConversion,
             SlashAsNakaguro = () => shared.Current.SlashAsNakaguro,
+            DoubleSpaceToJapanese = () => shared.Current.DoubleSpaceToJapanese,
             TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
         return session = new MeltypeSession(detector, converter, options, () => shared.Current, clipboard) { ReadingProvider = reader };
@@ -456,6 +457,14 @@ public sealed class MeltypeSession
         // 変換ボックスが無く、直せる語があるときだけキーを使う。無ければ、素通し (Ctrl の読み替えは素通し判定より前に行う。R41-9)。
         if (!_controller.IsComposing && ToggleDirection(vk, shift, control, alt, command) is { } toEnglish
             && _controller.TryToggleLastWord(toEnglish, before))
+        {
+            _controller.Pump();
+            _host.MarkToggle();
+            return _host.Result(consumed: true);
+        }
+        // 設定「英語で確定した直後の Space をもう一度で日本語に」(本家 #1029): 英語の語を空白つきで確定した直後の Space は、空白にせず、直前の語を日本語として読み直す。
+        // 直せなければ (OFF・直前が英語でない・時間切れ・読めない語) 何もせず、Space は今までどおり通る。
+        if (vk == VirtualKeys.Space && !shift && !modifier && !_controller.IsComposing && _controller.TryDoubleSpaceToJapanese(before))
         {
             _controller.Pump();
             _host.MarkToggle();
