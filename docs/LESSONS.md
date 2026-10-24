@@ -11,3 +11,5 @@
 | 2026-10-24 | 作成時刻 (birth time) で置き換えを見分けるテストが、作成時刻を区別しない一時フォルダーで落ちた | テスト | 環境を調べてスキップ (`CreationTimeDistinguishesReplacedFiles`) |
 | 2026-10-24 | 文書のテスト件数 (559 / 619) と正解表の数 (3) が実態 (938 / 4 表) とずれていた | 決まり | 数字は `docs/AGENT_STATE.md` だけに書き、他の文書からは参照する |
 | 2026-10-24 | 要件 001 の背景を `--explain` だけで書いて「全体が英語になる」と誤認した (実際は `あぴのerror`)。完成条件に「既に通る行」(`urlnoerror`) を入れた | 決まり | 要件の「今の挙動」は `--repro` と `--segments` の結果を写す。完成条件の正解表の行は、書く前に `--repro` で外れることを確かめる (`docs/requirements/README.md`) |
+| 2026-10-24 | 判定ロジックの変更が「辞書の英単語 + 助詞」全般に効き、`sorenoerror` → `soreのerror` などが悪化した。正解表にその形が無く、eval-guard は通った。別モデルの査読員が境界例を自分で作って見つけた | 決まり | `CLAUDE.md` §4 に「判定ロジックを変えたら、査読員が境界例を自分で作って base と比べる」を足した |
+| 2026-10-24 | 2 つのエージェントが同じブランチを `git worktree add` で取ろうとして衝突した | 決まり | `CLAUDE.md` §3 の worktree コマンドと `.claude/agents/eval-guard.md`・`reviewer.md` を `--detach` にした |
