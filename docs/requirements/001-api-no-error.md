@@ -8,9 +8,10 @@ scope: core
 # 001 短い英単語の直後の「の」が英語に吸われる
 
 ## 背景 (誰が、何に困っているか)
-- `apinoerror` と打つと `apiのerror` になってほしいのに、全体が英語と判定されて `apinoerror` のまま確定する (品質テストの「混在」カテゴリーで外れている 1 件。本家の期待値も `apiのerror`)。
-- 今の挙動 (Core の `--explain apinoerror`、2026-10-24): 2 文字目で `English(JP0 EN+3)`、3 文字目で「英語の語と一致 (JP0 EN+4)」となり、以後 `no` を日本語の助詞として切り出せない。
-- 似た形: `<短い英単語><助詞><英単語>` (例: `apinoerror`、`urlnoerror`)。ターミナルや技術文書で「API の error」「URL の設定」のように打つ場面。
+- `apinoerror` と打つと `apiのerror` になってほしいのに、`api` が日本語側に吸われて **`あぴのerror`** になる (品質テストの「混在」カテゴリーで外れている 1 件。本家の期待値も `apiのerror`)。
+- 今の挙動 (Core の `--repro apinoerror` / `--segments apinoerror`、2026-10-24): 区間は `JA:apino | EN:error`。`api` は辞書にある英単語だが、ローマ字として最後まで読める (あぴ) ので「英語とも日本語とも読める語」の点数勝負になり、後ろの文脈が常に「日本語」として渡される (`CompositionDetector.cs` の `IsEnglishSpanCore`、817〜836 行付近) ため英語に届かない。
+- 訂正 (2026-10-24、researcher の実測): 当初「全体が英語になる」と書いたのは誤り。`--explain` は先頭からの接頭辞の判定だけを出すので、区間分けは `--segments` で見ること (`docs/LESSONS.md`)。
+- 似た形: `<ローマ字として最後まで読める短い英単語><助詞><英単語>`。`urlnoerror`・`windowsnoupdate`・`pythonnobug` は英単語側に読めない文字 (`r`・`l`・`w`) があるので別の経路で既に正しく分かれる。問題になるのは `api` のような「読める 3 文字以上の辞書語」。ターミナルや技術文書で「API の error」「URL の設定」のように打つ場面。
 
 ## 今の動き (既に分かっていること)
 - 期待は既に 2 か所にある: `src/Meltype.Core.Tests/QualityTests.cs:140` (`new("混在", "apinoerror", "apiのerror")`) と `eval/cases/upstream-quality.tsv:106` (`full`)。どちらも今は外れている (品質テスト 1269/1271、upstream-quality 177/203 の外れに含まれる)。
@@ -28,10 +29,8 @@ scope: core
 
 ## 完成条件 (先に決める。機械で判定できる形)
 - [ ] 正解表: `eval/cases/upstream-quality.tsv:106` の `apinoerror	apiのerror	full` が、実装前は外れ (eval-guard で確認)、実装後は当たる。
-- [ ] 正解表: `eval/cases/mac-terminal.tsv` に次の行を足し、実装前は外れ、実装後は当たる (出典の列はこのファイル名)。
-  ```
-  urlnoerror	urlのerror	full	docs/requirements/001-api-no-error.md
-  ```
+- [ ] 正解表: `eval/cases/mac-terminal.tsv` に、`apinoerror` と同じ形 (ローマ字として読める 3 文字以上の辞書の英単語 + `no` + 辞書の英単語) の行を **1〜2 行** 足し、実装前は外れ (`--repro` で確認)、実装後は当たる (出典の列は `docs/requirements/001-api-no-error.md`)。候補は implementer が `--repro` で探す (`urlnoerror` は既に通るので使わない)。
+- [ ] 正解表: 守るものとして `urlnoerror\turlのerror\tfull` と `sushigatabetai`・`linewookuru` 相当の既存行が壊れない (broken 0 に含まれる)。
 - [ ] テスト: `src/Meltype.Core.Tests/CompositionTests.cs` (または最も近いファイル) に `ShortEnglishWord_FollowedByNo_SplitsParticle` を足す (要点: `apinoerror` の英語区間が `api` と `error` の 2 つに分かれ、間が `の` になる)。
 - [ ] 回帰なし: `tools/eval-compare.sh` (base = `ccr-27ad1b0c-qzazzd`) の broken 0、Core のテスト全件通過、品質テストの外れた例が `my name is taro` 以外に増えない。
 - [ ] 文書: `docs/KNOWN_LIMITS.md` に該当の限界が書かれていれば、直した旨に更新する。
