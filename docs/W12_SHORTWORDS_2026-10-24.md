@@ -113,10 +113,10 @@ fixed = 変更前で外れ候補で当たる。broken = 変更前で当たり候
 ### 8.3 採用した内容 (CompositionController.cs)
 - `WordsBeforeToInEnglish` を約 40 語に絞る。疑問詞 (what/where/how/who/whom/which/when/why)、to 不定詞を取る動詞・形容詞 (going/gonna/want 系/need 系/have 系/used/able/unable/ready/supposed/ought/try 系/hoping/planning/got/glad/sorry)、前置詞 (due/according/thanks/forward)、listening/talking。名詞・代名詞・接続詞・副詞・一般の形容詞は入れない (コードのコメントと一致させた)。
 - (a) 文末の to: 同じ一覧から what / try を除く。日本語対照の表に `What と`・`try と` を置いたため (実際の頻度は低いが、表で broken 0 を優先した)。`What to do` は (b) が直す。
-- (b) の取り消し: `to do ` に書き換えた直後の確定が日本語の語・助詞なら `とど` に戻す。入力欄のキャレット前が `to do ` のときだけ。分からなければ何もしない。
+- (b) の取り消し: `to do `・`to go `・`to be ` (語尾が空白つき) に書き換えた直後の確定が日本語の語・助詞なら `とど`・`とご`・`とべ` に戻す。自分の確定の記録とキャレット前の文字が一致するときだけ。間に Enter・Tab・Space・Backspace を通した、確定し直しの記録を捨てた (`ForgetLastCommit` など)、のどれでも取り消しの記録も捨てる (古い記録のまま戻すと、間に打った文字を消すため。`What tとどこにいく` が出た)。Enter で確定した `to do` (空白なし) は戻さない。ホストがキャレット前の文字を返さない (`_precedingText` が null) ときは**何もしない**。
 - (c) 大文字始まりの前の to: 前の語を welcome / thanks / due / according / going だけに。Up・Back・Next・Trip・Way・Train・Flight などは外した。
 - 英語側の直る数は 41 → 21 件。外れたままの型: `Time to go`・`Nothing to do`・`Good to go`・`Place to go`・`Back to`・`Up to`・`Trip to London`・`Flight to Osaka`・`Back to Tokyo`・`Next to Google`。英語として正しくても、同じ並びの日本語を壊すため見送り。
-- **既知の穴 (表には入れていない。入れると採用案の broken になる)**: 戻す条件は、次の語が日本語と判定される、または助詞 (ga・wo・ni・de・mo・ka・ne・yo・wa・na・ze・zo) のとき。`What to do no`・`What to do to`・`What to do so ka`・`What to do u zo`・`What to do ha` は no/to/so/u/ha が英語とも読めるため**戻らず英語のまま** (変更前は日本語だった型)。実機での頻度は不明。
+- **既知の穴 (表には入れていない。入れると採用案の broken になる)**: 戻す条件は、次の語が日本語と判定される、または助詞 (ga・wo・ni・de・mo・ka・ne・wa・na・ze・zo) のとき。`yo` は英語の語でもあり、戻すのに `yo` 自体が英語で確定済みで半分だけ戻る (`what to do yo` → `what とどyo`) ので助詞から**外した** (日本語対照 broken 0 のまま)。対象は no/to/so/u/ha の 5 語だけではなく、**英語にも見える語全般**: `What to do no`・`to`・`so ka`・`u zo`・`ha` のほか sushi・dame・sensei・home など、`how to do sudo` のように英語として打った後続と、日本語として打った語を区別できないため、戻らず英語のまま (変更前は日本語だった型)。実機での頻度は不明。
 - P3 (`Trip to Tokyo ha` の `ha` が `は` にならない): 変更前の main でも `ha` のまま (表の外れ、変更前後同じ)。記録のみ。
 
 ### 8.4 検証
@@ -125,3 +125,9 @@ fixed = 変更前で外れ候補で当たる。broken = 変更前で当たり候
 - `tools/eval-compare.sh` (base = main の `git archive`、cases = `eval/cases`): 466/603 → 487/603、**broken 0 / fixed 21 / added 0 / removed 0**。
 - `short-words-in-english.tsv`: 188/293 → 209/293 (英語 40/142 → 61/142、日本語 148/151 のまま。日本語の外れ 3 件は変更前から)。
 - 実機 (NSSpellChecker) は未確認。
+
+### 8.5 再査読の修正 (取り消しの安全化、W12-3)
+- 取り消しの記録 `_pairedRevert` を、確定し直しの記録を捨てる所すべて (`ClearCorrectable`) と、Enter・Tab・Space・Backspace をアプリに通したとき (`NoteBreakKeyPassedToApp`) で捨てる。Backspace は確定し直しの記録も捨てる。取り消しは語尾が `to do `/`to go `/`to be ` (空白つき) のときだけ。ホストがキャレット前の文字を返さなければ何もしない。助詞から `yo` を外した。
+- テスト 1045 → **1047/1047** (2 件追加)。修正を外すと赤: `What to do⏎⏎ko ni iku` が `What とどこにいく` (期待 `What to doこにいく`)、`what to do yo` が `what とどyo`。
+- `--eval` 1292/1294 (同じ)、`eval-compare` broken 0 / fixed 21。
+- 未確認: 実機の入力欄で改行・Backspace を挟んだ場合 (試験用ホストは Enter で改行を入れないため、実機の改行入りの記録では未実測)。

@@ -115,6 +115,32 @@ internal static class ShortWordsInEnglishTests
     }
 
     [Test]
+    public static void PairedRevert_DoesNotEatUserTypedText_AfterEnterBackspaceOrOtherKey()
+    {
+        // 「What to do」を Enter で確定した後、1.5 秒以内に改行・Backspace・別の文字を挟んでも、
+        // 古い記録のまま「to do 」を消してユーザーが打った文字を消してはならない
+        // Enter で確定 → 改行 → 日本語
+        Assert.Equal("What to doこにいく", Typed("What to do\n\nko ni iku\n"));
+        // Enter で確定 → Backspace (確定済みの文字が 1 字消える) → 日本語: 残りの文字を取り消しで消さない
+        var afterBackspace = Typed("What to do\n\bko ni iku\n");
+        Assert.True(afterBackspace.StartsWith("What to d") && afterBackspace.EndsWith("こにいく"), afterBackspace);
+        // 確定 → 別の文字 (Space) を挟む
+        var afterSpace = Typed("What to do\n ko ni iku\n");
+        Assert.True(afterSpace.StartsWith("What to do") && afterSpace.EndsWith("こにいく"), afterSpace);
+    }
+
+    [Test]
+    public static void PairedRevert_YoIsNotAParticle_StaysEnglishPair()
+    {
+        // yo は英語の語でもあるので、取り消しの助詞にしない (半分だけ戻って「What とどyo」にならない)
+        foreach (var s in new[] { "what to do yo", "have to go yo", "tried to be yo", "going to do yo" })
+        {
+            var doc = Typed(s + "\n");
+            Assert.True(!(doc.Contains("とど") && doc.Contains("yo")), s + " → " + doc);
+        }
+    }
+
+    [Test]
     public static void ListedWord_To_AtSentenceEnd_StaysJapanese()
     {
         foreach (var w in JapaneseSideWords)

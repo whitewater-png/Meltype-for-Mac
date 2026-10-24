@@ -554,7 +554,7 @@ public sealed class CompositionController
     private void CommitPart(string text, bool english)
     {
         _spaceStartedConversion = false;
-        _correctable.Clear();
+        ClearCorrectable();
         _lastWord = null;
         if (text.Length == 0) return;
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, null);
@@ -682,7 +682,7 @@ public sealed class CompositionController
             return false;
         }
         // 選んだことでキャレットは動いている。直前に確定した語を、あとで確定し直さない (確定し直すと、選んだ文字ではなく手前の文字を消す)
-        _correctable.Clear();
+        ClearCorrectable();
         _lastWord = null;
         BeginComposition();
         // 選んだ文字の前後の空白・改行・タブは、置き換えても残す
@@ -969,7 +969,7 @@ public sealed class CompositionController
         if (!IsComposing) return false;
         Diagnostics.Log.Warn($"{reason}ので、変換中の入力を取り消しました (移った先に入らないように)。");
         Reset();
-        _correctable.Clear();
+        ClearCorrectable();
         _lastWord = null;
         UpdateView();
         return true;
@@ -1007,7 +1007,7 @@ public sealed class CompositionController
     {
         _lastCommitEnglish = null;
         _lastCommitText = null;
-        _correctable.Clear();
+        ClearCorrectable();
         _lastWord = null;
     }
 
@@ -1029,7 +1029,7 @@ public sealed class CompositionController
     {
         // クリックで別の場所に移る前に、今の位置へ確定しておく。
         CommitPending();
-        _correctable.Clear();
+        ClearCorrectable();
         _lastWord = null;
         _host.Replay(e);
     }
@@ -1505,7 +1505,7 @@ public sealed class CompositionController
     private void ReleaseHeldAsEnglish()
     {
         ClearHeld();
-        _correctable.Clear();
+        ClearCorrectable();
         _lastWord = null;
         _options.DirectDecided?.Invoke(false);
     }
@@ -3004,7 +3004,7 @@ public sealed class CompositionController
         else _firstSoundCommitted = true;
         var text = first.Text;
         if (_options.SpaceAroundEnglish()) text = AddSpacesAroundEnglish(text, _precedingText, null);
-        _correctable.Clear();
+        ClearCorrectable();
         // 前の確定の、確定後の F10 / F6 の記録も消す (入力欄の末尾が変わった。部分確定 CommitPart と同じ。R46-2)
         _lastWord = null;
         _lastCommitEnglish = first.English;
@@ -3140,7 +3140,7 @@ public sealed class CompositionController
     /// <summary>キャレットが動いたかもしれないとき (Meltype を通らなかったキー・クリック)。直前の語は確定し直さない。</summary>
     public void ForgetLastCommit()
     {
-        _correctable.Clear();
+        ClearCorrectable();
         _lastWord = null;
     }
 
@@ -3216,7 +3216,7 @@ public sealed class CompositionController
             _host.DeleteBackward(body.Length, body);
             _host.CommitText(replacement);
             // 手で直した語を、自動の確定し直しが元に戻さない (R41-2)
-            _correctable.Clear();
+            ClearCorrectable();
             // 次の F6 で日本語として覚え直すのは、元の英語の区間の語と、今 F10 で英語として覚えた語
             _lastWord = new LastWord(replacement, word.Raw, HasEnglish: true, HasJapanese: false, Environment.TickCount64,
                 new SegmentRawSet(learnable ? [.. word.Raws.English, word.Raws.Japanese[0]] : word.Raws.English, [], JapaneseWord: false));
@@ -3248,7 +3248,7 @@ public sealed class CompositionController
         _host.DeleteBackward(body.Length, body);
         _toggleBox = new ToggleBox(word.Raw, word.Text[..lead], dropTail ? "" : tail, body, word);
         _lastWord = null;
-        _correctable.Clear();
+        ClearCorrectable();
         SetOwnContext(beforeBody, LanguageOf(beforeBody));
         _toggleUndo = new ToggleUndo(word, previousCorrectable, ownText, ownEnglish, ownTime, OpenedBox: true, Learning: null);
         _gate.Capture();
@@ -3278,7 +3278,7 @@ public sealed class CompositionController
             ResetPrediction();
         }
         if (undo.Learning is not null) _options.Languages?.Undo(undo.Learning);
-        _correctable.Clear();
+        ClearCorrectable();
         _correctable.AddRange(undo.Correctable);
         _lastCommitText = undo.OwnText;
         _lastCommitEnglish = undo.OwnEnglish;
@@ -3360,10 +3360,14 @@ public sealed class CompositionController
     /// </summary>
     public void NoteBreakKeyPassedToApp(int vk, bool shift = false)
     {
+        // 間に Enter・Tab・Space・BackSpace が入ったら、「to do 」の取り消しはもう使わない (キャレット前の文字が変わるので、ユーザーが打った文字を消してしまう)
+        _pairedRevert = null;
         if (_lastCommitText is null) return;
         // BackSpace で、記録の最後の改行・タブ・空白が消える (I want ⏎⌫to go)
         if (vk == VirtualKeys.Back)
         {
+            // 確定済みの文字が 1 字消えるので、確定し直しの記録 (キャレット前の文字との照合に使う) はもう合わない
+            ClearCorrectable();
             if (_lastCommitText.EndsWith('\n') || _lastCommitText.EndsWith('\t') || _lastCommitText.EndsWith(' ')) _lastCommitText = _lastCommitText[..^1];
             return;
         }
@@ -3533,9 +3537,16 @@ public sealed class CompositionController
     }
 
     /// <summary>後ろの語が日本語と分かる助詞 (ha・no・to・so は英語の語でもあるので入れない)。</summary>
-    private static readonly HashSet<string> JapaneseParticles = new(StringComparer.Ordinal) { "ga", "wo", "ni", "de", "mo", "ka", "ne", "yo", "wa", "na", "ze", "zo" };
+    private static readonly HashSet<string> JapaneseParticles = new(StringComparer.Ordinal) { "ga", "wo", "ni", "de", "mo", "ka", "ne", "wa", "na", "ze", "zo" };
     /// <summary>(b) で書き換えた直後だけ持つ「to do 」(英語) と「とど」(日本語)。次の確定で後ろが日本語だったときに戻す。</summary>
     private (string English, string Japanese)? _pairedRevert;
+
+    /// <summary>確定し直しの記録を無効にする。取り消し (<see cref="_pairedRevert"/>) も同じ記録に頼るので、一緒に捨てる。</summary>
+    private void ClearCorrectable()
+    {
+        _correctable.Clear();
+        _pairedRevert = null;
+    }
 
     /// <summary>
     /// (b) の取り消し。do / go / be を確定した時点では後ろの語が分からないので、いったん英語にしてから、
@@ -3544,7 +3555,8 @@ public sealed class CompositionController
     /// </summary>
     private bool TryRevertPairedInfinitive(string raw, bool english, (string English, string Japanese)? pending)
     {
-        if (pending is not { } p || _precedingText is null || (!JapaneseParticles.Contains(raw) && (english || _detector.IsAmbiguousWord(raw))) || !raw.Any(char.IsAsciiLetter)) return false;
+        if (pending is not { } p || !p.English.EndsWith("to do ", StringComparison.Ordinal) && !p.English.EndsWith("to go ", StringComparison.Ordinal) && !p.English.EndsWith("to be ", StringComparison.Ordinal)) return false;
+        if (_precedingText is null || (!JapaneseParticles.Contains(raw) && (english || _detector.IsAmbiguousWord(raw))) || !raw.Any(char.IsAsciiLetter)) return false;
         if (!NoBreakToSpace(_precedingText).EndsWith(NoBreakToSpace(p.English), StringComparison.Ordinal)) return false;
         Diagnostics.Log.Decision($"後ろが日本語だったので、to を日本語のままに戻しました: {Diagnostics.Log.Text(p.English)}→{Diagnostics.Log.Text(p.Japanese)}");
         _host.DeleteBackward(p.English.Length, p.English);
@@ -3766,9 +3778,10 @@ public sealed class CompositionController
         var jpText = text;
         var pendingRevert = _pairedRevert;
         _pairedRevert = null;
+        (string English, string Japanese)? newRevert = null;
         if (!hadFixed && !fromToggle && !english && !chosen && !afterFirstSound && TryPairToWithInfinitive(raw, spaceIntended, ref text))
         {
-            _pairedRevert = ("to " + text, "と" + jpText);
+            newRevert = ("to " + text, "と" + jpText);
             english = true;
             hasEnglish = true;
             hasJapanese = false;
@@ -3780,11 +3793,12 @@ public sealed class CompositionController
         if (!hadFixed && !fromToggle && !chosen && !afterFirstSound && !commandName && _detector.IsAmbiguousWord(raw))
         {
             // 前の語の後に Space で区切って続けたときだけつなげる (それ以外は新しい並び)。
-            if (_correctable.Count > 0 && !_correctable[^1].SpaceIntended) _correctable.Clear();
+            if (_correctable.Count > 0 && !_correctable[^1].SpaceIntended) ClearCorrectable();
             _correctable.Add(new CommitRecord(text, raw, english, spaceIntended));
             if (_correctable.Count > MaxCorrectable) _correctable.RemoveAt(0);
         }
-        else _correctable.Clear();
+        else ClearCorrectable();
+        _pairedRevert = newRevert;
         _lastCommitEnglish = english;
         var joined = (_lastCommitText ?? "") + text;
         _lastCommitText = joined.Length > 20 ? joined[^20..] : joined;
@@ -3847,7 +3861,7 @@ public sealed class CompositionController
     private void ReplayDown(KeyEvent e)
     {
         // Meltype を通らないキーを送る = キャレットが動くかもしれないので、直前の語はもう確定し直さない。
-        _correctable.Clear();
+        ClearCorrectable();
         _lastWord = null;
         // 握りつぶしていた Shift を先に送る (Shift+矢印 の範囲選択、Ctrl+Shift+Z など)。
         foreach (var shift in _swallowedShift)
