@@ -53,6 +53,16 @@ internal static class ParenSpaceTests
     }
 
     [Test]
+    public static void UnmatchedClosingParen_DoesNotUseBracketRule()
+    {
+        // 開き括弧が無い単独の `)` は、括弧の規則を使わない (W13-2 との結合で見つかった)。
+        var k = NewKeyboard();
+        k.Type("what to do)");
+        k.Type(" ");
+        Assert.True(k.Host.View?.Converting == true, "対にならない閉じ括弧では従来の Space 処理");
+    }
+
+    [Test]
     public static void OtherClosingBrackets_Space_AlsoKeepsTheSpace()
     {
         var square = NewKeyboard();

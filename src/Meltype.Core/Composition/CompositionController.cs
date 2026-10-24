@@ -518,13 +518,16 @@ public sealed class CompositionController
     private static bool HasAsciiLetterOutsideBrackets(string raw)
     {
         var depth = 0;
+        var sawBracket = false;
+        var asciiOutside = false;
         foreach (var c in raw)
         {
-            if (c is '(' or '[' or '{') depth++;
+            if (c is '(' or '[' or '{') { depth++; sawBracket = true; }
             else if (c is ')' or ']' or '}') { if (depth > 0) depth--; }
-            else if (depth == 0 && char.IsAsciiLetter(c)) return true;
+            else if (depth == 0 && char.IsAsciiLetter(c)) asciiOutside = true;
         }
-        return false;
+        // 対になった括弧があり、括弧の外に英字があるときだけ。`what to do)` のような単独の閉じ括弧は対象外。
+        return sawBracket && depth == 0 && asciiOutside;
     }
 
     private void CommitThroughSelectedClause()

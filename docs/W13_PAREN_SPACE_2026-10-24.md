@@ -18,7 +18,7 @@ Japanese(nihongo) input requires too complex IMEs.
 ## 2. 実装
 
 - `CompositionText.EndsWithClosingBracket` を追加し、保留中のローマ字がなく、最後の単位の `Raw` が `)`・`]`・`}` のいずれかのときだけ真にする。表示が全角の `）`・`｝` でも同じ判定になる。
-- `CompositionController` の Space 処理で、自動判定モード・固定済み文節なし・末尾が閉じ括弧、かつ**括弧の外に英字がある場合**を追加する (`HasAsciiLetterOutsideBrackets`)。`Japanese(nihongo)` は対象、`(nihongo)` は対象外。
+- `CompositionController` の Space 処理で、自動判定モード・固定済み文節なし・末尾が閉じ括弧、かつ**対になった括弧があり、括弧の外に英字がある場合**を追加する (`HasAsciiLetterOutsideBrackets`)。`Japanese(nihongo)` は対象、`(nihongo)` と `what to do)` のような単独の閉じ括弧は対象外 (W13-2 との結合で確認)。
   - 従来の Space 変換と同じ最初の候補を作るが、変換中のままにはせず、その場で確定して半角空白を 1 つ入れる。
   - これにより、報告例は `Japanese(日本語) input ...` になる。
 - 設定は追加しない。判定規則・辞書・括弧の幅設定・`SpaceAroundEnglish` の実装は変更しない。
@@ -35,7 +35,7 @@ Japanese(nihongo) input requires too complex IMEs.
 
 ## 3. 回帰テスト
 
-新規 `ParenSpaceTests` (9 件):
+新規 `ParenSpaceTests` (10 件):
 
 1. 報告文全体で `)` の後の空白を保持する。
 2. 日本語だけの括弧では従来の Space 変換を残すこと (全角を含む)、英文の括弧で `SpaceAroundEnglish` と併用しても空白が二重にならないこと。
@@ -78,3 +78,7 @@ Japanese(nihongo) input requires too complex IMEs.
 - 上記の実機打鍵、および macOS の `NSSpellChecker` を通した判定。
 - Windows/Linux は対象外。
 - 独立査読は未実施。実装・検証はこの作業内で行った。
+
+## 7. 結合後の確認 (main)
+
+W13-1・W13-2 と main で結合したところ、`what to do)` のような単独の閉じ括弧でも新しい分岐に入り、W13-2 の取り消しが効かなくなる失敗が 1 件出た。開き括弧と対になっている場合だけに絞って修正した。最終の main で全テスト **1092/1092**、`--eval` **1292/1294**、eval-compare は **broken 0 / fixed 21** (W13-1〜W13-3 の合計)。
