@@ -1,7 +1,7 @@
 # リリースの手順
 
 > **Mac 版 (このリポジトリ) の実際の手順について**: 以下は本家 (Windows) の手順書を引き継いだもので、GitHub Actions (`mac.yml` など) によるビルド・署名・公証を前提にしていますが、
-> このリポジトリには `.github/workflows` が無く、CI は動いていません。Mac 版は作者の Mac で `mac/build.sh` → `make-zip.sh` / `make-pkg.sh` → `make-dmg.sh` (`make-pkg.sh` の後。pkg を包んだ dmg を作る) を実行し、
+> このリポジトリの CI (`.github/workflows/ci.yml`、2026-10-24 導入) は Linux で Core のテストと正解表の回帰ゲートを流すだけで、ビルド・署名・リリースの作成は行いません。Mac 版は作者の Mac で `mac/build.sh` → `make-zip.sh` / `make-pkg.sh` → `make-dmg.sh` (`make-pkg.sh` の後。pkg を包んだ dmg を作る) を実行し、
 > ad-hoc 署名 (公証なし) のアプリを入れた zip と、署名していない pkg を包んだ dmg を `gh release create` で添付しています。**1.1.5 の次の版からは pkg を単体では添付せず、zip と dmg だけにします** (リョウさんの判断 2026-10-12。pkg だけを落とした利用者が「開発元が未確認」で止まったため。pkg は dmg の中に入っています)
 > (`gh release create v<版>-mac mac/dist/Meltype-mac-<版>.zip mac/dist/Meltype-mac-<版>.dmg ...`。リリースノートの SHA-256 には zip・dmg と、dmg の中の pkg の 3 つを載せる (dmg の中の案内が、pkg の SHA-256 をリリースページと比べるよう書いているため)。インストール節は `docs/RELEASE_INSTALL_SECTION_MAC.md` の雛形を使う。本文で `docs/images/mac-dmg-window.png` を main の raw URL で見せるので、その画像が push 済みであることを確かめてから公開・編集する)。Developer ID 署名・公証・CI は運用コストのため行っていません (限界は `SECURITY.md` を参照)。
 

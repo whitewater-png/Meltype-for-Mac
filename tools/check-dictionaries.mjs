@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Yukishiro
 //
-// dictionaries/*.txt の形式を確かめる。手元で実行する (この Mac 版のリポジトリには CI の設定 (.github/workflows) が無い)。
+// dictionaries/*.txt の形式を確かめる。手元で実行する (CI (.github/workflows/ci.yml) でも Pull Request ごとに流す)。
 //   node tools/check-dictionaries.mjs [ファイル …]   … 省略するとすべての辞書
 // 読み込めない行 (エラー) があれば終了コード 1。直した方がよい行 (警告) は表示だけ。
 // 指定したファイルが dictionaries/ に無いときもエラー (終了コード 1)。
