@@ -383,6 +383,9 @@ public sealed class CompositionDetector
                 // 英単語のすぐ後ろの する の活用 (push + site = して、commit + sita = した) は、英単語 (site) でも日本語
                 // (末尾だと pushsite 全体が英字になっていた)。
                 if (!kanaInput && PrecededByEnglish(i) == true && IsSuruForm(table.Kana(i, j))) continue;
+                // カスタム表: 実機のスペルチェッカーだけが英単語と言う短い綴り (hast) の後ろに表のキーが続き (kt)、
+                // 区間と続きの英字を合わせると表でだけ最後まで読める綴りになる (hastkt = ha + st + kt) なら、英語の区間にしない。
+                if (!kanaInput && !ReferenceMode && j < n && IsTableOnlyContinuation(table.Raw(i, j), table.Raw(j, n) + pending)) continue;
                 var english = kanaInput
                     ? IsEnglishSpanKana(table.Raw(i, j), table.Kana(i, j), atEnd: j == n, BeforeScore(i), after, level, final)
                     : IsEnglishSpan(table.Raw(i, j) + (j == n ? pending : ""), atEnd: j == n, BeforeScore(i), after, startOfInput: i == 0, level, final, endsWord: symbolsAfter,
@@ -709,6 +712,22 @@ public sealed class CompositionDetector
         var analysis = _romaji.AnalyzeFragmentForKana(span);
         if (!analysis.IsValid || analysis.Partial.Length > 0 || !analysis.Tokens.Any(t => table.TryGet(t.Romaji, out _))) return false;
         return !(IsListedEnglishWord(span) || IsKnownEnglishWord(span) || IsSpellWord(span));
+    }
+
+    /// <summary>
+    /// 区間 (hast) が実機のスペルチェッカーだけで英単語になる短い綴りで、その後ろの英字 (kt…) と合わせた全体 (hastkt) が
+    /// カスタム表でだけ最後まで読める綴り (IsTableOnlySpelling) か。そうなら区間は英語ではなく日本語の一部 (きょう + は + したこと)。
+    /// 同梱の英単語・固有名詞・学習した語 (IsBundledEnglishWord) は対象にしない: string / ring / apple / stop は表 ON でも変わらない。
+    /// 表が無い・OFF・区間の後ろが英小文字でないときは常に false。
+    /// </summary>
+    private bool IsTableOnlyContinuation(string span, string rest)
+    {
+        // 安いもの (表を引かない判定) を先に見る
+        if (span.Length < 2 || rest.Length == 0 || !span.All(char.IsAsciiLetterLower) || !char.IsAsciiLetterLower(rest[0])) return false;
+        var run = rest.TakeWhile(char.IsAsciiLetterLower).Count();
+        if (run + span.Length > MaxEnglishSpanLength) return false;
+        if (IsBundledEnglishWord(span) || !IsSpellWord(span)) return false;
+        return IsTableOnlySpelling(span + rest[..run]);
     }
 
     private readonly Dictionary<(string Span, string? Next, int Flags), bool> _spanCache = [];

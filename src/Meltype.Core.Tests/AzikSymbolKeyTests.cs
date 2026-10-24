@@ -259,6 +259,60 @@ internal static class AzikSymbolKeyTests
         });
     }
 
+    /// <summary>実機の NSSpellChecker の答え (macOS 27 で実測: hast は英単語、hastkt・stkt・kt・st は語でない)。BuiltIn に足して、実機で語になる短い綴りを再現する。</summary>
+    private sealed class MacLikeChecker(params string[] extra) : IWordChecker
+    {
+        public bool IsAvailable => true;
+        public bool IsWord(string lower) => extra.Contains(lower) || BuiltInWordChecker.Shared.IsWord(lower);
+    }
+
+    private static T WithMacLike<T>(Func<T> body, params string[] extra)
+    {
+        var previous = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = new MacLikeChecker(extra);
+        try { return body(); }
+        finally { CompositionTests.Detector.SpellChecker = previous; }
+    }
+
+    [Test]
+    public static void C1_HastKt_MacLikeSpellChecker_StaysJapanese()
+    {
+        // 実機の NSSpellChecker は hast を英単語と答える。表 (st・kt) で最後まで読める hastkt の一部が英単語でも、きょうはしたこと になる。
+        WithMacLike(() =>
+        {
+            WithTable(SampleTsv(), () =>
+            {
+                Assert.Equal("きょうはしたこと", Run("kyouhastkt\n").Split('|')[1], "kyouhastkt (hast を語と答えるチェッカー)");
+                Assert.Equal("きょうはしたこと", Run("kyouhastkt").Split('|')[0], "打ちかけの表示も同じ");
+            });
+            return 0;
+        }, "hast");
+    }
+
+    [Test]
+    public static void C1_HastKt_FixDoesNotTouchOffOrEnglish()
+    {
+        // 表 OFF・表なしは従来のまま (hast が語なら きょうhastkt のまま)。hast 単独・英文・知っている英単語も表 ON で変わらない。
+        string[] probes = { "hast", "hast the", "kyouhast", "hastkt", "string", "ring", "apple", "stop", "last", "must", "stereo", "hastily", "hasten", "I hast not", "stkt", "kyouhastktdesu" };
+        WithMacLike(() =>
+        {
+            var off = probes.Select(w => WithOff(() => Run(w + "\n"))).ToArray();
+            WithTable(null, () => Assert.Equal(off[0], Run("hast\n"), "表なしは OFF と同じ"));
+            WithTable(SampleTsv(), () =>
+            {
+                foreach (var (w, expected) in probes.Zip(off))
+                {
+                    // 表のキー (st・kt) で最後まで読める hastkt 系だけが変わってよい
+                    if (w is "hastkt" or "kyouhastktdesu" or "stkt") continue;
+                    Assert.Equal(expected, Run(w + "\n"), $"{w} は表 ON でも OFF と同じ (hast を語と答えるチェッカー)");
+                }
+                Assert.Equal("hast", Run("hast\n").Split('|')[1], "hast 単独は英字のまま");
+                Assert.Equal("きょうはしたことです", Run("kyouhastktdesu\n").Split('|')[1], "続きが日本語でも");
+            });
+            return 0;
+        }, "hast");
+    }
+
     [Test]
     public static void C1_KnownEnglishWordIsNotTakenByTable()
     {
