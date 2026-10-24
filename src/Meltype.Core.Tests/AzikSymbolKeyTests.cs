@@ -204,6 +204,44 @@ internal static class AzikSymbolKeyTests
         WithTable(null, () => Assert.Equal("stkt", Run("stkt").Split('|')[1], "表なしは英字のまま"));
     }
 
+    /// <summary>実アプリ (BuiltIn / NSSpellChecker) と同じく英単語チェッカーを付けて回す。付けないと辞書に無い英語が表で変わって見える (査読)。</summary>
+    private static T WithWords<T>(Func<T> body)
+    {
+        var previous = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try { return body(); }
+        finally { CompositionTests.Detector.SpellChecker = previous; }
+    }
+
+    [Test]
+    public static void C1_RealisticSpellChecker_KeepsEnglishAndStaysOnlyWhereFullyCovered()
+    {
+        WithWords(() =>
+        {
+            string[] english = { "strike", "kingdom", "steel", "artist", "western", "ringing", "string", "last", "must", "stop", "strong", "street", "kitten", "spring", "stdin", "ngrok", "nginx", "stdout" };
+            var off = english.Select(w => Run(w + "\n")).ToArray();
+            WithTable("st\tした\nkt\tこと\nng\tんぐ\nry\tらい\n", () =>
+            {
+                foreach (var (w, expected) in english.Zip(off))
+                    Assert.Equal(expected, Run(w + "\n"), $"英単語 {w} は表 ON でも OFF と同じ (BuiltIn 付き)");
+                // 表のキーだけで最後まで読める語は日本語、最後まで読めない語 (余りが出る) は変えない。
+                Assert.Equal("したこと", Run("stkt\n").Split('|')[1], "stkt は表で全部読める → したこと");
+                Assert.Equal("したことあ", Run("stkta\n").Split('|')[1], "stkta も st + kt + a で全部読める → したことあ (査読で文書の誤りを訂正)");
+                Assert.Equal(Run("stktx\n"), WithOff(() => Run("stktx\n")), "stktx は最後まで読めない → 変えない");
+            });
+            return 0;
+        });
+    }
+
+    private static string WithOff(Func<string> body)
+    {
+        var romaji = CompositionTests.Detector.Romaji;
+        var previous = romaji.CustomTable;
+        romaji.CustomTable = () => null;
+        try { return body(); }
+        finally { romaji.CustomTable = previous; }
+    }
+
     [Test]
     public static void C1_EnglishSpellingsStayEnglish_WithTableOn()
     {
