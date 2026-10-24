@@ -26,7 +26,7 @@
 
 ## 3. コマンド (2026-10-24 にクラウドで実測)
 ```bash
-# Core のテスト (938 件、約 50 秒)。出力の最後が N/N passed なら合格
+# Core のテスト (件数は docs/AGENT_STATE.md、約 50 秒)。出力の最後が N/N passed なら合格
 dotnet run -c Release --project src/Meltype.Core.Tests
 dotnet run -c Release --project src/Meltype.Core.Tests -- --eval          # 品質テスト (カテゴリーごとの正解率と外れた例)
 dotnet run -c Release --project src/Meltype.Core.Tests -- CompositionTests # 名前に一致するテストだけ
