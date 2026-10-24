@@ -21,8 +21,14 @@ ditto "$APP" "$WORK/root/Meltype.app"
 
 # 入れる場所を勝手に動かされない・上書き更新にする
 pkgbuild --analyze --root "$WORK/root" "$WORK/component.plist" >/dev/null
-/usr/libexec/PlistBuddy -c "Set :0:BundleIsRelocatable false" "$WORK/component.plist"
-/usr/libexec/PlistBuddy -c "Set :0:BundleOverwriteAction upgrade" "$WORK/component.plist"
+# macOS 27 の pkgbuild --analyze は BundleIsRelocatable のキーを出さない (古い macOS は出す)。
+# Set は「キーが無い」で失敗するので、無ければ Add する (どちらの macOS でも false になる)。
+plist_set() {
+    /usr/libexec/PlistBuddy -c "Set :0:$1 $3" "$WORK/component.plist" 2>/dev/null ||
+        /usr/libexec/PlistBuddy -c "Add :0:$1 $2 $3" "$WORK/component.plist"
+}
+plist_set BundleIsRelocatable bool false
+plist_set BundleOverwriteAction string upgrade
 
 pkgbuild --root "$WORK/root" --component-plist "$WORK/component.plist" \
     --identifier io.github.yksr-melt.inputmethod.Meltype.pkg --version "$VERSION" \
