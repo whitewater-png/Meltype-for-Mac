@@ -381,6 +381,34 @@ internal static class CompositionTests
         }
     }
 
+    // 要件 001: ローマ字としても読める 3 文字以上の辞書の英単語 (api = あぴ) の直後の の が、後ろの英単語 (error) を伴うとき
+    [Test]
+    public static void ShortEnglishWord_FollowedByNo_SplitsParticle()
+    {
+        var cases = new Dictionary<string, string>
+        {
+            ["apinoerror"] = "apiのerror",
+            ["apinoupdate"] = "apiのupdate",
+            ["apinoconfig"] = "apiのconfig",
+            ["urlnoerror"] = "urlのerror", // 既に通っていた経路 (守り)
+            // 後ろが英単語でなければ、今までどおり日本語 (守り)
+            ["sushigatabetai"] = "すしがたべたい",
+            ["linewookuru"] = "lineをおくる",
+            ["apino"] = "あぴの",
+        };
+        foreach (var (typed, expected) in cases)
+        {
+            var k = new Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, k.Showing, $"「{typed}」");
+        }
+        // 区間は api / の / error の並びで、英語の区間が 2 つ
+        var text = new CompositionText(Detector);
+        foreach (var c in "apinoerror") text.Append(c);
+        var english = text.Segments(final: true).Where(s => s.IsEnglish).Select(s => s.Raw).ToList();
+        Assert.Equal("api,error", string.Join(",", english), "apinoerror の英語区間は api と error の 2 つ (間が の)");
+    }
+
     // 実機で報告: 「やあやあ、私だよ」→「やあやあ、だよ私」、「ところでgoogleって」→「ところでってgoogle」
     [Test]
     public static void ReportedOrderSwaps()

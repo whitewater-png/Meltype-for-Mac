@@ -24,3 +24,6 @@ kubectl get pods	kubectl get pods	full	計画書 1-4
 npx create-next-app	npx create-next-app	full	計画書 1-4
 git commit -m "fix bug"	git commit -m "fix bug"	full	計画書 1-4
 ssh user@example.com	ssh user@example.com	full	計画書 1-4
+# 読める 3 文字以上の辞書の英単語 + no + 英単語 (要件 001)
+apinoupdate	apiのupdate	full	docs/requirements/001-api-no-error.md
+apinoconfig	apiのconfig	full	docs/requirements/001-api-no-error.md

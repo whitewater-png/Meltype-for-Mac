@@ -364,7 +364,8 @@ public sealed class CompositionDetector
                 var english = kanaInput
                     ? IsEnglishSpanKana(table.Raw(i, j), table.Kana(i, j), atEnd: j == n, BeforeScore(i), after, level, final)
                     : IsEnglishSpan(table.Raw(i, j) + (j == n ? pending : ""), atEnd: j == n, BeforeScore(i), after, startOfInput: i == 0, level, final, endsWord: symbolsAfter,
-                        unreadable: table.HasUnreadable(i, j) || EndsWithLoneSokuon(units, j), next: j < n ? units[j].Raw + (j + 1 == n ? pending : "") : null);
+                        unreadable: table.HasUnreadable(i, j) || EndsWithLoneSokuon(units, j), next: j < n ? units[j].Raw + (j + 1 == n ? pending : "") : null,
+                        particleThenEnglish: j < n && !symbolsAfter && ParticleThenEnglishWord(table.Raw(j, n) + pending));
                 if (english)
                 {
                     found = j;
@@ -640,13 +641,13 @@ public sealed class CompositionDetector
     /// <param name="final">打ち終わった (Space・Enter)。末尾の区間でも、英単語の打ちかけ (amaz) は英語の根拠にしない。</param>
     /// <param name="unreadable">区間にローマ字として読めなかった英字がある (zoom + de の m、bug + wo の g)。</param>
     /// <param name="endsWord">区間の後ろが記号だけ (let's go! の go)。語はそこで打ち終わっているので、短い語も末尾の語と同じく見る。</param>
-    private bool IsEnglishSpan(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final = false, bool unreadable = false, string? next = null, bool endsWord = false)
+    private bool IsEnglishSpan(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final = false, bool unreadable = false, string? next = null, bool endsWord = false, bool particleThenEnglish = false)
     {
         // 1 キー打つたびに、ほぼ同じ区間 (前のキーまでに調べた区間) を何度も判定するので、結果を覚えておく。
         // 判定は引数と、学習した語 (Memory) とスペルチェッカーだけで決まる。それらが変わったら捨てる。
         var flags = (atEnd ? 1 : 0) | (startOfInput ? 2 : 0) | (final ? 4 : 0) | (unreadable ? 8 : 0) | (endsWord ? 16 : 0) |
-                    ((after is null ? 0 : after.Value ? 1 : 2) << 5) | ((int)level << 7) | ((before + 8) << 10);
-        if (ReferenceMode) return IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord);
+                    ((after is null ? 0 : after.Value ? 1 : 2) << 5) | ((int)level << 7) | ((before + 8) << 10) | (particleThenEnglish ? 1 << 20 : 0);
+        if (ReferenceMode) return IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord, particleThenEnglish);
         var key = (span, next, flags);
         lock (_spanCache)
         {
@@ -659,7 +660,7 @@ public sealed class CompositionDetector
             }
             if (_spanCache.TryGetValue(key, out var cached)) return cached;
         }
-        var result = IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord);
+        var result = IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord, particleThenEnglish);
         lock (_spanCache) _spanCache[key] = result;
         return result;
     }
@@ -669,7 +670,7 @@ public sealed class CompositionDetector
     private int _spanCacheMemoryVersion;
     private Detection.IWordChecker? _spanCacheChecker;
 
-    private bool IsEnglishSpanCore(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final, bool unreadable, string? next, bool endsWord)
+    private bool IsEnglishSpanCore(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final, bool unreadable, string? next, bool endsWord, bool particleThenEnglish)
     {
         // まだ続きを打つかもしれない末尾の区間 (打ちかけの英単語を英語と見てよい)。
         var growing = atEnd && !final;
@@ -825,6 +826,9 @@ public sealed class CompositionDetector
         // スペルチェッカーだけが知っている、最後までローマ字として読める語 (shite, kore) は、前の英単語 1 つ (push) では足りない
         // (pushshite → pushして)。英文の続き (+2) か、前後の両方が英語のときだけ。
         if (spellWord && !inDictionary && _romaji.Analyze(lower) is { IsValid: true, Partial: "" }) needed = Math.Max(needed, 2);
+        // 3 文字以上の辞書の語 (api) の後ろが 助詞 + 3 文字以上の英単語 (apinoerror の no + error) なら、後ろは英語として数える
+        // (後ろを常に日本語と数えると api が あぴ になる。要件 001)。同梱の一覧の語だけを根拠にする。
+        if (particleThenEnglish && after == false && inDictionary && lower.Length >= 3) after = true;
         // 前が英文でも、後ろが日本語なら英文の強さは数えない (I love |sushi| が好き → 食い違うので日本語)。
         if (ambiguous && (after == false ? Math.Min(before, 1) : before) + Score(after) >= needed) return true;
         var analysis = _romaji.Analyze(lower);
@@ -1440,6 +1444,18 @@ public sealed class CompositionDetector
     /// </summary>
     private static readonly string[] FollowWordsShort = ["da", "ka", "ne", "yo", "he", "ya", "sa", "na", "tte", "tto", "kke", "jan"];
     private static readonly string[] FollowWordsLong = ["dayo", "dane", "dakara", "dake", "desu", "deshita", "janai", "jaa", "nara", "nanode", "nano", "nanoni", "shika", "mitai", "ppoi", "rashii", "kamo", "kana", "toka", "nado", "tte", "datta", "kurai", "gurai", "koso", "sura", "bakari", "nomi", "goto", "zenbu", "igai", "ijou", "ika"];
+
+    /// <summary>後ろの打鍵が 助詞 + 3 文字以上の英単語 (同梱の一覧の語。スペルチェッカーは使わない) だけでできているか (noerror)。</summary>
+    private bool ParticleThenEnglishWord(string rest)
+    {
+        var lower = rest.ToLowerInvariant();
+        foreach (var particle in TrailingParticles)
+        {
+            if (lower.Length - particle.Length >= 3 && lower.StartsWith(particle, StringComparison.Ordinal) &&
+                lower.AsSpan(particle.Length).IndexOfAnyExceptInRange('a', 'z') < 0 && IsBundledEnglishWord(lower[particle.Length..])) return true;
+        }
+        return false;
+    }
 
     private static readonly string[] TrailingParticles = ["kara", "made", "yori", "ga", "wo", "ni", "de", "no", "to", "mo", "ha", "wa"];
 
