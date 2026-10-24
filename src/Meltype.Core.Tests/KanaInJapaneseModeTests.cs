@@ -153,4 +153,36 @@ internal static class KanaInJapaneseModeTests
         }
         finally { CompositionTests.Detector.KanaInJapaneseMode = () => false; }
     }
+
+    // K98: exe は xe (ぇ) の小書きの綴りで最後まで読める辞書の英単語。日本語のすぐ後ろでも、後ろに日本語が続いても英字のまま
+    // (入力の先頭の exewo → exeを、exede → exeで と同じ)。ON のときは一覧の語なので、従来どおり かな。
+    [Test]
+    public static void Off_ExeInsideJapaneseSentenceStaysEnglish()
+    {
+        foreach (var (typed, expected) in new[]
+        {
+            ("korehaexedesu", "これはexeです"), ("korehaexewo", "これはexeを"), ("korehaexeda", "これはexeだ"),
+            ("korehaexedayo", "これはexeだよ"), ("korehaexeka", "これはexeか"), ("korehaexe", "これはexe"),
+            ("exedesu", "exeです"), ("exewo", "exeを"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, k.Showing, $"OFF: {typed}");
+        }
+    }
+
+    [Test]
+    public static void On_ExeInsideJapaneseSentenceStaysKana()
+    {
+        WithMode(true, () =>
+        {
+            foreach (var (typed, expected) in new[] { ("korehaexedesu", "これはえぇです"), ("korehaexewo", "これはえぇを"), ("korehaexe", "これはえぇ"), ("exedesu", "えぇです") })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed);
+                Assert.Equal(expected, k.Showing, $"ON: {typed}");
+            }
+        });
+    }
 }

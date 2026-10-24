@@ -778,6 +778,10 @@ public sealed class CompositionDetector
         // 設定「日本語入力中は一覧の語をかなで変換する」(本家 #1023): 英語の辞書にある語でも、
         // 前が英語でない (日本語の続き・入力の先頭) なら日本語として扱う。英語の文の中と .exe は今までどおり英語。
         if (KanaInJapaneseMode() && before <= 0 && KanaInJapaneseModeWords.ContainsWord(lower)) return false;
+        // 小書き文字の綴り (xe = ぇ) でしか最後まで読めない、同梱の辞書の 3 文字の英単語 (exe) は、日本語のすぐ後ろ・後ろに日本語が続くときも英字のまま
+        // (korehaexedesu → これはexeです。入力の先頭の exewo → exeを と同じ。K98)。後ろの日本語を数えると えぇ になっていた。
+        // 日本語の語の頭になる綴り (xa・xi で始まる語など) と固有名詞は除く。設定が ON のときは、上で一覧の語を先に かな にしている。
+        if (inDictionary && smallKanaSpelling && lower.Length == 3 && before <= 0 && !_japanese.IsPrefix(lower) && !_proper.Contains(lower)) return true;
         // ユーザーが英字 / かなに直して覚えた語。ただし短くてローマ字として読める語 (go、no) は、日本語のすぐ後ろ
         // (nihon|go) では使わない (一度 go を英字で確定しただけで、日本語 が にほんgo になっていた)。
         // english-readable.txt の語 (main) を英字で覚えていても、続く 1 音とでよく使う語・ブランド名の頭になる (main + do = マインド) ときは、覚えた英字を使わない (Q11 の実機確認)。
