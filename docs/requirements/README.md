@@ -27,4 +27,4 @@ Core のテストは偽の変換エンジンで動くので、漢字変換と実
 ## 一覧
 | 番号 | 題 | status |
 |---|---|---|
-| 001 | 短い英単語の直後の「の」が英語に吸われる (apinoerror → apiのerror) | approved |
+| 001 | 短い英単語の直後の「の」が英語に吸われる (apinoerror → apiのerror) | done (PR #5) |
