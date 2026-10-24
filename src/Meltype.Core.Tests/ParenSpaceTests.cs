@@ -25,17 +25,27 @@ internal static class ParenSpaceTests
     }
 
     [Test]
-    public static void ClosingParen_JapaneseAndWidthSettings_KeepTheSpace()
+    public static void JapaneseOnly_ClosingParen_Space_StillStartsConversion()
     {
-        var japanese = NewKeyboard();
-        japanese.Type("(kakko) desu\n");
-        Assert.Equal("(かっこ) です", japanese.Host.Document);
+        // 査読 C-1: 日本語だけの括弧では、従来の Space 変換を残す。
+        var k = NewKeyboard();
+        k.Type("(kakko)");
+        k.Type(" ");
+        Assert.Equal("", k.Host.Document);
+        Assert.True(k.Host.View?.Converting == true, "日本語だけの括弧では Space 変換を始める");
+        Assert.Equal("(かっこ)", k.Showing);
 
         var full = NewKeyboard();
         full.Parentheses = ParenthesisWidth.FullWidth;
-        full.Type("(kakko) desu\n");
-        Assert.Equal("（かっこ） です", full.Host.Document);
+        full.Type("(kakko)");
+        full.Type(" ");
+        Assert.True(full.Host.View?.Converting == true, "全角でも同じ");
+        Assert.Equal("（かっこ）", full.Showing);
+    }
 
+    [Test]
+    public static void ClosingParen_EnglishContext_WidthAndSpacing_KeepTheSpace()
+    {
         var spaced = NewKeyboard();
         spaced.SpaceAroundEnglish = true;
         spaced.Type("Japanese(nihongo) input\n");
@@ -71,9 +81,9 @@ internal static class ParenSpaceTests
     public static void RepeatedSpace_AfterClosingParen_PassesLaterSpacesToTheHost()
     {
         var k = NewKeyboard();
-        k.Type("(kakko)  ");
-        Assert.Equal("(かっこ) ", k.Host.Document);
-        Assert.Equal("(かっこ) ", k.Host.Output.Single());
+        k.Type("Japanese(nihongo)  ");
+        Assert.Equal("Japanese(日本語) ", k.Host.Document);
+        Assert.Equal("Japanese(日本語) ", k.Host.Output.Single());
         Assert.True(k.Showing is null, "2 回目の Space でも変換を始めない");
         Assert.True(k.Host.Events.Contains("passed:20"), "2 回目の Space はアプリへ渡す");
     }

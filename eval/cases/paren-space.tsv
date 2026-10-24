@@ -2,7 +2,7 @@
 # 既存の英文・コード形と、空白を入れない日本語の対照も含める。
 Japanese(nihongo) input requires too complex IMEs.	Japanese(日本語) input requires too complex IMEs.	full	W10 実測の再現 2026-10-24 (W13-3)
 Japanese(nihongo) input	Japanese(日本語) input	full	W10 実測の再現を短くした形 2026-10-24 (W13-3)
-(kakko) desu	(かっこ) です	full	日本語の括弧の直後の空白 2026-10-24 (W13-3)
+(kakko) desu	(かっこ)です	full	日本語だけの括弧は従来の Space 変換を残す (C-1) 2026-10-24 (W13-3)
 (kakko)desu	(かっこ)です	full	空白を打たない対照 2026-10-24 (W13-3)
 test[foo] bar	test「ふぉお」 bar	full	角括弧の直後の空白 2026-10-24 (W13-3)
 test{foo} bar	test{ふぉお｝ bar	full	中括弧の直後の空白 2026-10-24 (W13-3)

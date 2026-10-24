@@ -514,6 +514,19 @@ public sealed class CompositionController
     /// 最後の文節を選んでいれば、全部を確定する (Enter と同じ)。
     /// 変換後も続けて入力 (固定した文節) ・選んだ文の再変換の途中は、残す読みの扱いが合わないので、全部を確定する。
     /// </summary>
+    /// <summary>括弧の外に英字があるか。`Japanese(nihongo)` は true、`(nihongo)` は false。</summary>
+    private static bool HasAsciiLetterOutsideBrackets(string raw)
+    {
+        var depth = 0;
+        foreach (var c in raw)
+        {
+            if (c is '(' or '[' or '{') depth++;
+            else if (c is ')' or ']' or '}') { if (depth > 0) depth--; }
+            else if (depth == 0 && char.IsAsciiLetter(c)) return true;
+        }
+        return false;
+    }
+
     private void CommitThroughSelectedClause()
     {
         var count = _selectedClause + 1;
@@ -1151,8 +1164,9 @@ public sealed class CompositionController
                     StartConversion();
                     return;
                 }
-                // 閉じ括弧の直後の Space は英文・日本文のどちらでも区切り。変換を始めて空白を飲まない。
-                if (_headCount == 0 && _text.Mode == DisplayMode.Auto && _text.EndsWithClosingBracket)
+                // 英文の中の閉じ括弧の直後の Space は区切り。変換を始めて空白を飲まない。
+                // 日本語だけの括弧 ((kakko)) では従来どおり Space 変換を残す (査読 C-1)。
+                if (_headCount == 0 && _text.Mode == DisplayMode.Auto && _text.EndsWithClosingBracket && HasAsciiLetterOutsideBrackets(_text.Raw))
                 {
                     // 従来の最初の候補は採用するが、変換中のままにはせず、その場で確定して空白を入れる。
                     StartConversion();
