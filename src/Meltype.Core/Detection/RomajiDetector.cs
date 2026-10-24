@@ -221,7 +221,9 @@ public sealed class RomajiDetector
         while (i < s.Length)
         {
             var c = s[i];
-            if (c is < 'a' or > 'z') return Invalid($"'{c}' は英字ではない");
+            // 表のキーに使える記号 (; : [ など) は、記号入りの表があるときだけ読み進める。
+            // 標準の綴りには記号が無いので、表に一致しなければ下で不正になる (表が無いときは従来どおりここで不正)。
+            if (c is < 'a' or > 'z' && !(table is { HasSymbolKeys: true } && RomajiTable.IsSymbolKeyChar(c))) return Invalid($"'{c}' は英字ではない");
 
             // カスタム表: 位置 i から最長一致 (キーが完全に揃ったときだけ置換。保留はしない)。固定ルール (ん・っ) より優先。
             if (table is not null)

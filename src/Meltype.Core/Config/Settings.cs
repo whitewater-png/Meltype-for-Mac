@@ -378,7 +378,7 @@ public sealed class Settings
     public bool KanaInJapaneseMode { get; set; }
 
     [Category("2. 判定"), DisplayName("カスタムローマ字表を使う"),
-     Description("データフォルダー (Mac は ~/Library/Application Support/Meltype) の dictionaries/romaji.tsv に、1 行 1 定義で「入力(英字)[タブ]出力(かな)」を書くと (例: ry[タブ]らい)、変換ボックスのかな変換で標準の綴りより優先します (最長一致。キーが全部揃ったときだけ置換。標準の綴りで先に読み終わるキー、たとえば ka があるのに kak だけ定義した場合は、キーボードで打つと ka が先に確定するので届きません)。表が無い・空・OFF のときは今までと同じです。英語かどうかの判定には使いません。")]
+     Description("データフォルダー (Mac は ~/Library/Application Support/Meltype) の dictionaries/romaji.tsv に、1 行 1 定義で「入力(英字)[タブ]出力(かな)」を書くと (例: ry[タブ]らい)、変換ボックスのかな変換で標準の綴りより優先します (最長一致。キーが全部揃ったときだけ置換。標準の綴りで先に読み終わるキー、たとえば ka があるのに kak だけ定義した場合は、キーボードで打つと ka が先に確定するので届きません)。入力は英字のほか、記号 ; : [ ] @ - , . / \u0027 ^ \\ もキーに使えます (記号入りのキーが揃ったときだけ表を優先)。表が無い・空・OFF のときは今までと同じです。英語かどうかの判定は、標準の綴りでは読めず表でだけ最後まで読める綴り (英単語として知られていない語) を日本語にするほかは表を使いません。書き方は docs/CUSTOM_ROMAJI.md を参照してください。")]
     public bool CustomRomajiTable { get; set; }
 
     [Category("2. 判定"), DisplayName("英単語の後ろの英字の名前を英語にする"),

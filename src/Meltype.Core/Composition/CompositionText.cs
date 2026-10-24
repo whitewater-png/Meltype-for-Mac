@@ -74,6 +74,9 @@ public sealed class CompositionText
 
     public void Append(char c)
     {
+        // カスタムローマ字表に記号入りのキー (; : [ など) があり、打った記号でキーが揃う (または伸びる) ときだけ、表を優先する。
+        // 表が無い・OFF・記号入りのキーが無い・キーに届かない記号は、これまでの規則 (全角化・z+記号・区切り) のまま。
+        if (TryAppendTableSymbol(c)) return;
         // 英数字の間に打った . / - はドメイン名や略語の区切り。入力直後は後続文字が分からないため、
         // 次の英数字が来た時点で句点・長音として読んだ記号を半角に戻す (tetr.io、J-core)。
         if (char.IsAsciiLetterOrDigit(c) && _units.Count >= 2 && (_units[^1].Raw is "." or "-") &&
@@ -268,6 +271,29 @@ public sealed class CompositionText
             return;
         }
         _units.Add(new CompositionUnit(Symbol(c).ToString(), c.ToString()));
+    }
+
+    /// <summary>
+    /// 記号 c を表のキーの一部として pending に入れる。入れたら true。
+    /// pending + c が表のキー (または長いキーの先頭) ならそのまま伸ばす。そうでなくても c 単独が表のキー (の先頭) なら、
+    /// 今の pending を標準の綴りで確定してから c を新しいキーの先頭にする (B2 と同じ不一致時のフォールバック)。
+    /// 先頭の z + 記号 (z. = …, z[ = 『) は、z + c 自体が表のキーでない限り従来の規則に任せる。
+    /// </summary>
+    private bool TryAppendTableSymbol(char c)
+    {
+        if (KanaInput || !Detection.RomajiTable.IsSymbolKeyChar(c)) return false;
+        if (_detector.Romaji.CustomTable?.Invoke() is not { HasSymbolKeys: true } table) return false;
+        var pending = _pending.ToString().ToLowerInvariant();
+        if (!table.Extends(pending + c))
+        {
+            if (pending.Length == 0 || !table.Extends(c.ToString())) return false;
+            if (pending == "z" && ZSymbol(c) is not null) return false;
+            Normalize(final: true);
+        }
+        _pending.Append(c);
+        SplitUnitAfterNumber(final: false);
+        Normalize(final: false);
+        return true;
     }
 
     /// <summary>
@@ -793,6 +819,30 @@ public sealed class CompositionText
         }
     }
 
+    /// <summary>
+    /// 記号入りの表キーの途中 (;a に対する ; など) のまま確定するときの単位。記号は従来の記号の規則 (Symbol)、
+    /// 記号の前後の英字は標準の綴りで読む。
+    /// </summary>
+    private List<(string Kana, string Raw)> PartialRestUnits(string rest)
+    {
+        var result = new List<(string, string)>();
+        var letters = new StringBuilder();
+        void FlushLetters()
+        {
+            if (letters.Length == 0) return;
+            result.Add((_detector.Romaji.ConvertLenient(letters.ToString().ToLowerInvariant(), final: true), letters.ToString()));
+            letters.Clear();
+        }
+        foreach (var ch in rest)
+        {
+            if (!Detection.RomajiTable.IsSymbolKeyChar(ch)) { letters.Append(ch); continue; }
+            FlushLetters();
+            result.Add((Symbol(ch).ToString(), ch.ToString()));
+        }
+        FlushLetters();
+        return result;
+    }
+
     /// <summary>Pending のうち、音として確定した部分を単位に移す。</summary>
     private void Normalize(bool final)
     {
@@ -872,6 +922,10 @@ public sealed class CompositionText
                 {
                     // 確定時: 残った n / nn は ん、それ以外の子音は英字のまま。
                     if (rest.ToLowerInvariant() is "n" or "nn") _units.Add(new CompositionUnit("ん", rest));
+                    else if (rest.Any(Detection.RomajiTable.IsSymbolKeyChar) && romaji.CustomTable?.Invoke()?.IsPartial(rest.ToLowerInvariant()) == true)
+                    {
+                        foreach (var (kana, typed) in PartialRestUnits(rest)) _units.Add(new CompositionUnit(kana, typed));
+                    }
                     else if (romaji.CustomTable?.Invoke()?.IsPartial(rest.ToLowerInvariant()) == true)
                         _units.Add(new CompositionUnit(romaji.ConvertForDisplay(rest.ToLowerInvariant(), final: true), rest));
                     else foreach (var c in rest) _units.Add(new CompositionUnit(c.ToString(), c.ToString()));
@@ -884,7 +938,9 @@ public sealed class CompositionText
             }
 
             // ローマ字として読めない文字 (google の l など) は英字 1 文字の単位にして、続きを読み直す。
-            _units.Add(new CompositionUnit(original[position].ToString(), original[position].ToString()));
+            // 表のキーの途中だった記号は、表に届かなかったので従来の記号の規則 (全角化など) で 1 文字の単位にする。
+            var unreadable = original[position];
+            _units.Add(new CompositionUnit(Detection.RomajiTable.IsSymbolKeyChar(unreadable) ? Symbol(unreadable).ToString() : unreadable.ToString(), unreadable.ToString()));
             _pending.Clear();
             _pending.Append(original[(position + 1)..]);
         }
@@ -1557,6 +1613,14 @@ public sealed class CompositionText
     {
         var pending = Pending;
         if (pending.Length == 0) return "";
+        // 記号入りのキーの途中で確定するときは、Normalize と同じ規則 (記号は従来の Symbol、英字は標準の綴り) で読む。
+        if (final && pending.Any(Detection.RomajiTable.IsSymbolKeyChar) && _detector.Romaji.CustomTable?.Invoke() is { } table)
+        {
+            var lower = pending.ToLowerInvariant();
+            var analysis = _detector.Romaji.AnalyzeFragmentForKana(lower);
+            if (analysis.IsValid && analysis.Partial.Length > 0 && table.IsPartial(analysis.Partial))
+                return string.Concat(analysis.Tokens.Select(t => t.Kana)) + string.Concat(PartialRestUnits(analysis.Partial).Select(u => u.Kana));
+        }
         return _detector.Romaji.ConvertForDisplay(pending.ToLowerInvariant(), final);
     }
 

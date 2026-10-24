@@ -231,7 +231,7 @@ internal static class CustomRomajiTableTests
     public static void Parse_IgnoresBadLinesAndKeepsGood()
     {
         var warnings = new List<string>();
-        var table = RomajiTable.Parse("ry\tらい\n;\tっ\nA1\tあ\nnospace\nab\t\nry\tりぃ\n#c\n\ntoolongkeyxx\tあ\nok\tお\n", warnings);
+        var table = RomajiTable.Parse("ry\tらい\n(\tっ\nA1\tあ\nnospace\nab\t\nry\tりぃ\n#c\n\ntoolongkeyxx\tあ\nok\tお\n", warnings);
         Assert.True(table is not null, "有効な行があれば表ができる");
         Assert.Equal(2, table!.Count, "ry と ok だけ");
         Assert.True(table.TryGet("ry", out var kana) && kana == "りぃ", "重複は後の行が勝つ");

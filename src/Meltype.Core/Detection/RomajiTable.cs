@@ -9,13 +9,21 @@ namespace Meltype.Detection;
 /// <summary>
 /// ユーザーが定義するカスタムローマ字表 (本家 #979 の Phase 1 最小版)。
 /// 形式は TSV: <c>入力(英字)&lt;TAB&gt;出力(かな・記号)</c> 1 行 1 定義。# で始まる行と空行は無視。
-/// 入力は英字だけ (大文字は小文字にする)。不正な行は無視して理由を警告に残す。重複キーは後の行が勝つ (警告つき)。
+/// 入力は英字と安全な記号 (<see cref="SymbolKeyChars"/>) だけ (大文字は小文字にする。数字は不可)。不正な行は無視して理由を警告に残す。重複キーは後の行が勝つ (警告つき)。
 /// </summary>
 public sealed class RomajiTable
 {
     public const int MaxKeyLengthLimit = 8;
     public const int MaxValueLength = 16;
     public const string FileName = "romaji.tsv";
+
+    /// <summary>
+    /// 表のキーに使える記号。変換ボックスの Append に届く記号のうち、AZIK などの配列がキーに使うもの。
+    /// 数字・括弧・引用符・! ? など、表のキーにすると他の規則 (数字の単位・括弧の幅) と衝突しやすいものは含めない。
+    /// </summary>
+    public const string SymbolKeyChars = ";:[]@-,./'^\\";
+
+    public static bool IsSymbolKeyChar(char c) => SymbolKeyChars.Contains(c);
 
     private readonly Dictionary<string, string> _map;
     private readonly HashSet<string> _partials;
@@ -26,6 +34,7 @@ public sealed class RomajiTable
         _partials = new HashSet<string>(StringComparer.Ordinal);
         foreach (var key in map.Keys)
         {
+            if (key.Any(IsSymbolKeyChar)) HasSymbolKeys = true;
             MaxKeyLength = Math.Max(MaxKeyLength, key.Length);
             for (var i = 1; i < key.Length; i++) _partials.Add(key[..i]);
         }
@@ -33,6 +42,12 @@ public sealed class RomajiTable
 
     public int Count => _map.Count;
     public int MaxKeyLength { get; }
+
+    /// <summary>記号を含むキーが 1 つでもあるか。無ければ記号の扱いは従来と完全に同じ。</summary>
+    public bool HasSymbolKeys { get; }
+
+    /// <summary>この文字列が表のキーそのもの、またはより長いキーの先頭か。</summary>
+    public bool Extends(string text) => _map.ContainsKey(text) || _partials.Contains(text);
     public bool TryGet(string key, out string kana) => _map.TryGetValue(key, out kana!);
     public bool IsPartial(string letters) => _partials.Contains(letters);
 
@@ -51,7 +66,7 @@ public sealed class RomajiTable
             var key = line[..tab].Trim().ToLowerInvariant();
             var value = line[(tab + 1)..].Trim();
             if (key.Length == 0) { warnings?.Add($"{number} 行目: 入力が空 (無視)"); continue; }
-            if (!key.All(c => c is >= 'a' and <= 'z')) { warnings?.Add($"{number} 行目: 入力は英字だけ (無視)"); continue; }
+            if (!key.All(c => c is >= 'a' and <= 'z' || IsSymbolKeyChar(c))) { warnings?.Add($"{number} 行目: 入力は英字と記号 {SymbolKeyChars} だけ (無視)"); continue; }
             if (key.Length > MaxKeyLengthLimit) { warnings?.Add($"{number} 行目: 入力は {MaxKeyLengthLimit} 文字まで (無視)"); continue; }
             if (value.Length == 0) { warnings?.Add($"{number} 行目: 出力が空 (無視)"); continue; }
             if (value.Length > MaxValueLength || value.Contains('\t')) { warnings?.Add($"{number} 行目: 出力が長すぎる、またはタブを含む (無視)"); continue; }

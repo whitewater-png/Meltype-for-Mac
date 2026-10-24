@@ -245,12 +245,12 @@ public sealed class CompositionDetector
         {
             segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation, startsWord, precedingOpener, afterNewline);
         }
-        // 辞書にない英単語 (stackoverflow など) を最初から打っているなら全体を英語にする。
+        // 辞書にない英単語 (stackoverflow など) を最初から打っているなら全体を英語にする (カスタム表でしか読めない綴りは除く)。
         // 途中の区間 (… flow) だけを英語にすると「sたcこvえrflow」のようになってしまう。
         // ただし先頭が辞書の英単語として区切れている (github に push) ならその区切りを使う。
         var whole = Raw(units, 0, units.Count) + pending;
         if (UnknownWordThenJapanese(units, pending, segments, level, whole) is { } split) return split;
-        if (level != DetectionLevel.Manual && !segments[0].IsEnglish && Memory?.Get(whole.ToLowerInvariant()) != false && IsUnknownEnglishWord(whole))
+        if (level != DetectionLevel.Manual && !segments[0].IsEnglish && Memory?.Get(whole.ToLowerInvariant()) != false && IsUnknownEnglishWord(whole) && !IsTableOnlySpelling(whole))
         {
             return [new CompositionSegment(true, "", whole)];
         }
@@ -675,6 +675,8 @@ public sealed class CompositionDetector
         // 判定は引数と、学習した語 (Memory) とスペルチェッカーだけで決まる。それらが変わったら捨てる。
         var flags = (atEnd ? 1 : 0) | (startOfInput ? 2 : 0) | (final ? 4 : 0) | (unreadable ? 8 : 0) | (endsWord ? 16 : 0) |
                     ((after is null ? 0 : after.Value ? 1 : 2) << 5) | ((int)level << 7) | (KanaInJapaneseMode() ? 1 << 9 : 0) | ((before + 8) << 10) | (noThenEnglish ? 1 << 20 : 0);
+        // カスタムローマ字表でしか最後まで読めない綴り (表 st・kt に対する stkt) は、英語ではなく日本語 (C1)。結果は表で変わるので、覚えた結果は使わない。
+        if (!ReferenceMode && IsTableOnlySpelling(span)) return false;
         if (ReferenceMode) return IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord, noThenEnglish);
         var key = (span, next, flags);
         lock (_spanCache)
@@ -691,6 +693,22 @@ public sealed class CompositionDetector
         var result = IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord, noThenEnglish);
         lock (_spanCache) _spanCache[key] = result;
         return result;
+    }
+
+    /// <summary>
+    /// 区間全体が、標準の綴りでは読めず、カスタム表のキーを使うと最後まで読める小文字の綴りか (C1)。
+    /// 標準で読める綴り・表のキーを 1 つも使わない綴り・英単語として知っている語 (string / ring / apple / stereo) は対象にしない:
+    /// 表 ON でも、表のキーが語全体を覆うときだけ日本語にして、英語の判定は変えない。表が無い・OFF のときは常に false。
+    /// </summary>
+    private bool IsTableOnlySpelling(string span)
+    {
+        // 安いもの (表を引かない判定) を先に見る: 区間ごとに呼ばれ、表の取得はファイルの更新確認を伴うため。
+        if (span.Length < 2 || !span.All(char.IsAsciiLetterLower)) return false;
+        if (_romaji.AnalyzeFragment(span) is { IsValid: true, Partial: "" or "n" }) return false;
+        if (_romaji.CustomTable?.Invoke() is not { } table) return false;
+        var analysis = _romaji.AnalyzeFragmentForKana(span);
+        if (!analysis.IsValid || analysis.Partial.Length > 0 || !analysis.Tokens.Any(t => table.TryGet(t.Romaji, out _))) return false;
+        return !(IsListedEnglishWord(span) || IsKnownEnglishWord(span) || IsSpellWord(span));
     }
 
     private readonly Dictionary<(string Span, string? Next, int Flags), bool> _spanCache = [];
