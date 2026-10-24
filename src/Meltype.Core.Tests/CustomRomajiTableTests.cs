@@ -331,6 +331,45 @@ internal static class CustomRomajiTableTests
     }
 
     [Test]
+    public static void Hold_LongerKeyBeyondShortKeyAndStandardPartial()
+    {
+        // 査読 A-1: 短い表キーがあると、2 文字以上先の長いキーに届かなかった。
+        WithTable("ka\tか\nkaku\t長\n", () =>
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type("ka");
+            Assert.Equal("か", k.Showing, "短いキーは表示だけ確定");
+            k.Type("k");
+            Assert.Equal("かk", k.Showing, "長いキーの途中は短いキー + 標準の途中");
+            k.Type("u");
+            Assert.Equal("長", k.Showing, "kaku に届いたら長いキーで置き換える");
+
+            var mismatch = new CompositionTests.Keyboard();
+            mismatch.Type("kat");
+            Assert.Equal("かt", mismatch.Showing, "不一致なら短いキーで確定");
+
+            var enter = new CompositionTests.Keyboard();
+            enter.Type("ka\n");
+            Assert.Equal("か", string.Concat(enter.Host.Output), "Enter は短いキーで確定");
+        });
+
+        WithTable("n\tん\nngh\tにゅう\n", () =>
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type("n");
+            Assert.Equal("ん", k.Showing, "短いキー n は ん と表示");
+            k.Type("g");
+            Assert.Equal("んg", k.Showing, "ngh の途中は標準の途中形");
+            k.Type("h");
+            Assert.Equal("にゅう", k.Showing, "ngh に届く");
+
+            var enter = new CompositionTests.Keyboard();
+            enter.Type("ng\n");
+            Assert.Equal("んg", string.Concat(enter.Host.Output), "途中で確定したら標準の綴りに戻す");
+        });
+    }
+
+    [Test]
     public static void On_Keyboard_ReplacesInCompositionBox()
     {
         WithTable(Sample, () =>

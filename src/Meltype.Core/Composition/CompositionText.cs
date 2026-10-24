@@ -798,16 +798,17 @@ public sealed class CompositionText
         while (_pending.Length > 0)
         {
             var original = _pending.ToString();
+            // pending 全体が、より長い表キーの途中なら、解析結果に関係なく Raw を保留する。
+            // 短い表キーがあると (ka と kaku)、標準の途中形 (ng) があると (n と ngh)、
+            // 末尾のトークンだけを見る保留では長いキーに届かないため (査読 A-1)。
+            // 表示は PendingText が短いキー (または標準の綴り) で作る。
+            // 後続が来て長いキーに届かなければ接頭辞でなくなるため、従来どおり短いキーと標準で確定する。
+            if (!final && romaji.CustomTable?.Invoke()?.IsPartial(original.ToLowerInvariant()) == true) return;
+
             var analysis = romaji.AnalyzeFragmentForKana(original.ToLowerInvariant());
             var position = 0;
             var tokens = analysis.Tokens;
-            // 末尾の短いキーは、より長い表キーの途中でもある間だけ Raw を残す。
-            // 表示は PendingText が短いキー (または標準の綴り) で作る。後続が来て長いキーに
-            // 届かなければ Partial / 後続トークンが付くため、ここでは保留せず従来どおり確定する。
-            var holdTail = !final && analysis.IsValid && analysis.Partial.Length == 0 && tokens.Count > 0 &&
-                           (romaji.CustomTable?.Invoke()?.IsPartial(tokens[^1].Romaji) ?? false);
-            var tokenCount = tokens.Count - (holdTail ? 1 : 0);
-            for (var i = 0; i < tokenCount; i++)
+            for (var i = 0; i < tokens.Count; i++)
             {
                 var length = tokens[i].Romaji.Length;
                 var raw = original.Substring(position, length);
