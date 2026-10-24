@@ -19,10 +19,12 @@
 | 回帰なし | 常に | eval-compare の broken 0、品質テストの基準 (全体 95 %・各カテゴリー 80 %) |
 | 実機 | TextEdit・Safari・ターミナルなどで打つ内容と期待 | **人が確かめる** (AI は PR にチェックリストとして書く) |
 
+「今の挙動」は `dotnet run -c Release --project src/Meltype.Core.Tests -- --repro <打鍵>` と `-- --segments <打鍵>` の結果を写す (`--explain` は先頭からの接頭辞の判定だけで、区間分けは出ない)。完成条件に足す正解表の行は、**書く前に `--repro` で外れることを確かめる** (既に通る行は完成条件にならない)。
+
 正解表の形式と比べ方 (`full` / `ascii` / `nojp`) は [eval/README.md](../../eval/README.md)。`ascii` の行は期待に ASCII の語が 1 つも無いと読み込みエラーになります。
 Core のテストは偽の変換エンジンで動くので、漢字変換と実機の挙動は測れません。それは「実機」の行に書いてください。
 
 ## 一覧
 | 番号 | 題 | status |
 |---|---|---|
-| (無し) | | |
+| 001 | 短い英単語の直後の「の」が英語に吸われる (apinoerror → apiのerror) | approved |

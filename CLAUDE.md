@@ -26,14 +26,14 @@
 
 ## 3. コマンド (2026-10-24 にクラウドで実測)
 ```bash
-# Core のテスト (938 件、約 50 秒)。出力の最後が N/N passed なら合格
+# Core のテスト (件数は docs/AGENT_STATE.md、約 50 秒)。出力の最後が N/N passed なら合格
 dotnet run -c Release --project src/Meltype.Core.Tests
 dotnet run -c Release --project src/Meltype.Core.Tests -- --eval          # 品質テスト (カテゴリーごとの正解率と外れた例)
 dotnet run -c Release --project src/Meltype.Core.Tests -- CompositionTests # 名前に一致するテストだけ
 dotnet run -c Release --project src/Meltype.Core.Tests -- --explain konnichiwa hello   # 判定の理由
 
 # 正解表 (eval/cases/*.tsv) の回帰ゲート。前のコミットと比べ、broken が 1 件でもあれば終了コード 1
-git worktree add /tmp/meltype-base HEAD~1
+git worktree add --detach /tmp/meltype-base HEAD~1   # --detach: 同じブランチを複数の worktree に取れないため
 tools/eval-compare.sh /tmp/meltype-base . eval/cases /tmp/eval-out && cat /tmp/eval-out/compare.md
 git worktree remove --force /tmp/meltype-base
 
@@ -48,7 +48,7 @@ Mac 専用 (クラウドでは動かない): `mac/build.sh`、`tools/check-mac-a
 ## 4. 改善の流れ (要件 → 実装 → 検証 → PR)
 1. 要件定義書 `docs/requirements/NNN-<slug>.md` を書く (型は `docs/requirements/TEMPLATE.md`)。**完成条件を先に決める。** `status: approved` にするのは人。
 2. `/improve NNN` で回す (`.claude/commands/improve.md`)。役割: researcher → implementer → reviewer + eval-guard → doc-keeper。
-3. 先に正解表 (`eval/cases/*.tsv`) とテストに期待を足して**赤になることを確かめてから**直す。
+3. 先に正解表 (`eval/cases/*.tsv`) とテストに期待を足して**赤になることを確かめてから**直す。判定ロジックを変えたら、正解表に無い形の回帰は eval-guard では見えないので、別モデルの査読員が境界例を自分で作って base と比べる。
 4. Core のテストが全部通り、回帰ゲートの broken が 0 で、査読の指摘が無くなったら、作業ブランチに push して PR を作る。PR 本文に「完成条件の達成表」「測れていないこと」「Mac 実機チェックリスト」を書く。
 5. PR を作ったら `subscribe_pr_activity` で CI とレビューを見張り、落ちたら直して push する。
 6. 終わったら `docs/AGENT_STATE.md` を更新する。AI が間違えたら、直すだけで終わりにせず `docs/LESSONS.md` に 1 行足す (決まり / 正解表 / テストのどれで防ぐか)。
