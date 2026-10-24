@@ -12,6 +12,7 @@ import AppKit
 final class GridCandidatePanel: NSPanel {
     /// セルが押されたときの候補の位置。InputController が candidateSelected の経路で確定する。
     var onSelect: ((Int) -> Void)?
+    var onTrace: ((String) -> Void)?
 
     static let columns = 5
     static let cellHeight: CGFloat = 22
@@ -47,6 +48,7 @@ final class GridCandidatePanel: NSPanel {
         effect.state = .active
         effect.maskImage = maskImage
         gridView.onSelect = { [weak self] index in self?.onSelect?(index) }
+        gridView.onTrace = { [weak self] message in self?.onTrace?(message) }
         effect.addSubview(gridView)
         contentView = effect
     }
@@ -121,6 +123,8 @@ final class GridCandidateView: NSView {
     static let font = NSFont.systemFont(ofSize: 13)
 
     var onSelect: ((Int) -> Void)?
+    /// 診断用 (クリックが届いたか)。
+    var onTrace: ((String) -> Void)?
 
     private var candidates: [String] = []
     private var selected = 0
@@ -144,6 +148,7 @@ final class GridCandidateView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        onTrace?("grid mouseDown point=\(Int(point.x)),\(Int(point.y)) cell=\(Int(cellWidth))x\(Int(cellHeight))")
         guard point.x >= 0, point.y >= 0, cellWidth > 0, cellHeight > 0 else { return }
         let column = Int(point.x / cellWidth)
         let row = Int(point.y / cellHeight)

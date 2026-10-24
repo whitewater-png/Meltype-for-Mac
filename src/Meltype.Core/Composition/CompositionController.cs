@@ -1561,6 +1561,11 @@ public sealed class CompositionController
                 clause.Index = Math.Max(clause.Index - 9, 0);
                 clause.Changed = true;
                 return true;
+            // 格子状の候補 (Tab で広げた 5 列) では矢印を格子の向きに動かす: ← → は 1 つ、↑ ↓ は 1 行。
+            case VirtualKeys.Left or VirtualKeys.Right or VirtualKeys.Up or VirtualKeys.Down
+                when _gridCandidates && !shift:
+                MoveInGrid(vk);
+                return true;
             // ATOK スタイル (TokMode): ← → は文節の区切り、Shift+← → は文節の移動、↓ は部分確定。
             case VirtualKeys.Left or VirtualKeys.Right when _options.TokMode():
                 if (_reconvertRomaji) return true; // ローマ字の再変換は区切りを変えられない
@@ -2659,6 +2664,32 @@ public sealed class CompositionController
             if (!string.IsNullOrEmpty(candidate) && !list.Contains(candidate)) list.Add(candidate);
         }
         return list;
+    }
+
+    /// <summary>格子 (5 列) の中で矢印の向きに選択を動かす。端では反対側へ回り、↑ ↓ は列を保つ。</summary>
+    private void MoveInGrid(int vk)
+    {
+        const int Columns = 5;
+        var clause = _clauses[_selectedClause];
+        if (!clause.IsEnglish && !clause.Expanded) Expand(clause);
+        var count = clause.Candidates.Count;
+        var at = clause.Index;
+        int target;
+        switch (vk)
+        {
+            case VirtualKeys.Left: target = (at - 1 + count) % count; break;
+            case VirtualKeys.Right: target = (at + 1) % count; break;
+            case VirtualKeys.Down:
+                target = at + Columns < count ? at + Columns : at % Columns; // 最下段なら同じ列の先頭へ
+                break;
+            default: // Up
+                target = at - Columns >= 0
+                    ? at - Columns
+                    : at + (count - 1 - at) / Columns * Columns; // 先頭の行なら同じ列の最下段へ
+                break;
+        }
+        clause.Index = target;
+        clause.Changed = true;
     }
 
     private void NextCandidate(int step)

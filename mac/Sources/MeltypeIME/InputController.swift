@@ -829,6 +829,7 @@ final class MeltypeInputController: IMKInputController {
         } else {
             let created = GridCandidatePanel()
             created.onSelect = { [weak self] index in self?.selectFromGrid(index) }
+            created.onTrace = { message in Self.trace(message) }
             gridPanel = created
             panel = created
         }
@@ -848,8 +849,13 @@ final class MeltypeInputController: IMKInputController {
 
     /// 格子のセルが押された。候補ウィンドウのクリックと同じ経路 (candidateSelected) で確定する。
     private func selectFromGrid(_ index: Int) {
-        guard candidateList.indices.contains(index) else { return }
-        candidateSelected(NSAttributedString(string: candidateList[index]))
+        Self.trace("selectFromGrid index=\(index) list=\(candidateList.count) programmatic=\(isSelectingProgrammatically)")
+        guard candidateList.indices.contains(index),
+              let client = self.client() as? IMKTextInput else { return }
+        // 格子のセルは、クリックしたらその候補で確定する (選ぶだけで止めない)。
+        let string = candidateList[index]
+        candidateSelected(NSAttributedString(string: string))
+        apply(NativeCore.shared.commit(session), to: client)
     }
 
     /// 候補ウィンドウの選択 (青いバー) を、本体 (Core) が選んでいる候補へ合わせる (1 列のとき上下だけ)。
