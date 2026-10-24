@@ -381,7 +381,7 @@ internal static class CompositionTests
         }
     }
 
-    // 要件 001: ローマ字としても読める 3 文字以上の辞書の英単語 (api = あぴ) の直後の の が、後ろの英単語 (error) を伴うとき
+    // 要件 001: 英字 1 文字ずつ読む略語の形の語 (api。ローマ字としては あぴ とも読める) の直後の の が、後ろの英字の残る英単語 (error) を伴うとき
     [Test]
     public static void ShortEnglishWord_FollowedByNo_SplitsParticle()
     {
