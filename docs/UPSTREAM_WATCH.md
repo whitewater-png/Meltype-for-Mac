@@ -1,8 +1,52 @@
-<!-- seen: 7b7044a964be52699313f8c8de3bde1dd0b7cf8d -->
+<!-- seen: ae73a2bd9104a83af6f4147bad9d85e87a7cf6ab -->
 # 本家追従の候補表
 
 `tools/upstream_watch.py` が更新します (使い方は docs/DEVELOPMENT.md の「本家追従」)。新しい節が上です。
 候補ファイル (`eval/candidates/`) の新しい正解ケースは、人が確かめてから `eval/cases/upstream-quality.tsv` に移します。
+
+## 2026-10-24 (7b7044a..ae73a2b、20 件)
+
+| hash | 日付 | PR | 件名 | 分類 | 取り込み | 当たるか | 新ケース (当たり/件数) |
+|---|---|---|---|---|---|---|---|
+| 9d0b259 | 2026-10-22 | #1046 | Merge pull request #1046 from yksr-melt/bot/sponsors | 文書 | 未 | - | - |
+| 9b7744f | 2026-10-22 | #1000 | Merge pull request #1000 from yksr-melt/ccr-36a5875b-r6ytyv | 文書 | 未 | - | - |
+| ecb2ba1 | 2026-10-22 | #642 | Merge pull request #642 from Ginji001/fix/mac-start-running-server | 判定・変換 (+Windows) (+本家 Mac) (+Linux) (+文書) | 未 | 対象ファイルなし | - |
+| ee46590 | 2026-10-23 | #1099 | Merge pull request #1099 from yksr-melt/bot/sponsors | 文書 | 未 | - | - |
+| fc2baf1 | 2026-10-23 | #1096 | Merge pull request #1096 from yksr-melt/bot/conflict-notice | Windows (+文書) | 未 | - | - |
+| 29ca4d8 | 2026-10-23 | #967 | Merge pull request #967 from yksr-melt/homebrew-cask-1.3.1-pre.1 | Windows (+本家 Mac) (+文書) | 未 | - | - |
+| 5849c66 | 2026-10-23 | #662 | Merge pull request #662 from A6P3W/feature/configurable-input-mode-shortcuts | 判定・変換 (+Windows) (+本家 Mac) (+文書) | 未 | 手移植 | - |
+| 5dfa048 | 2026-10-23 | #1059 | Merge pull request #1059 from yksr-melt/fix/1040-meltype-brand | 判定・変換 (+Windows) (+文書) | 未 | 手移植 | - |
+| 1c9aa7d | 2026-10-23 | #1060 | Merge pull request #1060 from yksr-melt/fix/968-kansouritsu | 判定・変換 (+Windows) (+文書) | 未 | 手移植 | - |
+| ade4963 | 2026-10-24 | #1119 | Merge pull request #1119 from yksr-melt/bot/sponsors | 文書 | 未 | - | - |
+| 732b82f | 2026-10-24 | #1101 | Merge pull request #1101 from yksr-melt/claude/ci-code-quality | 判定・変換 (+Windows) (+本家 Mac) (+文書) | 未 | 対象ファイルなし | - |
+| 8e28b36 | 2026-10-24 | #1108 | Merge pull request #1108 from yksr-melt/claude/codeql-ja | Windows (+文書) | 未 | - | - |
+| 5aef5b6 | 2026-10-24 | #1100 | Merge pull request #1100 from yksr-melt/claude/beautiful-clarke-lzhq61 | 判定・変換 (+Windows) (+文書) | 未 | 対象ファイルなし | - |
+| c33d8ff | 2026-10-24 | #983 | Merge pull request #983 from Serugu/fix/zenzai-runtime-http | 判定・変換 (+Windows) (+本家 Mac) (+文書) | 未 | 手移植 | - |
+| dac365f | 2026-10-24 | #1082 | Merge pull request #1082 from aster-void/fix/f10-raw-after-resize | 判定・変換 (+Windows) (+文書) | 未 | 手移植 | - |
+| 60e4c57 | 2026-10-24 | #1065 | Merge pull request #1065 from yksr-melt/fix/853-series | 判定・変換 (+Windows) (+文書) | 未 | 手移植 | - |
+| 549ccf5 | 2026-10-24 | #1053 | Merge pull request #1053 from yksr-melt/fix/1028-todo-list | 判定・変換 | 未 | 手移植 | - |
+| e8836ef | 2026-10-24 | #1127 | Merge pull request #1127 from yksr-melt/claude/wonderful-wozniak-e7h45m | 判定・変換 (+Windows) (+本家 Mac) | 未 | 手移植 | - |
+| 7587cda | 2026-10-24 | #1129 | Merge pull request #1129 from yksr-melt/homebrew-cask-1.3.1-pre.2 | その他 | 未 | - | - |
+| ae73a2b | 2026-10-24 | #645 | Merge pull request #645 from haru0416-dev/perf/windows-spell-checker | 判定・変換 (+Windows) (+本家 Mac) (+Linux) (+文書) | 未 | 対象ファイルなし | - |
+
+新しい正解ケース (QualityTests.cs の追加行) はありません。
+
+### 分類 (2026-10-24 手作業。65 コミット = PR 単位 20 件 + 枝の中のコミット 45 件)
+
+本家 1.3.1-pre.2 への版上げ (#1127) は本家 Windows / 本家 Mac の版で、**この Mac 版の版 (1.2.3) とは無関係**。取り込まない。
+
+| 区分 | 件数 | PR |
+|---|---|---|
+| Mac 版に効く修正 (取り込み勧め) | 3 | #1060 (P56)、#1065・#1053 (P57) |
+| 判断が要る | 1 | #1082 (P58。土台の #678 が Mac に無い) |
+| すでに Mac にある | 1 | #1059 (めるたいぷ→Meltype。Mac は 56e68e0) |
+| Windows 専用 | 4 | #662 (入力モード切替キー設定)、#983 (Zenzai の HTTP 部品。Mac は Swift の ZenzaiModel)、#645 (WindowsSpellChecker の速度)、#1096 (conflict bot) |
+| 本家 Mac のみ (この版に該当ファイルなし) | 1 | #642 (`mac/start-input-method.sh`。この版に無い) |
+| 版上げ・cask | 3 | #1127 (1.3.1-pre.2)、#967・#1129 (Homebrew cask) |
+| sponsors 自動更新 | 3 | #1046・#1099・#1119 |
+| 文書・CI・bot | 4 | #1000 (AGENTS.md)、#1101 (CI 品質)、#1108 (CodeQL)、#1100 (bot) |
+
+合計 20 件。
 
 ## 2026-10-21 (45e14f8..7b7044a、59 件)
 
