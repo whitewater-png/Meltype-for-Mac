@@ -401,6 +401,73 @@ internal static class CompositionTests
         }
     }
 
+    // 要件 001: 英字 1 文字ずつ読む略語の形の語 (api。ローマ字としては あぴ とも読める) の直後の の が、後ろの英字の残る英単語 (error) を伴うとき
+    [Test]
+    public static void ShortEnglishWord_FollowedByNo_SplitsParticle()
+    {
+        var cases = new Dictionary<string, string>
+        {
+            ["apinoerror"] = "apiのerror",
+            ["apinoupdate"] = "apiのupdate",
+            ["apinoconfig"] = "apiのconfig",
+            ["urlnoerror"] = "urlのerror", // 既に通っていた経路 (守り)
+            // 後ろが英単語でなければ、今までどおり日本語 (守り)
+            ["sushigatabetai"] = "すしがたべたい",
+            ["linewookuru"] = "lineをおくる",
+            ["apino"] = "あぴの",
+        };
+        foreach (var (typed, expected) in cases)
+        {
+            var k = new Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, k.Showing, $"「{typed}」");
+        }
+        // 区間は api / の / error の並びで、英語の区間が 2 つ
+        var text = new CompositionText(Detector);
+        foreach (var c in "apinoerror") text.Append(c);
+        var english = text.Segments(final: true).Where(s => s.IsEnglish).Select(s => s.Raw).ToList();
+        Assert.Equal("api,error", string.Join(",", english), "apinoerror の英語区間は api と error の 2 つ (間が の)");
+    }
+
+    // 要件 001 の査読: 英字にするのは略語の形の語 (api) + の だけ。日本語の語・日本由来の語・英単語とも読めるローマ字は今までどおり
+    [Test]
+    public static void ShortEnglishWord_FollowedByNo_KeepsJapaneseWords()
+    {
+        var cases = new Dictionary<string, string>
+        {
+            // 日本語の語 (japanese.txt)
+            ["sorenoerror"] = "それのerror",
+            ["arewoupdate"] = "あれをupdate",
+            ["sorekaraerror"] = "それからerror",
+            // 日本由来の語・外来語として english.txt にもある語
+            ["sakenoerror"] = "さけのerror",
+            ["sushinoset"] = "すしのset",
+            ["kanjinoinput"] = "かんじのinput",
+            ["karaokenoset"] = "からおけのset",
+            // 英単語とも読めるローマ字
+            ["takenoset"] = "たけのset",
+            ["namenoset"] = "なめのset",
+            ["agonoset"] = "あごのset",
+            ["menunoupdate"] = "めぬのupdate",
+            // の 以外の助詞は、今回は変えない (要件は の だけ)
+            ["apiwaerror"] = "あぴわerror",
+            ["apikaraerror"] = "あぴからerror",
+            ["apitoerror"] = "あぴとerror",
+            // の の後ろがかなになる語なら、前も今までどおり
+            ["apinone"] = "あぴのね",
+            ["animenohero"] = "あにめのへろ",
+            ["ninjanogame"] = "にんじゃのがめ",
+            ["tokyonotime"] = "ときょのちめ",
+        };
+        // 打って Enter した結果 (eval/cases と同じ。set の t は Enter で英字に残る)
+        foreach (var (typed, expected) in cases)
+        {
+            var k = new Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, $"「{typed}」");
+        }
+    }
+
     // 実機で報告: 「やあやあ、私だよ」→「やあやあ、だよ私」、「ところでgoogleって」→「ところでってgoogle」
     [Test]
     public static void ReportedOrderSwaps()

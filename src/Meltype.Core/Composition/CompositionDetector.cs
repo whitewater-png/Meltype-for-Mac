@@ -386,7 +386,10 @@ public sealed class CompositionDetector
                 var english = kanaInput
                     ? IsEnglishSpanKana(table.Raw(i, j), table.Kana(i, j), atEnd: j == n, BeforeScore(i), after, level, final)
                     : IsEnglishSpan(table.Raw(i, j) + (j == n ? pending : ""), atEnd: j == n, BeforeScore(i), after, startOfInput: i == 0, level, final, endsWord: symbolsAfter,
-                        unreadable: table.HasUnreadable(i, j) || EndsWithLoneSokuon(units, j), next: j < n ? units[j].Raw + (j + 1 == n ? pending : "") : null);
+                        unreadable: table.HasUnreadable(i, j) || EndsWithLoneSokuon(units, j), next: j < n ? units[j].Raw + (j + 1 == n ? pending : "") : null,
+                        // 略語の形の語 (api) + の + 英単語 (apinoerror)。先に安い条件 (の・残りの長さ) を見てから文字列を作る (長い文で遅くしない)
+                        noThenEnglish: j + 1 < n && !symbolsAfter && units[j].Raw == "no" && table.Length(j + 1, n, pending) >= 3 &&
+                            IsSpelledAcronym(table.Raw(i, j).ToLowerInvariant()) && IsEnglishWordAfterNo(table.Raw(j + 1, n) + pending));
                 if (english)
                 {
                     found = j;
@@ -665,13 +668,14 @@ public sealed class CompositionDetector
     /// <param name="final">打ち終わった (Space・Enter)。末尾の区間でも、英単語の打ちかけ (amaz) は英語の根拠にしない。</param>
     /// <param name="unreadable">区間にローマ字として読めなかった英字がある (zoom + de の m、bug + wo の g)。</param>
     /// <param name="endsWord">区間の後ろが記号だけ (let's go! の go)。語はそこで打ち終わっているので、短い語も末尾の語と同じく見る。</param>
-    private bool IsEnglishSpan(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final = false, bool unreadable = false, string? next = null, bool endsWord = false)
+    /// <param name="noThenEnglish">区間が略語の形の語 (api) で、後ろが の + 英単語 (apinoerror の no + error)。</param>
+    private bool IsEnglishSpan(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final = false, bool unreadable = false, string? next = null, bool endsWord = false, bool noThenEnglish = false)
     {
         // 1 キー打つたびに、ほぼ同じ区間 (前のキーまでに調べた区間) を何度も判定するので、結果を覚えておく。
         // 判定は引数と、学習した語 (Memory) とスペルチェッカーだけで決まる。それらが変わったら捨てる。
         var flags = (atEnd ? 1 : 0) | (startOfInput ? 2 : 0) | (final ? 4 : 0) | (unreadable ? 8 : 0) | (endsWord ? 16 : 0) |
-                    ((after is null ? 0 : after.Value ? 1 : 2) << 5) | ((int)level << 7) | (KanaInJapaneseMode() ? 1 << 9 : 0) | ((before + 8) << 10);
-        if (ReferenceMode) return IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord);
+                    ((after is null ? 0 : after.Value ? 1 : 2) << 5) | ((int)level << 7) | (KanaInJapaneseMode() ? 1 << 9 : 0) | ((before + 8) << 10) | (noThenEnglish ? 1 << 20 : 0);
+        if (ReferenceMode) return IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord, noThenEnglish);
         var key = (span, next, flags);
         lock (_spanCache)
         {
@@ -684,7 +688,7 @@ public sealed class CompositionDetector
             }
             if (_spanCache.TryGetValue(key, out var cached)) return cached;
         }
-        var result = IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord);
+        var result = IsEnglishSpanCore(span, atEnd, before, after, startOfInput, level, final, unreadable, next, endsWord, noThenEnglish);
         lock (_spanCache) _spanCache[key] = result;
         return result;
     }
@@ -694,7 +698,7 @@ public sealed class CompositionDetector
     private int _spanCacheMemoryVersion;
     private Detection.IWordChecker? _spanCacheChecker;
 
-    private bool IsEnglishSpanCore(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final, bool unreadable, string? next, bool endsWord)
+    private bool IsEnglishSpanCore(string span, bool atEnd, int before, bool? after, bool startOfInput, DetectionLevel level, bool final, bool unreadable, string? next, bool endsWord, bool noThenEnglish)
     {
         // まだ続きを打つかもしれない末尾の区間 (打ちかけの英単語を英語と見てよい)。
         var growing = atEnd && !final;
@@ -856,6 +860,9 @@ public sealed class CompositionDetector
         // スペルチェッカーだけが知っている、最後までローマ字として読める語 (shite, kore) は、前の英単語 1 つ (push) では足りない
         // (pushshite → pushして)。英文の続き (+2) か、前後の両方が英語のときだけ。
         if (spellWord && !inDictionary && _romaji.Analyze(lower) is { IsValid: true, Partial: "" }) needed = Math.Max(needed, 2);
+        // 略語の形の辞書の語 (api) の後ろが の + 英単語 (apinoerror の no + error) なら、後ろは英語として数える
+        // (後ろを常に日本語と数えると api が あぴ になる。要件 001)。日本語の語 (sore・are) と、略語でない語 (sake・take) は今までどおり。
+        if (noThenEnglish && after == false && inDictionary && !_japanese.Words.ContainsWord(lower)) after = true;
         // 前が英文でも、後ろが日本語なら英文の強さは数えない (I love |sushi| が好き → 食い違うので日本語)。
         if (ambiguous && (after == false ? Math.Min(before, 1) : before) + Score(after) >= needed) return true;
         var analysis = _romaji.Analyze(lower);
@@ -1471,6 +1478,59 @@ public sealed class CompositionDetector
     /// </summary>
     private static readonly string[] FollowWordsShort = ["da", "ka", "ne", "yo", "he", "ya", "sa", "na", "tte", "tto", "kke", "jan"];
     private static readonly string[] FollowWordsLong = ["dayo", "dane", "dakara", "dake", "desu", "deshita", "janai", "jaa", "nara", "nanode", "nano", "nanoni", "shika", "mitai", "ppoi", "rashii", "kamo", "kana", "toka", "nado", "tte", "datta", "kurai", "gurai", "koso", "sura", "bakari", "nomi", "goto", "zenbu", "igai", "ijou", "ika"];
+
+    /// <summary>
+    /// の の後ろの打鍵が、英字のまま残る 3 文字以上の英単語だけでできているか (apinoerror の error)。同梱の一覧の語だけを見る (スペルチェッカーは使わない)。
+    /// 最後までローマ字として読める語 (hero・game・time) は後ろもかなになるので数えない (animenohero の前だけ英字になっていた)。
+    /// 読めない英字が残る語 (error の最後の r、update の p) だけを数える。
+    /// </summary>
+    private bool IsEnglishWordAfterNo(string rest)
+    {
+        var lower = rest.ToLowerInvariant();
+        return lower.Length >= 3 && lower.AsSpan().IndexOfAnyExceptInRange('a', 'z') < 0 && IsBundledEnglishWord(lower) &&
+            _romaji.Analyze(lower) is not { IsValid: true, Partial: "" };
+    }
+
+    /// <summary>
+    /// 英字 1 文字ずつ読む略語か (api = えーぴーあい、url、cpu)。loanwords.txt (JMdict) で大文字だけで書き、読みが英字の名前を並べたものになっている語。
+    /// 大文字で書いても語として読む略語 (NASA = なさ、TEN = てん) や、日本由来の語 (sake)・英単語 (take) は含まない。
+    /// </summary>
+    private static bool IsSpelledAcronym(string lower) => SpelledAcronyms.Value.Contains(lower);
+
+    private static readonly Lazy<HashSet<string>> SpelledAcronyms = new(() =>
+    {
+        var words = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rawLine in DictionarySource.ReadEmbedded("loanwords.txt").Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0 || line[0] == '#') continue;
+            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            for (var p = 1; p < parts.Length; p++)
+            {
+                if (parts[p].Length >= 2 && parts[p].All(char.IsAsciiLetterUpper) && IsLetterNames(parts[p], parts[0])) words.Add(parts[p].ToLowerInvariant());
+            }
+        }
+        return words;
+    });
+
+    /// <summary>読み (ひらがな) が、英字 (大文字) の名前を 1 文字ずつ並べたものか (API と えーぴーあい)。</summary>
+    private static bool IsLetterNames(string letters, string reading)
+    {
+        if (letters.Length == 0) return reading.Length == 0;
+        foreach (var name in LetterNames[letters[0] - 'A'])
+        {
+            if (reading.StartsWith(name, StringComparison.Ordinal) && IsLetterNames(letters[1..], reading[name.Length..])) return true;
+        }
+        return false;
+    }
+
+    // 英字の名前 (JMdict の読みに出る書き方)。A から Z の順
+    private static readonly string[][] LetterNames =
+    [
+        ["えー", "えい"], ["びー"], ["しー"], ["でぃー", "でー"], ["いー"], ["えふ"], ["じー"], ["えいち", "えっち"], ["あい"], ["じぇー", "じぇい"],
+        ["けー", "けい"], ["える"], ["えむ"], ["えぬ"], ["おー"], ["ぴー"], ["きゅー"], ["あーる"], ["えす"], ["てぃー", "てー"],
+        ["ゆー"], ["ぶい", "ぶいー", "ゔぃー"], ["だぶりゅー", "だぶる"], ["えっくす"], ["わい"], ["ぜっと", "ぜっど", "ずぃー"],
+    ];
 
     private static readonly string[] TrailingParticles = ["kara", "made", "yori", "ga", "wo", "ni", "de", "no", "to", "mo", "ha", "wa"];
 

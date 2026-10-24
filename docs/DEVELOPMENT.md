@@ -87,7 +87,7 @@ dotnet run --project src/Meltype.Tests -- --eval                          # 品�
 
 ### Mac・Linux でのテスト
 
-OS に依存しない部分 (`src/Meltype.Core`: 英語 / 日本語の判定・ローマ字・変換ボックスの中身・辞書・学習・設定) と、そのテスト (`src/Meltype.Core.Tests`) は Mac・Linux でも動きます (Mac 版・Linux 版の土台)。.NET 10 SDK (10.0.401 以上、`global.json`) を入れて次を実行します。このリポジトリには CI (GitHub Actions) が無いので、コミット前に手元で流します。
+OS に依存しない部分 (`src/Meltype.Core`: 英語 / 日本語の判定・ローマ字・変換ボックスの中身・辞書・学習・設定) と、そのテスト (`src/Meltype.Core.Tests`) は Mac・Linux でも動きます (Mac 版・Linux 版の土台)。.NET 10 SDK (10.0.401 以上、`global.json`) を入れて次を実行します。軽い CI (`.github/workflows/ci.yml`。Linux で Core のテスト・正解表の回帰ゲート・辞書の検査だけ。署名・macOS のビルドは行わない) が Pull Request と `main` への push で動きますが、コミット前に手元でも流してください。AI (Claude Code) で作業するときの決まりとコマンドは [CLAUDE.md](../CLAUDE.md)、現在の基準の数字は [AGENT_STATE.md](AGENT_STATE.md) にあります。
 
 ```bash
 dotnet run --project src/Meltype.Core.Tests                 # すべてのテスト
@@ -116,7 +116,7 @@ dotnet run --project src/Meltype.Core.Tests -- --eval       # 品質テスト (�
 
 ### 正解表
 
-`eval/cases/*.tsv`。1 行 = `打鍵<Tab>期待<Tab>比べ方<Tab>出典` の 4 列です。比べ方は `full` (完全一致。期待にカタカナがあるときだけ、カタカナ→ひらがなと英字の大小を吸収。本家の `Expect` と同じ)・`ascii` (印字可能 ASCII の連続の並びだけ)・`nojp` (日本語・全角記号・半角カナが 1 文字も無い。英文が崩れないことだけ見たい行用)。`upstream-quality.tsv` (本家の品質テストの写し)・`mac-device.tsv` (実機の記録と計画書の期待)・`mac-terminal.tsv` (ターミナル・AI ツール名) の 3 つがあります。
+`eval/cases/*.tsv`。1 行 = `打鍵<Tab>期待<Tab>比べ方<Tab>出典` の 4 列です。比べ方は `full` (完全一致。期待にカタカナがあるときだけ、カタカナ→ひらがなと英字の大小を吸収。本家の `Expect` と同じ)・`ascii` (印字可能 ASCII の連続の並びだけ)・`nojp` (日本語・全角記号・半角カナが 1 文字も無い。英文が崩れないことだけ見たい行用)。`upstream-quality.tsv` (本家の品質テストの写し)・`mac-device.tsv` (実機の記録と計画書の期待)・`mac-terminal.tsv` (ターミナル・AI ツール名)・`mac-protected-spans.tsv` (パス・オプション・変数の保護区間) の 4 つがあります。
 
 ### 1 つの作業ツリーで流す (`--expect-all`)
 
@@ -138,7 +138,7 @@ tools/eval-compare.sh /tmp/meltype-upstream . eval/cases /tmp/eval-out
 
 - `broken` … base で当たり、new で外れた例 (回帰)。**1 件でもあれば終了コード 1** です (dotnet や入力の失敗は 2、問題なしは 0。本家のゲートは broken + addedFailing、こちらは broken のみ)。これが回帰ゲートで、`broken` が 0 件になるまで取り込んだ変更を「回帰なし」と言いません。
 - `fixed` … base で外れ、new で当たった例。`added` / `removed` … 片方にしかない例 (表の増減)。
-- base には Mac 版の前回のコミットの作業ツリー (`git worktree add /tmp/prev <コミット>`) も使えます。
+- base には Mac 版の前回のコミットの作業ツリー (`git worktree add /tmp/prev <コミット>`) も使えます。CI (`.github/workflows/ci.yml`) は Pull Request の base ブランチをこの方法で展開して比べ、broken が 1 件でもあれば失敗にします。クラウドの Claude Code セッションからは本家の clone に届かないので、そこでも前回のコミットを base にします。
 - 本家の `Meltype.Core.Tests` には `--expect-all` と 3 つの比べ方が無いので、本家側は `tools/eval_legacy_base.py` が `--expect` を表ごとに回し、返ってきた `actual` を同じ規則で判定し直します。この判定は C# の `Checks.Judge` と同じで、`python3 tools/eval_legacy_base.py --rejudge <--expect-all の JSON>` で食い違いが無いことを確かめられます。
 - `dotnet` は作業ツリーの中に `bin/` `obj/` を作ります。本家の clone を汚したくないときは、コピーを渡します。
 - `/tmp` のようにシンボリックリンクを通る絶対パスで `dotnet run --project` を呼ぶとビルドが失敗することがあったので、スクリプトは作業ツリーに入って相対パスで呼びます。
