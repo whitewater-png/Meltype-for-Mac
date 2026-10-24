@@ -3193,6 +3193,20 @@ public sealed class CompositionController
         return TryToggleLastWord(toEnglish: false, precedingText, dropTail: true);
     }
 
+    /// <summary>preceding の末尾が recorded と、ASCII の英字の大文字小文字を除いて同じか (長さは同じ・他の文字は完全一致)。ß など ASCII 以外の変換は同じとみなさない。</summary>
+    private static bool SameWordIgnoringAsciiCase(string preceding, string recorded)
+    {
+        if (preceding.Length < recorded.Length) return false;
+        var offset = preceding.Length - recorded.Length;
+        for (var i = 0; i < recorded.Length; i++)
+        {
+            char a = preceding[offset + i], b = recorded[i];
+            if (a == b) continue;
+            if (!(char.IsAsciiLetter(a) && char.IsAsciiLetter(b) && char.ToLowerInvariant(a) == char.ToLowerInvariant(b))) return false;
+        }
+        return true;
+    }
+
     private bool TryToggleLastWord(bool toEnglish, string? precedingText, bool dropTail)
     {
         _toggleUndo = null;
@@ -3210,7 +3224,14 @@ public sealed class CompositionController
         if (!(toEnglish ? word.HasJapanese : word.HasEnglish) || precedingText is null) return false;
         var preceding = NoBreakToSpace(precedingText);
         var recorded = NoBreakToSpace(word.Text);
-        if (!preceding.EndsWith(recorded, StringComparison.Ordinal))
+        // 画面の語。アプリが語頭などを大文字にした (TextEdit の自動大文字化: can→Can) ときは記録と大文字小文字だけが違う。
+        // 2 回目の Space の読み直しでだけ、ASCII の英字の大文字小文字の違いに限って同じ語とみなす (消すのは画面にある文字列、読みは記録の raw=小文字側)
+        var exact = preceding.EndsWith(recorded, StringComparison.Ordinal);
+        var caseOnly = !exact && dropTail && SameWordIgnoringAsciiCase(preceding, recorded);
+        var onScreen = caseOnly ? precedingText[^word.Text.Length..] : word.Text;
+        if (caseOnly)
+            Diagnostics.Log.Decision($"画面の語 {Diagnostics.Log.Text(onScreen)} は記録と大文字小文字だけが違うので、同じ語として読み直します");
+        if (!exact && !caseOnly)
         {
             Diagnostics.Log.Decision("キャレットの前の文字が記録と違うので、確定後の F10 / F6 は効かせません");
             _lastWord = null;
@@ -3219,7 +3240,7 @@ public sealed class CompositionController
         var lead = recorded.Length - recorded.TrimStart(' ').Length;
         var tailLength = recorded.Length - recorded.TrimEnd(' ').Length;
         if (lead + tailLength >= recorded.Length) return false;
-        var body = word.Text[lead..];
+        var body = onScreen[lead..];
         var tail = word.Text[^tailLength..];
         var beforeBody = preceding[..^body.Length];
         var previousCorrectable = _correctable.ToList();

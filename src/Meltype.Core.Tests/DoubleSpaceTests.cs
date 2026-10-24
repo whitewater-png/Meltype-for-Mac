@@ -27,6 +27,13 @@ internal static class DoubleSpaceTests
             Session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(), options, () => new Settings());
         }
 
+        /// <summary>アプリ側が入力欄の文字を書き換えたつもり (TextEdit の自動大文字化: 確定した <c>can </c> が <c>Can </c> になる)。Meltype は知らない。</summary>
+        public void AppRewrites(string tail, string replacement)
+        {
+            Assert.True(Doc.EndsWith(tail, StringComparison.Ordinal), $"前提: 入力欄の末尾が {tail}: {Doc}");
+            Doc = Doc[..^tail.Length] + replacement;
+        }
+
         private string? Before => Session.IsComposing ? null : Doc.Length > 20 ? Doc[^20..] : Doc;
 
         public SessionResult Key(int vk, char? ch = null, bool shift = false)
@@ -231,6 +238,106 @@ internal static class DoubleSpaceTests
             e.Type("can ");
             var shiftSpace = e.Key(VirtualKeys.Space, shift: true);
             Assert.True(!shiftSpace.Toggle, "Shift+Space は今までどおり (この設定の対象ではない)");
+            return 0;
+        });
+    }
+
+    // ---- アプリが語頭を大文字にした (TextEdit の自動大文字化) ----
+
+    [Test]
+    public static void On_AutoCapitalizedWord_IsRereadWithTheLowercaseReading()
+    {
+        WithWords(() =>
+        {
+            var e = new Editor(on: true);
+            e.Type("can ");
+            e.AppRewrites("can ", "Can ");
+            var second = e.Key(VirtualKeys.Space);
+            Assert.True(second.Consumed && second.Toggle, "大文字になっていても 2 回目の Space で読み直す");
+            Assert.Equal("", e.Doc, "消すのは画面にある Can と空白");
+            Assert.Equal("かん", e.Last?.View?.Text ?? "", "読みは Meltype が覚えている小文字側 (can→かん)");
+            e.Key(VirtualKeys.Return);
+            Assert.Equal("かん", e.Doc);
+            return 0;
+        });
+    }
+
+    [Test]
+    public static void On_AutoCapitalizedWord_EscRestoresWhatWasOnScreen()
+    {
+        WithWords(() =>
+        {
+            var e = new Editor(on: true);
+            e.Type("can ");
+            e.AppRewrites("can ", "Can ");
+            e.Key(VirtualKeys.Space);
+            e.Key(VirtualKeys.Escape);
+            Assert.Equal("Can ", e.Doc, "Esc は画面にあった Can をそのまま戻す (can に変えない)");
+            var next = e.Key(VirtualKeys.Space);
+            Assert.True(!next.Consumed && !next.Toggle, "戻したあとの Space は普通の空白");
+            return 0;
+        });
+    }
+
+    [Test]
+    public static void On_AutoCapitalizedWord_InTheMiddleOfASentence()
+    {
+        WithWords(() =>
+        {
+            var e = new Editor(on: true);
+            e.Type("I like can ");
+            e.AppRewrites("can ", "CAN ");
+            e.Key(VirtualKeys.Space);
+            Assert.Equal("I like ", e.Doc);
+            Assert.Equal("かん", e.Last?.View?.Text ?? "");
+            return 0;
+        });
+    }
+
+    [Test]
+    public static void On_DifferentWordOnScreen_IsNotReread()
+    {
+        WithWords(() =>
+        {
+            var e = new Editor(on: true);
+            e.Type("can ");
+            e.AppRewrites("can ", "Cat ");
+            var next = e.Key(VirtualKeys.Space);
+            Assert.True(!next.Consumed && !next.Toggle, "別の語なら読み直さない");
+            Assert.Equal("Cat  ", e.Doc);
+            Assert.True(!e.Session.IsComposing, "変換ボックスは開かない");
+            return 0;
+        });
+    }
+
+    [Test]
+    public static void On_NonAsciiCaseDifference_IsNotReread()
+    {
+        WithWords(() =>
+        {
+            var e = new Editor(on: true);
+            e.Type("can ");
+            // 大文字小文字以外の違い (ASCII 以外の変換) は対象外
+            e.AppRewrites("can ", "ćan ");
+            var next = e.Key(VirtualKeys.Space);
+            Assert.True(!next.Consumed && !next.Toggle, "読み直さない");
+            Assert.Equal("ćan  ", e.Doc);
+            return 0;
+        });
+    }
+
+    [Test]
+    public static void Off_AutoCapitalizedWord_SecondSpaceIsJustASpace()
+    {
+        WithWords(() =>
+        {
+            var e = new Editor(on: false);
+            e.Type("can ");
+            e.AppRewrites("can ", "Can ");
+            var next = e.Key(VirtualKeys.Space);
+            Assert.True(!next.Consumed && !next.Toggle, "読み直さない");
+            Assert.Equal("Can  ", e.Doc);
+            Assert.True(!e.Session.IsComposing, "変換ボックスは開かない");
             return 0;
         });
     }
