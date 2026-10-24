@@ -27,6 +27,7 @@ ssh user@example.com	ssh user@example.com	full	計画書 1-4
 # 読める 3 文字以上の辞書の英単語 + no + 英単語 (要件 001)
 apinoupdate	apiのupdate	full	docs/requirements/001-api-no-error.md
 apinoconfig	apiのconfig	full	docs/requirements/001-api-no-error.md
+urlnoerror	urlのerror	full	docs/requirements/001-api-no-error.md
 # 守る行: 日本語の語・日本由来の語・英単語とも読めるローマ字 + no + 英単語は、今までどおり日本語 (要件 001 の査読)
 sorenoerror	それのerror	full	docs/requirements/001-api-no-error.md
 arewoupdate	あれをupdate	full	docs/requirements/001-api-no-error.md
