@@ -3,6 +3,7 @@
 
 using Meltype.Config;
 using Meltype.Detection;
+using Meltype.Input;
 
 namespace Meltype.Tests;
 
@@ -117,7 +118,10 @@ internal static class CustomRomajiTableTests
             var mid = r.AnalyzeFragmentForKana("ng");
             Assert.True(mid.IsValid && mid.Partial == "ng", "ng は途中扱い: Partial=" + mid.Partial);
             Assert.Equal("にゅう", r.ConvertForDisplay("ngh", true), "ngh");
-            Assert.Equal("ng", r.ConvertForDisplay("ng", true), "待ちのまま確定すると英字のまま (docs 制限 4)");
+            Assert.Equal("んg", r.ConvertForDisplay("ng", true), "表キーの途中で確定するときは標準の綴りにフォールバックする");
+            var final = new CompositionTests.Keyboard();
+            final.Type("ng\n");
+            Assert.Equal("んg", string.Concat(final.Host.Output), "Enter でも英字 ng を残さない");
             var k = new CompositionTests.Keyboard();
             k.Type("ngh");
             Assert.Equal("にゅう", k.Showing, "ngh を打つと にゅう");
@@ -298,29 +302,31 @@ internal static class CustomRomajiTableTests
     }
 
     [Test]
-    public static void Limitation_Keyboard_KeyThatIsPrefixOfStandardSpelling_Unreachable()
+    public static void Hold_Keyboard_StandardPrefixCanReachLongerKey()
     {
-        // 表が kak だけ (ka 無し) のとき、キーボードでは ka が先に か になり kak の定義には届かない (制限。docs/W11 制限 1・4)。
-        // 一括 (ConvertForDisplay) なら かく。
-        // 保留機構 B1/B2 を実装したらキーボードでも かく になるので、この Assert は赤になる。そのとき期待値を "かく" に直すこと。
+        // 表が kak だけ (ka 無し) でも、ka は標準の か と表示しつつ Raw を保留する。
         WithTable("kak\tかく\n", () =>
         {
             var k = new CompositionTests.Keyboard();
-            k.Type("kak");
-            Assert.Equal("かk", k.Showing, "現状の制限: ka が先に確定する (B1 実装時に赤→ かく に直す)");
-            Assert.Equal("かく", CompositionTests.Detector.Romaji.ConvertForDisplay("kak", true), "一括なら届く");
+            k.Type("ka");
+            Assert.Equal("か", k.Showing, "標準で読める途中は従来どおり か と見せる");
+            k.Type("k");
+            Assert.Equal("かく", k.Showing, "キーボードでも kak に届く");
+            Assert.Equal("かく", CompositionTests.Detector.Romaji.ConvertForDisplay("kak", true), "一括変換と同じ");
         });
     }
 
     [Test]
-    public static void Limitation_NoHold_ShorterKeyCommitsFirst()
+    public static void Hold_ShorterKeyWaitsForLongerKey()
     {
-        // 表に ka と kak があるとき、保留しないので ka は先に確定する (制限。docs/W11 に記録)。
+        // 短いキーは表示だけ確定し、より長いキーの可能性がある間は Raw を保留する。
         WithTable("ka\tか\nkak\tかく\n", () =>
         {
             var k = new CompositionTests.Keyboard();
-            k.Type("kak");
-            Assert.Equal("かk", k.Showing, "ka が先に確定し、kak には伸びない");
+            k.Type("ka");
+            Assert.Equal("か", k.Showing, "短いキーの表示は従来どおり");
+            k.Type("k");
+            Assert.Equal("かく", k.Showing, "kak が揃ったら長いキーで置き換える");
         });
     }
 
@@ -331,7 +337,7 @@ internal static class CustomRomajiTableTests
         {
             var k = new CompositionTests.Keyboard();
             k.Type("ryp");
-            Assert.Equal("らいp", k.Showing, "保留しないので ry が先に確定する (制限)。ryp 完全一致は一括変換側 (ConvertForDisplay) のみ");
+            Assert.Equal("りょう", k.Showing, "ry を保留し、p が来た時点で ryp に置き換える");
         });
     }
 
@@ -344,6 +350,136 @@ internal static class CustomRomajiTableTests
             var k = new CompositionTests.Keyboard();
             k.Type("ngh");
             Assert.Equal("にゅう", k.Showing, "表のキーが揃ったら置換");
+        });
+    }
+
+    [Test]
+    public static void Hold_Mismatch_CommitsShortKeyAndProcessesRest()
+    {
+        WithTable(Sample + "ka\tか\nkak\tかく\n", () =>
+        {
+            var r = new CompositionTests.Keyboard();
+            r.Type("ryt");
+            Assert.Equal("らいt", r.Showing, "ryp に届かない t は短いキーのあと標準どおり残す");
+            var k = new CompositionTests.Keyboard();
+            k.Type("kat");
+            Assert.Equal("かt", k.Showing, "kak に届かないときも短いキーで確定する");
+        });
+    }
+
+    [Test]
+    public static void Hold_EnterSpaceAndEscape_FinalizeShortKey()
+    {
+        WithTable("ka\tか\nkak\tかく\n", () =>
+        {
+            var enter = new CompositionTests.Keyboard();
+            enter.Type("ka\n");
+            Assert.Equal("か", string.Concat(enter.Host.Output), "Enter は短いキーで確定");
+
+            var space = new CompositionTests.Keyboard();
+            space.Type("ka ");
+            Assert.Equal("か", space.Showing, "Space の変換読みも短いキー");
+            space.Press(VirtualKeys.Escape);
+            Assert.Equal("か", space.Showing, "変換を Esc で戻しても短いキーの読みを保持");
+            space.Type("\n");
+            Assert.Equal("か", string.Concat(space.Host.Output), "Esc 後の Enter でも英字が残らない");
+
+            var cancel = new CompositionTests.Keyboard();
+            cancel.Type("ka");
+            cancel.Press(VirtualKeys.Escape);
+            Assert.True(cancel.Showing is null && cancel.Host.Output.Count == 0, "入力中の Esc は従来どおり取り消し");
+        });
+    }
+
+    [Test]
+    public static void Hold_Backspace_CanRetypeLongerKey()
+    {
+        WithTable("ka\tか\nkak\tかく\n", () =>
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type("kak\b");
+            Assert.Equal("か", k.Showing, "長いキーの 1 文字を消すと短いキーの表示に戻る");
+            k.Type("k");
+            Assert.Equal("かく", k.Showing, "打ち直せる");
+        });
+    }
+
+    [Test]
+    public static void Hold_TableReplacement_IsUsedOnNextKey()
+    {
+        var romaji = CompositionTests.Detector.Romaji;
+        var previous = romaji.CustomTable;
+        var table = RomajiTable.Parse("ka\tか\nkak\tかく\n");
+        romaji.CustomTable = () => table;
+        try
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type("ka");
+            table = RomajiTable.Parse("ka\tか\n");
+            k.Type("t");
+            Assert.Equal("かt", k.Showing, "長いキーを消した表では保留を伸ばさず短いキーで確定する");
+        }
+        finally { romaji.CustomTable = previous; }
+    }
+
+    [Test]
+    public static void Hold_InvalidLongerLine_DoesNotCreatePrefix()
+    {
+        WithTable("ka\tか\nkak\t\n", () =>
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type("kak");
+            Assert.Equal("かk", k.Showing, "無効な長いキーは保留の根拠にしない");
+        });
+    }
+
+    [Test]
+    public static void Hold_NAndNn_KeepStandardFinalization()
+    {
+        WithTable("ngh\tにゅう\n", () =>
+        {
+            var n = new CompositionTests.Keyboard();
+            n.Type("n\n");
+            Assert.Equal("ん", string.Concat(n.Host.Output), "n は確定時に ん");
+            var nn = new CompositionTests.Keyboard();
+            nn.Type("nn");
+            Assert.Equal("ん", nn.Showing, "nn は従来どおり即時に ん");
+        });
+    }
+
+    [Test]
+    public static void Hold_Keyboard_TableStillBeatsSokuonAndN()
+    {
+        WithTable("kk\tきん\nnk\tにん\n", () =>
+        {
+            var kk = new CompositionTests.Keyboard();
+            kk.Type("kk");
+            Assert.Equal("きん", kk.Showing, "キーボードでも kk は っ より表が先");
+            var nk = new CompositionTests.Keyboard();
+            nk.Type("nk");
+            Assert.Equal("にん", nk.Showing, "キーボードでも nk は ん+k より表が先");
+        });
+    }
+
+    [Test]
+    public static void Hold_EnglishJudgment_UnaffectedByLongerPrefix()
+    {
+        WithTable("st\tした\nstr\tスト\n", () =>
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type("string ");
+            Assert.Equal("string ", string.Concat(k.Host.Output), "表の短縮キーとその長い接頭辞があっても英単語は英字のまま");
+        });
+    }
+
+    [Test]
+    public static void Hold_Symbol_FinalizesStandardPartial()
+    {
+        WithTable("ngh\tにゅう\n", () =>
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type("ng.");
+            Assert.Equal("んg。", k.Showing, "記号で終わるときも標準の綴りで確定する");
         });
     }
 

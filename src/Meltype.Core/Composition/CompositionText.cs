@@ -520,6 +520,10 @@ public sealed class CompositionText
                               (Mode == DisplayMode.Auto && Segments() is { Count: > 0 } segments && segments[^1].IsEnglish);
             if (_frozen is not null) _frozen = _frozen.Take(Math.Min(FrozenCount(_units), _units.Count - 1)).ToList();
             var last = _units[^1];
+            // 表キーでできた単位は、1 打鍵戻して残りを表+標準で読み直す (kak → ka → か)。
+            // 標準の 1 音 (kyo など) は従来どおり単位ごと消す。
+            var customTail = !KanaInput && last.Raw.Length > 1 &&
+                             (_detector.Romaji.CustomTable?.Invoke()?.TryGet(last.Raw.ToLowerInvariant(), out _) ?? false);
             // z + 記号を OFF にしたときの、打った英字 + 記号の単位 (かぞえかたz. の z.) は 1 文字ずつ消す
             // (BackSpace 1 回で . だけ消す。単位ごと消すと、打ち直したい記号で z まで消えていた)。
             if (!KanaInput && last.Raw.Length > 1 && last.Kana == last.Raw && !last.Raw.All(char.IsAsciiLetter))
@@ -529,7 +533,7 @@ public sealed class CompositionText
             }
             _units.RemoveAt(_units.Count - 1);
             // 英字として見せている部分は 1 文字ずつ消す (google の "le" のように 1 音にまとまった単位を丸ごと消さない)。
-            if (englishTail && last.Raw.Length > 1 && !KanaInput)
+            if ((englishTail || customTail) && last.Raw.Length > 1 && !KanaInput)
             {
                 _pending.Append(last.Raw[..^1]);
                 Normalize(final: false);
@@ -797,7 +801,13 @@ public sealed class CompositionText
             var analysis = romaji.AnalyzeFragmentForKana(original.ToLowerInvariant());
             var position = 0;
             var tokens = analysis.Tokens;
-            for (var i = 0; i < tokens.Count; i++)
+            // 末尾の短いキーは、より長い表キーの途中でもある間だけ Raw を残す。
+            // 表示は PendingText が短いキー (または標準の綴り) で作る。後続が来て長いキーに
+            // 届かなければ Partial / 後続トークンが付くため、ここでは保留せず従来どおり確定する。
+            var holdTail = !final && analysis.IsValid && analysis.Partial.Length == 0 && tokens.Count > 0 &&
+                           (romaji.CustomTable?.Invoke()?.IsPartial(tokens[^1].Romaji) ?? false);
+            var tokenCount = tokens.Count - (holdTail ? 1 : 0);
+            for (var i = 0; i < tokenCount; i++)
             {
                 var length = tokens[i].Romaji.Length;
                 var raw = original.Substring(position, length);
@@ -858,6 +868,8 @@ public sealed class CompositionText
                 {
                     // 確定時: 残った n / nn は ん、それ以外の子音は英字のまま。
                     if (rest.ToLowerInvariant() is "n" or "nn") _units.Add(new CompositionUnit("ん", rest));
+                    else if (romaji.CustomTable?.Invoke()?.IsPartial(rest.ToLowerInvariant()) == true)
+                        _units.Add(new CompositionUnit(romaji.ConvertForDisplay(rest.ToLowerInvariant(), final: true), rest));
                     else foreach (var c in rest) _units.Add(new CompositionUnit(c.ToString(), c.ToString()));
                 }
                 else

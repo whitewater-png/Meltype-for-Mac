@@ -320,7 +320,12 @@ public sealed class RomajiDetector
             foreach (var token in analysis.Tokens) builder.Append(token.Kana);
             if (analysis.IsValid)
             {
-                builder.Append(final && analysis.Partial == "n" ? "ん" : analysis.Partial);
+                // 表キーの途中で打ち終わったときは、その英字列をそのまま残さず標準の綴りで確定する
+                // (ngh に対する ng → んg)。短い表キーがある場合は上の Tokens がそれを担う。
+                if (final && useTable && analysis.Partial.Length > 0)
+                    builder.Append(ConvertLenient(analysis.Partial, final: true, useTable: false));
+                else
+                    builder.Append(final && analysis.Partial == "n" ? "ん" : analysis.Partial);
                 break;
             }
             var consumed = analysis.Tokens.Sum(t => t.Romaji.Length);
