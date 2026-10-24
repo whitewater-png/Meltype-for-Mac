@@ -397,7 +397,12 @@ internal static class LearnedWordsTests
     [Test]
     public static void SaveFailure_RestoresMemory()
     {
-        if (OperatingSystem.IsWindows()) return;
+        // root (CI のコンテナーや Claude Code のクラウド セッション) は、フォルダーの権限を外しても書けてしまうので、確かめられない
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        {
+            Console.WriteLine("  SaveFailure_RestoresMemory: スキップ (権限で書けなくできる環境だけ)");
+            return;
+        }
         var path = TempFile(out var cleanup);
         var directory = Path.GetDirectoryName(path)!;
         const UnixFileMode all = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;

@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# 軽い CI (2026-10-24 に導入。docs/STRATEGY_2026-10.md §6 の「CI はやらない」の例外)。
+# Linux で、OS に依存しない部分 (src/Meltype.Core) のテストと、正解表 (eval/cases) の回帰ゲートだけを流す。
+# 署名・公証・macOS のビルド・リリースの作成は行わない (運用コストの方針は変えない)。
+# シークレットは使わず、権限は読み取りだけ。
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+
+jobs:
+  core:
+    name: Core のテストと正解表の回帰ゲート (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Core のテスト (品質テストの基準を含む)
+        run: dotnet run -c Release --project src/Meltype.Core.Tests
+
+      # PR のときだけ: base ブランチの作業ツリーを展開し、同じ正解表を両方で回して broken (base で当たり PR で外れた例) を数える。
+      # 正解表は PR 側 (.) のものを両方に使う (tools/eval-compare.sh の仕様。added / removed は 0 になり、broken だけ見る)。
+      - name: 正解表の回帰ゲート (PR の base と比較)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          git worktree add "${{ runner.temp }}/base" "origin/${{ github.base_ref }}"
+          tools/eval-compare.sh "${{ runner.temp }}/base" . eval/cases "${{ runner.temp }}/eval-out"
+          status=$?
+          cat "${{ runner.temp }}/eval-out/compare.md" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+        shell: bash {0}
+
+      - name: 比較結果を添付
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-compare
+          path: ${{ runner.temp }}/eval-out/
+          if-no-files-found: ignore
+
+      - name: 辞書の検査
+        run: |
+          node tools/check-dictionaries.mjs
+          node tools/check-terms.mjs
+
+      - name: スクリプトの自己テスト
+        run: |
+          python3 tools/test_update_cask.py
+          python3 tools/test_upstream_watch.py

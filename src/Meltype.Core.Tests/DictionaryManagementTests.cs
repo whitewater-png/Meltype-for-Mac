@@ -419,6 +419,11 @@ internal static class DictionaryManagementTests
         try
         {
             var path = Path.Combine(directory, "userdict.txt");
+            if (!CreationTimeDistinguishesReplacedFiles(directory))
+            {
+                Console.WriteLine("  UserDict_SameSizeReplacement_IsDetectedByCreationTime: スキップ (置き換えたファイルの作成時刻が変わるファイルシステムだけ)");
+                return;
+            }
             UserDictionary.FileCheckIntervalMs = 60 * 60 * 1000;
             var writer = new UserDictionary(path, builtIn: false);
             writer.AddNew("あいう", "愛");
@@ -432,6 +437,26 @@ internal static class DictionaryManagementTests
             Assert.Equal("藍", reader.Words.Single().Word, "確認");
         }
         finally { restore(); }
+    }
+
+    /// <summary>
+    /// 作成時刻 (birth time) で置き換えを見分けられるファイルシステムか。Linux の一部 (overlay・tmpfs など) や古いカーネルでは、
+    /// 作成時刻が取れず更新時刻で代用されるので、更新時刻を戻すと区別が付かない。そういう環境ではテストの前提が成り立たない。
+    /// </summary>
+    private static bool CreationTimeDistinguishesReplacedFiles(string directory)
+    {
+        var probe = Path.Combine(directory, "probe.txt");
+        File.WriteAllText(probe, "a");
+        var first = File.GetCreationTimeUtc(probe);
+        var written = File.GetLastWriteTimeUtc(probe);
+        Thread.Sleep(20);
+        var temp = Path.Combine(directory, "probe.tmp");
+        File.WriteAllText(temp, "b");
+        File.Move(temp, probe, overwrite: true);
+        File.SetLastWriteTimeUtc(probe, written);
+        var second = File.GetCreationTimeUtc(probe);
+        File.Delete(probe);
+        return second != first;
     }
 
     [Test]
