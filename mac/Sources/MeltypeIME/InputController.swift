@@ -655,6 +655,16 @@ final class MeltypeInputController: IMKInputController {
             Self.trace("apply: insertText text=\(Self.cut(edit.text)) replacementRange=\(NSStringFromRange(range)) 直前 \(Self.ranges(client))")
             client.insertText(edit.text, replacementRange: range)
             Self.trace("apply: insertText 直後 \(Self.ranges(client))")
+            // 確定済みの文字を「空の文字」で置き換える (純粋な削除) と、TextEdit は範囲を無視して何もしないことがある
+            // (実機のトレース: 文書の先頭の `can ` を消す edit で、直後も selected={4, 0} のまま `can ` が残った)。
+            // 置き換えたはずの範囲にまだ元の文字があれば、変換中の文字として空に置き換える形で消し直す。
+            if edit.text.isEmpty, edit.deleteBefore > 0, range.location != NSNotFound, range.length > 0,
+               let original = edit.original,
+               Self.sameText(client.attributedSubstring(from: NSRange(location: range.location, length: range.length))?.string, original) {
+                Self.trace("apply: 空の置き換えでは消えなかった。変換中の文字として消し直す range=\(NSStringFromRange(range))")
+                client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: range)
+                Self.trace("apply: 消し直した後 \(Self.ranges(client))")
+            }
             if hasMarkedText { MeltypeConverter.shared.endComposition() }
             hasMarkedText = false
         }
