@@ -69,6 +69,9 @@ public sealed class CompositionText
     /// <summary>打った文字そのもの。</summary>
     public string Raw => string.Concat(_units.Select(u => u.Raw)) + _pending;
 
+    /// <summary>入力の末尾が閉じ括弧か。表示幅の設定に関わらず、打った記号で判定する。</summary>
+    public bool EndsWithClosingBracket => _pending.Length == 0 && _units.Count > 0 && _units[^1].Raw is ")" or "]" or "}";
+
     public void Append(char c)
     {
         // 英数字の間に打った . / - はドメイン名や略語の区切り。入力直後は後続文字が分からないため、

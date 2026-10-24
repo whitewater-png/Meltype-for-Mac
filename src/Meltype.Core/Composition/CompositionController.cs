@@ -1151,6 +1151,14 @@ public sealed class CompositionController
                     StartConversion();
                     return;
                 }
+                // 閉じ括弧の直後の Space は英文・日本文のどちらでも区切り。変換を始めて空白を飲まない。
+                if (_headCount == 0 && _text.Mode == DisplayMode.Auto && _text.EndsWithClosingBracket)
+                {
+                    // 従来の最初の候補は採用するが、変換中のままにはせず、その場で確定して空白を入れる。
+                    StartConversion();
+                    Commit(suffix: " ", fixEnglish: true);
+                    return;
+                }
                 // 英語と判定した語で終わっているなら、変換ではなく確定して空白を入れる
                 // (日本語の部分は、ライブ変換が ON なら漢字にして、OFF なら見えているかなのまま確定)。
                 // 数字だけ (1、12) は、前が英文なら確定して空白 (I have 2 cats)。それ以外は変換して ① 一 Ⅰ などの候補を出す。

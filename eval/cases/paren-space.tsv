@@ -1,0 +1,14 @@
+# 閉じ括弧の直後の Space を残す回帰表 (W13-3、docs/W13_PAREN_SPACE_2026-10-24.md)。
+# 既存の英文・コード形と、空白を入れない日本語の対照も含める。
+Japanese(nihongo) input requires too complex IMEs.	Japanese(日本語) input requires too complex IMEs.	full	W10 実測の再現 2026-10-24 (W13-3)
+Japanese(nihongo) input	Japanese(日本語) input	full	W10 実測の再現を短くした形 2026-10-24 (W13-3)
+(kakko) desu	(かっこ) です	full	日本語の括弧の直後の空白 2026-10-24 (W13-3)
+(kakko)desu	(かっこ)です	full	空白を打たない対照 2026-10-24 (W13-3)
+test[foo] bar	test「ふぉお」 bar	full	角括弧の直後の空白 2026-10-24 (W13-3)
+test{foo} bar	test{ふぉお｝ bar	full	中括弧の直後の空白 2026-10-24 (W13-3)
+foo(bar) baz	ふぉお(bar) ばz	full	コードに似た括弧の直後の空白 2026-10-24 (W13-3)
+run(foo) bar	るん(ふぉお) bar	full	関数名に似た括弧の直後の空白 2026-10-24 (W13-3)
+func(arg) next	ふんc(arg) next	full	関数に似た括弧の直後の空白 2026-10-24 (W13-3)
+array[index] value	array「index」 value	full	添字に似た括弧の直後の空白 2026-10-24 (W13-3)
+kono (kyou) input	この(今日) input	full	日本語の中の括弧の直後の空白 2026-10-24 (W13-3)
+kono [hello] desu	この「hello」 です	full	日本語の中の角括弧の直後の空白 2026-10-24 (W13-3)
