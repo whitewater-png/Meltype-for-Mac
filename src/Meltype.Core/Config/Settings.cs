@@ -305,6 +305,9 @@ public sealed class Settings
     [Category("1. 全般"), DisplayName("Enter は見えているとおりに確定"),
      Description("Enter で確定するとき、打ち間違いの自動修正をせず、変換ボックスに見えているとおりに確定します (Space で変換するときの修正は今までどおりです)。")]
     public bool EnterCommitsAsShown { get; set; }
+    [Category("1. 全般"), DisplayName("F9 / F10 の 1 回目は打ったまま"),
+     Description("入力中に F9 (全角) / F10 (半角) で英字にしたとき、1 回目は常に打ったまま (小文字) の英字にします。続けて押すと、すべて大文字 → 先頭だけ大文字 → 打ったまま と切り替わります。OFF のときは、何回押しても打ったままの英字で、大文字・小文字は切り替わりません。確定後の F10 / F6 には関係しません。")]
+    public bool AlphanumericKeyStartsAsTyped { get; set; }
 
     [Category("1. 全般"), DisplayName("記号を全角にする"),
      Description("日本語の中で打った ! ? ~ などの記号を全角 (！？～) にします。OFF にすると、打ったままの半角で入ります (チャットで !? を半角にしたいとき)。")]

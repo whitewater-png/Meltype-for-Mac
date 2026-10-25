@@ -279,6 +279,11 @@ public sealed class CompositionOptions
     /// 既定は OFF (今までは Enter の確定の直前に打ち間違いを直す)。Space で変換するときの直しは設定に関係なく今までどおり。
     /// </summary>
     public Func<bool> EnterCommitsAsShown { get; init; } = () => false;
+    /// <summary>
+    /// 入力中の F9 / F10 の 1 回目は常に打ったままの英字にして、続けて押すと すべて大文字 → 先頭だけ大文字 → 打ったまま と切り替えるか
+    /// (設定、本家 #515)。既定は OFF (今までは何回押しても打ったまま)。
+    /// </summary>
+    public Func<bool> AlphanumericKeyStartsAsTyped { get; init; } = () => false;
 
     /// <summary>確定するときに、日本語と英単語の間に半角スペースを入れるか (設定)。</summary>
     public Func<bool> SpaceAroundEnglish { get; init; } = () => false;
@@ -1265,6 +1270,8 @@ public sealed class CompositionController
             case VirtualKeys.F6: SetMode(DisplayMode.Hiragana); return;
             case VirtualKeys.F7: SetMode(DisplayMode.Katakana); return;
             case VirtualKeys.F8: SetMode(DisplayMode.HalfWidthKatakana); return;
+            case VirtualKeys.F9 when _options.AlphanumericKeyStartsAsTyped(): SetAlphanumericMode(DisplayMode.FullWidthAlphanumeric); return;
+            case VirtualKeys.F10 when _options.AlphanumericKeyStartsAsTyped(): SetAlphanumericMode(DisplayMode.HalfWidthAlphanumeric); return;
             case VirtualKeys.F9: SetMode(DisplayMode.FullWidthAlphanumeric); return;
             case VirtualKeys.F10: SetMode(DisplayMode.HalfWidthAlphanumeric); return;
             case VirtualKeys.Down when _options.TokMode() && _headCount == 0 && _toggleBox is null && (_swallowedShift.Count > 0 || _host.IsShiftDown()):
@@ -1786,6 +1793,28 @@ public sealed class CompositionController
         _converting = false;
         TrimToFixedClauses();
         _text.Mode = mode;
+    }
+
+    /// <summary>
+    /// 設定 AlphanumericKeyStartsAsTyped が ON のときの F9 / F10: 1 回目は見えている内容にかかわらず打ったままの英字にする。
+    /// すでにその英字で見せているときに続けて押すと、すべて大文字 → 先頭だけ大文字 → 打ったまま と切り替える
+    /// (見た目の変わらない段は飛ばす: AI → Ai)。F6〜F8 を挟むと 1 回目に戻る。
+    /// </summary>
+    private void SetAlphanumericMode(DisplayMode mode)
+    {
+        if (_headCount > 0 && _text.IsEmpty) return;
+        var sameMode = !_converting && _text.Mode == mode;
+        if (!sameMode)
+        {
+            SetMode(mode);
+            return;
+        }
+        var before = CurrentDisplay(final: false);
+        for (var i = 0; i < 3; i++)
+        {
+            _text.Case = (LetterCase)(((int)_text.Case + 1) % 3);
+            if (CurrentDisplay(final: false) != before) return;
+        }
     }
 
     // ---- 変換後も続けて入力 ----
