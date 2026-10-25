@@ -269,6 +269,12 @@ public sealed class CompositionOptions
     /// </summary>
     public Func<bool> DoubleSpaceToJapanese { get; init; } = () => false;
 
+    /// <summary>
+    /// 入力中の Esc を、全部消す代わりに一段ずつ戻すか (設定、本家 #676)。漢字 → ひらがな → 打ったローマ字 → 消す。見た目が変わらない段は飛ばす。
+    /// 戻した語は日本語 / 英語の判定として覚えない。既定は OFF (今までは Esc 1 回で全部消す)。
+    /// </summary>
+    public Func<bool> EscStepsBack { get; init; } = () => false;
+
     /// <summary>確定するときに、日本語と英単語の間に半角スペースを入れるか (設定)。</summary>
     public Func<bool> SpaceAroundEnglish { get; init; } = () => false;
 
@@ -999,6 +1005,7 @@ public sealed class CompositionController
         _reconvertOriginal = null;
         _reconvertRomaji = false;
         _firstSoundCommitted = false;
+        _escReverted = false;
         _toggleBox = null;
         _toggleUndo = null;
         _lastWord = null;
@@ -1201,6 +1208,7 @@ public sealed class CompositionController
                     return;
                 }
                 _text.RemoveLast();
+                if (_text.IsEmpty) _escReverted = false;
                 // 未変換の文節を消し切ったら、前の文節の選択に戻る。
                 if (_headCount > 0 && _text.IsEmpty) SelectLastFixedClause();
                 return;
@@ -1208,8 +1216,12 @@ public sealed class CompositionController
                 // 固定した文節を、変換前の読みに戻す (その次の Esc は今までどおり入力を取り消す)。
                 UnfixClauses();
                 return;
+            case VirtualKeys.Escape when _options.EscStepsBack() && _reconvertOriginal is null && _toggleBox is null && StepBack():
+                ResetPrediction();
+                return;
             case VirtualKeys.Escape:
                 _text.Clear();
+                _escReverted = false;
                 ResetPrediction();
                 // 再変換した変換ボックスを Esc で取り消したら、置き換えた元の文字を書き戻す (消えないように)。学習・文脈の記録はしない。
                 if (_reconvertOriginal is { } original)
@@ -1729,6 +1741,36 @@ public sealed class CompositionController
         if (shift && vk is VirtualKeys.Left or VirtualKeys.Right) Resize(vk == VirtualKeys.Left ? -1 : +1);
         else if (vk == VirtualKeys.Up) NextCandidate(-1);
     }
+
+    /// <summary>
+    /// 設定「Esc で一段ずつ戻す」(本家 #676): 見えている内容を 漢字 → ひらがな → 打ったローマ字 の順に一段戻す。見た目が変わらない段は飛ばす。
+    /// 戻せる段が無ければ false (今までどおり全部消す)。戻した語は日本語 / 英語の判定として覚えない (_escReverted)。
+    /// 変換中の Esc は先に変換を取り消して読みに戻す (ここへは来ない)。再変換・確定後 F6 の変換ボックスは元の文字を書き戻す Esc があるので対象外。
+    /// </summary>
+    private bool StepBack()
+    {
+        if (_text.IsEmpty) return false;
+        var before = CurrentDisplay(final: false);
+        // 今のモードより先の段だけ (ひらがなの次はローマ字。カタカナなどはひらがなへ)
+        DisplayMode[] steps = _text.Mode switch
+        {
+            DisplayMode.Hiragana => [DisplayMode.HalfWidthAlphanumeric],
+            DisplayMode.HalfWidthAlphanumeric => [],
+            // 英字のまま見えている入力 (hello) は、かな (へっぉ) に変えても「一段戻す」にならない。戻せる段は無い (そのまま全部消す)
+            DisplayMode.Auto when _text.IsAlphanumeric => [],
+            _ => [DisplayMode.Hiragana, DisplayMode.HalfWidthAlphanumeric],
+        };
+        foreach (var mode in steps)
+        {
+            SetMode(mode);
+            _escReverted = true;
+            if (CurrentDisplay(final: false) != before) return true;
+        }
+        return false;
+    }
+
+    // Esc で戻した入力は、日英の判定として覚えない (確定か取り消しで下ろす)
+    private bool _escReverted;
 
     private void SetMode(DisplayMode mode)
     {
@@ -3065,7 +3107,7 @@ public sealed class CompositionController
     /// </summary>
     private void LearnLanguage()
     {
-        if (_firstSoundCommitted) return;
+        if (_firstSoundCommitted || _escReverted) return;
         if (_options.Languages is not { } memory) return;
         var raw = _text.Raw;
         var automatic = _text.Segments(final: true);
@@ -3803,6 +3845,7 @@ public sealed class CompositionController
     /// <summary>確定して入力する。英語だったか日本語だったか・確定した文字列を、次の入力の文脈として覚えておく。</summary>
     private void CommitText(string text, bool english, string raw = "", bool chosen = false, bool hasEnglish = false, bool hasJapanese = false, SegmentRawSet? raws = null)
     {
+        _escReverted = false;
         var spaceIntended = _spaceStartedConversion;
         _spaceStartedConversion = false;
         _tabStartedConversion = false;

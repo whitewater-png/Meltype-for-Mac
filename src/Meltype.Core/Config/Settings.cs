@@ -299,6 +299,10 @@ public sealed class Settings
      Description("英語と判定された語を Space で確定して空白が入った直後に、Space をもう一度押すと、その空白を取り、直前の語だけを日本語として読み直して変換候補を開きます (man␣␣ → まん → 万)。Esc で元の英語に戻ります。英文の途中でも対象は直前の語だけです。英文で空白を 2 つ続けて打ちたい人は OFF のままにしてください。")]
     public bool DoubleSpaceToJapanese { get; set; }
 
+    [Category("1. 全般"), DisplayName("Esc で一段ずつ戻す"),
+     Description("入力中の Esc を、打った内容を全部消すのではなく一段ずつ戻します (漢字 → ひらがな → 打ったローマ字 → 消す。見た目が変わらない段は飛ばします)。戻した語は、日本語 / 英語の判定として覚えません。")]
+    public bool EscStepsBack { get; set; }
+
     [Category("1. 全般"), DisplayName("記号を全角にする"),
      Description("日本語の中で打った ! ? ~ などの記号を全角 (！？～) にします。OFF にすると、打ったままの半角で入ります (チャットで !? を半角にしたいとき)。")]
     public bool FullWidthSymbols { get; set; } = true;

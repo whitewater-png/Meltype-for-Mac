@@ -159,6 +159,9 @@ internal static class CompositionTests
 
         /// <summary>日本語を確定した直後の / を中黒 (・) にするか (CompositionOptions.SlashAsNakaguro)。既定は OFF。</summary>
         public bool SlashAsNakaguro { get; set; }
+
+        /// <summary>入力中の Esc を一段ずつ戻すか (CompositionOptions.EscStepsBack)。既定は OFF。</summary>
+        public bool EscStepsBack { get; set; }
         public bool Prediction { get; set; } = true;
 
         /// <summary>変換中の Shift+Enter で確定してキーをアプリに渡すか (CompositionOptions.ShiftEnterNewline)。既定は ON。</summary>
@@ -287,6 +290,7 @@ internal static class CompositionTests
                 Braces = () => Braces,
                 ZSymbolConversion = () => ZSymbolConversion,
                 SlashAsNakaguro = () => SlashAsNakaguro,
+                EscStepsBack = () => EscStepsBack,
                 Prediction = () => Prediction,
                 Suggestions = suggestions,
                 DictionarySuggest = () => SuggestEnabled,

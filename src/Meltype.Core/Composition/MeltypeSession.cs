@@ -243,6 +243,7 @@ public sealed class MeltypeSession
             ZSymbolConversion = () => shared.Current.ZSymbolConversion,
             SlashAsNakaguro = () => shared.Current.SlashAsNakaguro,
             DoubleSpaceToJapanese = () => shared.Current.DoubleSpaceToJapanese,
+            EscStepsBack = () => shared.Current.EscStepsBack,
             TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
         return session = new MeltypeSession(detector, converter, options, () => shared.Current, clipboard) { ReadingProvider = reader };
