@@ -149,6 +149,7 @@ internal static class CompositionTests
         public bool Kana { get; set; }
         public bool CorrectTypos { get; set; } = true;
         public bool SpaceAroundEnglish { get; set; }
+        public bool EnterCommitsAsShown { get; set; }
         public PunctuationStyle Punctuation { get; set; } = PunctuationStyle.Japanese;
         public bool FullWidthSymbols { get; set; } = true;
         public ParenthesisWidth Parentheses { get; set; } = ParenthesisWidth.HalfWidth;
@@ -281,6 +282,7 @@ internal static class CompositionTests
                 RomajiTypos = Typos,
                 CorrectTypos = () => CorrectTypos,
                 SpaceAroundEnglish = () => SpaceAroundEnglish,
+                EnterCommitsAsShown = () => EnterCommitsAsShown,
                 Punctuation = () => Punctuation,
                 FullWidthSymbols = () => FullWidthSymbols,
                 Parentheses = () => Parentheses,

@@ -269,6 +269,12 @@ public sealed class CompositionOptions
     /// </summary>
     public Func<bool> DoubleSpaceToJapanese { get; init; } = () => false;
 
+    /// <summary>
+    /// Enter で確定するとき、打ち間違いの自動修正をせず、変換ボックスに見えているとおりに確定するか (設定、本家 #677)。
+    /// 既定は OFF (今までは Enter の確定の直前に打ち間違いを直す)。Space で変換するときの直しは設定に関係なく今までどおり。
+    /// </summary>
+    public Func<bool> EnterCommitsAsShown { get; init; } = () => false;
+
     /// <summary>確定するときに、日本語と英単語の間に半角スペースを入れるか (設定)。</summary>
     public Func<bool> SpaceAroundEnglish { get; init; } = () => false;
 
@@ -1129,7 +1135,7 @@ public sealed class CompositionController
             if (_predicting) CommitPrediction(_predictions[_predictionIndex]);
             else
             {
-                if (!_converting) _text.FixTypos();
+                if (!_converting) _text.FixTypos(correct: !_options.EnterCommitsAsShown());
                 Commit();
             }
             ReplayDown(e);
@@ -1142,8 +1148,10 @@ public sealed class CompositionController
         switch (vk)
         {
             case VirtualKeys.Return:
-                _text.FixTypos();
-                Commit();
+                // 設定「Enter は見えているとおりに確定」: 打ち間違いの直しは Space で変換するときだけ (本家 #677)
+                _text.FixTypos(correct: !_options.EnterCommitsAsShown());
+                _committingByEnter = true;
+                try { Commit(); } finally { _committingByEnter = false; }
                 return;
             case VirtualKeys.Space when _swallowedShift.Count > 0 || _host.IsShiftDown():
                 // Shift+Space: 英語と判定した語でも、ローマ字として読んで変換する (go → 語、camera → かめら)。
@@ -2874,6 +2882,9 @@ public sealed class CompositionController
     }
 
     /// <param name="implicitly">暗黙の確定か。F6 で開いた変換ボックスは、Enter・Space など自分で確定したときだけ日本語として学習する (R43-3)。</param>
+    /// <summary>Enter キーでの確定の最中か (設定 EnterCommitsAsShown が、Enter 以外の確定には効かないように)。</summary>
+    private bool _committingByEnter;
+
     private void Commit(string suffix = "", bool fixEnglish = false, bool implicitly = false)
     {
         var converting = _converting && _clauses.Count > 0;
@@ -2881,6 +2892,12 @@ public sealed class CompositionController
         var fixedOnly = !converting && _headCount > 0;
         if (fixedOnly) TrimToFixedClauses();
         var text = converting ? string.Concat(_clauses.Select(c => c.Text)) + SuffixText : fixedOnly ? FixedText + CurrentDisplay(final: true) + SuffixText : CurrentDisplay(final: true);
+        // 設定「Enter は見えているとおりに確定」: かな + 語末の n (かんたn) は、確定でライブ変換が漢字にせず、見えていたかなに n を ん にしただけで確定する (本家 #677)
+        if (_committingByEnter && !converting && !fixedOnly && suffix.Length == 0 && !fixEnglish && _options.EnterCommitsAsShown() && _text.Mode == DisplayMode.Auto && _text.Pending == "n" &&
+            CurrentDisplay(final: false) is { Length: > 1 } shownText && shownText[^1] == 'n' && shownText[^2] is >= '\u3041' and <= '\u3096')
+        {
+            text = shownText[..^1] + "ん";
+        }
         if (fixEnglish && !converting && _text.Mode == DisplayMode.Auto) text = FixEnglishTypo(text);
         var english = converting ? _clauses.All(c => c.IsEnglish) : _text.IsAlphanumericAt(final: true);
         // 確定後の F10 / F6 の対象: 英語の区間・日本語の区間があるか (確定 1 回分まるごと)
