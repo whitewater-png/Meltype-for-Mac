@@ -1763,6 +1763,23 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Upstream1060_KansouritsuHasDryingRate()
+    {
+        // 本家 #1060 (issue #968): かんそうりつ の候補に 乾燥率 (Mac の実機では 貫創立 が先頭に出ていた)
+        Assert.True(CandidateDictionary.Load(null).Lookup("かんそうりつ").Contains("乾燥率"), "かんそうりつ → 乾燥率");
+    }
+
+    [Test]
+    public static void Upstream1065_1053_SeriesAndTodoListAreSplitOut()
+    {
+        // 本家 #1065 (issue #853): しりーず → シリーズ (実機では 尻図)。#1053 (issue #1028): とどりすと → todoリスト (実機では とドリスと)
+        var dictionary = new UserDictionary(null);
+        Assert.True(dictionary.Split("しりーず")?.Any(p => p.Word == "シリーズ") == true, "しりーず → シリーズ");
+        Assert.True(dictionary.Split("とどりすと")?.Any(p => p.Word == "todoリスト") == true, "とどりすと → todoリスト");
+        Assert.Equal(0, dictionary.Count, "同梱の語句はユーザー辞書の一覧に出さない");
+    }
+
+    [Test]
     public static void Symbols_HalfWidthCandidate()
     {
         // 報告: Space を続けて押して、記号も半角で出せるように。
