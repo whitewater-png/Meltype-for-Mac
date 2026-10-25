@@ -299,6 +299,10 @@ public sealed class Settings
      Description("英語と判定された語を Space で確定して空白が入った直後に、Space をもう一度押すと、その空白を取り、直前の語だけを日本語として読み直して変換候補を開きます (man␣␣ → まん → 万)。Esc で元の英語に戻ります。英文の途中でも対象は直前の語だけです。英文で空白を 2 つ続けて打ちたい人は OFF のままにしてください。")]
     public bool DoubleSpaceToJapanese { get; set; }
 
+    [Category("1. 全般"), DisplayName("F9 / F10 の 1 回目は打ったまま"),
+     Description("入力中に F9 (全角) / F10 (半角) で英字にしたとき、1 回目は常に打ったまま (小文字) の英字にします。続けて押すと、すべて大文字 → 先頭だけ大文字 → 打ったまま と切り替わります。OFF のときは、何回押しても打ったままの英字で、大文字・小文字は切り替わりません。確定後の F10 / F6 には関係しません。")]
+    public bool AlphanumericKeyStartsAsTyped { get; set; }
+
     [Category("1. 全般"), DisplayName("記号を全角にする"),
      Description("日本語の中で打った ! ? ~ などの記号を全角 (！？～) にします。OFF にすると、打ったままの半角で入ります (チャットで !? を半角にしたいとき)。")]
     public bool FullWidthSymbols { get; set; } = true;

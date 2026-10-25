@@ -149,6 +149,9 @@ internal static class CompositionTests
         public bool Kana { get; set; }
         public bool CorrectTypos { get; set; } = true;
         public bool SpaceAroundEnglish { get; set; }
+
+        /// <summary>F9 / F10 の 1 回目は打ったままにして、続けて押すと大文字・小文字を切り替えるか (CompositionOptions.AlphanumericKeyStartsAsTyped)。既定は OFF。</summary>
+        public bool AlphanumericKeyStartsAsTyped { get; set; }
         public PunctuationStyle Punctuation { get; set; } = PunctuationStyle.Japanese;
         public bool FullWidthSymbols { get; set; } = true;
         public ParenthesisWidth Parentheses { get; set; } = ParenthesisWidth.HalfWidth;
@@ -281,6 +284,7 @@ internal static class CompositionTests
                 RomajiTypos = Typos,
                 CorrectTypos = () => CorrectTypos,
                 SpaceAroundEnglish = () => SpaceAroundEnglish,
+                AlphanumericKeyStartsAsTyped = () => AlphanumericKeyStartsAsTyped,
                 Punctuation = () => Punctuation,
                 FullWidthSymbols = () => FullWidthSymbols,
                 Parentheses = () => Parentheses,
