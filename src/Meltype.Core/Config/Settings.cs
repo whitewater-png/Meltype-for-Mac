@@ -302,6 +302,9 @@ public sealed class Settings
     [Category("1. 全般"), DisplayName("Esc で一段ずつ戻す"),
      Description("入力中の Esc を、打った内容を全部消すのではなく一段ずつ戻します (漢字 → ひらがな → 打ったローマ字 → 消す。見た目が変わらない段は飛ばします)。戻した語は、日本語 / 英語の判定として覚えません。")]
     public bool EscStepsBack { get; set; }
+    [Category("1. 全般"), DisplayName("Enter は見えているとおりに確定"),
+     Description("Enter で確定するとき、打ち間違いの自動修正をせず、変換ボックスに見えているとおりに確定します (Space で変換するときの修正は今までどおりです)。")]
+    public bool EnterCommitsAsShown { get; set; }
 
     [Category("1. 全般"), DisplayName("記号を全角にする"),
      Description("日本語の中で打った ! ? ~ などの記号を全角 (！？～) にします。OFF にすると、打ったままの半角で入ります (チャットで !? を半角にしたいとき)。")]

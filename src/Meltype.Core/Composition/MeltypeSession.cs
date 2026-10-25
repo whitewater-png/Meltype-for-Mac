@@ -244,6 +244,7 @@ public sealed class MeltypeSession
             SlashAsNakaguro = () => shared.Current.SlashAsNakaguro,
             DoubleSpaceToJapanese = () => shared.Current.DoubleSpaceToJapanese,
             EscStepsBack = () => shared.Current.EscStepsBack,
+            EnterCommitsAsShown = () => shared.Current.EnterCommitsAsShown,
             TranslationHistory = TranslationHistory.Shared(AppPaths.TranslationHistoryFile),
         };
         return session = new MeltypeSession(detector, converter, options, () => shared.Current, clipboard) { ReadingProvider = reader };
