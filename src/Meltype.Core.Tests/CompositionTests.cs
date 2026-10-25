@@ -1767,6 +1767,8 @@ internal static class CompositionTests
     {
         // 本家 #1060 (issue #968): かんそうりつ の候補に 乾燥率 (Mac の実機では 貫創立 が先頭に出ていた)
         Assert.True(CandidateDictionary.Load(null).Lookup("かんそうりつ").Contains("乾燥率"), "かんそうりつ → 乾燥率");
+        // Mac の実機は かん|そうりつ の 2 文節に分けるので、補助辞書 (文節全体の読みで引く) には届かない。語句辞書で 1 文節にする
+        Assert.True(new UserDictionary(null).Split("かんそうりつ")?.Any(p => p.Word == "乾燥率") == true, "かんそうりつ → 乾燥率 (語句辞書)");
     }
 
     [Test]
