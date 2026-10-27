@@ -464,6 +464,9 @@ public sealed class CompositionController
     /// <summary>消した文節より後ろの文節の文字の一覧 (変換ボックスの文節の表示用)。</summary>
     private IEnumerable<string> SuffixTexts => _retypeSuffix?.Select(s => s.Text) ?? [];
 
+    /// <summary>打ち直しの後ろに残した文節に日本語があるか (その確定は英語で終わっていない)。</summary>
+    private bool SuffixHasJapanese => _retypeSuffix?.Any(s => !s.IsEnglish) == true;
+
     /// <summary>
     /// 変換中に選んでいる文節を消す (本家 #972)。前の文節は変換したまま固定し、後ろの文節は変換したまま
     /// 打ち直した文節の後ろに付ける。消した文節の読みは捨てる (打ち直す)。
@@ -1203,8 +1206,10 @@ public sealed class CompositionController
                     Commit(suffix: " ", fixEnglish: true);
                 }
                 // chosen は文節を見ない: 固定した文節を含む確定は CommitText が確定し直しを記録しない。Esc で戻った後の古い文節で誤って真にしない (R45 任意 1)
-                else if (EndsWithEnglish(final: true)) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + " ", english: true, _text.Raw, ChosenByUser(clausesInUse: false), hasEnglish: true, hasJapanese: _text.Segments(final: true).Any(s => !s.IsEnglish), SegmentRaws(converting: false));
-                else if (_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level())) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.Raw) + " ", english: true, _text.Raw, ChosenByUser(clausesInUse: false), hasEnglish: true);
+                // 打ち直しの後ろに残した文節 (本家 #972) も確定に含める (CommitText は _retypeSuffix を捨てるので、ここで足す)。
+                // 後ろに日本語があれば、この確定は英語で終わっていない (Commit() と同じ補正。次の数字だけの Space を「英文の後ろ」と誤らない。Q18)
+                else if (EndsWithEnglish(final: true)) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + SuffixText + " ", english: !SuffixHasJapanese, _text.Raw, ChosenByUser(clausesInUse: false), hasEnglish: true, hasJapanese: SuffixHasJapanese || _text.Segments(final: true).Any(s => !s.IsEnglish), SegmentRaws(converting: false));
+                else if (_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level())) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.Raw) + SuffixText + " ", english: !SuffixHasJapanese, _text.Raw, ChosenByUser(clausesInUse: false), hasEnglish: true, hasJapanese: SuffixHasJapanese);
                 else
                 {
                     // Space で変換した = 語の後に空白を打とうとした、とも取れる (確定し直して英語にするときに空白を足す)。
@@ -3919,6 +3924,9 @@ public sealed class CompositionController
         _clauses = [];
         _headCount = 0;
         _fixedUnits = [];
+        // 守り: 打ち直しの後ろに残した文節は、呼ぶ側が text に足している (Commit() と Space の英語の経路)。足し忘れると黙って消えるので、ログに残す (Q18)。
+        if (_retypeSuffix is not null && SuffixText is { Length: > 0 } droppedSuffix && !text.Contains(droppedSuffix, StringComparison.Ordinal))
+            Diagnostics.Log.Warn($"打ち直しの後ろの文節「{droppedSuffix}」が確定に含まれていません (確定「{text}」)。");
         _retypeSuffix = null;
         _clipboardCandidate = null;
         ResetPrediction();

@@ -71,6 +71,81 @@ internal static class DeleteClauseOnBackspaceTests
         Assert.Equal("えか知らん", k.Host.Output.Single(), "前 + 打ち直し + 後ろ の順で確定する");
     }
 
+    /// <summary>
+    /// Q18: 打ち直しが英語で終わる (英語だけ / 日本語 + 英語 / パス / 保護区間) と、Space は変換ではなく
+    /// 「確定して空白」になる (Commit() を通らず CommitText を直接呼ぶ経路がある)。その経路でも、
+    /// 後ろの文節 (知らん) が Enter と同じく確定に残ること。表示は「え + 打ち直し + 知らん」で、確定もそのとおり。
+    /// SpaceCommits = false の行 (-) は Space で変換が始まる (今までどおり) ことの守り。
+    /// </summary>
+    private static readonly (string Retype, string Shown, bool SpaceCommits)[] EnglishEndingRetypes =
+    [
+        ("github", "えgithub知らん", true),          // 英語だけ
+        ("wogithub", "えをgithub知らん", true),      // 日本語 + 英語 (Q18 の再現手順)
+        ("./build.sh", "え。/build.sh知らん", true), // パス。日本語 (え) の直後なので保護区間にはならず . は 。 だが、英語で終わる確定の経路
+        ("src/main.rs", "えsrc/main.rs知らん", true), // 保護区間 (/ を含む英字の並び)
+        ("-", "えー知らん", false),                  // 箇条書きの - は日本語の直後では ー (Space は変換)
+    ];
+
+    private static CompositionTests.Keyboard RetypeAfterDeletingTheMiddleClause(string retype)
+    {
+        var k = new CompositionTests.Keyboard { DeleteClauseOnBackspace = true };
+        k.Type("e,shiran ");
+        Assert.Equal("え|、|知らん", Clauses(k), "前提: 3 文節");
+        k.Press(VirtualKeys.Right);
+        k.Press(VirtualKeys.Back);
+        k.Type(retype);
+        return k;
+    }
+
+    [Test]
+    public static void On_Enter_AfterRetypeEndingWithEnglish_KeepsTheTail()
+    {
+        foreach (var (retype, shown, _) in EnglishEndingRetypes)
+        {
+            var k = RetypeAfterDeletingTheMiddleClause(retype);
+            Assert.Equal(shown, k.Host.View!.Text, $"前提 ({retype}): 表示は 前 + 打ち直し + 後ろ");
+            k.Type("\n");
+            Assert.Equal(shown, k.Host.Output.Single(), $"Enter ({retype}): 後ろの文節 (知らん) も確定に残る");
+        }
+    }
+
+    [Test]
+    public static void On_Space_AfterRetypeEndingWithEnglish_KeepsTheTail()
+    {
+        foreach (var (retype, shown, spaceCommits) in EnglishEndingRetypes)
+        {
+            var k = RetypeAfterDeletingTheMiddleClause(retype);
+            Assert.Equal(shown, k.Host.View!.Text, $"前提 ({retype}): 表示は 前 + 打ち直し + 後ろ");
+            k.Type(" ");
+            if (spaceCommits)
+            {
+                Assert.Equal(1, k.Host.Output.Count, $"Space ({retype}): 英語で終わるので変換ではなく確定する");
+                Assert.Equal(shown + " ", k.Host.Output.Single(), $"Space ({retype}): 後ろの文節 (知らん) も確定に残り、空白はその後ろ (Enter の確定 + 空白)");
+            }
+            else
+            {
+                Assert.True(k.Host.View!.Converting, $"Space ({retype}): 日本語で終わるので今までどおり変換が始まる");
+                Assert.Equal(0, k.Host.Output.Count, $"Space ({retype}): まだ確定しない");
+                k.Type("\n");
+                Assert.Equal(shown, k.Host.Output.Single(), $"Space → Enter ({retype}): 後ろの文節 (知らん) も確定に残る");
+            }
+        }
+    }
+
+    [Test]
+    public static void On_Space_AfterRetypeEndingWithEnglish_DoesNotCountAsAnEnglishCommit()
+    {
+        // 後ろの文節 (知らん) が日本語なので、この確定は「英語で終わった確定」ではない (Commit() と同じ旗の補正)。
+        // 英語で終わった確定の直後だけ、数字だけ (2) の Space は変換せずに確定する (I have 2 cats)。
+        // 日本語で終わったあとの 2 + Space は、今までどおり変換して ② 二 などの候補を出す。
+        var k = RetypeAfterDeletingTheMiddleClause("wogithub");
+        k.Type(" ");
+        Assert.Equal("えをgithub知らん ", k.Host.Output.Single(), "前提: 確定した");
+        k.Type("2 ");
+        Assert.Equal(1, k.Host.Output.Count, "日本語 (知らん) で終わった確定の後なので、2 + Space は確定せず変換する");
+        Assert.True(k.Host.View!.Converting, "2 の候補 (② 二 など) を出す変換中");
+    }
+
     [Test]
     public static void On_Escape_RestoresReadingWithoutTheDeletedClause()
     {
