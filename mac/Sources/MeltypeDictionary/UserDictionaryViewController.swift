@@ -26,6 +26,9 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
     /// このタブを入れているウインドウ (タブを切り替えると view.window が nil になるので、シート・取り消しはこちらを使う)。
     weak var hostWindow: NSWindow?
     private var window: NSWindow? { view.window ?? hostWindow }
+    /// 辞書の変更を積む undoManager (MainWindowController が専門用語集のタブと共有のものを渡す)。
+    /// window.undoManager は選んでいるタブで変わるので経由しない (隠れている間や別のタブを選んでいる間に積んでも同じ履歴に入る)。
+    var dictionaryUndoManager: UndoManager?
 
     init(dictionary: NativeDictionary) {
         self.dictionary = dictionary
@@ -312,10 +315,10 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
         return nil
     }
 
-    /// 元に戻す操作を積む。undoManager はウインドウのもの (タブを切り替えて、このタブの view がウインドウから外れていても同じものを使う。
+    /// 元に戻す操作を積む。undoManager は dictionaryUndoManager (タブを切り替えて、このタブの view がウインドウから外れていても同じものを使う。
     /// 取り消しの中でやり直しを積むときも、引数で渡された同じ undoManager に積む)。
     private func registerUndo(_ change: DictionaryChange, name: String, on manager: UndoManager? = nil) {
-        guard let undoManager = manager ?? window?.undoManager else { return }
+        guard let undoManager = manager ?? dictionaryUndoManager else { return }
         // undoManager は弱く持つ (積んだ操作が undoManager を持ち、undoManager が操作を持つ循環を作らない)
         undoManager.registerUndo(withTarget: self) { [weak undoManager] target in
             let undoing = undoManager?.isUndoing ?? true
@@ -413,7 +416,7 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
         // 専門用語集に書けたのにユーザー辞書から消せなかったとき (result.error) も、足した語を取り消せるようにしておく
         let undoable = !outcome.added.isEmpty || !outcome.removed.isEmpty
         if undoable {
-            if let createdId, let undoManager = window?.undoManager {
+            if let createdId, let undoManager = dictionaryUndoManager {
                 // 取り消しは後に積んだものから戻る: 語を戻してから、作った分野を消す (1 回の ⌘Z にまとめる)
                 undoManager.beginUndoGrouping()
                 registerUndo(.deleteDomain(id: createdId), name: actionName, on: undoManager)
@@ -482,7 +485,7 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
             self.reload()
             // 取り込みで新しく登録した語 (本体が返したもの) を、まとめて取り消せるようにする
             let added = result.added
-            if !added.isEmpty { self.registerUndo(.remove(added), name: "取り込み", on: window.undoManager) }
+            if !added.isEmpty { self.registerUndo(.remove(added), name: "取り込み") }
             self.didChange?()
             let message = result.summary?.message ?? "取り込みました。"
             self.showStatus(message.replacingOccurrences(of: "\n", with: " / "))
