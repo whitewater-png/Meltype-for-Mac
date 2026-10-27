@@ -2892,6 +2892,9 @@ public sealed class CompositionController
     private void Reconvert(Clause clause)
     {
         clause.Candidates = JapaneseCandidates(clause.Reading, null);
+        // 読みが変わったので候補一覧は引き直す。選択中の文節は伸縮前に開いた印 (Expanded) が残っていて、
+        // 以後 Expand が呼ばれず作り直した 3〜4 件に固定されていた (Q26)。
+        clause.Expanded = false;
         clause.Index = 0;
         clause.Changed = false;
         clause.ClipboardText = null;
