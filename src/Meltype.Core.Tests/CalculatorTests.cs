@@ -50,4 +50,12 @@ internal static class CalculatorTests
         Assert.Equal("-4", Calculator.Evaluate("1+2-3-4"), "+ を含めば - が何個でも式");
         Assert.Equal("-3", Calculator.Evaluate("-3"), "単独の -3 は今までどおり (- が 1 個)");
     }
+
+    [Test]
+    public static void Evaluate_NegativeZero_IsShownAsZero()
+    {
+        // L4b-3: 0*-1 は -0.0 になり、"0.##########" が -0 と出していた。
+        Assert.Equal("0", Calculator.Evaluate("0*-1"));
+        Assert.Equal("0", Calculator.Evaluate("-0"));
+    }
 }

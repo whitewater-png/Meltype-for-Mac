@@ -35,6 +35,7 @@ public static class Calculator
             var value = ParseSum(text, ref position);
             if (position != text.Length || double.IsNaN(value) || double.IsInfinity(value) || Math.Abs(value) >= 1e15) return null;
             var rounded = Math.Round(value, 10);
+            if (rounded == 0) rounded = 0; // 負のゼロ (0*-1) を -0 と出さない
             return rounded.ToString("0.##########", CultureInfo.InvariantCulture);
         }
         catch (FormatException)
