@@ -26,10 +26,10 @@ scope: dictionary
 - `ost` 以外の語の追加。
 
 ## 完成条件
-- [x] 正解表: `eval/cases/short-words-in-english.tsv` に `ost` → `ost`、`ost wo tsukau` → `ost をつかう`、守る 4 行を足す。実装前は `ost` 系 2 行が外れ、実装後は当たる
-- [x] テスト: `FeedbackTests.cs` の `Req002_Ost_StaysEnglish_AndJapaneseSpellingsAroundItDoNot` (実装前は赤を確認)
-- [ ] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過、`node tools/check-dictionaries.mjs` が通る
-- [ ] 文書: `docs/KNOWN_LIMITS.md` に該当の記載が無いことを確かめる
+- [x] 正解表 (ece771a。base で ost 系 2 行が外れ、実装後 b9328e4 で当たる): `eval/cases/short-words-in-english.tsv` に `ost` → `ost`、`ost wo tsukau` → `ost をつかう`、守る 4 行を足す。実装前は `ost` 系 2 行が外れ、実装後は当たる
+- [x] テスト: `FeedbackTests.cs` の `Req002_Ost_StaysEnglish_AndJapaneseSpellingsAroundItDoNot` (ece771a で赤 1145/1146、b9328e4 で緑)
+- [x] 回帰なし: eval-compare broken 0 / fixed 2、Core 1146/1146、品質テスト 1293/1294 (base と同一)、`check-dictionaries.mjs` エラー 0
+- [x] 文書: `docs/KNOWN_LIMITS.md` に ost の記載は無く、直す箇所なし
 
 ## Mac 実機チェックリスト (人が確かめる)
 - [ ] TextEdit: `ost` + Enter → `ost`
@@ -41,3 +41,5 @@ scope: dictionary
 
 ## 記録
 - 定期タスクによる自動実行 (2026-10-27)。
+- 周回数 1 (査読 1 回)。査読員が境界例 120 件を base と比べ、変わったのは `ost` をそのまま含む打鍵 33 件 (どれも ost が英字で残る向き) だけ。
+- 既存の制限: `eiga no ost` (日本語 + 空白 + no + 空白 + ost) は `えいがno ost` になる。`eiga no ssd` も base で同じで、今回の範囲外。
