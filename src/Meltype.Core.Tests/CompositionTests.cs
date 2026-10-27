@@ -2891,7 +2891,7 @@ internal static class CompositionTests
         // 予測の並び: 予測を確定した語は、エンジンの予測が無くても履歴から次の予測に出る (今までどおり)。
         k = new Keyboard(history: history, predictions: r => []);
         k.Type("ose");
-        Assert.True(k.Host.View!.Predictions!.Contains("お世話になります"), "予測で確定した語は次の予測に出る: " + string.Join(",", k.Host.View.Predictions));
+        Assert.True(k.Host.View!.Predictions!.Contains("お世話になります"), "予測で確定した語は次の予測に出る: " + string.Join(",", k.Host.View.Predictions!));
         Assert.True(history.Usage().ContainsKey("お世話になります"), "使用頻度 (Usage) にも入る");
 
         // 変換で同じ読みの語を選んだら (通常の Remember)、印は外れて Get が返す。
