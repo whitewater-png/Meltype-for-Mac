@@ -3268,3 +3268,339 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **管理**: 中の不具合・堅牢性のうち新規 7 件を UPSTREAM_PR_TRACKER の Q17〜Q23 に登録。文書の §8 に判断待ち 7 件 (F6 → BackSpace の戻し / 電卓候補の日付・電話番号 / uninstall の退避に `dictionaries/` を含めるか / 予測学習の直し方 / テスト用判定器の構成 / IME の `--self-test` / 修正の進め方)。
 - **未確認**: 実機は全項目 (Swift 側は読取か推測)。粗読みの範囲・未計測の数は文書の §9。**push 前**。
 - **決定 (2026-10-27、リョウさん)**: §8 の 7 件はすべて (a)。修正は Q17〜Q25 を独立した worktree で並列に実装し、査読を付けてから統合する。進捗は各項目の節に追記する。
+
+## コード総点検の修正バッチ (Q17〜Q27、2026-10-27)
+
+- **進め方**: 決定 (§8 はすべて (a)) どおり、Q17〜Q25 を独立した worktree で並列に実装 (1 項目 1 コミット、テスト先行で RED を確認)。あわせてリョウさんの報告「文章の途中の変換で候補の語が著しく少なくなる」を調査 (I1) し、原因 2 つを Q26・Q27 として直した。
+- **検証**: 全ブランチで、全テスト合格・`--eval` が基準と同一・新しいテストが修正前の Core で赤になることを機械的に再実行して確認。統合ツリーで全テスト 1177 件 (基準 1145 + 32)・Swift ビルド・codesign・`check-mac-aot-settings.py`・辞書アプリの `--self-test` を確認。独立査読 (Core 9 件を 2 名: P0 0・P1 4・P2 10、Swift 2 件は統括が読取) の P1 4 件を実装 2 (Q17 の学習の上書き・Q20 の `LoadForUpdate`) とテスト 2 (Q18 の `my`・Q19 の続けて入力) で閉じ、P2 は各節の損に書いた。
+- **未確認**: 実機は全項目 (各節の「残る限界・未確認」)。**push 前**。
+
+## Q17 の修正 (予測候補の確定を変換の最初の候補に使わない、2026-10-27)
+
+### 目的
+予測候補 (Tab → Enter) で「おせわ → お世話になります」を確定すると、`History.Remember` が変換の学習 (読み → 語) に入り、次に `osewa` を Space で変換したとき 1 番目の候補が `お世話になります` に乗っ取られていた。文節にも波及し、「たんいを → 単位を取得する」を予測で確定したあと `tanniwotoru` Space が `単位を取得する取る` になった (ライブ変換も)。予測の確定は「この語をまた予測に出してほしい」であって「この読みの変換はこの語」ではないので、予測の並びにだけ効かせる。
+
+### 変更
+- `src/Meltype.Core/Composition/ConversionPreferences.cs` `ConversionHistory.Entry`: `Prediction` (予測から覚えた印) を追加。false は書かない (`JsonIgnore WhenWritingDefault`) ので `conversions.json` の形式は今までどおり。既存のファイルは欄が無く、false (変換の学習) として読む。保存・読み込みはソース生成の `LearningJsonContext` のまま
+- 同 `ConversionHistory.Remember(reading, text, fromPrediction = false)`: 予測からは印つきで覚える。変換で学習済みの同じ語なら印を付けない (学習を消さない)。変換で同じ読みを選び直せば (通常の `Remember`) 印は外れる
+- 同 `ConversionHistory.Get`: 印のある項目は返さない。`StartingWith`・`Usage` (予測の並び・使用頻度) は印に関係なく今までどおり
+- `src/Meltype.Core/Composition/CompositionController.cs` `CommitPrediction`: `Remember(..., fromPrediction: true)`
+- `Get` を通る経路 (`ConvertWithEngineOnce`・`Reconvert`・`LiveConvert`・ユーザー辞書の語の学習・辞書登録の提案 `RecordSuggestions`) はすべて同じ効果
+
+### 得と損
+- 得: 予測で長い語を確定しても、同じ読みの変換 (Space・ライブ変換・区切りの変更) の 1 番目が変わらない。予測の並び (使うほど上に出る) は今までどおり
+- 損: 予測で確定した語は、変換で選び直すまで変換の 1 番目にならない (以前はなっていた。それが本件の不具合なので意図どおり)。変換で学習済みの読みに別の語を予測で確定しても、変換の学習は上書きしない (査読 F1-1 で「学習が消える」を見つけて直した) ので、その読みの予測の並びにはその語が効かない。辞書登録の提案も、予測で確定しただけの語を「学習済みの語をそのまま確定」とは数えない
+
+### 残る限界・未確認
+- 実機 (mac / Windows) は未確認
+- 設定の「学習した語」の一覧には予測から覚えた項目も今までどおり並ぶ (印は表示しない)
+- `ReadingOf` (確定後の再変換で読みに戻す) は印に関係なく返す (今までどおり)
+
+### テスト (`src/Meltype.Core.Tests/CompositionTests.cs`、5 件)
+- `Prediction_CommitRemembersAndSpaceConverts` (更新): 予測確定後の `osewa` Space の 1 番目が `お世話になります` でない
+- `Prediction_CommitDoesNotHijackConversion`: 予測の並び (履歴から次の予測に出る・Usage に入る) は今までどおり、変換で選んだ語は今までどおり `Get` が返す、変換で学習済みの語を予測で確定しても学習は消えない
+- `Prediction_CommitDoesNotHijackClauseConversion`: `たんいを → 単位を取得する` のあと `tanniwotoru` Space が `単位を|取る`、Shift+←→ で `たんいを|とる`、ライブ変換で `単位を取る`
+- `ConversionHistory_PredictionFlagRoundTrips`: 保存 (印は true のときだけ書く)・読み込み・印の無い旧形式
+- `ConversionHistory_PredictionDoesNotOverwriteConversionLearning` (査読 F1-1): 変換で学習済みの読みに別の語を予測で確定しても `Get` と予測の並びに学習が残る
+- `--eval` は変更前と同じ
+
+### 近傍の --repro (変更前後で差なし)
+| 入力 | 最後 | 結果 |
+|---|---|---|
+| osewa | space | composing おせわ |
+| osewa | enter | committed おせわ |
+| osewaninarimasu | space | composing おせわになります |
+| tanniwotoru | space | composing 単位を取る |
+| tanniwotoru | enter | committed たんいをとる |
+| tanniwo | space | composing たんいを |
+| kigoutou | space | composing 記号等 |
+| hashiwo | space | composing 橋を |
+| kyouha | enter | committed きょうは |
+| nihongowohanasu | space | composing にほんごをはなす |
+| kawa | space | composing 川 |
+| konnnichiha | enter | committed こんにちは |
+| osewa | none | composing おせわ |
+
+の節
+
+## Q18 の修正 (文節を消して打ち直した後の Space で後ろの文節が消える、2026-10-27)
+
+**目的**: 設定「変換中の BackSpace で選んだ文節を消す」(DeleteClauseOnBackspace、既定 OFF) で文節を消して打ち直したあと、打ち直しが「日本語 + 英語」(wogithub) やパス (./build.sh) で終わって Space を押すと、表示は「えをgithub知らん」なのに確定が「えをgithub 」になり、後ろの文節 (知らん) が消えていた。Enter と同じく、後ろの文節も確定に残す。
+
+**原因**: Space の「英語で終わる語は変換せず確定して空白」の 2 経路 (`EndsWithEnglish` / `IsEnglishAtWordEnd`) が `Commit()` を通らず `CommitText` を直接呼んでいて、`TakeFixedClauses()` は後ろの文節 (`_retypeSuffix`) を足さず、`CommitText` が `_retypeSuffix = null` で黙って捨てていた。後ろの文節を足すのは `Commit()` だけだった。
+
+**変更** (`src/Meltype.Core/Composition/CompositionController.cs`):
+- `HandleKey` の Space、英語で終わる 2 経路の `CommitText(...)`: `TakeFixedClauses() + <打ち直し> + SuffixText + " "` にして後ろの文節を足す (空白は `Commit(suffix: " ")` と同じく後ろの文節のあと)
+- 同じ 2 経路で、後ろの文節に日本語があれば `english = false` / `hasJapanese = true` に補正 (`Commit()` の補正と同じ。次に打つ「2 + Space」を「英文の後ろの数字」として確定しない)
+- `SuffixHasJapanese` プロパティを追加
+- `CommitText`: `_retypeSuffix` が残っていて確定の文字に含まれていなければ `Log.Warn` (呼ぶ側の足し忘れを黙って捨てないための守り)
+
+**得と損**:
+- 得: 表示と確定が一致する。Enter と Space で確定の内容が変わらない (空白の有無だけ)
+- 損: なし (設定 OFF では `SuffixText` が常に空なので動作は変わらない。`--repro` 18 入力で前後一致)
+
+**残る限界・未確認**:
+- 実機 (Mac) は未確認。Core のテストハーネスのみ
+- 1 音確定 (Shift+↓) で入力が空になる経路に後ろの文節が残っていると、後ろの文節は落ちる (元からの別の問題。今回は `Log.Warn` が出るだけで、直していない。再現も未確認)
+- 日本語 (え) の直後に `./build.sh` を打ち直すと `.` は `。` になる (保護区間は英語の直後・語頭でしか始まらない、元からの仕様)
+
+**テスト** (`DeleteClauseOnBackspaceTests.cs`、+3 本):
+- `On_Enter_AfterRetypeEndingWithEnglish_KeepsTheTail`: 表駆動 6 入力 (github / wogithub / my / ./build.sh / src/main.rs / -。`my` は `IsEnglishAtWordEnd` の経路。査読 F2-1) × Enter。確定 = 表示
+- `On_Space_AfterRetypeEndingWithEnglish_KeepsTheTail`: 同 5 入力 × Space。英語で終わる 4 つは確定 = 表示 + 空白、`-` (ー) は今までどおり変換が始まる
+- `On_Space_AfterRetypeEndingWithEnglish_DoesNotCountAsAnEnglishCommit`: `wogithub` → Space のあとの `2` + Space が確定せず変換になる (直前の確定を「英語で終わった」扱いにしない旗の補正)
+- 注: この場面では前の文節が必ず固定されているので、確定後の F10 / F6 は旗に関係なく素通し (`_lastWord` を記録しない)。旗の効果は次の入力の「英文の後ろか」の判定に出るので、そこをテストにした
+
+**近傍の --repro** (設定 OFF。変更前 = 変更後):
+
+| 入力 | 最後 | 表示 | 確定 / 変換中 |
+|---|---|---|---|
+| wogithub | space | をgithub | 確定 `をgithub ` |
+| egithub | space | えgithub | 確定 `えgithub ` |
+| kyouhagithubwomiru | space | きょうはgithubをみる | 変換 `今日はgithubをみる` |
+| kyouhagithubwomiru | enter | きょうはgithubをみる | 確定 `きょうはgithubをみる` |
+| nihongowohanasu | space | にほんごをはなす | 変換 |
+| kyouhasushidesu | space | きょうはすしです | 変換 |
+| kyouhasushidesu | enter | きょうはすしです | 確定 |
+| ./build.sh | space | ./build.sh | 確定 `./build.sh ` |
+| src/main.rs | space | src/main.rs | 確定 `src/main.rs ` |
+| watashihagoogle | space | わたしはgoogle | 確定 `わたしはgoogle ` |
+| thisisapen | space | てぃしさぺn | 変換 |
+| e,shiran | enter | え、しらn | 確定 `え、しらん` |
+| tanniwotoru | space | たんいをとる | 変換 `単位を取る` |
+| ihave2cats | space | いhave2cats | 確定 `いhave2cats ` |
+| sushi | space | すし | 変換 |
+| - | enter | ー | 確定 `ー` |
+| ~/build.sh | space | ~/build.sh | 確定 `~/build.sh ` |
+| pullrequestwo | space | pullrequestを | 変換 |
+
+の節
+
+## Q19 の修正 (F6 の変換ボックスで読みを消し切ったら元の語を書き戻す、2026-10-27)
+
+**目的**: 確定した直後の語を F6 でかなの変換ボックスに移したあと、BackSpace で変換を取り消し、さらに BackSpace で読みを消し切ると、ボックスは閉じるのに入力欄から消した語 (`hello api` の `api`) が戻らず、Esc・F10 でも取り戻せなかった (コード総点検 §2 の 3、L1b-1)。書き戻しが変換前の Esc にしか無く、BackSpace の経路に無かったため。直すつもりで押した F6 で語を失わないようにする。
+
+**変更** (`src/Meltype.Core/Composition/CompositionController.cs`):
+- 変換前の BackSpace (`case VirtualKeys.Back`、`:1226-1228`): 読みが空になったとき、確定後の F6 で開いた変換ボックス (`_toggleBox`) があれば、Esc と同じく元の語を書き戻して記録も戻す (`RestoreReconvertedOriginal`)。文節を固定した続き (`_headCount > 0`) は今までどおり前の文節の選択に戻る
+- 変換前の Esc (`:1242`): 既存の書き戻し (`_reconvertOriginal` → `_host.CommitText` → `RestoreToggleBox`) を新設の `RestoreReconvertedOriginal()` (`:3458-3469`) に共通化 (挙動は同じ)
+- 選択の再変換 (選択 + Shift+Space。`_toggleBox` が無い) は対象外: 読みを消し切ったら今までどおり閉じるだけ (選んだ文字は消える)。ローマ字の再変換は既に `CancelRomajiReconversion` で書き戻すので変更なし
+
+**得と損**:
+- 得: F6 → BackSpace で読みを消し切っても語が消えない。Esc と同じ戻り方で、戻した語はもう一度 F6 で直せる。学習・文脈の記録はしない (Esc と同じ)
+- 損: F6 の箱で「読みを全部消す = 語を消す」つもりだった人は、BackSpace が 1 手増える (戻った語を消す)。選択の再変換は変えていないので、そちらは今までどおり消える
+
+**残る限界・未確認**:
+- 実機 (Mac) 未確認。Swift は Esc の書き戻しと同じ edit (`DeleteBackward` のあと `CommitText`) を受けるので、Esc が動く入力欄なら同じに動く見込み
+- Windows は Core 共通の経路 (ビルド未確認)
+- 選択の再変換 (かなの再変換) で読みを消し切ると選んだ文字が消えるのは、決定どおり今までのまま (ガードのテストで固定)
+
+**テスト** (`src/Meltype.Core.Tests/LastWordToggleTests.cs`、+3):
+- `F6_BackspacingTheReadingAway_PutsTheOriginalBack_WithoutLearning`: `hello api`⏎ → F6 → BackSpace ×3 で入力欄が `hello api` に戻り、箱が閉じ、学習せず、もう一度 F6 が効き、続けて `neko`⏎ で `hello apiねこ`。Space で確定した `hello api␣` でも空白ごと `hello api␣` に戻る
+- `F6_ThenContinueTyping_BackspacingTheNewReadingAway_DoesNotPutTheOriginalBack` (査読 F3-1): F6 の箱で変換 → 続けて入力 (ContinueAfterConversion ON) → 新しい読みを消し切っても、前の文節が固定されている間は書き戻さない (二重にしない)
+- `Reconvert_BackspacingTheReadingAway_StaysDeleted` (ガード): 選択の再変換 (`Reconvert("にほんご")`) で読みを消し切ったときは書き戻さない (入力欄への書き込み 0 件)
+- `--eval` は変更前と同じ (外れた例 1 件: `my name is taro → my name is たろ` は従来どおり)
+
+**近傍の --repro** (確定の経路が変わっていないことの確認。変更は F6 の箱の BackSpace だけで効く):
+| 入力 | showing | committed | composing |
+|---|---|---|---|
+| hello enter | hello | hello | null |
+| hello space | hello | `hello ` | null |
+| api enter | あぴ | あぴ | null |
+| api space | あぴ | (空) | あぴ |
+| nihongo enter | にほんご | にほんご | null |
+| sushi enter | すし | すし | null |
+| sushi space | すし | (空) | すし |
+| neko enter | ねこ | ねこ | null |
+| kyouha enter | きょうは | きょうは | null |
+| taro enter | たろ | たろ | null |
+| meeting space | meeting | `meeting ` | null |
+| nihongowohanasu enter | にほんごをはなす | にほんごをはなす | null |
+| sorekara space | それから | (空) | それから |
+
+の節
+
+## Q20 の修正 (config.json の 1 項目の型違いで全設定が既定に戻る、2026-10-27)
+
+**目的**: 手で編集した config.json の 1 項目だけ型が違う (`"PredictionMinLength": "2"`、`"Punctuation": "Z"`) と、`JsonSerializer.Deserialize` 一発の `Settings.Load` が `JsonException` で全設定を既定値に戻し、元のファイルを `.broken` に退避していた (IME は黙って既定で動く)。型の違う項目だけを既定に戻し、他の項目は保つ。
+
+**変更**:
+- `src/Meltype.Core/Config/Settings.cs` `Load` (759 行目付近): 一発の `Deserialize` を `Parse(json)` に置換
+- 同 `Parse` (新設、`ToJson` の下): 1 段目は従来どおり全体を一度に読む。読めなければ 2 段目として `ImportProfile` と同じ作法 (`new Settings()` を `SerializeToNode` した既定の `JsonObject` に、知っている項目だけを 1 つずつ重ねて `Deserialize`) で、失敗した項目だけ既定に戻し `Log.Warn("config.json の <項目名> を読めないので、この項目だけ既定値にします: …")`。JSON 全体が読めない (構文の誤り・0 バイト・先頭がオブジェクトでない) ときは従来どおり例外 → `.broken` に退避して既定値
+- ソース生成の `SettingsJsonContext` と `JsonNode` だけを使う (reflection を足さない。NativeAOT の Mac 版 libMeltypeNative 用)
+- 同 `LoadForUpdate` (書き換えのための読み込み。辞書アプリの設定タブ・`ConfigFlag`・分野の保存が使う) も `Parse(json)` を通す (査読 F4-1: `Load` だけ救済すると IME は正常に動くのに設定の保存が「読めない」で黙って見送られていた)。JSON 全体が読めないときは今までどおり null
+- `Migrate` / `Normalize` / ロック内の保存し直しの流れは変えていない
+
+**得と損**:
+- 得: 1 項目の打ち間違いで全設定 (ライブ変換・アプリ別設定・プロファイルなど) を失わない。どの項目が読めなかったかがログに残る。元のファイルは書き換えない
+- 損: 2 段目は項目数 × 全体 `Deserialize` (起動時に、壊れたファイルのときだけ)。型違いの項目は黙って既定で動く (ログの警告のみ。画面には出ない)。次に設定を保存すると、型の違う項目は既定値で書き戻される (IME が使っている値と同じ。以前は `.broken` 退避で全部失っていた)
+
+**残る限界・未確認**:
+- `"Punctuation": 7` のような「未定義の整数」は列挙が整数を受けるので型違いにならず、そのまま入る (別件)
+- `Log.Warn` に出る位置 (LineNumber) は内部の JsonObject のもので、利用者のファイルの行とは合わない (項目名で見る。値は書かない)。`.broken` の場所を画面に出す案 (L5-1 (b)) は未実施
+- Mac 実機・`tools/check-mac-aot-settings.py` は未確認。Windows はビルド不可 (`Settings.Load(path)` の署名は不変)
+
+**テスト** (`src/Meltype.Core.Tests/SettingsLoadTests.cs`、6 件):
+- `BrokenSyntax_DefaultsAndBackup`: 構文が壊れた JSON → 既定値 + `.broken` (今の挙動の固定)
+- `WrongTypeItem_OnlyThatItemDefaults`: `"PredictionMinLength": "2"`、`"Punctuation": "Z"` → その 2 項目だけ既定、`LiveConversion: false` などは保たれ、`.broken` なし (RED→GREEN)
+- `UnknownKey_IgnoredOthersKept`: 未知のキーは無視、他は保たれる
+- `MissingVersion_Migrates`: `SettingsVersion` 無し → v1 として移行し保存し直す (今の挙動の固定)
+- `EmptyFile_DefaultsAndBackup`: 0 バイト → 既定値 + `.broken` (今の挙動の固定)
+- `WrongTypeItem_LoadForUpdateStillReads` (査読 F4-1): 型違い 1 項目では `LoadForUpdate` も通り、JSON 全体が壊れていれば null
+
+**近傍の --repro** (enter。設定の読み込みは打鍵の経路に無く、変更前後で同じ。`--eval` も変更前と同じ):
+
+| typed | committed |
+|---|---|
+| konnichiwa | こんいちわ |
+| hello | hello |
+| nihongowohanasu | にほんごをはなす |
+| my name is taro | my name is たろ |
+| settei | せってい |
+| config | config |
+| kyouhaiitenki | きょうはいいてんき |
+| json | json |
+| watashihagakuseidesu | わたしはがくせいです |
+| the quick brown fox | the quick brown fox |
+| ohayougozaimasu | おはようございます |
+| github | github |
+
+## Q21 の修正 (文脈ごとに覚えた語を辞書アプリから消す・直す、2026-10-27)
+
+**目的**: 設定「英語 / 日本語の学習を前の文脈ごとに分ける」(既定 OFF) で覚えた語は、languages.json のキーに印が付く (`api@e` = 英語の後、`api@j` = 日本語の後)。辞書アプリの「学習した語」の一覧は印を外した語だけを出し (`LanguageMemory.Entries`)、消す・直すも語だけを渡すので、`Remove` は何も消さずに理由 null (= 成功と表示)、`Set` は「一覧にありません」、`Check` は重複を見逃していた。画面・FFI の形式を変えずに、Core 側が印つきのキーも見るようにする。
+
+**変更** (`src/Meltype.Core/Composition/LanguageMemory.cs`):
+- `KeysOf(word)` (:485): 語のキーになりうる 3 つ (印なし・`@e`・`@j`)
+- `FindKey(word)` (:491): 画面が渡した語に当たるキーを探す。印なしがあればそれ。無ければ `@e` / `@j` のうちある方。**両方あれば理由を返す** (「『api』は前の文脈ごとに 2 つ覚えています。消してから覚え直してください。」)
+- `Remove` (:546): 語ごとに 3 キーを消す
+- `Set` (:505): `old` のキーを `FindKey` で探し、見つかった印を引き継いで書き戻す (綴りを直しても文脈は変えない。`sushi@j` → `sashimi@j`)。両方あれば理由を返して何も変えない
+- `CheckCore` (:473): 重複の判定も 3 キーを見る (`except` = 編集中の元の語は 3 キーとも重複にしない)
+- Swift・FFI (`Exports.cs`)・`DictionaryManagement`・ファイル形式・`Remember` / `Get` の経路は変えない
+
+**得**: 設定 ON で覚えた語を、辞書アプリから消せる・英字 / かなを直せる・綴りを直せる。足すときの重複も見逃さない。「消したのに残る」が無くなる。
+**損**: 画面は印を知らないままなので、同じ語を英語の後と日本語の後の両方で覚えているときは、どちらを直すか選べず断る (消すのは両方いっぺん)。印なしと `@e` が両方あるときは印なしだけを直す (これまでの挙動のまま) ので、`@e` 側は画面から直せない (消すことはできる)。
+
+**残る限界・未確認**:
+- 画面に印 (文脈) を出す・印ごとに直す (`Learned.Context` を FFI に乗せる) は別の項目 (L4b-8 / R-1 (L4b))
+- `MaxWordLength` が印の 2 文字も数える (`:313`) は今回は触っていない
+- 辞書アプリの実機 (Swift 側) は未確認。Core の経路 (`FormatLearned` の行 → `ParseLearnedWords` → `Remove` / `Set`) はテストで確認
+
+**テスト** (`src/Meltype.Core.Tests/LearnedWordsTests.cs`、6 件、合計 1151/1151):
+`ContextSensitive_RemoveForgetsSuffixedKeys` (語だけで `api@e` が消える。印なし・`@e`・`@j` が 3 つそろっていても 1 回で消える) / `ContextSensitive_CheckSeesSuffixedKeys` (`sushi@j` があれば重複。`except` は重複にしない) / `ContextSensitive_SetEditsTheOnlySuffixedKey` (`@j` 1 つなら印のまま直る。綴りを直しても印を引き継ぐ。印なしと `@e` の両方があれば印なしだけ) / `ContextSensitive_SetRefusesWhenBothContextsExist` (両方あれば理由を返して版も内容も変えない) / `ContextSensitive_PlainWordsBehaveAsBefore` (印なしの語の消す・直す・重複はこれまでどおり) / `ContextSensitive_DictionaryApp_RemovesAndEditsByListedWord` (IME が文脈つきで覚えた語を、画面の別インスタンスが一覧の行で消す・直す。IME にもすぐ効く)
+
+**近傍の `--repro`** (学習データは使わないので、変更前後で同じ):
+
+| 入力 (enter) | 結果 |
+|---|---|
+| api | あぴ |
+| sushi | すし |
+| kyouha | きょうは |
+| github | github |
+| go | ご |
+| my name is taro | my name is たろ |
+| apiwotsukau | あぴをつかう |
+| sushiwotaberu | すしをたべる |
+| kubernetes | kubernetes |
+| notoukouha | のとうこうは |
+| xnotoukouha | んおとうこうは |
+| swift | swift |
+
+## Q22 の修正 (辞書アプリの設定・判定タブでの ⌘Z、2026-10-27)
+
+- **目的**: 設定タブ・判定を調べるタブを選んでいる間に ⌘Z を押すと、隠れたユーザー辞書 / 専門用語集タブの直前の操作 (登録・削除・除外・分野の削除・取り込み…) が黙って取り消されていた (CODE_REVIEW_2026-10 §2 の 6、L8-1)。見える反応は隠れたタブの状態欄だけだった。
+- **変更**:
+  - `mac/Sources/MeltypeDictionary/MainWindowController.swift` `windowWillReturnUndoManager`: ユーザー辞書・専門用語集のタブのときだけ共有の `sharedUndoManager` を返す。学習した語・設定・判定を調べるのタブは、タブごとの空の UndoManager (`learnedUndoManager` / `settingsUndoManager` / `judgeUndoManager`) を返す (学習した語のタブと同じ作法)。
+  - `UserDictionaryViewController` / `TermDictionaryViewController` に `dictionaryUndoManager` を足し、`registerUndo` (と `performMove` の undo グループ、取り込み後の「取り込み」の登録) は `window.undoManager` を経由せずそれに積む。`MainWindowController` が `sharedUndoManager` を渡す。`windowWillReturnUndoManager` は積むときにも呼ばれるので、積む経路がタブの選択と非同期になっても (シートの完了後など) 別の undoManager に入らない。
+  - ファイル冒頭と `windowWillReturnUndoManager` のコメントを実装に合わせた (L8-8 の「設定のタブで共有」は誤りだった)。
+- **得と損**: 得: 見えないところで辞書が変わらない。専門用語集の「直す」はユーザー辞書も変えるので、2 つのタブの履歴は 1 本のまま。損: 設定タブに移った直後に辞書の操作を取り消すには、辞書のタブへ戻してから ⌘Z を押す必要がある。
+- **残る限界・未確認**: Swift に自動テストは無く、実機未確認。設定タブ・判定タブのテキスト欄の文字の取り消しが、そのタブ専用の UndoManager に積まれるか (⌘Z で文字が戻るか) は実機で見る。設定タブの変更 (トグル・数値) は今までどおり undo に積まない (L8-8 の後段は範囲外)。タブをまたぐやり直し (P20) は別件のまま。
+- **テスト**: 自動テストなし (self-test は UI を通らない)。ビルド・codesign・`check-mac-aot-settings.py`・`MeltypeDictionary --self-test` が通ることを確認。
+
+## Q23 の修正 (本体の版が合わないときの IME の通知、2026-10-27)
+
+- **目的**: `libMeltypeNative.dylib` に `meltype_abi_version` が無い、または値が期待 (13) と違うとき、IME は NSLog だけ残して初期化を中止し、全キーがアプリへ素通しになるが利用者への通知は無かった (§3 の 2、L6-1)。dlopen の失敗だけは M7 対応で通知が入っていた (ABI 側は意図的に範囲外のままだった)。
+- **変更**: `mac/Sources/MeltypeIME/NativeCore.swift` `notifyLoadFailureOnce` を理由の文を受ける形 (`notifyLoadFailureOnce(_ reason: String)`) にし、`initialize()` の 2 つの guard からも呼ぶ。文言は「Meltype の判定エンジン (libMeltypeNative.dylib) の版が合いません (期待 13 / 実際 N)。」「… に版の情報がありません (古い版です)。」で、後ろに従来と同じ「日本語入力は無効のまま、キーはそのままアプリに渡します。Meltype を入れ直してください。」が付く。dlopen に失敗したときは `init` で知らせているので、`meltype_abi_version` が無い guard は `library != nil` のときだけ知らせる (重ねない)。起動ごとに 1 回の制限 (`didNotifyLoadFailure`) と、通知の仕組み (osascript の `display dialog`、120 秒で閉じる) は変えない。
+- **得と損**: 得: 版の不一致の原因に 1 回で辿り着ける (ダイアログに期待と実際の版が出る)。損: なし。
+- **残る限界・未確認**: 実機未確認 (通常の配布では dylib と IME が同じ pkg に入るので再現しにくい。確かめるなら別の版の dylib を Frameworks に置くか、`meltype_abi_version` の無い dylib を用意する)。M7 の「dylib を壊しての表示」の未検証も同じまま。
+- **テスト**: 自動テストなし。ビルド・codesign が通ることを確認。
+
+## Q24 の修正 (計算候補 ON で日付・電話番号を式にしない、2026-10-27)
+
+目的: 設定「計算式を変換すると結果を候補に出す」(既定 OFF) が ON のとき、演算子が `-` だけの列 (日付 `2026-10-27`、電話番号 `03-1234-5678`) も式として受理され、Space で確定ではなく変換が始まっていた (候補に `1989`)。あわせて `0*-1` の結果が `-0` と出ていた。
+
+変更 (2 コミット):
+- `src/Meltype.Core/Composition/Calculator.cs` `Evaluate`: `=` で終わらない式は、「`-` 以外の二項演算子 (`+ * /`) を含む」か「`-` がちょうど 1 個」のときだけ受ける。`=` で終わる式 (`10-3-2=`) は今までどおり。`=` の判定は `Calculator` の中 (呼び側 `CompositionController` の `TrimEnd('=')` は候補の表示用だけなので変更なし)。
+- 同 `Evaluate`: 丸めた結果が 0 なら `+0` に正規化 (`0*-1`・`-0` → `0`)。
+
+得と損:
+- 得: 日付・電話番号は設定 ON でも従来どおり Space で確定する。`10-3`・`10-3=`・`-3`・`2*3-1`・`1+2-3-4` は今までどおり計算する。
+- 損: `-` が 2 個以上で `+ * /` も `=` も無い式 (`10-3-2`、`1--1`) の候補が出なくなる。`=` を付ければ (`10-3-2=`) 出る。単項の `-` も数えるので `-10-3`・`(10-3)-2` も同じ (査読 F8-1。二項の `-` だけ数える改善案はあるが、日付と区別する目的には今の形で足りるので入れていない)。
+
+残る限界・未確認:
+- 実機未確認 (Core のテストで固定)。
+- 全角の `＝` は前から受けていない (`１＋２＝` は候補なし)。今回も変えていない。
+- 日付でも `+ * /` を含む列は対象外のまま (例: `2026/10/27` は `/` を含むので従来どおり式として読み、`7.5037037037` が候補に出る。設定 OFF では無関係。テストでは未固定)。
+
+テスト (4 件追加、1149/1149):
+- `CalculatorTests.Evaluate_HyphenOnly_RejectsDateAndPhoneLikeSequences` (`2026-10-27`・`03-1234-5678`・`10-3-2`・`２０２６－１０－２７` → null)
+- `CalculatorTests.Evaluate_HyphenOnly_AcceptsSingleMinusOrEqualsSuffix` (`10-3`→7、`10-3=`→7、`10-3-2=`→5、`2*3-1`→5、`1+2-3-4`→-4、`-3`→-3)
+- `CalculatorTests.Evaluate_NegativeZero_IsShownAsZero` (`0*-1`・`-0` → `0`)
+- `CalculatorCandidatesTests.DateAndPhoneLikeHyphens_CommitWithoutConversion` (設定 ON: `2026-10-27`+Space は変換に入らず `2026-10-27 ` と確定、`10-3 `→候補 `7`、`10-3-2= `→候補 `5`)
+
+近傍の `--repro` (設定 OFF = 既定。変更前と同じ):
+
+| 入力 | Space | Enter |
+|---|---|---|
+| `2026-10-27` | `2026-10-27 ` 確定 | `2026-10-27` |
+| `03-1234-5678` | `03-1234-5678 ` 確定 | `03-1234-5678` |
+| `10-3` | `10-3 ` 確定 | `10-3` |
+| `10-3-2` | `10-3-2 ` 確定 | `10-3-2` |
+| `-3` | `-3 ` 確定 | `-3` |
+| `1+2*3` | 変換中 `1＋2＊3` | `1＋2＊3` |
+| `2*3-1` | 変換中 `2＊3-1` | `2＊3-1` |
+| `0*-1` | 変換中 `0＊ー1` | `0＊ー1` |
+| `10/4` | `10/4 ` 確定 | `10/4` |
+| `10-ji` | 変換中 `10-じ` | `10-じ` |
+| `- kyou wa` | `- 今日` 確定 + `わ` | `- 今日わ` |
+
+の節
+
+## Q25 の修正 (uninstall の退避と Backup.cs に dictionaries/ を含める、2026-10-27)
+
+- **目的**: 「設定・学習データも消す」(`--remove-data` / y 回答) で、利用者が手で書く自作のローマ字表 `dictionaries/romaji.tsv` と辞書の上書き `dictionaries/*.txt` が、デスクトップへ写されずに `rm -rf` で消えていた (コード総点検 L9-1、§8 の 3 = (a))。Core の `Backup.cs` (Mac 未配線) も `dictionaries/*.txt` だけを入れ、`.tsv` は `IsRestorableName` が拒むので `Restore` が黙って飛ばしていた。
+- **変更**:
+  - `mac/uninstall.sh` の退避ループ (`for sub in "terms" "terms/.trash" "dictionaries"`): `dictionaries/` も対象にし、`*.txt` と `*.tsv` を 1 件ずつ `cp -p` (失敗で `set -e` が止める形は不変)。問い・完了文・ヘッダーの説明に「自作のローマ字表・辞書」を追加。
+  - `src/Meltype.Core/Config/Backup.cs` `TargetFiles`: `dictionaries/romaji.tsv` (`RomajiTable.FileName`) が存在すれば明示的に列挙。`IsRestorableName`: 正規表現を `\.(txt|tsv)\z` に (`..`・`:`・予約名・ドット始まりの守りは不変)。
+- **得と損**: 得: 自作のローマ字表・辞書が消える前にデスクトップ / バックアップに残る。損: `dictionaries/` の下のサブフォルダーは写さない (今は使っていない)。`cp` が失敗すると `set -e` で止まり、空の退避フォルダーが残る (元からの挙動。査読 F9-1/2)。
+- **残る限界・未確認**: `uninstall.sh` の通し実行は実機でのみ確認可能 (構文 `bash -n` と、退避ブロックを一時フォルダーに向けた実行で確認済み)。`Backup.cs` は Mac 未配線 (L5-8 と同じ) で、Windows の画面での動作は未確認 (Core のテストで確認)。
+- **テスト**: `BackupTests.Backup_IncludesCustomRomajiTable_AndUserDictionaries` (1 本追加。`romaji.tsv` が Create に入り Restore で戻る、既存の `dictionaries/*.txt` も引き続き入る、`.md` など他の拡張子は入らない)。1146/1146 passed、`--eval` は変更前と同一。
+- **近傍の --repro** (打鍵経路は触っていない。変化なし):
+
+| 入力 | 最後 | committed |
+|---|---|---|
+| konnnichiha | enter | こんにちは |
+| ka | enter | か |
+| kya | enter | きゃ |
+| tsu | enter | つ |
+| xtu | enter | っ |
+| nn | enter | ん |
+| kanji henkan | enter | かんじへんかん |
+| hello | enter | hello |
+| this is a pen | enter | this is a pen |
+| ka, | enter | か、 |
+| meeting | space | `meeting ` |
+
+## Q26 の修正 (Shift+←→ で伸縮した文節の候補が 3〜4 件に固定される、2026-10-27)
+
+- **目的**: リョウさんの報告「文章の途中の変換で、候補の語が一部著しく少なくなる」の原因 1 (調査 I1、再現済み)。変換中に Shift+← / Shift+→ で文節の区切りを動かすと、その文節の候補が 3〜4 件 (単独変換 + ひらがな + カタカナ + 半角) に固定され、Space・↓・数字・PageDown のどれでもエンジンの候補一覧 (`MoreCandidates`) が出ず、Esc まで戻らなかった。文の途中の文節は azooKey の区切りで助詞を伴う (`きょう|のかいぎ`) ことが多く、利用者が区切りを直す操作でこそ起きていた。
+- **原因**: `Resize` → `Reconvert` が候補を作り直すとき、選択中の文節に残っていた `Expanded` (候補一覧を引き終えた印) を戻していなかった。`Expand` は `!clause.Expanded` のときしか呼ばれない。
+- **変更** (`src/Meltype.Core/Composition/CompositionController.cs` `Reconvert`): `clause.Expanded = false` を 1 行。`Reconvert` の呼び元は `Resize` の 3 か所だけで、`:735` の「候補を開くだけ」の経路 (`Expanded = true` で作る) は通らない。
+- **得と損**: 得: 伸縮した文節でも同音異義語の一覧が出る (本物のエンジンの計測: `かいぎ` 4 → 24 件)。損: 伸縮のたびにエンジンへ一覧を 1 回引き直す (伸縮した文節の分だけ。候補を動かすたびには引かない)。
+- **残る限界・未確認**: 実機未確認 (Core のハーネスと `--bench` の計測で確認)。
+- **テスト** (`src/Meltype.Core.Tests/ResizeCandidatesTests.cs`、5 件): 縮める / 伸ばす (修正前は 3 件で赤) / 伸縮で生まれた隣の文節 / 引く回数が伸縮 1 回につき変わった文節の分だけで候補を動かしても増えない / 伸縮しない文節の候補数は不変。全体 1150/1150、`--eval` は基準と同じ。
+
+## Q27 の修正 (助詞で終わる文節の候補一覧に語幹の同音異義語を足す、2026-10-27)
+
+- **目的**: 同じ報告の原因 2 (調査 I1、再現済み)。文の途中の文節は読みに助詞が付く (`かいぎで`・`しりょうを`) ので、その読みで候補一覧を引くと azooKey の辞書語の一覧 (同音異義語) が落ち、全文候補 + 先頭文節候補 + かなの 11〜12 件で頭打ちになっていた (単独の読みは 17〜30 件)。Shift+←→ で区切りを動かしていなくても起きる (「両方」の報告と一致)。
+- **変更** (`mac/Sources/MeltypeIME/Converter.swift` `candidates(for:)`): 読みの末尾が助詞 1 文字 (を・で・に・の・は・が・と・も・へ) で、先頭候補の表記も同じかなで終わり、読みが 3 文字以上のときは、語幹 (末尾を除いた読み) でも `results(for:)` を引き、「語幹の候補 + 助詞」を重複なしで後ろに足す。上限 30 は今までどおり。Core・FFI は変えていない (Mac だけで試せる形を先に取った)。
+- **得と損**: 得: 助詞つきの文節で同音異義語が出る (`--bench` の計測、学習データは空: `かいぎで` 12 → 22 (`回議で`・`會議で`・`開議で` が入る)、`こうえんを` 11 → 30、`きかいは` 12 → 27)。損: 文節を選んだときにエンジンをもう 1 回呼ぶ (キャッシュ `resultCache` に乗る)。足した候補 (`開議で`) を選んで確定しても、azooKey 側の学習は「その読みで azooKey が出した候補」に限られるので掛からない (Core の学習 `ConversionHistory` には入るので、次からは 1 番目に出る)。
+- **残る限界・未確認**: 判定は品詞を見ない (末尾のかな + 先頭候補の末尾 + 3 文字以上) ので、て形 (`しんで`・`およいで`) や副詞 (`すでに`・`さらに`)・接続詞 (`なので`) にも発火し、一覧の後ろに `新で`・`既で` のような無関係な候補が並ぶことがある (先頭側の並びは変わらない。査読 F10-1。絞るなら「語幹の先頭候補が先頭候補の語幹と一致するときだけ」の案があり、実機の件数を見てから)。足した候補を選んで確定しても azooKey 側の学習には入らず (Core の学習には入る)、語幹の候補が `recentCandidates` (上限 10) を 1 件使う (査読 F10-2)。実機未確認。助詞が**前**に付く区切り (`のかいぎ`・`をみた`・`がくる`) には効かない (azooKey の `data` 要素が `の会議` の形で来るため。L7-17 の助詞結合の隣接。別件)。語幹が 2 文字以上の読みだけ (`はし` + `を` = 3 文字は対象)。
+- **テスト**: Swift に自動テストは無い。`--bench` に一時的に足した計測で前後を比較 (コミットには入れていない)。ビルド・codesign・`check-mac-aot-settings.py`・辞書アプリの `--self-test` は統合後に確認。
