@@ -55,6 +55,9 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     /// このタブを入れているウインドウ (タブを切り替えると view.window が nil になるので、シート・取り消しはこちらを使う)。
     weak var hostWindow: NSWindow?
     private var window: NSWindow? { view.window ?? hostWindow }
+    /// 辞書の変更を積む undoManager (MainWindowController がユーザー辞書のタブと共有のものを渡す)。
+    /// window.undoManager は選んでいるタブで変わるので経由しない。
+    var dictionaryUndoManager: UndoManager?
 
     init(dictionary: NativeDictionary) {
         self.dictionary = dictionary
@@ -569,9 +572,9 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         return nil
     }
 
-    /// 元に戻す操作を積む (UserDictionaryViewController.registerUndo と同じ: タブが隠れていても同じ undoManager に積む)。
+    /// 元に戻す操作を積む (UserDictionaryViewController.registerUndo と同じ: タブが隠れていても dictionaryUndoManager に積む)。
     private func registerUndo(_ change: DictionaryChange, name: String, on manager: UndoManager? = nil) {
-        guard let undoManager = manager ?? window?.undoManager else { return }
+        guard let undoManager = manager ?? dictionaryUndoManager else { return }
         // undoManager は弱く持つ (積んだ操作が undoManager を持ち、undoManager が操作を持つ循環を作らない)
         undoManager.registerUndo(withTarget: self) { [weak undoManager] target in
             let undoing = undoManager?.isUndoing ?? true

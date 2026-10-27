@@ -5,8 +5,10 @@ import AppKit
 import MeltypeDictionaryKit
 
 /// メインのウインドウ: 「ユーザー辞書」「専門用語集」「学習した語」「設定」「判定を調べる」のタブ。メニューの独自の項目 (登録・取り込み・書き出し・検索・タブの切り替え) を受ける
-/// (ウインドウの delegate はアクションの responder chain に入る)。取り消す (⌘Z) は、ユーザー辞書・専門用語集・設定のタブで 1 つの NSUndoManager を共有する。
-/// 「学習した語」のタブには取り消しが無いので、そのタブを選んでいる間は別の空の NSUndoManager を返す (⌘Z でほかのタブの変更を取り消さないように)。
+/// (ウインドウの delegate はアクションの responder chain に入る)。取り消す (⌘Z) は、ユーザー辞書・専門用語集のタブで 1 つの NSUndoManager を共有する
+/// (専門用語集の「直す」はユーザー辞書も変えるので、2 つのタブの変更は 1 本の履歴で戻す)。
+/// 「学習した語」「設定」「判定を調べる」のタブは辞書の取り消しを積まないので、そのタブを選んでいる間はタブごとに別の空の NSUndoManager を返す
+/// (⌘Z で隠れたタブの変更を取り消さないように)。
 final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     private let dictionary: NativeDictionary
     private let tabs = NSTabViewController()
@@ -15,9 +17,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private let learnedController: LearnedWordsViewController
     private let settingsController: SettingsViewController
     private let judgeController: JudgeViewController
-    /// ウインドウの取り消し (windowWillReturnUndoManager で返す)。学習した語のタブは learnedUndoManager。
+    /// ユーザー辞書・専門用語集の取り消し (windowWillReturnUndoManager で返すほか、2 つのタブの registerUndo はウインドウを経由せず直接これに積む)。
     private let sharedUndoManager = UndoManager()
+    /// 学習した語・設定・判定を調べるのタブを選んでいる間に返す (辞書の操作は積まれない)。
     private let learnedUndoManager = UndoManager()
+    private let settingsUndoManager = UndoManager()
+    private let judgeUndoManager = UndoManager()
 
     init(dictionary: NativeDictionary) {
         self.dictionary = dictionary
@@ -57,12 +62,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         window.contentViewController = tabs
         window.setContentSize(NSSize(width: 900, height: 620))
         window.delegate = self
-        // 隠れているタブの view は window が nil になるので、シート・取り消しのためにウインドウを渡しておく
+        // 隠れているタブの view は window が nil になるので、シートのためにウインドウを渡しておく
         userController.hostWindow = window
         termController.hostWindow = window
         learnedController.hostWindow = window
         settingsController.hostWindow = window
         judgeController.hostWindow = window
+        // 辞書の取り消しは共有の undoManager に直接積む (window.undoManager は選んでいるタブで変わるので経由しない)
+        userController.dictionaryUndoManager = sharedUndoManager
+        termController.dictionaryUndoManager = sharedUndoManager
         // 片方のタブの変更 (専門用語の「直す」でユーザー辞書が変わるなど) を、もう片方にもすぐ反映する
         userController.didChange = { [weak self] in self?.termController.pollChanges() }
         termController.didChange = { [weak self] in self?.userController.pollChanges() }
@@ -70,11 +78,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    /// NSWindow の undo:/redo: と、ほかのタブの registerUndo (window.undoManager) はここで決まる。
-    /// 取り消しを積む操作はどれも、そのタブを選んでいるときのユーザーの操作なので、学習した語のタブを選んでいる間に共有の方へ積まれることはない
-    /// (取り消しの中で積むやり直しは、引数で渡した同じ undoManager に積む)。
+    /// NSWindow の undo:/redo: (⌘Z / ⇧⌘Z) と、テキスト欄の文字の取り消しが使う undoManager はここで決まる。
+    /// ユーザー辞書・専門用語集のタブを選んでいる間だけ共有の undoManager を返す。ほかのタブでは、そのタブ専用の空の undoManager を返すので、
+    /// ⌘Z で隠れたタブの辞書の変更が取り消されることはない (辞書の変更を積む側は window.undoManager を経由せず sharedUndoManager に直接積む)。
     func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
-        tabs.selectedTabViewItemIndex == Tab.learned.rawValue ? learnedUndoManager : sharedUndoManager
+        switch Tab(rawValue: tabs.selectedTabViewItemIndex) {
+        case .learned: return learnedUndoManager
+        case .settings: return settingsUndoManager
+        case .judge: return judgeUndoManager
+        case .user, .term, nil: return sharedUndoManager
+        }
     }
 
     /// ほかのプロセス (IME) の変更を拾う。
