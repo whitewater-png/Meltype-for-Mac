@@ -55,6 +55,24 @@ internal static class SettingsLoadTests
     }
 
     [Test]
+    public static void WrongTypeItem_LoadForUpdateStillReads()
+    {
+        // Q20 (査読 F4-1): 書き換えのための読み込み (辞書アプリの設定タブ・ConfigFlag など) も、1 項目の型違いでは null にしない
+        var path = TempConfig(out var cleanup);
+        try
+        {
+            File.WriteAllText(path, "{ \"SettingsVersion\": 5, \"LiveConversion\": false, \"PredictionMinLength\": \"2\" }");
+            var loaded = Settings.LoadForUpdate(path);
+            Assert.True(loaded is not null, "型違い 1 項目では書き換え用の読み込みも通る");
+            Assert.True(!loaded!.LiveConversion, "型の合う項目は保たれる");
+            Assert.Equal(new Settings().PredictionMinLength, loaded.PredictionMinLength, "型の違う項目だけ既定");
+            File.WriteAllText(path, "{ not json");
+            Assert.True(Settings.LoadForUpdate(path) is null, "JSON 全体が読めないときは今までどおり null");
+        }
+        finally { cleanup(); }
+    }
+
+    [Test]
     public static void UnknownKey_IgnoredOthersKept()
     {
         var path = TempConfig(out var cleanup);

@@ -736,8 +736,9 @@ public sealed class Settings
         {
             if (!File.Exists(path)) return new Settings();
             if (SafeFile.ReadAllText(path) is not { } json) return null;
-            var settings = JsonSerializer.Deserialize(json, SettingsJsonContext.Default.Settings);
-            if (settings is null) return null;
+            // Load と同じく、1 項目の型違いはその項目だけ既定にして読む (書き換えられないままにしない。Q20 の査読 F4-1)。
+            // JSON 全体が読めないときは今までどおり null (既定値で上書きして元の設定を失わない)。
+            var settings = Parse(json);
             if (!json.Contains(nameof(SettingsVersion))) settings.SettingsVersion = 1;
             settings.Migrate();
             return settings.Normalize();
