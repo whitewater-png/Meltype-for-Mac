@@ -237,6 +237,8 @@ public sealed class ConversionHistory
         {
             // 同じ読みで同じ語を選び続けているときだけ回数を足す (別の語に変えたら数え直し)。
             var same = _entries.TryGetValue(reading, out var previous) && previous.Text == text;
+            // 予測の確定は、変換で学習済みの別の語を上書きしない (変換の学習を予測で消さない。Q17 の査読 F1-1)。
+            if (fromPrediction && previous is { Prediction: false } && !same) return;
             var count = same ? Math.Max(1, previous!.Count) + 1 : 1;
             _entries[reading] = new Entry { Text = text, Used = Clock(), Count = count, Prediction = fromPrediction && (!same || previous!.Prediction) };
             if (_entries.Count > MaxEntries)

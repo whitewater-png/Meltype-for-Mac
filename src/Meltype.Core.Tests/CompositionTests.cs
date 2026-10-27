@@ -2933,6 +2933,23 @@ internal static class CompositionTests
 
     /// <summary>Q17: 印は conversions.json に保存され (欄は省略可)、印の無い古いファイルは今までどおり変換の学習として読む。</summary>
     [Test]
+    public static void ConversionHistory_PredictionDoesNotOverwriteConversionLearning()
+    {
+        // Q17 (査読 F1-1): 変換で学習済みの読みに別の語を予測で確定しても、変換の学習は消えない
+        var directory = Path.Combine(Path.GetTempPath(), $"meltype-q17b-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var history = new ConversionHistory(Path.Combine(directory, "conversions.json"));
+        history.Remember("おせわ", "お世話");
+        history.Remember("おせわ", "お世話になります", fromPrediction: true);
+        Assert.Equal("お世話", history.Get("おせわ"), "予測の確定で変換の学習を上書きしない");
+        Assert.True(history.StartingWith("おせ").Any(p => p.Text == "お世話"), "予測の並びからも消えない");
+        // 変換で学習していない読みなら、予測からの印つきで覚える (今までどおり)
+        history.Remember("きごう", "記号等", fromPrediction: true);
+        Assert.True(history.Get("きごう") is null && history.StartingWith("きご").Any(p => p.Text == "記号等"), "印つきで覚える");
+        Directory.Delete(directory, true);
+    }
+
+    [Test]
     public static void ConversionHistory_PredictionFlagRoundTrips()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"meltype-q17-{Guid.NewGuid():N}");
