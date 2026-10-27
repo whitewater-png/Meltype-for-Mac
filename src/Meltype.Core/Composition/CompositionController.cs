@@ -4195,12 +4195,12 @@ public sealed class CompositionController
         }
     }
 
-    /// <summary>予測候補を確定する。読み → 語を履歴に覚えて、次から予測の上位に出す。</summary>
+    /// <summary>予測候補を確定する。読み → 語を履歴に「予測から」の印つきで覚えて、次から予測の上位に出す (変換の最初の候補にはしない。Q17)。</summary>
     private void CommitPrediction(string text)
     {
         var reading = _text.AllKana(final: false);
         CommitText(text, english: false, _text.Raw, hasJapanese: true);
-        _options.History?.Remember(reading, text);
+        _options.History?.Remember(reading, text, fromPrediction: true);
     }
 
     private static bool IsShift(int vk) => vk is VirtualKeys.Shift or VirtualKeys.LShift or VirtualKeys.RShift;

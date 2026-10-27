@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Yukishiro
 
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Meltype.Composition;
 
@@ -100,6 +101,14 @@ public sealed class ConversionHistory
 
         /// <summary>確定した回数。古い conversions.json には無い (読み込むと 0) ので、0 は 1 回として扱う。</summary>
         public int Count { get; set; }
+
+        /// <summary>
+        /// 予測候補の確定から覚えた項目か (Q17)。予測の並び (StartingWith・Usage) には使うが、変換の最初の候補 (Get) にはしない
+        /// (予測で「おせわ → お世話になります」を確定しただけで、おせわ の変換の 1 番目が乗っ取られないように)。
+        /// 変換で同じ読みの語を選び直せば (fromPrediction なしの Remember) 外れる。false は書かない (古いファイルは欄が無く、false として読む)。
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool Prediction { get; set; }
     }
 
     // パスごとの共有インスタンス。セッションごとに別インスタンスだと、後からの保存が他のセッションの更新
@@ -197,9 +206,10 @@ public sealed class ConversionHistory
         get { lock (_gate) return _entries.Count; }
     }
 
+    /// <summary>変換の最初の候補にする学習済みの語。予測の確定から覚えただけの項目 (Entry.Prediction) は返さない (Q17)。</summary>
     public string? Get(string reading)
     {
-        lock (_gate) return _entries.TryGetValue(reading, out var entry) ? entry.Text : null;
+        lock (_gate) return _entries.TryGetValue(reading, out var entry) && !entry.Prediction ? entry.Text : null;
     }
 
     /// <summary>学習した変換の中から、text を選んだときの読み (一番新しいもの)。確定後の再変換で読みに戻すのに使う。無ければ null。</summary>
@@ -218,14 +228,17 @@ public sealed class ConversionHistory
         }
     }
 
-    public void Remember(string reading, string text)
+    /// <param name="fromPrediction">予測候補の確定から覚えるとき true。予測の並びには使うが、変換の最初の候補 (Get) にはしない (Q17)。
+    /// 変換で学習済みの同じ語なら印を付けない (学習を消さない)。</param>
+    public void Remember(string reading, string text, bool fromPrediction = false)
     {
         if (reading.Length == 0 || text.Length == 0) return;
         lock (_gate)
         {
             // 同じ読みで同じ語を選び続けているときだけ回数を足す (別の語に変えたら数え直し)。
-            var count = _entries.TryGetValue(reading, out var previous) && previous.Text == text ? Math.Max(1, previous.Count) + 1 : 1;
-            _entries[reading] = new Entry { Text = text, Used = Clock(), Count = count };
+            var same = _entries.TryGetValue(reading, out var previous) && previous.Text == text;
+            var count = same ? Math.Max(1, previous!.Count) + 1 : 1;
+            _entries[reading] = new Entry { Text = text, Used = Clock(), Count = count, Prediction = fromPrediction && (!same || previous!.Prediction) };
             if (_entries.Count > MaxEntries)
             {
                 foreach (var old in _entries.OrderBy(e => e.Value.Used).Take(_entries.Count - MaxEntries * 9 / 10).Select(e => e.Key).ToList())

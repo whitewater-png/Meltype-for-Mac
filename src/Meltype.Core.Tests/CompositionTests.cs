@@ -2859,7 +2859,14 @@ internal static class CompositionTests
         k.Type("osewa");
         k.Press(VirtualKeys.Tab);
         k.Press(VirtualKeys.Return);
-        Assert.Equal("お世話になります", history.Get("おせわ"), "確定した予測は履歴に覚える (使うほど出やすくなる)");
+        Assert.True(history.StartingWith("おせわ").Any(e => e.Text == "お世話になります"), "確定した予測は履歴に覚える (使うほど予測の上位に出る)");
+        // Q17: 予測で確定した語は「読み → 語」の変換の学習ではない。おせわ を Space で変換しても お世話になります を 1 番目にしない。
+        Assert.True(history.Get("おせわ") is null, "予測から覚えた語は変換の最初の候補 (Get) にしない: " + history.Get("おせわ"));
+
+        k = new Keyboard(history: history, predictions: OsewaPredictions);
+        k.Type("osewa");
+        k.Press(VirtualKeys.Space);
+        Assert.True(k.Host.View!.Candidates[0] != "お世話になります", "予測を確定した後も Space の 1 番目は乗っ取られない: " + string.Join(",", k.Host.View.Candidates));
 
         k = new Keyboard(predictions: OsewaPredictions);
         k.Type("osewa");
@@ -2867,6 +2874,84 @@ internal static class CompositionTests
         k.Press(VirtualKeys.Space);
         Assert.True(k.Host.View!.Converting, "予測に入っていても Space は変換");
         Assert.Equal("", k.Host.Document, "予測は確定しない");
+    }
+
+    /// <summary>Q17: 予測の確定は予測の並びには効くが、変換の学習 (最初の候補) には入らない。変換で選び直せば今までどおり学習する。</summary>
+    [Test]
+    public static void Prediction_CommitDoesNotHijackConversion()
+    {
+        var history = new ConversionHistory(null);
+        var k = new Keyboard(history: history, predictions: OsewaPredictions);
+        k.Type("osewa");
+        k.Press(VirtualKeys.Tab);
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("お世話になります", k.Host.Document);
+        Assert.True(history.Get("おせわ") is null, "予測で確定しただけの語は変換の学習 (Get) に入らない: " + history.Get("おせわ"));
+
+        // 予測の並び: 予測を確定した語は、エンジンの予測が無くても履歴から次の予測に出る (今までどおり)。
+        k = new Keyboard(history: history, predictions: r => []);
+        k.Type("ose");
+        Assert.True(k.Host.View!.Predictions!.Contains("お世話になります"), "予測で確定した語は次の予測に出る: " + string.Join(",", k.Host.View.Predictions));
+        Assert.True(history.Usage().ContainsKey("お世話になります"), "使用頻度 (Usage) にも入る");
+
+        // 変換で同じ読みの語を選んだら (通常の Remember)、印は外れて Get が返す。
+        history.Remember("おせわ", "お世話");
+        Assert.Equal("お世話", history.Get("おせわ"), "変換で選んだ語は今までどおり最初の候補にする");
+        // 変換で学習済みの語を、あとから予測で確定しても、学習は消えない。
+        history.Remember("おせわ", "お世話", fromPrediction: true);
+        Assert.Equal("お世話", history.Get("おせわ"), "予測での確定は、変換で学習した同じ語を消さない");
+    }
+
+    /// <summary>Q17: 文節にも波及しない。予測で長い語を確定したあと、同じ読み + 続きを変換しても長い語が最初の候補にならない (ライブ変換も)。</summary>
+    [Test]
+    public static void Prediction_CommitDoesNotHijackClauseConversion()
+    {
+        var history = new ConversionHistory(null);
+        Func<string, IReadOnlyList<string>> predictions = r => r.StartsWith("たんい", StringComparison.Ordinal) ? ["単位を取得する"] : [];
+        var k = new Keyboard(history: history, predictions: predictions);
+        k.Type("tanniwo");
+        k.Press(VirtualKeys.Tab);
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("単位を取得する", k.Host.Document);
+
+        k = new Keyboard(history: history, predictions: predictions);
+        k.Type("tanniwotoru ");
+        Assert.Equal("単位を|取る", string.Join("|", k.Host.View!.Clauses!), "文節 たんいを の 1 番目が予測で確定した長い語にならない");
+        // 区切りを変えて変換し直す (Reconvert) 経路も同じ Get を通る。
+        k.Key(VirtualKeys.LShift);
+        k.Press(VirtualKeys.Left);
+        k.Press(VirtualKeys.Right);
+        k.Key(VirtualKeys.LShift, up: true);
+        Assert.Equal("たんいを|とる", string.Join("|", k.Host.View.Clauses!), "Shift+← → で変換し直しても予測で確定した語を 1 番目にしない");
+        k.Type("\n");
+        Assert.Equal("たんいをとる", k.Host.Document);
+
+        k = new Keyboard(live: true, history: history, predictions: predictions);
+        k.Type("tanniwotoru");
+        Assert.Equal("単位を取る", k.Showing, "ライブ変換でも同じ");
+    }
+
+    /// <summary>Q17: 印は conversions.json に保存され (欄は省略可)、印の無い古いファイルは今までどおり変換の学習として読む。</summary>
+    [Test]
+    public static void ConversionHistory_PredictionFlagRoundTrips()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"meltype-q17-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "conversions.json");
+        var history = new ConversionHistory(path);
+        history.Remember("おせわ", "お世話になります", fromPrediction: true);
+        history.Remember("きごう", "記号");
+        var json = File.ReadAllText(path);
+        Assert.True(json.Contains("\"Prediction\":true") && !json.Contains("\"Prediction\":false"), "予測からの印だけ書く (変換で学習した項目の形式は今までどおり): " + json);
+
+        var loaded = new ConversionHistory(path);
+        Assert.True(loaded.Get("おせわ") is null, "読み直しても予測からの印が残る");
+        Assert.Equal("記号", loaded.Get("きごう"));
+        Assert.True(loaded.StartingWith("おせ").Any(e => e.Text == "お世話になります"), "予測の並びには読み直しても出る");
+
+        File.WriteAllText(path, "{\"はしを\":{\"Text\":\"箸を\",\"Used\":\"2026-01-01T00:00:00Z\",\"Count\":2}}");
+        Assert.Equal("箸を", new ConversionHistory(path).Get("はしを"), "印の欄が無い既存のファイルは変換の学習として読む");
+        Directory.Delete(directory, recursive: true);
     }
 
     [Test]
