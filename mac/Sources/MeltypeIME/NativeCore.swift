@@ -236,11 +236,12 @@ final class NativeCore {
     private let setTermDomainFunction: SetTermDomainFunction?
     private let updateEvaluateFunction: UpdateEvaluateFunction?
 
-    /// 読み込めなかったことを、IME が動いているあいだ 1 回だけ利用者に知らせる。
+    /// 本体を使えないこと (読み込めない・版の情報が無い・版が合わない) を、IME が動いているあいだ 1 回だけ利用者に知らせる。
+    /// reason は理由の 1 文 (「〜ませんでした。」の形)。後ろに「日本語入力は無効のまま…入れ直してください。」を足して出す。
     /// IME は背面専用 (LSBackgroundOnly) で自前のダイアログを出せないので、UpdateManager と同じく osascript に任せる。
     /// init の中で同期的に UI を出さず、メインスレッドで後回しにする (初期化の順序を崩さない)。
     private static var didNotifyLoadFailure = false
-    private static func notifyLoadFailureOnce() {
+    private static func notifyLoadFailureOnce(_ reason: String) {
         DispatchQueue.main.async {
             guard !didNotifyLoadFailure else { return }
             didNotifyLoadFailure = true
@@ -248,7 +249,7 @@ final class NativeCore {
                 "-e", "on run argv",
                 "-e", "display dialog (item 1 of argv) with title \"Meltype\" buttons {\"OK\"} default button \"OK\" giving up after 120",
                 "-e", "end run",
-                "--", "Meltype の判定エンジン (libMeltypeNative.dylib) を読み込めませんでした。日本語入力は無効のまま、キーはそのままアプリに渡します。Meltype を入れ直してください。",
+                "--", reason + "日本語入力は無効のまま、キーはそのままアプリに渡します。Meltype を入れ直してください。",
             ]) { _, _ in }
         }
     }
@@ -265,7 +266,7 @@ final class NativeCore {
             } else {
                 NSLog("Meltype: libMeltypeNative.dylib の場所 (Frameworks) が分かりません")
             }
-            Self.notifyLoadFailureOnce()
+            Self.notifyLoadFailureOnce("Meltype の判定エンジン (libMeltypeNative.dylib) を読み込めませんでした。")
         }
         func symbol<T>(_ name: String, as type: T.Type) -> T? {
             guard let handle, let pointer = dlsym(handle, name) else { return nil }
@@ -312,13 +313,18 @@ final class NativeCore {
 
     func initialize() {
         // 版数が合わないときはクラッシュさせず、ログを残して初期化しない (createSession も nil を返し、キーはアプリに素通しになる)。
+        // 利用者にも 1 回だけ知らせる (dlopen の失敗と同じ経路。読み込めていないときは init で知らせているので、ここでは重ねない)。
         guard let abiVersionFunction else {
             NSLog("Meltype: libMeltypeNative.dylib に meltype_abi_version がありません (古い版か、読み込めていません)。初期化を中止します。")
+            if library != nil {
+                Self.notifyLoadFailureOnce("Meltype の判定エンジン (libMeltypeNative.dylib) に版の情報がありません (古い版です)。")
+            }
             return
         }
         let actual = abiVersionFunction()
         guard actual == Self.expectedAbiVersion else {
             NSLog("Meltype: libMeltypeNative.dylib の版数が合いません (期待 %d / 実際 %d)。初期化を中止します。", Self.expectedAbiVersion, actual)
+            Self.notifyLoadFailureOnce("Meltype の判定エンジン (libMeltypeNative.dylib) の版が合いません (期待 \(Self.expectedAbiVersion) / 実際 \(actual))。")
             return
         }
         isCompatible = true
