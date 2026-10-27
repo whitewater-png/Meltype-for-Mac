@@ -55,6 +55,39 @@ internal static class BackupTests
         }
     }
 
+    /// <summary>自作のローマ字表 dictionaries/romaji.tsv (Q25) も、利用者の辞書 dictionaries/*.txt と一緒にバックアップに入り、戻る。</summary>
+    [Test]
+    public static void Backup_IncludesCustomRomajiTable_AndUserDictionaries()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "meltype-backup-test-" + Guid.NewGuid().ToString("N"));
+        var source = Path.Combine(root, "source");
+        var target = Path.Combine(root, "target");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(source, "dictionaries"));
+            File.WriteAllText(Path.Combine(source, "dictionaries", "candidates.txt"), "てすと テスト\n");
+            File.WriteAllText(Path.Combine(source, "dictionaries", Meltype.Detection.RomajiTable.FileName), "ka\tか\n");
+            File.WriteAllText(Path.Combine(source, "dictionaries", "notes.md"), "対象外");
+
+            var (content, files) = Backup.Create(source, "0.2.0");
+            Assert.Equal(2, files, "辞書とローマ字表 (他の拡張子は入れない)");
+            var (_, _, names) = Backup.Inspect(content);
+            Assert.True(names.Contains("dictionaries/candidates.txt"), "ユーザーの辞書は引き続き入る");
+            Assert.True(names.Contains("dictionaries/romaji.tsv"), "自作のローマ字表も入る");
+            Assert.True(Backup.IsRestorableName("dictionaries/romaji.tsv"), "戻してよい名前");
+            Assert.True(!Backup.IsRestorableName("dictionaries/notes.md") && !Backup.IsRestorableName("dictionaries/x.tsv.exe"), "txt と tsv 以外は戻さない");
+
+            Directory.CreateDirectory(target);
+            Assert.Equal(2, Backup.Restore(content, target));
+            Assert.Equal("ka\tか\n", File.ReadAllText(Path.Combine(target, "dictionaries", "romaji.tsv")));
+            Assert.Equal("てすと テスト\n", File.ReadAllText(Path.Combine(target, "dictionaries", "candidates.txt")));
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
     private static bool Throws(Action action)
     {
         try { action(); return false; } catch { return true; }

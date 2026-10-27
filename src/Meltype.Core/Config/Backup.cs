@@ -16,11 +16,11 @@ public static class Backup
     private const string Format = "meltype-backup";
     private const int FormatVersion = 1;
 
-    /// <summary>バックアップに入れるファイル (データフォルダーからの相対パス)。dictionaries/ はユーザーが足した辞書。</summary>
+    /// <summary>バックアップに入れるファイル (データフォルダーからの相対パス)。dictionaries/ はユーザーが足した辞書と、自作のローマ字表 (romaji.tsv)。</summary>
     private static readonly string[] RootFiles = ["config.json", "model.json", "conversions.json", "translations.json", "languages.json", "userdict.txt", "terms-excluded.txt"];
 
     /// <summary>
-    /// 戻してよい名前か (バックアップに入れるファイルと同じ名前だけ: 決まった名前か、dictionaries/ の直下の .txt)。
+    /// 戻してよい名前か (バックアップに入れるファイルと同じ名前だけ: 決まった名前か、dictionaries/ の直下の .txt と .tsv (自作のローマ字表))。
     /// 人から受け取ったバックアップでも、データフォルダーの外や、決まったもの以外のファイルには書かない
     /// (../・C:foo のようなドライブ・a:b のような代替データストリーム・予約名を含む名前は使えない)。
     /// </summary>
@@ -31,7 +31,7 @@ public static class Backup
         if (name.StartsWith("terms/", StringComparison.Ordinal)) return System.Text.RegularExpressions.Regex.IsMatch(name["terms/".Length..], @"^terms-user-[0-9a-f]{8}\.txt\z");
         if (!name.StartsWith("dictionaries/", StringComparison.Ordinal)) return false;
         var file = name["dictionaries/".Length..];
-        return System.Text.RegularExpressions.Regex.IsMatch(file, @"^[^\\/:*?""<>|\x00-\x1f]{1,100}\.txt\z") && !file.StartsWith('.') &&
+        return System.Text.RegularExpressions.Regex.IsMatch(file, @"^[^\\/:*?""<>|\x00-\x1f]{1,100}\.(txt|tsv)\z") && !file.StartsWith('.') &&
                !System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileNameWithoutExtension(file), @"^(con|prn|aux|nul|com\d|lpt\d)(\..*)?\z", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
@@ -50,6 +50,8 @@ public static class Backup
         if (Directory.Exists(dictionaries))
         {
             foreach (var file in Directory.GetFiles(dictionaries, "*.txt")) yield return "dictionaries/" + Path.GetFileName(file);
+            // 自作のローマ字表 (設定「カスタムローマ字表を使う」。利用者が手で書くので、辞書と同じく消える前に残す)
+            if (File.Exists(Path.Combine(dictionaries, Detection.RomajiTable.FileName))) yield return "dictionaries/" + Detection.RomajiTable.FileName;
         }
     }
 
