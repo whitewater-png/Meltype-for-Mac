@@ -476,8 +476,25 @@ public sealed class LanguageMemory
         if (!word.All(char.IsAsciiLetterLower)) return "英字 (a〜z) だけで入力してください。";
         if (word.Length < 2) return "2 文字以上にしてください。";
         if (word.Length > Detection.WordList.MaxWordLength) return $"{Detection.WordList.MaxWordLength} 文字までにしてください。";
-        if (word != except && _entries.ContainsKey(word)) return $"「{word}」はもう一覧にあります。";
+        // 文脈ごとに分けて覚えた語 (word@e / word@j) も同じ語 (画面の一覧は印を外して出す)。
+        if (word != except && KeysOf(word).Any(_entries.ContainsKey)) return $"「{word}」はもう一覧にあります。";
         return null;
+    }
+
+    /// <summary>語のキーになりうる 3 つ: 印なし・英語の文脈 (@e)・日本語の文脈 (@j)。画面は印を知らないので、画面からの消す・直す・重複の判定はこの 3 つを見る。</summary>
+    private static string[] KeysOf(string word) => [word, word + "@e", word + "@j"];
+
+    /// <summary>
+    /// 画面が渡した語 (印なし) に当たるキーを探す。印なしの項目があればそれ。無ければ @e / @j のうちある方 (両方あれば理由を返す: どちらを直すか画面では選べない)。
+    /// どれも無ければ null (理由も null)。
+    /// </summary>
+    private (string? Key, string? Reason) FindKey(string word)
+    {
+        if (_entries.ContainsKey(word)) return (word, null);
+        var english = _entries.ContainsKey(word + "@e");
+        var japanese = _entries.ContainsKey(word + "@j");
+        if (english && japanese) return (null, $"「{Excerpt(word)}」は前の文脈ごとに 2 つ覚えています。消してから覚え直してください。");
+        return (english ? word + "@e" : japanese ? word + "@j" : null, null);
     }
 
     /// <summary>
@@ -493,12 +510,21 @@ public sealed class LanguageMemory
         {
             if (CheckCore(word, old) is { } reason) return (reason, false);
             Entry? previous = null;
-            if (old is not null && !_entries.TryGetValue(old, out previous)) return ($"「{Excerpt(old)}」は一覧にありません (ほかの画面で消されたかもしれません)。", false);
-            if (old is not null && old != word) _entries.Remove(old);
+            var suffix = "";
+            if (old is not null)
+            {
+                // 画面は印 (@e / @j) を知らずに語だけを渡すので、印つきのキーも探す。見つかった印は書き戻すときに引き継ぐ (綴りを直しても文脈は変えない)。
+                var (oldKey, twoContexts) = FindKey(old);
+                if (twoContexts is not null) return (twoContexts, false);
+                if (oldKey is null) return ($"「{Excerpt(old)}」は一覧にありません (ほかの画面で消されたかもしれません)。", false);
+                previous = _entries[oldKey];
+                suffix = oldKey[old.Length..];
+                _entries.Remove(oldKey);
+            }
             // 同じ語を直すときは、最後に使った日と回数を残す (英字 / かなを変えたら、回数は新しい向きで 2 から数え直す)。
             // 綴りを変えたら別の語なので、今足した語として扱う。
             var same = previous is not null && old == word;
-            _entries[word] = new Entry
+            _entries[word + suffix] = new Entry
             {
                 English = english,
                 Used = same ? previous!.Used : DateTime.UtcNow,
@@ -514,11 +540,12 @@ public sealed class LanguageMemory
 
     /// <summary>
     /// 学習した語を忘れる (「学習した語」の一覧から消したとき)。一覧に無い語は飛ばす。だめなら理由、できたら null。
+    /// 画面は語だけを渡す (印を知らない) ので、文脈ごとに分けて覚えた語 (word@e / word@j) もいっしょに消す。
     /// ほかのプロセスがロックを持ったままなら、保存せずに理由を返す。
     /// </summary>
     public string? Remove(IEnumerable<string> words)
     {
-        var keys = words.Select(Normalize).ToList();
+        var keys = words.Select(Normalize).SelectMany(KeysOf).ToList();
         return Edit(fromApp: true, () =>
         {
             var removed = false;

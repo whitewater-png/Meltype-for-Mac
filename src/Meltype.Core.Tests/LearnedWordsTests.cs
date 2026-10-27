@@ -129,6 +129,154 @@ internal static class LearnedWordsTests
     }
 
     /// <summary>
+    /// 設定「英語 / 日本語の学習を前の文脈ごとに分ける」で覚えた語 (キーは api@e / api@j) を、画面から消す・直す・重複と見る (Q21)。
+    /// 画面は印を知らない (一覧は語だけを出し、消す・直すも語だけを渡す) ので、Core 側が印つきのキーも見る。
+    /// </summary>
+    [Test]
+    public static void ContextSensitive_RemoveForgetsSuffixedKeys()
+    {
+        var memory = new LanguageMemory(null) { ContextSensitive = true, Context = true };
+        memory.Remember("api", english: true, explicitChoice: true);
+        memory.Context = false;
+        memory.Remember("sushi", english: false, explicitChoice: true);
+        Assert.True(Find(memory, "api") is { Context: true } && Find(memory, "sushi") is { Context: false }, "api@e と sushi@j で覚えている");
+        var version = memory.Version;
+        Assert.Equal(null, memory.Remove(["API"]), "画面は語だけを渡す (大文字でも)");
+        Assert.True(Find(memory, "api") is null, "api@e が一覧から消える");
+        memory.Context = true;
+        Assert.True(memory.Get("api") is null, "英語の文脈でも効かない");
+        Assert.True(memory.Version > version && memory.Count == 1 && Find(memory, "sushi") is not null, "版が上がり、sushi@j は残る");
+
+        // 印なし・@e・@j がそろっていても、1 回で全部消える。
+        memory.ContextSensitive = false;
+        memory.Remember("go", english: true, explicitChoice: true);
+        memory.ContextSensitive = true;
+        memory.Context = true;
+        memory.Remember("go", english: true, explicitChoice: true);
+        memory.Context = false;
+        memory.Remember("go", english: false, explicitChoice: true);
+        Assert.Equal(3, memory.Entries().Count(e => e.Word == "go"), "go・go@e・go@j");
+        Assert.Equal(null, memory.Remove(["go"]), "消す");
+        Assert.True(memory.Entries().All(e => e.Word != "go") && memory.Count == 1, "3 つとも消え、sushi@j は残る");
+    }
+
+    [Test]
+    public static void ContextSensitive_CheckSeesSuffixedKeys()
+    {
+        var memory = new LanguageMemory(null) { ContextSensitive = true, Context = false };
+        memory.Remember("sushi", english: false, explicitChoice: true);
+        Assert.True(memory.Check("sushi") is not null && memory.Check("SUSHI") is not null, "sushi@j があるので重複");
+        Assert.Equal(null, memory.Check("sushi", except: "sushi"), "編集中の元の語 (印つき) とは重複にしない");
+        Assert.True(memory.Check("sushi", except: "api") is not null, "ほかの語の編集なら重複");
+        Assert.True(memory.Set("sushi", english: true) is not null, "画面から足すのも重複");
+        Assert.Equal(1, memory.Count, "足していない");
+    }
+
+    [Test]
+    public static void ContextSensitive_SetEditsTheOnlySuffixedKey()
+    {
+        var memory = new LanguageMemory(null) { ContextSensitive = true, Context = false };
+        memory.Remember("sushi", english: false, explicitChoice: true);
+        memory.Remember("sushi", english: false, explicitChoice: true);
+        var before = Find(memory, "sushi")!;
+
+        // 英字 / かなを変える: sushi@j のまま (印は変えない) 英語にする。
+        Assert.Equal(null, memory.Set("sushi", english: true, oldWord: "sushi"), "画面は語だけを渡す");
+        var flipped = Find(memory, "sushi")!;
+        Assert.True(flipped is { English: true, Context: false, Active: true, Count: 2 } && flipped.Used == before.Used, "sushi@j のまま英語・回数 2・最後に使った日は同じ");
+        Assert.Equal(1, memory.Count, "増えない");
+        Assert.Equal(true, memory.Get("sushi") ?? false, "日本語の文脈 (@j) で英語");
+        memory.Context = true;
+        Assert.True(memory.Get("sushi") is null, "英語の文脈 (@e) では覚えていないまま");
+
+        // 綴りを直す: 印を引き継ぐ。
+        Assert.Equal(null, memory.Set("Sashimi", english: true, oldWord: "sushi"), "綴りを直す");
+        Assert.True(Find(memory, "sushi") is null && Find(memory, "sashimi") is { English: true, Context: false, Active: true }, "sashimi@j になる");
+        Assert.Equal(1, memory.Count, "元の語は消える");
+
+        // 印なしの語と @e の語が両方あるときは、印なしを直す (これまでどおり) ので、@e は残る。
+        memory.ContextSensitive = false;
+        memory.Remember("api", english: true, explicitChoice: true);
+        memory.ContextSensitive = true;
+        memory.Context = true;
+        memory.Remember("api", english: true, explicitChoice: true);
+        Assert.Equal(null, memory.Set("api", english: false, oldWord: "api"), "印なしがあれば直せる");
+        Assert.True(memory.Entries().Any(e => e is { Word: "api", Context: null, English: false }) && memory.Entries().Any(e => e is { Word: "api", Context: true, English: true }), "印なしだけ直り、api@e はそのまま");
+    }
+
+    [Test]
+    public static void ContextSensitive_SetRefusesWhenBothContextsExist()
+    {
+        var memory = new LanguageMemory(null) { ContextSensitive = true, Context = true };
+        memory.Remember("api", english: true, explicitChoice: true);
+        memory.Context = false;
+        memory.Remember("api", english: false, explicitChoice: true);
+        Assert.Equal(2, memory.Count, "api@e と api@j");
+        var version = memory.Version;
+        var reason = memory.Set("api", english: true, oldWord: "api");
+        Assert.True(reason is not null && reason.Contains("2 つ", StringComparison.Ordinal), $"両方あれば理由を返して断る: {reason}");
+        Assert.True(memory.Set("apis", english: true, oldWord: "api") is not null, "綴りの変更も断る");
+        Assert.Equal(version, memory.Version, "何も変えない (版は同じ)");
+        Assert.True(memory.Entries().Any(e => e is { Word: "api", Context: true, English: true }) && memory.Entries().Any(e => e is { Word: "api", Context: false, English: false }), "両方そのまま");
+        Assert.True(Find(memory, "apis") is null, "足さない");
+        Assert.Equal(null, memory.Remove(["api"]), "消すのは両方いっぺんに");
+        Assert.Equal(0, memory.Count, "空");
+    }
+
+    [Test]
+    public static void ContextSensitive_PlainWordsBehaveAsBefore()
+    {
+        // 印なしの語 (設定 OFF で覚えた語) は、設定 ON の画面からもこれまでどおり消せる・直せる。
+        var memory = new LanguageMemory(null) { ContextSensitive = true, Context = true };
+        memory.ContextSensitive = false;
+        memory.Remember("api", english: true, explicitChoice: true);
+        memory.Remember("sushi", english: false, explicitChoice: true);
+        memory.ContextSensitive = true;
+        Assert.True(memory.Check("api") is not null && memory.Check("api", except: "api") is null, "重複の判定はこれまでどおり");
+        Assert.Equal(null, memory.Set("api", english: false, oldWord: "api"), "直す");
+        Assert.True(Find(memory, "api") is { Context: null, English: false } && memory.Count == 2, "印なしのまま");
+        Assert.Equal(null, memory.Set("github", english: true, oldWord: "api"), "綴りを直す");
+        Assert.True(Find(memory, "api") is null && Find(memory, "github") is { Context: null, English: true }, "印なしのまま別の語に");
+        Assert.True(memory.Set("abc", english: true, oldWord: "nosuchword") is not null && Find(memory, "abc") is null, "無い語は直せない");
+        Assert.Equal(null, memory.Remove(["sushi", "nosuchword"]), "消す");
+        Assert.True(memory.Count == 1 && Find(memory, "github") is not null, "消した語だけ消える");
+        var version = memory.Version;
+        Assert.Equal(null, memory.Remove(["nosuchword"]), "無い語だけなら何もしない");
+        Assert.Equal(version, memory.Version, "版は同じ");
+    }
+
+    /// <summary>辞書アプリの経路: 一覧 (FormatLearned) の行をそのまま消す・直すに渡す。IME (文脈ごとに分ける) が覚えた語を、画面 (印を知らない別のインスタンス) から消す・直す。</summary>
+    [Test]
+    public static void ContextSensitive_DictionaryApp_RemovesAndEditsByListedWord()
+    {
+        var path = TempFile(out var cleanup);
+        try
+        {
+            LanguageMemory.FileCheckIntervalMs = 0;
+            var ime = new LanguageMemory(path) { ContextSensitive = true, Context = true };
+            ime.Remember("api", english: true, explicitChoice: true);
+            ime.Context = false;
+            ime.Remember("sushi", english: false, explicitChoice: true);
+
+            var app = new LanguageMemory(path);
+            var lines = DictionaryManagement.FormatLearned(app.Entries());
+            Assert.True(lines.Split('\n').Select(l => l.Split('\t')[0]).Order().SequenceEqual(["api", "sushi"]), $"一覧は語だけ (印なし): {lines}");
+            var apiLine = lines.Split('\n').Single(l => l.StartsWith("api\t", StringComparison.Ordinal));
+            var sushiLine = lines.Split('\n').Single(l => l.StartsWith("sushi\t", StringComparison.Ordinal));
+            Assert.Equal(null, app.Remove(DictionaryManagement.ParseLearnedWords(apiLine)), "一覧の行をそのまま渡して消す");
+            Assert.True(app.Entries().All(e => e.Word != "api"), "画面の一覧から消える");
+            ime.Context = true;
+            Assert.True(ime.Get("api") is null, "IME でも効かなくなる");
+
+            Assert.Equal(null, app.Set("sushi", english: true, oldWord: DictionaryManagement.ParseLearnedWords(sushiLine)[0]), "一覧の語で直す");
+            ime.Context = false;
+            Assert.Equal(true, ime.Get("sushi") ?? false, "IME も直った方 (日本語の文脈)");
+            Assert.True(new LanguageMemory(path).Entries().Single() is { Word: "sushi", Context: false, English: true }, "ファイルでも sushi@j のまま英語");
+        }
+        finally { cleanup(); }
+    }
+
+    /// <summary>
     /// IME (入力中にメモリに持ち続ける) と画面 (別のプロセス) が同じ languages.json を持つ。
     /// 画面で消した語を、IME が使い続けたり、IME の次の保存で書き戻したりしない。画面で足した語は IME でも効く。
     /// </summary>
