@@ -63,7 +63,7 @@ final class WordEditor: NSObject, NSTextFieldDelegate {
         hiraganaButton = UI.button("ひらがなにする", target: self, action: #selector(convertReading(_:)))
         hiraganaButton.controlSize = .small
         hiraganaButton.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        hiraganaButton.toolTip = "ローマ字・カタカナで打った読みを、ひらがなにします"
+        hiraganaButton.toolTip = "ローマ字・カタカナ・漢字で打った読みを、ひらがなにします (漢字の読みは macOS の日本語解析。違っていたら直してください)"
 
         let grid = NSGridView(views: [
             [UI.label("読み"), readingField, hiraganaButton],
@@ -111,6 +111,10 @@ final class WordEditor: NSObject, NSTextFieldDelegate {
             content.widthAnchor.constraint(greaterThanOrEqualToConstant: 460),
         ])
         sheet.contentView = content
+        // Tab で 読み → 単語 → 読み と回る (自動の順ではボタンを挟んで止まることがあった)。ボタンはフルキーボードアクセスのときだけ入る
+        sheet.autorecalculatesKeyViewLoop = false
+        readingField.nextKeyView = wordField
+        wordField.nextKeyView = readingField
         sheet.initialFirstResponder = configuration.key.reading.isEmpty || !configuration.key.word.isEmpty ? readingField : wordField
         refresh()
     }
@@ -150,7 +154,7 @@ final class WordEditor: NSObject, NSTextFieldDelegate {
         let key = currentKey
         // 「ひらがなにする」は、欄に入っている文字そのもの (カタカナのままでも) を見て出す
         let typed = readingField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let converted = typed.isEmpty ? typed : toReading(typed)
+        let converted = typed.isEmpty ? typed : reading(of: typed)
         hiraganaButton.isEnabled = !typed.isEmpty && converted != typed
         hiraganaButton.setAccessibilityHelp(hiraganaButton.isEnabled ? "読みを「\(converted)」にします" : nil)
         let empty = key.reading.isEmpty && key.word.isEmpty
@@ -167,8 +171,13 @@ final class WordEditor: NSObject, NSTextFieldDelegate {
     }
 
     @objc private func convertReading(_ sender: Any?) {
-        readingField.stringValue = toReading(readingField.stringValue)
+        readingField.stringValue = reading(of: readingField.stringValue)
         refresh()
+    }
+
+    /// 欄の文字をひらがなの読みにする: 漢字は macOS の日本語解析で読みに (SystemReading)、ローマ字・カタカナは本体の規則で (toReading)。
+    private func reading(of text: String) -> String {
+        toReading(SystemReading.readKanji(text))
     }
 
     @objc private func confirm(_ sender: Any?) {

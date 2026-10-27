@@ -134,6 +134,9 @@ final class MeltypeInputController: IMKInputController {
         Int((NSEvent.EventTypeMask.keyDown.union(.leftMouseDown).union(.rightMouseDown).union(.otherMouseDown)).rawValue)
     }
 
+    /// 辞書の管理画面のバンドル ID (Resources/Dictionary/Info.plist)。Tab の扱いを変えるのはこのアプリだけ。
+    private static let dictionaryAppBundleID = "io.github.yksr-melt.Meltype.Dictionary"
+
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event else { return false }
         // クリックでキャレットが別の場所へ移ったかもしれない。確定し直しの記録を捨てるだけ (変換中の文字の確定・取消はしない)。
@@ -195,6 +198,13 @@ final class MeltypeInputController: IMKInputController {
         if flags.contains(.control) { modifiers |= 2 }
         if flags.contains(.option) { modifiers |= 4 }
         if flags.contains(.command) { modifiers |= 8 }
+
+        // 辞書の管理画面 (Meltype 辞書) の登録シートでは、入力中の Tab は「次の欄へ」の意味なので、未確定の文字をそのまま確定してからアプリに渡す
+        // (ふつうのアプリでは Tab は予測候補・格子に使うので変えない)。
+        if Int(event.keyCode) == kVK_Tab, hasMarkedText, modifiers & ~1 == 0, client.bundleIdentifier() == Self.dictionaryAppBundleID {
+            apply(NativeCore.shared.commit(session), to: client)
+            return false
+        }
 
         // 確定済みの文字列を選択して Shift + Space: 読みに戻して再変換する (選択範囲を変換中の文字に置き換える)。読みに戻せなければ通常の処理へ。
         // 選択が長いとき (段落など) は読みに戻せないので、中身を読まずに通常の処理へ (本体の MaxReconvertLength と同じ 200 文字)。
