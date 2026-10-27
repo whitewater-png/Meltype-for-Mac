@@ -756,7 +756,7 @@ public sealed class Settings
             if (!File.Exists(path)) return new Settings();
             // 大きすぎる設定ファイルは読まず既定値で動く (元のファイルは触らない)。
             if (SafeFile.ReadAllText(path) is not { } json) return new Settings();
-            var settings = JsonSerializer.Deserialize(json, SettingsJsonContext.Default.Settings) ?? new Settings();
+            var settings = Parse(json);
             if (!json.Contains(nameof(SettingsVersion))) settings.SettingsVersion = 1;
             if (settings.Migrate())
             {
@@ -793,6 +793,47 @@ public sealed class Settings
 
     /// <summary>config.json と同じ形式の文字列 (変更があったかを比べるのに使う)。</summary>
     public string ToJson() => JsonSerializer.Serialize(this, SettingsJsonContext.Default.Settings);
+
+    /// <summary>
+    /// config.json の文字列から設定を読む (<see cref="Load"/> 用)。まず全体を一度に読み、読めなければ項目ごとに読み直して、
+    /// 型の違う項目 (文字列の整数 "2"・無い列挙名 "Z" など) はその項目だけ既定値に戻す (ほかの項目は保つ。警告をログに残す)。
+    /// JSON 全体が読めない (構文の誤り・空のファイル) ときは例外 (呼び出し側が .broken に退避して既定値にする)。
+    /// <see cref="ImportProfile"/> と同じく、既定の設定の JsonObject に知っている項目だけを重ねる (ソース生成の SettingsJsonContext だけを使う。NativeAOT 用)。
+    /// </summary>
+    private static Settings Parse(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize(json, SettingsJsonContext.Default.Settings) ?? new Settings();
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or NotSupportedException)
+        {
+            // 1 項目の型違いか、JSON 全体が壊れているかは、下で項目ごとに読んで分ける
+        }
+        // 構文が壊れていれば、ここで JsonException
+        if (JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) is not JsonObject raw)
+        {
+            throw new JsonException("config.json の中身がオブジェクト ({ ... }) ではありません");
+        }
+        var merged = JsonSerializer.SerializeToNode(new Settings(), SettingsJsonContext.Default.Settings)!.AsObject();
+        foreach (var (key, value) in raw)
+        {
+            // 知らない項目は無視 (全体を一度に読むときと同じ)
+            if (!merged.ContainsKey(key)) continue;
+            var previous = merged[key]?.DeepClone();
+            merged[key] = value?.DeepClone();
+            try
+            {
+                merged.Deserialize(SettingsJsonContext.Default.Settings);
+            }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or NotSupportedException)
+            {
+                merged[key] = previous;
+                Diagnostics.Log.Warn($"config.json の {key} を読めないので、この項目だけ既定値にします: {ex.Message}");
+            }
+        }
+        return merged.Deserialize(SettingsJsonContext.Default.Settings) ?? new Settings();
+    }
 
     public void Save(string path)
     {
