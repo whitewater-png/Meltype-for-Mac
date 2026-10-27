@@ -81,6 +81,7 @@ internal static class DeleteClauseOnBackspaceTests
     [
         ("github", "えgithub知らん", true),          // 英語だけ
         ("wogithub", "えをgithub知らん", true),      // 日本語 + 英語 (Q18 の再現手順)
+        ("my", "えmy知らん", true),                  // 英語の短い語 (IsEnglishAtWordEnd の経路。査読 F2-1)
         ("./build.sh", "え。/build.sh知らん", true), // パス。日本語 (え) の直後なので保護区間にはならず . は 。 だが、英語で終わる確定の経路
         ("src/main.rs", "えsrc/main.rs知らん", true), // 保護区間 (/ を含む英字の並び)
         ("-", "えー知らん", false),                  // 箇条書きの - は日本語の直後では ー (Space は変換)

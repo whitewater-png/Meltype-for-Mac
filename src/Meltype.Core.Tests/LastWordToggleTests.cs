@@ -290,6 +290,24 @@ internal static class LastWordToggleTests
     }
 
     [Test]
+    public static void F6_ThenContinueTyping_BackspacingTheNewReadingAway_DoesNotPutTheOriginalBack()
+    {
+        // Q19 (査読 F3-1): F6 の箱で変換 → 続けて入力 (ContinueAfterConversion ON) → 新しい読みを消し切っても、
+        // 前の文節が固定されている間は元の語を書き戻さない (書き戻すと二重になる)
+        var e = new Editor(continueAfterConversion: true);
+        e.Type("hello api\n");
+        e.F6();
+        e.Key(VirtualKeys.Space);
+        Assert.True(e.Last is { View: { Converting: true } }, "前提: 箱の中で変換中");
+        e.Type("neko");
+        for (var i = 0; i < 4; i++) e.Key(VirtualKeys.Back);
+        Assert.Equal("hello ", e.Doc, "固定した文節が残っている間は書き戻さない");
+        Assert.True(e.Session.IsComposing, "前の文節の選択に戻るだけ");
+        e.Type("\n");
+        Assert.True(!e.Doc.Contains("api"), "確定しても元の語は二重にならない: " + e.Doc);
+    }
+
+    [Test]
     public static void F6_BackspacingTheReadingAway_PutsTheOriginalBack_WithoutLearning()
     {
         // Q19: F6 の変換ボックスで BackSpace (変換取消) → BackSpace で読みを消し切ったら、Esc と同じく消した語を書き戻す (消えたままにしない)
