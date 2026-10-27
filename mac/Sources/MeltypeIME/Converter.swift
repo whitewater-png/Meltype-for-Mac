@@ -366,6 +366,8 @@ final class MeltypeConverter {
     }
 
     /// 読みに対する候補の一覧 (重複なし、30 個まで)。
+    /// 読みの末尾が助詞 1 文字 (かいぎで・しりょうを) のときは、azooKey の辞書語の一覧 (同音異義語) が
+    /// 語 + 助詞の形では出ないので、語幹でも引いて「語幹の候補 + 助詞」を後ろに足す (Q27)。
     func candidates(for reading: String) -> [String] {
         var seen = Set<String>()
         var list: [String] = []
@@ -373,6 +375,19 @@ final class MeltypeConverter {
             list.append(candidate.text)
             if list.count >= 30 { break }
         }
+        if list.count < 30, let particle = reading.last, MeltypeConverter.trailingParticles.contains(particle),
+           let first = list.first, first.last == particle, reading.count >= 3 {
+            let stem = String(reading.dropLast())
+            for candidate in results(for: stem) {
+                let text = candidate.text + String(particle)
+                guard seen.insert(text).inserted else { continue }
+                list.append(text)
+                if list.count >= 30 { break }
+            }
+        }
         return list
     }
+
+    /// 文節の末尾に付くことの多い助詞 (1 文字)。語幹の候補を足す判定にだけ使う。
+    private static let trailingParticles: Set<Character> = ["を", "で", "に", "の", "は", "が", "と", "も", "へ"]
 }
