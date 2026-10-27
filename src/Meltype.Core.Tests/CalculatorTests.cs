@@ -31,4 +31,23 @@ internal static class CalculatorTests
         Assert.True(Calculator.Evaluate("1000000000000000+0") is null, "1e15 以上は出さない");
         Assert.Equal("100000000000000", Calculator.Evaluate("100000000000000+0"), "1e14 は出せる");
     }
+
+    [Test]
+    public static void Evaluate_HyphenOnly_RejectsDateAndPhoneLikeSequences()
+    {
+        // Q24: - だけが演算子の列は、日付・電話番号のことが多い。= で終わらなければ - は 1 個までしか式と見なさない。
+        foreach (var text in new[] { "2026-10-27", "03-1234-5678", "10-3-2", "２０２６－１０－２７" })
+            Assert.True(Calculator.Evaluate(text) is null, text + " は式ではない: " + Calculator.Evaluate(text));
+    }
+
+    [Test]
+    public static void Evaluate_HyphenOnly_AcceptsSingleMinusOrEqualsSuffix()
+    {
+        Assert.Equal("7", Calculator.Evaluate("10-3"), "- が 1 個なら式");
+        Assert.Equal("7", Calculator.Evaluate("10-3="), "= つき");
+        Assert.Equal("5", Calculator.Evaluate("10-3-2="), "= で終われば - が 2 個でも式");
+        Assert.Equal("5", Calculator.Evaluate("2*3-1"), "* を含めば - が何個でも式");
+        Assert.Equal("-4", Calculator.Evaluate("1+2-3-4"), "+ を含めば - が何個でも式");
+        Assert.Equal("-3", Calculator.Evaluate("-3"), "単独の -3 は今までどおり (- が 1 個)");
+    }
 }

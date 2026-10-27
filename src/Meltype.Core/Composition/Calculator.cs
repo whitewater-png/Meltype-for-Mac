@@ -12,17 +12,22 @@ public static class Calculator
 {
     private const int MaxLength = 80;
 
-    /// <summary>式 (末尾の = は除く) を計算した結果の文字列。演算子を 1 つも含まなければ null。</summary>
+    /// <summary>式 (末尾の = は除く) を計算した結果の文字列。演算子を 1 つも含まなければ null。
+    /// = で終わらない式は、- 以外の二項演算子 (+ * /) を含むか - が 1 個のときだけ受ける (日付・電話番号を式にしない。Q24)。</summary>
     public static string? Evaluate(string expression)
     {
+        var trimmed = expression.Trim();
+        var endsWithEquals = trimmed.EndsWith('=');
         // 本家は半角の数字だけ。Mac では全角の数字 (１＋２) も受ける (本家の式が null だった入力だけが対象なので、既存の結果は変わらない)。
-        var text = new string(expression.Trim().TrimEnd('=').Select(c => c switch
+        var text = new string(trimmed.TrimEnd('=').Select(c => c switch
         {
             '×' => '*', '÷' => '/', '＋' => '+', '－' => '-',
             >= '０' and <= '９' => (char)(c - '０' + '0'),
             _ => c,
         }).ToArray()).Replace(" ", "");
         if (text.Length is 0 or > MaxLength || !text.Any(c => c is '+' or '-' or '*' or '/') || !text.Any(char.IsAsciiDigit)) return null;
+        // - だけが演算子の列 (2026-10-27、03-1234-5678) は日付・電話番号のことが多いので、= で終わらなければ - が 2 個以上なら式としない。
+        if (!endsWithEquals && !text.Any(c => c is '+' or '*' or '/') && text.Count(c => c == '-') > 1) return null;
         if (!text.All(c => char.IsAsciiDigit(c) || c is '+' or '-' or '*' or '/' or '(' or ')' or '.')) return null;
         var position = 0;
         try
