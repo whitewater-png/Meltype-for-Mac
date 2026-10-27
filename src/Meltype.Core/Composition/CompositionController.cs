@@ -1228,6 +1228,9 @@ public sealed class CompositionController
                 if (_text.IsEmpty) _escReverted = false;
                 // 未変換の文節を消し切ったら、前の文節の選択に戻る。
                 if (_headCount > 0 && _text.IsEmpty) SelectLastFixedClause();
+                // 確定後の F6 で開いた変換ボックスの読みを消し切った: 入力欄から消した語が消えたままにならないよう、Esc と同じく書き戻す (Q19)。
+                // 選択の再変換 (F6 の箱ではない) は今までどおり、消し切ったら閉じるだけ (選択した文字は消える)。
+                else if (_text.IsEmpty && _toggleBox is not null) RestoreReconvertedOriginal();
                 return;
             case VirtualKeys.Escape when _headCount > 0:
                 // 固定した文節を、変換前の読みに戻す (その次の Esc は今までどおり入力を取り消す)。
@@ -1241,13 +1244,7 @@ public sealed class CompositionController
                 _escReverted = false;
                 ResetPrediction();
                 // 再変換した変換ボックスを Esc で取り消したら、置き換えた元の文字を書き戻す (消えないように)。学習・文脈の記録はしない。
-                if (_reconvertOriginal is { } original)
-                {
-                    _reconvertOriginal = null;
-                    _host.CommitText(original);
-                    // 確定後の F6 で開いた変換ボックスなら、直す前の記録も戻す (学習はまだしていない)
-                    if (_toggleBox is { } box) RestoreToggleBox(box);
-                }
+                RestoreReconvertedOriginal();
                 return;
             case VirtualKeys.Tab when FindMisspelling() is { } typo:
                 // もしかして: 書き間違いを直す。
@@ -3461,6 +3458,18 @@ public sealed class CompositionController
         _lastWord = new LastWord(restored, box.Raw, HasEnglish: true, HasJapanese: false, Environment.TickCount64, new SegmentRawSet(box.Previous.Raws.English, [], JapaneseWord: false));
         SetOwnContext((_precedingText ?? "") + restored, english: true);
         Committed?.Invoke(restored);
+    }
+
+    /// <summary>
+    /// 再変換した変換ボックスを取り消した (変換前の Esc、F6 の箱で読みを消し切った BackSpace): 置き換えた元の文字を書き戻す (消えないように)。
+    /// 確定後の F6 で開いた変換ボックスなら、直す前の記録も戻す (学習はまだしていない)。学習・文脈の記録はしない。
+    /// </summary>
+    private void RestoreReconvertedOriginal()
+    {
+        if (_reconvertOriginal is not { } original) return;
+        _reconvertOriginal = null;
+        _host.CommitText(original);
+        if (_toggleBox is { } box) RestoreToggleBox(box);
     }
 
     /// <summary>F6 で開いた変換ボックスを Esc で取り消した: 消した語を書き戻し、記録も元に戻す。</summary>
