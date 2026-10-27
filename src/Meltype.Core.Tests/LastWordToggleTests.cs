@@ -290,6 +290,59 @@ internal static class LastWordToggleTests
     }
 
     [Test]
+    public static void F6_BackspacingTheReadingAway_PutsTheOriginalBack_WithoutLearning()
+    {
+        // Q19: F6 の変換ボックスで BackSpace (変換取消) → BackSpace で読みを消し切ったら、Esc と同じく消した語を書き戻す (消えたままにしない)
+        var e = new Editor();
+        e.Type("hello api\n");
+        e.F6();
+        Assert.Equal("hello ", e.Doc, "前提: 入力欄の語は変換ボックスに移った");
+        e.Key(VirtualKeys.Back);
+        Assert.True(e.Session.IsComposing && e.Last is { View: { Converting: false } }, "1 回目の BackSpace は変換の取消 (読みに戻る)");
+        e.Key(VirtualKeys.Back);
+        Assert.True(e.Session.IsComposing, "読みが 1 文字残っている");
+        var result = e.Key(VirtualKeys.Back);
+        Assert.True(result.Consumed, "消し切った BackSpace はキーを使う (アプリに渡して hello の o を消さない)");
+        Assert.Equal("hello api", e.Doc, "読みを消し切ったら、消した語を書き戻す (Esc と同じ)");
+        Assert.True(!e.Session.IsComposing && result.View is null, "変換ボックスは閉じる");
+        Assert.True(e.Memory.Get("api") is null, "書き戻しでは学習しない");
+        Assert.True(e.F6().Consumed, "書き戻した語は、また直せる (Esc と同じ記録の戻し)");
+        e.Esc();
+        Assert.Equal("hello api", e.Doc);
+        // 続きの確定はふつうに通る (api の読みが次の確定に混ざらない)
+        e.Type("neko\n");
+        Assert.Equal("hello apiねこ", e.Doc, "次の確定は正常");
+        Assert.True(e.Memory.Get("api") is null && e.Memory.Get("neko") is null, "学習に api が漏れない");
+
+        // Space で確定した語 (末尾に半角スペース) も、空白ごと書き戻す
+        var spaced = new Editor();
+        spaced.Type("hello api ");
+        spaced.F6();
+        Assert.Equal("hello ", spaced.Doc, "前提");
+        spaced.Type("\b\b\b");
+        Assert.Equal("hello api ", spaced.Doc, "末尾の空白も F6 の前のまま");
+        Assert.True(!spaced.Session.IsComposing, "変換ボックスは閉じる");
+        spaced.Type("neko\n");
+        Assert.Equal("hello api ねこ", spaced.Doc, "次の確定は正常");
+    }
+
+    [Test]
+    public static void Reconvert_BackspacingTheReadingAway_StaysDeleted()
+    {
+        // ガード (Q19): 選択の再変換 (選択 + Shift+Space) は F6 の箱ではないので、読みを消し切ったら今までどおり書き戻さない (選択は消える)
+        var e = new Editor();
+        var result = e.Session.Reconvert("にほんご");
+        Assert.True(result.Consumed && result.View is { Converting: true }, "前提: 再変換が始まる");
+        e.Key(VirtualKeys.Back);
+        Assert.True(e.Session.IsComposing && e.Last is { View: { Converting: false } }, "1 回目の BackSpace は変換の取消");
+        SessionResult? last = null;
+        for (var i = 0; i < 4 && e.Session.IsComposing; i++) last = e.Key(VirtualKeys.Back);
+        Assert.True(!e.Session.IsComposing && last is { Consumed: true, View: null }, "読みを消し切ったら閉じる");
+        Assert.Equal("", e.Doc, "書き戻さない (今までどおり)");
+        Assert.Equal(0, last!.Commits.Count, "入力欄への書き込みは無い");
+    }
+
+    [Test]
     public static void Toggle_KeepsTheSpacesAroundTheWord()
     {
         // Space で確定した語 (末尾に半角スペース) は、直しても空白を残す
