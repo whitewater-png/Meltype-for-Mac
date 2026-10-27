@@ -60,6 +60,29 @@ internal static class CalculatorCandidatesTests
     }
 
     [Test]
+    public static void DateAndPhoneLikeHyphens_CommitWithoutConversion()
+    {
+        // Q24: 設定 ON でも、- だけの列 (日付・電話番号) は式ではないので、Space で変換に入らず確定して空白 (設定 OFF と同じ)。
+        foreach (var keys in new[] { "2026-10-27", "03-1234-5678" })
+        {
+            var k = new CompositionTests.Keyboard { CalculatorCandidates = true };
+            k.Type(keys + " ");
+            var candidates = k.Host.View?.Candidates.ToList() ?? [];
+            Assert.Equal(keys + " ", k.Host.Document, keys + ": 確定して空白。候補: " + string.Join("|", candidates));
+            Assert.True(!candidates.Any(c => c.Contains('=')), keys + ": 式=結果を出さない: " + string.Join("|", candidates));
+        }
+
+        // - が 1 個 (10-3) と = つき (10-3-2=) は今までどおり結果を出す。
+        foreach (var (keys, expected) in new[] { ("10-3 ", "7"), ("10-3-2= ", "5") })
+        {
+            var k = new CompositionTests.Keyboard { CalculatorCandidates = true };
+            k.Type(keys);
+            var list = k.Host.View?.Candidates.ToList() ?? [];
+            Assert.True(list.Contains(expected), keys + ": " + string.Join("|", list));
+        }
+    }
+
+    [Test]
     public static void KanaInput_DoesNotUseCalculator()
     {
         var k = new CompositionTests.Keyboard { CalculatorCandidates = true, Kana = true };
