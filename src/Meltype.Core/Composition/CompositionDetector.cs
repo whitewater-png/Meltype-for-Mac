@@ -1581,7 +1581,9 @@ public sealed class CompositionDetector
     /// </summary>
     private bool EndsWithParticleAfterUnknownWord(string lower)
     {
-        if (_english.Words.ContainsWord(lower) || _proper.Contains(lower) || Memory?.Get(lower) == true || IsSpellWord(lower)) return false;
+        // english-readable の語 (opencode・claudecode) は「知らない語 + 助詞 (de)」ではない (本家と同じ。U6)
+        if (_english.Words.ContainsWord(lower) || _proper.Contains(lower) || ReadableEnglish.Value.ContainsWord(lower) ||
+            Memory?.Get(lower) == true || IsSpellWord(lower)) return false;
         foreach (var particle in TrailingParticles)
         {
             if (!lower.EndsWith(particle, StringComparison.Ordinal)) continue;
