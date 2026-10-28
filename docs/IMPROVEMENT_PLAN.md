@@ -301,7 +301,7 @@ if (control && !alt && !command && !shift && _controller.IsComposing && CtrlShor
   2. オンライン新語辞書 (P4) の前方一致
   3. 変換エンジンの予測 (Mac: azooKey `predictionResults`。Win/Linux: P10 で Mozc。それまでは空)
   4. Core の変換履歴 (`conversions.json`) で読みが前方一致するもの
-- 操作: **Tab** で予測候補に入る (最初の候補が選ばれる)。↓↑ で移動、**Enter で確定**、Esc か文字キーで予測から抜けて入力に戻る。Space は今までどおり「変換」(予測は無視)。
+- 操作: **Tab** で予測候補に入る (最初の候補が選ばれる)。↓↑ で移動、**Enter で確定**、Esc か文字キーで予測から抜けて入力に戻る。Space は今までどおり「変換」(予測は無視)。[追記 2026-10-28: W16-2 で、予測を選んでいる間の文字キーは「選んだ語で確定してから打つ」に変えた (本家 issue #1187 #1214)]
 - **英語と判定した語には予測を出さない**。表示モードが Auto / Hiragana のときだけ。
 - 設定 `Prediction` (bool、既定 true)、`PredictionMinLength` (int、既定 2、`Normalize` で 1〜5)。
 - Windows の変換ボックス (`CompositionWindow`) で予測を描く部分は **この計画の範囲外** (Core は `View.Predictions` を返すだけにし、描画は作者側に任せる。描画しなくても壊れない)。
@@ -310,7 +310,7 @@ if (control && !alt && !command && !shift && _controller.IsComposing && CtrlShor
 
 1. Mac で `osewa` と打つと候補ウィンドウに予測が出る。Tab → Enter で「お世話になります」などが確定する。
 2. `google` と打っても予測は出ない (英語判定)。
-3. Tab で予測に入ったあと文字を打つと、予測から抜けて入力が続く。
+3. Tab で予測に入ったあと文字を打つと、予測から抜けて入力が続く。[追記 2026-10-28: W16-2 で「選んだ語で確定してから、その文字で入力が続く」に変えた]
 4. 予測を OFF にすると出ない。既存テストが通る (`SessionFacadeTests.Json_IsEscaped` は `ToJson` を完全一致で比べているので期待値を更新する)。
 
 ### 設計
@@ -3618,7 +3618,7 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 ## 本家追従 W16 (2026-10-28 の精査から小さな 9 件)
 
 - **目的**: 本家 main `a2d74f0` までの新着を精査し ([UPSTREAM_REVIEW_2026-10-28.md](UPSTREAM_REVIEW_2026-10-28.md))、リョウさんの指示「軽微なものは先に全部」で、手間の小さい 9 件を入れる。
-- **進め方**: 1 項目 1 ブランチ (起点 main `67e5341`)。実装はテスト先行 (Sonnet)、項目ごとに機械ゲート (全テスト・`--eval`・main の Core / 辞書に戻すと新テストが赤になるか)、統合の木で全テスト・`--eval`・コーパス比較・Mac ビルド・codesign・AOT 設定・辞書アプリの自己テスト。独立査読 3 レーン (Opus) の指摘は、項目のブランチに新しいコミットで直した。
+- **進め方**: 1 項目 1 ブランチ (起点 main `67e5341`)。実装はテスト先行、項目ごとに機械ゲート (全テスト・`--eval`・main の Core / 辞書に戻すと新テストが赤になるか)、統合の木で全テスト・`--eval`・コーパス比較・Mac ビルド・codesign・AOT 設定・辞書アプリの自己テスト。独立査読 (1 回目 3 レーン・2 回目 1 名) の指摘は、項目のブランチに新しいコミットで直した。
 - **項目とコミット**:
   - W16-1 (`a0d54a4`・`7229d04`): `dictionaries/propernouns.txt` から `Wakatte` を外す。`wakatte`・`sorewakatte` が英字のまま確定されていた (本家 issue #1231、本家は未修正)。既存テストの `Wakatte.TV` (ドメインの `.` の後ろの規則の例) は `Tetr.TV` に置き換えた。
   - W16-2 (`175e488`・`430fadd`): `CompositionController.HandlePredictionKey` の `default:`。予測候補を選んでいる (`_predictionIndex >= 0`) ときに文字として入るキー (`TypesCharacter`: かな入力のかなキー、または空白・制御文字でない文字) を打つと、`CommitPrediction` してから `StartWith`。今までは選んだ語を捨てて読みに戻った (設計どおりだったが、本家 issue #1187 #1214 と同じ不満があるので変える。リョウさんの選択)。BackSpace・Esc・Enter・Space・←→・修飾キーは今までどおり。既存テスト `Prediction_TypingLeaves` は旧仕様を固定していたので、期待と名前を変えた。docs/USAGE.md の Tab の行に 1 文。
@@ -3629,6 +3629,6 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
   - W16-7 (`7061829`・`4764b8b`): `english.txt` に bookoff・adb (本家 issue #1191・#1131 の adb 単体)、`misspellings.txt` に クダシア → クダサイ (issue #1190。自動では直さず「もしかして」に出る)。
   - W16-8 (`755fdee`・`fe28a44`): `UserDictionaryFile` の書き出しの日時、`Backup` の作成日時、`NumberCandidates` の数値・元号の年、`CompositionController` の元号の年、`DictionarySuggestions` の 1 日 1 回のヒントの日付を `CultureInfo.InvariantCulture` に (本家 #1157 の Core の部分。Mac の dylib は `InvariantGlobalization=false` なので、タイ語の地域設定では書き出しの年が仏暦になっていた)。
   - W16-9 (`e821ad6`・`ddbe42a`): `mac/install.sh` (登録できたときの案内) と `mac/README.md` で、入力ソースが出てこないときはシステム設定からの追加を先に、ログアウトを次に (本家 PR #1026 #1027 の文言)。登録できなかったときの案内 (直前に有効な入力ソースの一覧へ直接書き込む #21 の分岐。「+」の一覧に出ない Mac のためで、「+」を先に案内すると一覧への二重登録の条件もそろいうる。査読 R-C の必須) と、前の Meltype を消した直後の案内は元のまま。
-- **確認 (統合の木)**: 全テスト 1177 → 1213 (W16-1 +2、W16-2 +12、W16-3 +2、W16-4 +5、W16-6 +5、W16-7 +6、W16-8 +4)。`--eval` は起点と同じ (1293/1294、外れは `my name is taro` の 1 件)。コーパス比較 (同梱の英単語表。実機の NSSpellChecker は通していない): 日本語の読み 120,714 入力・英単語 6,000 語 × 3 形 = 18,000 入力・対象語の綴りを含む日本語 222 入力で変化 0、対象語 10 語 × 前 5 × 後ろ 12 = 600 入力で 528 変化 (対象語が英字になる・wakatte が日本語になる方向。残る崩れは K108 の (2))。Mac ビルド・`codesign --verify --deep --strict`・`tools/check-mac-aot-settings.py` (3 PASS)・辞書アプリの `--self-test` (213 件 PASS)。
+- **確認 (統合の木)**: 全テスト 1177 → 1213 (W16-1 +2、W16-2 +12、W16-3 +2、W16-4 +5、W16-6 +5、W16-7 +6、W16-8 +4)。`--eval` は起点と同じ (1293/1294、外れは `my name is taro` の 1 件)。コーパス比較 (同梱の英単語表。実機の NSSpellChecker は通していない): 日本語の読み 120,714 入力・英単語 6,000 語 × 3 形 = 18,000 入力・対象語の綴りを含む日本語 222 入力で変化 0、対象語 10 語 × 前 5 × 後ろ 12 = 600 入力で 528 変化 (対象語が英字になる・wakatte が日本語になる方向)。変化しなかった 72 入力のうち 30 件は崩れたまま (K108 の (2) の yo の形 20 件と、(4) の `koreadb` + 助詞 10 件。どちらも取り込みの前と同じ)、残る 42 件は取り込みの前から正しい。Mac ビルド・`codesign --verify --deep --strict`・`tools/check-mac-aot-settings.py` (3 PASS)・辞書アプリの `--self-test` (213 件 PASS)。
 - **得と損**: 得: 毎日打つ語 (分かって) と、AI・端末の道具の名前が崩れない。予測候補を選んで続けて打てる。損: `Wakatte.TV` は わかって。TV になる。予測を選んだあと打ち直したいときは Esc か BackSpace が要る (K108 と W16-2 の説明)。
 - **残る限界・未確認**: すべて実機未確認 (漢字変換の結果・候補窓・外部ディスプレイ)。W16-2 のテンキーは Core のテストの仮のキー表に無く未確認。W16-5 は Swift に自動テストが無い。子音で終わる語 + yo・yu の形と予測候補の窓は K108。
