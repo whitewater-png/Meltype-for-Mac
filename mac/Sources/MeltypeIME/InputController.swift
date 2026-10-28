@@ -732,7 +732,8 @@ final class MeltypeInputController: IMKInputController {
     }
 
     /// 「もしかして」の案内を、書き間違いがある間だけ入力位置の行の上に出す。変換中も出す (本体は変換中も案内を返し、
-    /// 変換中の Tab も書き間違いの修正が最優先。案内が無いと Tab が予告なしに読みを直す)。行の上なので、行の下の候補ウィンドウ・格子と重ならない。
+    /// 変換中の Tab も書き間違いの修正が最優先。案内が無いと Tab が予告なしに読みを直す)。行の上に出すので、ふつうは行の下の候補ウィンドウ・格子と重ならない
+    /// (画面の下端で候補ウィンドウ・格子が行の上に回るとき、画面の上端で案内が行の下に回るときは重なることがある。実機未確認)。
     private func updateMisspellingHint(_ view: CompositionView, client: IMKTextInput) {
         if let suggestion = view.suggestion, !suggestion.isEmpty {
             SuggestionHint.misspelling.show(suggestion, near: client, duration: nil, characterIndex: hasMarkedText ? 0 : nil)
