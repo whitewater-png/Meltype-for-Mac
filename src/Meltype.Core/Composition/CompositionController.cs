@@ -2628,7 +2628,7 @@ public sealed class CompositionController
     {
         if (EraReading.Match(reading) is not { Success: true } match) return null;
         var number = match.Groups["n"].Value;
-        var n = number == "がん" ? 1 : int.Parse(new string(number.Select(c => c is >= '０' and <= '９' ? (char)(c - '０' + '0') : c).ToArray()));
+        var n = number == "がん" ? 1 : int.Parse(new string(number.Select(c => c is >= '０' and <= '９' ? (char)(c - '０' + '0') : c).ToArray()), System.Globalization.CultureInfo.InvariantCulture);
         (int Start, int Last) range = match.Groups["e"].Value switch
         {
             "れいわ" => (2019, 2100),
@@ -2639,7 +2639,7 @@ public sealed class CompositionController
         };
         var year = range.Start + n - 1;
         if (n < 1 || year > range.Last) return null;
-        return [$"{year}年", year.ToString()];
+        return [$"{year}年", year.ToString(System.Globalization.CultureInfo.InvariantCulture)];
     }
 
     /// <summary>尺貫法の単位 (読み → 単位の字、メートル法での大きさ、メートル法の単位)。</summary>
