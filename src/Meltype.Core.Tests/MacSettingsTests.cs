@@ -114,6 +114,19 @@ internal static class MacSettingsTests
             previous = item.Group;
         }
 
+        var expected = string.Join(" / ", new[]
+        {
+            "変換の基本: LiveConversion Zenzai InputStyle CustomRomajiTable Prediction PredictionMinLength DownSelectsPrediction ContinueAfterConversion",
+            "英語と日本語の判定: DetectionLevel KanaInJapaneseMode KeepEnglishNameAfterEnglish DoubleSpaceToJapanese SpaceAroundEnglish ContextualLearning AutoCorrectAfterCommit CorrectTypos LaughterAfterKana",
+            "キー操作: TokMode TabConversion TabGridCandidates DeleteClauseOnBackspace ShiftEnterNewline EscStepsBack EnterCommitsAsShown AlphanumericKeyStartsAsTyped TypeDigitsAfterConversion ToggleLastWordCtrlKeys",
+            "記号・句読点: Punctuation FullWidthSymbols Parentheses Braces ZSymbolConversion SlashAsNakaguro",
+            "候補に出すもの: TranslationCandidates CalculatorCandidates ConsonantAbbreviations ClipboardCandidates ShowCandidateMeanings",
+            "辞書: DictionarySuggest DictionarySuggestThreshold",
+            "ログ: FileLog LogTypedText",
+        });
+        var actual = string.Join(" / ", MacSettingsCatalog.Items.GroupBy(i => i.Group).Select(g => g.Key + ": " + string.Join(" ", g.Select(i => i.Key))));
+        Assert.Equal(expected, actual, "項目の並びとグループ");
+
         var examples = 0;
         foreach (var item in MacSettingsCatalog.Items)
         {
@@ -127,8 +140,11 @@ internal static class MacSettingsTests
                 Assert.True(!example.StartsWith("例"), $"{item.Key} の例に「例」を付けない (画面が付ける)");
             }
             foreach (var text in new[] { item.DisplayDescription, summary, item.Example ?? "" })
-                foreach (var internalWord in new[] { "本家", "Mac 版", "Mac は", "Windows", "#9", "#1" })
+            {
+                foreach (var internalWord in new[] { "本家", "Mac 版", "Mac は", "Windows", "現在は" })
                     Assert.True(!text.Contains(internalWord), $"{item.Key} の画面の文に開発の事情「{internalWord}」がある: {text}");
+                Assert.True(!System.Text.RegularExpressions.Regex.IsMatch(text, @"#\d"), $"{item.Key} の画面の文に issue / PR の番号がある: {text}");
+            }
         }
         Assert.True(examples >= 15, $"例のある項目が少ない ({examples})");
 
@@ -138,7 +154,8 @@ internal static class MacSettingsTests
         Assert.True(live.GetProperty("summary").GetString()!.Length > 0, "JSON に要約がある");
         Assert.True(live.GetProperty("example").GetString()!.Contains('→'), "JSON に例がある");
         // 例の無い項目は、JSON に example を書かない (画面は例の行を出さない)
-        Assert.True(!Item(json, nameof(Settings.Zenzai)).TryGetProperty("example", out _), "例の無い項目に example がある");
+        foreach (var item in MacSettingsCatalog.Items.Where(i => i.Example is null))
+            Assert.True(!Item(json, item.Key).TryGetProperty("example", out _), $"例の無い {item.Key} に example がある");
     }
 
     [Test]

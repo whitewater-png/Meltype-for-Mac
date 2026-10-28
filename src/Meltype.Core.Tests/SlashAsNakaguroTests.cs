@@ -54,7 +54,7 @@ internal static class SlashAsNakaguroTests
         Assert.Equal("日本語の直後の / を ・ にする", item.GetProperty("label").GetString());
         Assert.Equal("bool", item.GetProperty("kind").GetString());
         Assert.Equal(false, item.GetProperty("value").GetBoolean());
-        // 「入力」の組に出す (入力の変換の設定の並び)
+        // 「記号・句読点」の組に出す (入力の変換の設定の並び)
         Assert.Equal("記号・句読点", item.GetProperty("group").GetString());
         // 設定タブの値が Settings と同じ (DisplayName / Description の一致は MacSettingsTests が見る)
         var attribute = typeof(Settings).GetProperty(nameof(Settings.SlashAsNakaguro))!
