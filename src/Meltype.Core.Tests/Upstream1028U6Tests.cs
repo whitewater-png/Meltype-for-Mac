@@ -45,6 +45,20 @@ internal static class Upstream1028U6Tests
         Assert.Equal("vocaloidについて", Committed("vocaloidnitsuite"), "vocaloid ni");
     }
 
+    /// <summary>
+    /// 査読 R-B 必須 1: english-readable にしか無い語は、確定直前の打ち間違いの補正 (FixTypos) に守られず、
+    /// 表示 vocaloidは のまま Enter で ゔぉかぉいしゃ (d→s) が確定していた。english.txt にも置いて守る。
+    /// </summary>
+    [Test]
+    public static void U6_5_ParticleAfterReadableWord_CommitsAsShown()
+    {
+        Assert.Equal("vocaloidは", Committed("vocaloidha"), "vocaloid ha");
+        Assert.Equal("vocaloidも", Committed("vocaloidmo"), "vocaloid mo");
+        Assert.Equal("きょうはvocaloidはすきです", Committed("kyouhavocaloidhasukidesu"), "kyouha vocaloid ha");
+        Assert.Equal("opencodeも", Committed("opencodemo"), "opencode mo");
+        Assert.Equal("きょうはopencodeはべんり", Committed("kyouhaopencodehabenri"), "kyouha opencode ha");
+    }
+
     [Test]
     public static void U6_4_NearbyJapanese_Unchanged()
     {
