@@ -6,7 +6,7 @@
 
 - インストール先: `~/Library/Input Methods/Meltype.app`。dylib は **2026-10-19 17:28:29**、SHA-256 は `ba500e4d52c5ac307f6e0638e300c667cc77461fc46253b33701e1758d89627a`（ビルド成果物と一致）。B2-5 の `I saw` 修正と B2-6 の学習除外を入れた版（`15c5ffc`）。
 - 稼働中の IME: `ps -axo pid,lstart,command | grep 'Input Methods/Meltype.app/Contents/MacOS/Meltype'` で起動時刻を見る。**17:28:29 より後**なら新しい dylib。前なら IME を再起動する（ログアウト/ログイン、または入力ソースを切り替える）。
-- 設定: 「Meltype 辞書」→「設定」タブ（⌘4）。B2-4・B2-5・B2-6 は**既定 OFF**。検証する項目だけ ON にし、終わったら OFF に戻す。
+- 設定: 「Meltype 辞書」→「設定」タブ（⌘5。2026-10-28 までの版は ⌘4）。B2-4・B2-5・B2-6 は**既定 OFF**。検証する項目だけ ON にし、終わったら OFF に戻す。
 - 入力先: TextEdit の新規書類など、Meltype が有効なプレーンテキスト。ほかの IME に切り替わっていないことを確認する。
 - 候補の確定は Space / Enter。候補の並びも見たいときは、確定せずに Space を押したままにする。
 

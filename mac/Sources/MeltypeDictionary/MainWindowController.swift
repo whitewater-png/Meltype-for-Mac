@@ -53,12 +53,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         let learnedTab = NSTabViewItem(viewController: learnedController)
         learnedTab.label = "学習した語"
         tabs.addTabViewItem(learnedTab)
-        let settingsTab = NSTabViewItem(viewController: settingsController)
-        settingsTab.label = "設定"
-        tabs.addTabViewItem(settingsTab)
+        // 「設定」は右端 (ほかのアプリの設定と同じく、いちばん端に置く)
         let judgeTab = NSTabViewItem(viewController: judgeController)
         judgeTab.label = "判定を調べる"
         tabs.addTabViewItem(judgeTab)
+        let settingsTab = NSTabViewItem(viewController: settingsController)
+        settingsTab.label = "設定"
+        tabs.addTabViewItem(settingsTab)
         window.contentViewController = tabs
         window.setContentSize(NSSize(width: 900, height: 620))
         window.delegate = self
@@ -103,7 +104,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     // ---- メニュー ----
 
     /// タブの位置 (表示メニューの ⌘1〜⌘5 と同じ順)。
-    private enum Tab: Int { case user = 0, term, learned, settings, judge }
+    private enum Tab: Int { case user = 0, term, learned, judge, settings }
 
     /// 判定を調べるのタブには検索が無い。
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
