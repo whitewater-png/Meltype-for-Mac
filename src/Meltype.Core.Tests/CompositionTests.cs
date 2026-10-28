@@ -2812,7 +2812,7 @@ internal static class CompositionTests
     }
 
     [Test]
-    public static void Prediction_TypingLeaves()
+    public static void Prediction_TypingCommitsSelected()
     {
         var k = new Keyboard(predictions: OsewaPredictions);
         k.Type("osewa");
