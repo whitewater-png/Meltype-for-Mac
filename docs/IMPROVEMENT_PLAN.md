@@ -3615,3 +3615,20 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **得と損**: 得: 登録が手だけで済む。漢字から読みを引ける。損: 読みは macOS の解析なので人名・専門語で外れることがある (ツールチップに明記。画面で直す前提)。辞書アプリの中だけ Tab の意味が変わる (入力中の Tab で予測候補に入れない)。
 - **確認**: 使い捨ての Swift スクリプトで 東京 → とうきょう、佐々木 → ささき、新宿御苑 → しんじゅくぎょえん、ABC会社 → ABCかいしゃ、テスト・yomi は不変。実機 (2026-10-28、リョウさん): 確定後の Tab・入力中の Tab・漢字の「ひらがなにする」とも期待どおり。自動テストなし (Swift)。
 
+## 本家追従 W16 (2026-10-28 の精査から小さな 9 件)
+
+- **目的**: 本家 main `a2d74f0` までの新着を精査し ([UPSTREAM_REVIEW_2026-10-28.md](UPSTREAM_REVIEW_2026-10-28.md))、リョウさんの指示「軽微なものは先に全部」で、手間の小さい 9 件を入れる。
+- **進め方**: 1 項目 1 ブランチ (起点 main `67e5341`)。実装はテスト先行 (Sonnet)、項目ごとに機械ゲート (全テスト・`--eval`・main の Core / 辞書に戻すと新テストが赤になるか)、統合の木で全テスト・`--eval`・コーパス比較・Mac ビルド・codesign・AOT 設定・辞書アプリの自己テスト。独立査読 3 レーン (Opus) の指摘は、項目のブランチに新しいコミットで直した。
+- **項目とコミット**:
+  - W16-1 (`a0d54a4`・`7229d04`): `dictionaries/propernouns.txt` から `Wakatte` を外す。`wakatte`・`sorewakatte` が英字のまま確定されていた (本家 issue #1231、本家は未修正)。既存テストの `Wakatte.TV` (ドメインの `.` の後ろの規則の例) は `Tetr.TV` に置き換えた。
+  - W16-2 (`175e488`・`430fadd`): `CompositionController.HandlePredictionKey` の `default:`。予測候補を選んでいる (`_predictionIndex >= 0`) ときに文字として入るキー (`TypesCharacter`: かな入力のかなキー、または空白・制御文字でない文字) を打つと、`CommitPrediction` してから `StartWith`。今までは選んだ語を捨てて読みに戻った (設計どおりだったが、本家 issue #1187 #1214 と同じ不満があるので変える。リョウさんの選択)。BackSpace・Esc・Enter・Space・←→・修飾キーは今までどおり。既存テスト `Prediction_TypingLeaves` は旧仕様を固定していたので、期待と名前を変えた。docs/USAGE.md の Tab の行に 1 文。
+  - W16-3 (`571d0ab`): `UserDictionary.Split` が、読みの終わりの次の文字が小さいかな (ゃゅょぁぃぅぇぉゎ と片仮名。っ は別の拍なので除く) なら、その長さでは切らない (本家 PR #1160 の考え方。実装は写していない)。
+  - W16-4 (`adde6d4`): `TimeCandidates` の きょう の候補に `2026/10/28(水)`・`10/28(水)` (本家 #1072 (f)) と `20261028` (本家 PR #1189) を足す。並びは本家 main と同じで、既存の 7 つの相対順は変えない。
+  - W16-5 (`7b8c228`): `InputController.swift` の変換中の候補 (`updateCandidates`) で、一覧を出し直すときに `hide()` → `update()` → `show()` ×2 (本家 PR #1250 と同じ)。予測候補 (`updatePredictions`) には入れない (打つたびに一覧が変わるので出し直すとちらつく。本家も変えていない)。
+  - W16-6 (`19fc5f3`・`b238321`): `english.txt` に printenv・nohup・doomscroll・tmux・claudecode・vocaloid・opencode、`english-readable.txt` に vocaloid・opencode。`CompositionDetector.EndsWithParticleAfterUnknownWord` で english-readable の語を「知らない語 + 助詞」にしない (本家 main と同じ形)。査読 R-B の必須: english-readable にしか無い語は、確定直前の打ち間違いの補正 (`CompositionText.FixTypos` の守り `EnglishMask` が使う `IsKnownEnglishWord` は english.txt・固有名・スペルチェッカーしか見ない) に守られず、表示 `vocaloidは` が Enter で `ゔぉかぉいしゃ` (d→s) になっていた。english.txt にも置いて直した。
+  - W16-7 (`7061829`・`4764b8b`): `english.txt` に bookoff・adb (本家 issue #1191・#1131 の adb 単体)、`misspellings.txt` に クダシア → クダサイ (issue #1190。自動では直さず「もしかして」に出る)。
+  - W16-8 (`755fdee`・`fe28a44`): `UserDictionaryFile` の書き出しの日時、`Backup` の作成日時、`NumberCandidates` の数値・元号の年、`CompositionController` の元号の年、`DictionarySuggestions` の 1 日 1 回のヒントの日付を `CultureInfo.InvariantCulture` に (本家 #1157 の Core の部分。Mac の dylib は `InvariantGlobalization=false` なので、タイ語の地域設定では書き出しの年が仏暦になっていた)。
+  - W16-9 (`e821ad6`・`ddbe42a`): `mac/install.sh` (登録できたときの案内) と `mac/README.md` で、入力ソースが出てこないときはシステム設定からの追加を先に、ログアウトを次に (本家 PR #1026 #1027 の文言)。登録できなかったときの案内 (直前に有効な入力ソースの一覧へ直接書き込む #21 の分岐。「+」の一覧に出ない Mac のためで、「+」を先に案内すると一覧への二重登録の条件もそろいうる。査読 R-C の必須) と、前の Meltype を消した直後の案内は元のまま。
+- **確認 (統合の木)**: 全テスト 1177 → 1213 (W16-1 +2、W16-2 +12、W16-3 +2、W16-4 +5、W16-6 +5、W16-7 +6、W16-8 +4)。`--eval` は起点と同じ (1293/1294、外れは `my name is taro` の 1 件)。コーパス比較 (同梱の英単語表。実機の NSSpellChecker は通していない): 日本語の読み 120,714 入力・英単語 6,000 語 × 3 形 = 18,000 入力・対象語の綴りを含む日本語 222 入力で変化 0、対象語 10 語 × 前 5 × 後ろ 12 = 600 入力で 528 変化 (対象語が英字になる・wakatte が日本語になる方向。残る崩れは K108 の (2))。Mac ビルド・`codesign --verify --deep --strict`・`tools/check-mac-aot-settings.py` (3 PASS)・辞書アプリの `--self-test` (213 件 PASS)。
+- **得と損**: 得: 毎日打つ語 (分かって) と、AI・端末の道具の名前が崩れない。予測候補を選んで続けて打てる。損: `Wakatte.TV` は わかって。TV になる。予測を選んだあと打ち直したいときは Esc か BackSpace が要る (K108 と W16-2 の説明)。
+- **残る限界・未確認**: すべて実機未確認 (漢字変換の結果・候補窓・外部ディスプレイ)。W16-2 のテンキーは Core のテストの仮のキー表に無く未確認。W16-5 は Swift に自動テストが無い。子音で終わる語 + yo・yu の形と予測候補の窓は K108。
