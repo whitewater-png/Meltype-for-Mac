@@ -192,7 +192,7 @@ beta cafe cage cane cape coma cone cube cure dine dire dome dope dude duke ego f
 lane logo meta mute nude nuke pane pine poke polo pope rage rake ripe rode rune sage sane soda solo tore
 wade wipe woke wore anime demo dojo emoji kimono karate tsunami typhoon tycoon
 # 技術用語 (日本語の文の中でもそのまま英字で書くことが多い)
-api apis url urls uri json yaml csv pdf png jpg jpeg gif svg html css xml sql ssh ssl tls dns ip tcp udp http https oem
+api apis url urls uri json yaml csv pdf png jpg jpeg gif svg html css xml sql ssh ssl tls dns ip tcp udp http https oem ost
 cpu gpu ram rom ssd hdd usb hdmi wifi bluetooth nfc os ui ux io ai ml llm gpt rag mcp sdk ide cli gui repo repos
 bug bugs issue issues pull push merge commit commits branch branches deploy build release tag tags diff patch
 token tokens prompt prompts model models agent agents tool tools server servers client clients browser
