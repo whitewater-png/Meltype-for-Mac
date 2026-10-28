@@ -31,10 +31,10 @@ scope: dictionary
 - [x] 回帰なし: eval-compare broken 0 / fixed 2、Core 1146/1146、品質テスト 1293/1294 (base と同一)、`check-dictionaries.mjs` エラー 0
 - [x] 文書: `docs/KNOWN_LIMITS.md` に ost の記載は無く、直す箇所なし
 
-## Mac 実機チェックリスト (人が確かめる)
-- [ ] TextEdit: `ost` + Enter → `ost`
-- [ ] ターミナル (zsh): `ost` + Enter → `ost`、`kosuto` → こすと
-- [ ] TextEdit: `osutoraria` → おすとらりあ (変わらない)
+## Mac 実機チェックリスト (人が確かめる。リョウさんが 2026-10-28 に「確認済み」と報告。項目ごとの記録は無い)
+- [x] TextEdit: `ost` + Enter → `ost`
+- [x] ターミナル (zsh): `ost` + Enter → `ost`、`kosuto` → こすと
+- [x] TextEdit: `osutoraria` → おすとらりあ (変わらない)
 
 ## 止める条件
 - `ost` を足して日本語の語の正解表の行が 1 件でも崩れる。
