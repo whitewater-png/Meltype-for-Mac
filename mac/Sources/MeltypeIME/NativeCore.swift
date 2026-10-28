@@ -166,6 +166,9 @@ struct CompositionView: Decodable {
     /// 候補の一覧を格子状 (5 列) に広げて出すか (設定「Tab で候補を格子状に広げる」で、変換中に Tab を押したとき)。
     /// 無いキーは nil として読み、false と同じに扱う (古い本体の JSON でも読める。本家 #1016)。
     let grid: Bool?
+    /// 「もしかして」の案内 (読みに書き間違いがあれば「もしかして: ブレスレット　<Tab>で修正」。無ければ nil)。
+    /// 無いキーも nil として読む (古い本体の JSON でも読める)。
+    let suggestion: String?
 }
 
 /// 専門用語集の分野 (meltype_term_domains の 1 行: ID・名称・語数・有効か・自作か)。

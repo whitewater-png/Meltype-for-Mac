@@ -312,6 +312,7 @@ final class MeltypeInputController: IMKInputController {
         commitComposition(sender)
         hideCandidateWindows()
         AnnotationPanel.shared.hide()
+        SuggestionHint.misspelling.hide()
         super.deactivateServer(sender)
     }
 
@@ -727,6 +728,16 @@ final class MeltypeInputController: IMKInputController {
         Self.trace("showComposition: setMarkedText 直後 \(Self.ranges(client))")
         hasMarkedText = length > 0
         updateCandidates(view)
+        updateMisspellingHint(view, client: client)
+    }
+
+    /// 「もしかして」の案内を、書き間違いがある間だけ入力位置の行の上に出す (変換中は本体が案内を返さないので消える)。
+    private func updateMisspellingHint(_ view: CompositionView, client: IMKTextInput) {
+        if let suggestion = view.suggestion, !suggestion.isEmpty, !view.converting {
+            SuggestionHint.misspelling.show(suggestion, near: client, duration: nil)
+        } else {
+            SuggestionHint.misspelling.hide()
+        }
     }
 
     private func hideComposition(client: IMKTextInput) {
@@ -745,6 +756,7 @@ final class MeltypeInputController: IMKInputController {
         shownIndex = 0
         lastView = nil
         AnnotationPanel.shared.hide()
+        SuggestionHint.misspelling.hide()
         hideCandidateWindows()
     }
 
