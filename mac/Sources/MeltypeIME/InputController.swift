@@ -732,11 +732,21 @@ final class MeltypeInputController: IMKInputController {
     }
 
     /// 「もしかして」の案内を、書き間違いがある間だけ入力位置の行の上に出す。変換中も出す (本体は変換中も案内を返し、
-    /// 変換中の Tab も書き間違いの修正が最優先。案内が無いと Tab が予告なしに読みを直す)。行の上に出すので、ふつうは行の下の候補ウィンドウ・格子と重ならない
-    /// (画面の下端で候補ウィンドウ・格子が行の上に回るとき、画面の上端で案内が行の下に回るときは重なることがある。実機未確認)。
+    /// 変換中の Tab も書き間違いの修正が最優先。案内が無いと Tab が予告なしに読みを直す)。行の上に出すので、ふつうは行の下の候補ウィンドウ・格子と重ならない。
+    /// 画面の下端で候補ウィンドウ・格子が行の上に回ったとき (画面の上端で案内が行の下に回ったときも) は、SuggestionHint が候補ウィンドウの右などへ置き直す。
+    /// IMK の候補ウィンドウは show の後で位置が決まることがあるので、次の回り (と少し後) にもう一度置き直す。
     private func updateMisspellingHint(_ view: CompositionView, client: IMKTextInput) {
         if let suggestion = view.suggestion, !suggestion.isEmpty {
-            SuggestionHint.misspelling.show(suggestion, near: client, duration: nil, characterIndex: hasMarkedText ? 0 : nil)
+            let hint = SuggestionHint.misspelling
+            // 入力欄ごとに InputController が違うので、毎回いまの格子を見るように付け直す。
+            hint.obstacles = { [weak self] in
+                [Self.visibleCandidateBarFrame(),
+                 (self?.gridPanel?.isVisible == true) ? self?.gridPanel?.frame : nil,
+                 AnnotationPanel.shared.visibleFrame].compactMap { $0 }
+            }
+            hint.show(suggestion, near: client, duration: nil, characterIndex: hasMarkedText ? 0 : nil)
+            DispatchQueue.main.async { hint.reposition() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { hint.reposition() }
         } else {
             SuggestionHint.misspelling.hide()
         }

@@ -8,7 +8,9 @@ import InputMethodKit
 /// 候補ウィンドウの横の意味のパネル (AnnotationPanel) と取り合わないよう、別の小さなパネルを入力位置の下に数秒だけ出す。
 /// フォーカスを奪わず (nonactivating)、クリックも受けない。1 日 1 回までの制限は本体 (Core) が持つ。
 /// 「もしかして」(書き間違いの指摘) の案内も同じ作りの別のパネル (misspelling) で出す。こちらは消えずに、
-/// 書き間違いが無くなるか変換ボックスが閉じるまで、入力位置の行の上に出し続ける (行の下は予測・変換の候補ウィンドウが使う。画面の上端・下端では重なることがある)。
+/// 書き間違いが無くなるか変換ボックスが閉じるまで、入力位置の行の上に出し続ける (行の下は予測・変換の候補ウィンドウが使う)。
+/// 画面の下端で候補ウィンドウ・格子が行の上に回ったとき (画面の上端で案内が行の下に回ったときも) は、重ならないように
+/// 候補ウィンドウの右 → 上 → 下の順に置き直す (obstacles。2026-10-28 の実機で、画面の下端の入力欄で案内が候補ウィンドウに隠れた)。
 final class SuggestionHint {
     static let shared = SuggestionHint()
     /// 「もしかして: ブレスレット　<Tab>で修正」の案内 (本体の CompositionView.suggestion)。Mac 版はこれまで出していなかった (Tab の修正だけ効いていた)。
@@ -18,6 +20,10 @@ final class SuggestionHint {
     private var panel: NSPanel?
     private var generation = 0
     private var shownText: String?
+    /// 避ける窓 (候補ウィンドウ・格子・意味のパネル) の枠 (画面座標)。見えているものだけを返す。nil なら避けない (登録提案のヒント)。
+    var obstacles: (() -> [NSRect])?
+    /// 避ける前の位置 (行の上、または上端で回り込んだ行の下)。候補ウィンドウが後から動いたとき、ここから置き直す。
+    private var baseFrame: NSRect?
 
     private init(above: Bool = false) {
         self.above = above
@@ -44,7 +50,8 @@ final class SuggestionHint {
                frame.maxY > screen.visibleFrame.maxY {
                 frame.origin.y = rect.minY - frame.height - 4
             }
-            panel.setFrameOrigin(frame.origin)
+            baseFrame = frame
+            panel.setFrameOrigin(avoided(frame).origin)
             return
         }
 
@@ -77,7 +84,9 @@ final class SuggestionHint {
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle]
         panel.contentView = background
-        panel.setFrame(NSRect(origin: origin, size: size), display: true)
+        let base = NSRect(origin: origin, size: size)
+        baseFrame = base
+        panel.setFrame(avoided(base), display: true)
         panel.orderFrontRegardless()
         self.panel = panel
         shownText = text
@@ -99,5 +108,29 @@ final class SuggestionHint {
         generation += 1
         panel?.orderOut(nil)
         shownText = nil
+        baseFrame = nil
+    }
+
+    /// 候補ウィンドウなどが出た・動いたあとに、避ける前の位置から置き直す (出していなければ何もしない)。
+    func reposition() {
+        guard let panel, panel.isVisible, let baseFrame else { return }
+        let frame = avoided(baseFrame)
+        if frame.origin != panel.frame.origin { panel.setFrameOrigin(frame.origin) }
+    }
+
+    /// frame が避ける窓と重なるなら、重ならない位置を返す。候補ウィンドウの右 (行の高さのまま。入力位置から離れにくい) →
+    /// 避ける窓すべての上 → 下 の順に、画面 (visibleFrame) に収まり、どの窓とも重ならない最初の位置。どこも無理なら元のまま。
+    private func avoided(_ frame: NSRect) -> NSRect {
+        let blocks = (obstacles?() ?? []).filter { !$0.isEmpty }
+        guard blocks.contains(where: { $0.intersects(frame) }) else { return frame }
+        let all = blocks.dropFirst().reduce(blocks[0]) { $0.union($1) }
+        let center = NSPoint(x: frame.midX, y: frame.midY)
+        guard let screen = (NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main)?.visibleFrame else { return frame }
+        let tries = [
+            NSRect(x: all.maxX + 4, y: frame.minY, width: frame.width, height: frame.height),
+            NSRect(x: frame.minX, y: all.maxY + 4, width: frame.width, height: frame.height),
+            NSRect(x: frame.minX, y: all.minY - frame.height - 4, width: frame.width, height: frame.height),
+        ]
+        return tries.first { screen.contains($0) && !blocks.contains(where: $0.intersects) } ?? frame
     }
 }
