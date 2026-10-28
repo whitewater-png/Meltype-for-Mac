@@ -311,8 +311,8 @@ final class MeltypeInputController: IMKInputController {
         Self.trace("deactivateServer bundle=\(bundleID ?? "nil")")
         commitComposition(sender)
         hideCandidateWindows()
-        AnnotationPanel.shared.hide()
         SuggestionHint.misspelling.hide()
+        AnnotationPanel.shared.hide()
         super.deactivateServer(sender)
     }
 
@@ -767,8 +767,8 @@ final class MeltypeInputController: IMKInputController {
         candidateList = []
         shownIndex = 0
         lastView = nil
-        AnnotationPanel.shared.hide()
         SuggestionHint.misspelling.hide()
+        AnnotationPanel.shared.hide()
         hideCandidateWindows()
     }
 
