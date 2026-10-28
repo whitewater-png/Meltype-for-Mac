@@ -115,6 +115,40 @@ enum UI {
         return label
     }
 
+    /// view を container の右端 (余白 trailing) まで広げる制約。幅に上限 (lessThanOrEqualToConstant) がある中身に使う。
+    /// 「右端まで」は窓の大きさを保つ強さ (windowSizeStayPut) より弱くする: 強いと、上限のある中身に合わせて窓のほうが縮み、
+    /// タブを選んだだけで窓が狭くなって、ほかのタブに戻っても狭いままになる (判定を調べる・設定のタブで起きていた)。
+    /// はみ出さないこと (右端より内側) は必須のままにする。
+    static func fillWidth(_ view: NSView, in container: NSView, trailing: CGFloat) -> [NSLayoutConstraint] {
+        let fill = view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -trailing)
+        fill.priority = NSLayoutConstraint.Priority(NSLayoutConstraint.Priority.windowSizeStayPut.rawValue - 1)
+        return [fill, view.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -trailing)]
+    }
+
+    /// 件数・状態の 1 行の文字。長い文 (取り込みの結果など) は末尾を「…」で切り、窓を広げない
+    /// (横に縮みにくい強さが既定の 750 のままだと、窓の大きさを保つ強さ 500 に勝ち、窓のほうが広がって戻らない)。
+    /// 切れた文は、マウスを乗せると全文が出る。
+    static func statusLabel() -> NSTextField {
+        let label = UI.label(secondary: true)
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.allowsExpansionToolTips = true
+        return label
+    }
+
+    /// 一覧が空のときの案内 (一覧の真ん中に出す)。長い案内は折り返し、窓を広げない
+    /// (1 行の文字のままだと、横に縮みにくい強さ 750 が窓の大きさを保つ強さ 500 に勝ち、窓が広がって、隠したあとも戻らない)。
+    /// 幅の上限 (一覧の幅 - 余白) は使う側が付ける。
+    static func emptyLabel() -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.textColor = .secondaryLabelColor
+        label.font = .systemFont(ofSize: 13)
+        label.alignment = .center
+        // 一覧の上に重ねるので、選べない文字にする (選べると I ビームのカーソルになり、クリックでキーボードの操作先を取る)
+        label.isSelectable = false
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return label
+    }
+
     static func spacer() -> NSView {
         let view = NSView()
         view.setContentHuggingPriority(.init(1), for: .horizontal)

@@ -1175,6 +1175,22 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req002_Ost_StaysEnglish_AndJapaneseSpellingsAroundItDoNot()
+    {
+        // 本家 #1123: ost が おst になる (o は読めるが、後ろの st が残って日本語にも英語にも決まらない)。dictionaries/english.txt の技術用語に足した。
+        // 日本語の語 (kosuto・osutoraria) と、ost の後ろが日本語の文のときの動きは変わらない。
+        foreach (var (typed, expected) in new[]
+        {
+            ("ost", "ost"), ("osttsukau", "ostつかう"), ("kosuto", "こすと"), ("osutoraria", "おすとらりあ"), ("kyouhaosutoda", "きょうはおすとだ"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Q3_ReadableEnglishWords_LeaveJapaneseAndTheKnownLimitsAlone()
     {
         // english-readable.txt に語を足したとき、日本語の語の中・前後に偶然その綴りが現れても日本語のままであること。

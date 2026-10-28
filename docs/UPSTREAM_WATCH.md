@@ -1,8 +1,50 @@
-<!-- seen: ae73a2bd9104a83af6f4147bad9d85e87a7cf6ab -->
+<!-- seen: a2d74f0272efa0011e6dd332a2d8e3c0275aecb8 -->
 # 本家追従の候補表
 
 `tools/upstream_watch.py` が更新します (使い方は docs/DEVELOPMENT.md の「本家追従」)。新しい節が上です。
 候補ファイル (`eval/candidates/`) の新しい正解ケースは、人が確かめてから `eval/cases/upstream-quality.tsv` に移します。
+
+## 2026-10-28 (ae73a2b..a2d74f0、33 件)
+
+| hash | 日付 | PR | 件名 | 分類 | 取り込み | 当たるか | 新ケース (当たり/件数) |
+|---|---|---|---|---|---|---|---|
+| 9e8250f | 2026-10-25 | #1072 | Merge pull request #1072 from yksr-melt/claude/serene-cray-ypjtst | 判定・変換 (+Windows) (+文書) | 記録あり (UPSTREAM_PR_TRACKER.md) | 手移植 | -/25 |
+| 6105624 | 2026-10-25 | #1002 | Merge pull request #1002 from aster-void/mozc-ut-separate-file | 判定・変換 (+Windows) (+本家 Mac) (+文書) | 未 | 対象ファイルなし | - |
+| 389929b | 2026-10-25 | #1140 | Merge pull request #1140 from yksr-melt/claude/self-assign-triage | 判定・変換 (+Windows) (+文書) | 未 | 対象ファイルなし | - |
+| 5465b91 | 2026-10-25 | #1109 | Merge pull request #1109 from yksr-melt/claude/funny-feynman-vamjgh | 判定・変換 (+Windows) (+文書) | 未 | 対象ファイルなし | - |
+| 1054139 | 2026-10-25 | #1150 | Merge pull request #1150 from yksr-melt/codex/bot-pr-limits-and-timeouts | Windows (+文書) | 未 | - | - |
+| 9a9ae8e | 2026-10-25 | #1153 | Merge pull request #1153 from yksr-melt/codex/bump-1.3.1-pre.3 | 判定・変換 (+Windows) (+本家 Mac) | 未 | 手移植 | - |
+| e4eb93c | 2026-10-25 | #1154 | Merge pull request #1154 from yksr-melt/homebrew-cask-1.3.1-pre.3 | その他 | 未 | - | - |
+| bd25203 | 2026-10-25 | #1151 | Merge pull request #1151 from harukikubota/fix-usb-japanese-boundary | 判定・変換 (+Windows) (+本家 Mac) (+文書) | 未 | 手移植 | - |
+| cd4b75e | 2026-10-26 | #1148 | Merge pull request #1148 from aster-void/fix/dictionary-words | 判定・変換 (+Windows) (+本家 Mac) (+文書) | 記録あり (UPSTREAM_PR_TRACKER.md) | 手移植 | -/13 |
+| 94de3a2 | 2026-10-26 | #1174 | Merge pull request #1174 from yksr-melt/bot/sponsors | 文書 | 未 | - | - |
+| 93fe286 | 2026-10-26 | #1168 | Merge pull request #1168 from aster-void/fix/build-required-checks | 判定・変換 (+Windows) (+文書) | 未 | 対象ファイルなし | - |
+| 8601133 | 2026-10-26 | #1177 | Merge pull request #1177 from yksr-melt/claude/charming-heisenberg-n78w2k | 判定・変換 | 未 | 手移植 | -/1 |
+| b6f23b3 | 2026-10-26 | #1006 | Merge pull request #1006 from MuNeNiCK/fix/fcitx5-terminal-japanese | 判定・変換 (+Windows) (+本家 Mac) (+Linux) (+文書) | 未 | 手移植 | - |
+| 9ad46a5 | 2026-10-27 | #1031 | Merge pull request #1031 from midasdf/fix/fcitx5-reload-without-restart | Linux | 未 | - | - |
+| 17351e0 | 2026-10-27 | #1219 | Merge pull request #1219 from yksr-melt/ccr-b770d547-w1ygxc | 判定・変換 (+Windows) (+Linux) | 未 | 手移植 | - |
+| 3f78637 | 2026-10-27 | #1220 | Merge pull request #1220 from yksr-melt/ccr-b770d547-w1ygxc-1211 | 判定・変換 (+Windows) (+Linux) (+文書) | 未 | 対象ファイルなし | - |
+| 893e9bb | 2026-10-27 | #1234 | Merge pull request #1234 from aster-void/fix/maintainer-pr-limit | Windows (+文書) | 未 | - | - |
+| f1372d5 | 2026-10-27 | #1221 | Merge pull request #1221 from yksr-melt/ccr-b770d547-w1ygxc-1208 | Windows (+文書) | 未 | - | - |
+| d475db6 | 2026-10-27 | #1224 | Merge pull request #1224 from yksr-melt/ccr-b770d547-w1ygxc-1196 | 判定・変換 (+Windows) (+Linux) (+文書) | 未 | 手移植 | - |
+| e785339 | 2026-10-27 | #1157 | Merge pull request #1157 from yksr-melt/fix/code-scanning-alerts | 判定・変換 (+Windows) (+本家 Mac) (+Linux) (+文書) | 記録あり (UPSTREAM_PR_TRACKER.md) | 手移植 | - |
+| d7ed47e | 2026-10-27 | #1237 | Merge pull request #1237 from yksr-melt/yksr-melt-patch-1 | Windows | 未 | - | - |
+| 605ee6d | 2026-10-27 | #1245 | Merge pull request #1245 from aster-void/fix/bot-pr-limit | Windows | 未 | - | - |
+| b0829ca | 2026-10-27 | #1243 | Merge pull request #1243 from yksr-melt/dependabot/github_actions/actions/github-script-9.0.0 | Windows | 未 | - | - |
+| f76022b | 2026-10-27 | #1242 | Merge pull request #1242 from yksr-melt/dependabot/github_actions/actions/upload-artifact-7.0.2 | Windows | 未 | - | - |
+| a0f86ed | 2026-10-27 | #1239 | Merge pull request #1239 from yksr-melt/dependabot/github_actions/github/codeql-action/analyze-4.39.1 | Windows | 未 | - | - |
+| 2fb45ee | 2026-10-27 | #1241 | Merge pull request #1241 from yksr-melt/dependabot/github_actions/actions/create-github-app-token-3.3.0 | Windows | 未 | - | - |
+| b58cf58 | 2026-10-27 | #1249 | Merge pull request #1249 from yksr-melt/dependabot/github_actions/actions/download-artifact-8.0.2 | Windows | 未 | - | - |
+| 478e748 | 2026-10-27 | #1248 | Merge pull request #1248 from yksr-melt/dependabot/github_actions/vedantmgoyal9/winget-releaser-b7370d4d152efdce803a26cc6ca9eee58cb2ad54 | Windows | 未 | - | - |
+| da38c63 | 2026-10-27 | #1247 | Merge pull request #1247 from yksr-melt/dependabot/github_actions/actions/dependency-review-action-5.0.0 | Windows | 未 | - | - |
+| a2f2e58 | 2026-10-27 | #1246 | Merge pull request #1246 from yksr-melt/dependabot/github_actions/codeql-action-4179f0a880 | Windows | 未 | - | - |
+| 5069e21 | 2026-10-27 | #1240 | Merge pull request #1240 from yksr-melt/dependabot/github_actions/actions/cache-6.1.0 | Windows | 未 | - | - |
+| 04d5eb1 | 2026-10-28 | #1252 | Merge pull request #1252 from aster-void/fix/policy-skip-bot-pr | Windows | 未 | - | - |
+| a2d74f0 | 2026-10-28 | #1260 | Merge pull request #1260 from yksr-melt/dependabot/npm_and_yarn/web/multi-925a388b19 | その他 | 記録あり (UPSTREAM_PR_TRACKER.md) | - | - |
+
+本家の QualityTests.cs に足された新しい正解ケースは 39 件 (`--no-eval` で動かしたので、Mac 版で当たるかは未確認。候補ファイルはリポジトリに入れていない)。
+
+分類と判断 (2026-10-28 手作業): [UPSTREAM_REVIEW_2026-10-28.md](UPSTREAM_REVIEW_2026-10-28.md)。この表の「取り込み」の列は件名と管理表の番号だけで決まるので、W16 で取り込んだ #1148・#1157・#1072 (の一部) は「記録あり」、件名に本家の hash を書いていない取り込みは「未」のまま出る。分類の列は first-parent の差分の数え方で広めに出ることがある (2026-10-24 の節の注と同じ)。
 
 ## 2026-10-24 (7b7044a..ae73a2b、20 件)
 

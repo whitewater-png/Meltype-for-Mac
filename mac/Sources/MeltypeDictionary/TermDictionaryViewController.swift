@@ -31,11 +31,11 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     private let searchField = NSSearchField()
     private let searchDebouncer = SearchDebouncer()
     private let filterPopup = NSPopUpButton()
-    private let countLabel = UI.label(secondary: true)
-    private let statusLabel = UI.label(secondary: true)
+    private let countLabel = UI.statusLabel()
+    private let statusLabel = UI.statusLabel()
     private let infoLabel = UI.wrapping("")
     private let offLabel = UI.wrapping("", secondary: false)
-    private let emptyLabel = UI.label(secondary: true, size: 13)
+    private let emptyLabel = UI.emptyLabel()
     private let spinner = NSProgressIndicator()
     private var excludeButton: NSButton!
     private var includeButton: NSButton!
@@ -123,7 +123,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         searchField.delegate = self
         UI.configure(search: searchField)
         searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 220).isActive = true
+        searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 180).isActive = true
         filterPopup.addItems(withTitles: ["すべての語", "使う語だけ", "除外した語だけ"])
         filterPopup.target = self
         filterPopup.action = #selector(filterChanged(_:))
@@ -155,7 +155,6 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         scroll.translatesAutoresizingMaskIntoConstraints = false
         emptyLabel.alignment = .center
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-        scroll.addSubview(emptyLabel)
 
         excludeButton = UI.button("除外する", target: self, action: #selector(excludeSelected(_:)))
         excludeButton.setAccessibilityHelp("選んだ語を変換に使わないようにします (Delete。元に戻せます)")
@@ -192,6 +191,9 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 880, height: 560))
         root.addSubview(left)
         root.addSubview(right)
+        // 一覧が空のときの案内は、一覧 (NSScrollView) の外の親に置いて上に重ねる。
+        // NSScrollView の直下に足すと、制約の結果が位置と大きさに当てはまらず、作ったときの 4×16 のまま描かれなかった (Q32)
+        root.addSubview(emptyLabel)
         NSLayoutConstraint.activate([
             left.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
             left.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),

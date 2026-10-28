@@ -343,7 +343,7 @@ public sealed class CompositionDetector
                 // 日本語の 「 (確定済みの 「 も) に対応する ] は範囲に入れず、日本語の 」 のまま (下の「英語の後ろの記号は半角」に回さない)
                 if (protectedEnd < n && units[protectedEnd].Raw == "]" && (i > 0 ? units[i - 1].Raw == "[" && PrecededByEnglish(i) != true : precedingOpener == "「")) bracketCloser = protectedEnd;
             }
-            // ドメイン・拡張子の . の後ろは、ローマ字として読めても英字のままにする (tetr.io、Wakatte.TV、MeltypeTip.dll)。
+            // ドメイン・拡張子の . の後ろは、ローマ字として読めても英字のままにする (tetr.io、Tetr.TV、MeltypeTip.dll)。
             // (本家 yksr-melt/Meltype の PR #267 / issue #260・#254 と同じ変更)
             if (found < 0 && !kanaInput && level != DetectionLevel.Manual && i > 0 && units[i - 1].Raw == "." && PrecededByEnglish(i) == true) found = DotSuffixEnd(units, i, pending, final);
             // 入力の先頭の .gitignore / .env / .exe などドットファイルは英字のままにする (本家 803719c、#34)。
@@ -1581,7 +1581,9 @@ public sealed class CompositionDetector
     /// </summary>
     private bool EndsWithParticleAfterUnknownWord(string lower)
     {
-        if (_english.Words.ContainsWord(lower) || _proper.Contains(lower) || Memory?.Get(lower) == true || IsSpellWord(lower)) return false;
+        // english-readable の語 (opencode・claudecode) は「知らない語 + 助詞 (de)」ではない (本家と同じ。U6)
+        if (_english.Words.ContainsWord(lower) || _proper.Contains(lower) || ReadableEnglish.Value.ContainsWord(lower) ||
+            Memory?.Get(lower) == true || IsSpellWord(lower)) return false;
         foreach (var particle in TrailingParticles)
         {
             if (!lower.EndsWith(particle, StringComparison.Ordinal)) continue;

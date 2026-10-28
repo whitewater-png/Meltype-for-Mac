@@ -1677,7 +1677,7 @@ internal static class CompositionTests
         var cases = new Dictionary<string, string> { ["[kagi]"] = "「かぎ」", ["-"] = "ー", ["/"] = "/", ["z/"] = "・", ["#"] = "#", ["("] = "(", [")"] = ")", ["]"] = "」", ["@"] = "@", [",,,"] = "...", ["\\"] = "\\", [","] = "、",
             // 報告: Shift で打つ記号が全角で打てない、/ が打てない。英語の中では半角のまま。
             ["$%&"] = "＄％＆", ["kyouha(tenki)"] = "きょうは(てんき)", ["hello@example"] = "hello@example",
-            ["tetr.io"] = "tetr.io", ["Wakatte.TV"] = "Wakatte.TV", ["J-core"] = "J-core", ["p-hub"] = "p-hub", ["talk-admin"] = "talk-admin",
+            ["tetr.io"] = "tetr.io", ["Tetr.TV"] = "Tetr.TV", ["J-core"] = "J-core", ["p-hub"] = "p-hub", ["talk-admin"] = "talk-admin",
             // 報告: ca / cu / co で か く こ
             ["cacuco"] = "かくこ", ["iijane"] = "いいじゃね", ["shoucanshi"] = "しょうかんし", ["vanpaia"] = "ゔぁんぱいあ", ["wyiwye"] = "ゐゑ", ["GPL3.0"] = "GPL3.0", ["3.14desu"] = "3.14です", ["oknotasuku"] = "okのたすく",
         };
@@ -1729,7 +1729,7 @@ internal static class CompositionTests
         {
             // 数字入りの拡張子・co.jp・TV・2 文字のドメインの後ろの助詞は、日本語にする (mp4wokesu を英字のまま残さない)
             ["Meltype.mp4wokesu"] = "Meltype.mp4をけす", ["Meltype.7zwojikkou"] = "Meltype.7zをじっこう", ["yahoo.co.jpde"] = "yahoo.co.jpで",
-            ["amazon.co.jpdekaimono"] = "amazon.co.jpでかいもの", ["Wakatte.TVde"] = "Wakatte.TVで", ["mail.google.comwo"] = "mail.google.comを",
+            ["amazon.co.jpdekaimono"] = "amazon.co.jpでかいもの", ["Tetr.TVde"] = "Tetr.TVで", ["mail.google.comwo"] = "mail.google.comを",
             ["Meltype.pdfnipush"] = "Meltype.pdfにpush", ["Meltype.prprojwokesu"] = "Meltype.prprojをけす", ["Meltype.json.jsonwo"] = "Meltype.json.jsonを",
             // よく使う拡張子の後ろの助詞だけでも日本語にする
             ["readme.mdwo"] = "readme.mdを", ["test.jsonha"] = "test.jsonは", ["index.htmlno"] = "index.htmlの",
@@ -2812,14 +2812,25 @@ internal static class CompositionTests
     }
 
     [Test]
-    public static void Prediction_TypingLeaves()
+    public static void Prediction_TypingCommitsSelected()
     {
         var k = new Keyboard(predictions: OsewaPredictions);
         k.Type("osewa");
         k.Press(VirtualKeys.Tab);
         k.Type("n");
+        // 本家 #1187 #1214: 選んでいる予測は、続けて打った文字で捨てずに確定する (リョウさんが選んだ仕様変更)。
         Assert.Equal(-1, k.Host.View!.SelectedPrediction, "文字を打つと予測から抜ける");
-        Assert.Equal("おせわn", k.Showing, "打った文字は入力として続く");
+        Assert.Equal("n", k.Showing, "打った文字から新しい入力が始まる");
+        Assert.Equal(OsewaPredictions("おせわ")[0], k.Host.Document, "選んでいた予測は確定する");
+    }
+
+    [Test]
+    public static void Prediction_TypingWithoutSelection_Continues()
+    {
+        var k = new Keyboard(predictions: OsewaPredictions);
+        k.Type("osewa");
+        k.Type("n");
+        Assert.Equal("おせわn", k.Showing, "選んでいなければ入力として続く");
         Assert.Equal("", k.Host.Document, "予測は確定していない");
     }
 

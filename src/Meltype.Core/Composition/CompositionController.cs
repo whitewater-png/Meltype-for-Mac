@@ -1157,7 +1157,7 @@ public sealed class CompositionController
         }
 
         if (_converting && HandleConversionKey(vk)) return;
-        if (_predicting && HandlePredictionKey(vk)) return;
+        if (_predicting && HandlePredictionKey(e)) return;
 
         switch (vk)
         {
@@ -2586,7 +2586,7 @@ public sealed class CompositionController
     /// <summary>
     /// いま・なう の文節に今の日時、きょう の文節に今日の日付を候補として出す (本家 #208。書式は本家と同じ)。
     /// いま → 17:22 / 17時22分 / 午後5時22分 / 2026年10月9日(金) 17時22分 / 10月9日(金) 17時22分 / 2026年10月9日(金) 17:22 / 2026/10/09 17:22
-    /// きょう → 2026年10月9日 / 2026年10月9日(金) / 10月9日 / 10月9日(金) / 2026/10/09 / 2026-10-09 / 金曜日
+    /// きょう → 2026年10月9日 / 2026年10月9日(金) / 10月9日 / 10月9日(金) / 2026/10/09 / 2026/10/09(金) / 10/9(金) / 2026-10-09 / 金曜日 / 20261009
     /// 文節の読みがまるごとこの語のときだけ (いまから・きょうは では出さない)。
     /// </summary>
     private IEnumerable<string> TimeCandidates(string reading)
@@ -2609,8 +2609,10 @@ public sealed class CompositionController
         // 区切りの / と : は、地域の設定に左右されないように数字から組み立てる (DateTime の書式の / : は地域の区切りになる)
         var slashDate = $"{now.Year:D4}/{now.Month:D2}/{now.Day:D2}";
         var clock = $"{now.Hour:D2}:{now.Minute:D2}";
+        // 本家 #1072 (f)・#1189: / 区切りの曜日つきと月日だけの曜日つき、8 桁 (yyyyMMdd)。既存の並びは変えず、/ 区切りの後ろ・日付の最後に足す。
         if (!isNow)
-            return [date, $"{date}({day})", monthDay, $"{monthDay}({day})", slashDate, $"{now.Year:D4}-{now.Month:D2}-{now.Day:D2}", $"{day}曜日"];
+            return [date, $"{date}({day})", monthDay, $"{monthDay}({day})", slashDate, $"{slashDate}({day})", $"{now.Month}/{now.Day}({day})",
+                $"{now.Year:D4}-{now.Month:D2}-{now.Day:D2}", $"{day}曜日", $"{now.Year:D4}{now.Month:D2}{now.Day:D2}"];
         var time = $"{now.Hour}時{now.Minute}分";
         return [clock, time, $"{(now.Hour < 12 ? "午前" : "午後")}{now.Hour % 12}時{now.Minute}分",
             $"{date}({day}) {time}", $"{monthDay}({day}) {time}", $"{date}({day}) {clock}", $"{slashDate} {clock}"];
@@ -2626,7 +2628,7 @@ public sealed class CompositionController
     {
         if (EraReading.Match(reading) is not { Success: true } match) return null;
         var number = match.Groups["n"].Value;
-        var n = number == "がん" ? 1 : int.Parse(new string(number.Select(c => c is >= '０' and <= '９' ? (char)(c - '０' + '0') : c).ToArray()));
+        var n = number == "がん" ? 1 : int.Parse(new string(number.Select(c => c is >= '０' and <= '９' ? (char)(c - '０' + '0') : c).ToArray()), System.Globalization.CultureInfo.InvariantCulture);
         (int Start, int Last) range = match.Groups["e"].Value switch
         {
             "れいわ" => (2019, 2100),
@@ -2637,7 +2639,7 @@ public sealed class CompositionController
         };
         var year = range.Start + n - 1;
         if (n < 1 || year > range.Last) return null;
-        return [$"{year}年", year.ToString()];
+        return [$"{year}年", year.ToString(System.Globalization.CultureInfo.InvariantCulture)];
     }
 
     /// <summary>尺貫法の単位 (読み → 単位の字、メートル法での大きさ、メートル法の単位)。</summary>
@@ -4169,10 +4171,12 @@ public sealed class CompositionController
 
     /// <summary>
     /// Tab で予測候補に入っている間のキー。処理したら true。↓ で次、↑ で前 (先頭から上は入力に戻る)、Tab で次・Shift+Tab で前 (一巡して入力に戻る)、Enter で確定、
-    /// Esc で入力に戻る。それ以外のキーは予測から抜けて、入力として普通に処理する (Space は今までどおり変換)。
+    /// Esc で入力に戻る。選んだ予測があるときに文字として入るキー (英字・数字・記号、かな入力ではかなキー) を打つと、選んだ予測で確定してから、そのキーで新しい入力を始める (本家 #1187 #1214)。
+    /// それ以外のキーは予測から抜けて、入力として普通に処理する (Space は今までどおり変換、BackSpace は確定しない)。
     /// </summary>
-    private bool HandlePredictionKey(int vk)
+    private bool HandlePredictionKey(KeyEvent e)
     {
+        var vk = e.Vk;
         switch (vk)
         {
             case VirtualKeys.Tab:
@@ -4210,10 +4214,22 @@ public sealed class CompositionController
                 _predicting = false;
                 return true;
             default:
+                // 本家 #1187 #1214: Tab で選んだ語を、続けて打った文字に捨てられない。選んだ語で確定して、打った文字から新しい入力を始める。
+                if (_predictionIndex >= 0 && _predictionIndex < _predictions.Count && vk != VirtualKeys.Back && TypesCharacter(e))
+                {
+                    CommitPrediction(_predictions[_predictionIndex]);
+                    StartWith(e);
+                    return true;
+                }
                 _predicting = false;
                 return false;
         }
     }
+
+    /// <summary>通常の入力処理 (HandleKey の末尾) で未確定に文字を足すキーか。かな入力のかなキー、または空白・制御文字でない文字。</summary>
+    private bool TypesCharacter(KeyEvent e) =>
+        (_text.KanaInput && KanaOf(e) is not null) ||
+        (_host.CharFromKey(e, _swallowedShift.Count > 0) is { } ch && !char.IsControl(ch) && ch != ' ');
 
     /// <summary>予測候補を確定する。読み → 語を履歴に「予測から」の印つきで覚えて、次から予測の上位に出す (変換の最初の候補にはしない。Q17)。</summary>
     private void CommitPrediction(string text)

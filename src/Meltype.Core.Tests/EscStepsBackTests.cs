@@ -30,7 +30,7 @@ internal static class EscStepsBackTests
         var item = Item(MacSettingsCatalog.ToJson(new Settings()), nameof(Settings.EscStepsBack));
         Assert.Equal("bool", item.GetProperty("kind").GetString());
         Assert.Equal(false, item.GetProperty("value").GetBoolean());
-        Assert.Equal("入力", item.GetProperty("group").GetString());
+        Assert.Equal("キー操作", item.GetProperty("group").GetString());
         var attribute = typeof(Settings).GetProperty(nameof(Settings.EscStepsBack))!
             .GetCustomAttributes(typeof(System.ComponentModel.DisplayNameAttribute), false)
             .Cast<System.ComponentModel.DisplayNameAttribute>().Single();

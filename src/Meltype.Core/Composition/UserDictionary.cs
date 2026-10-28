@@ -589,6 +589,8 @@ public sealed class UserDictionary
             var longest = Math.Max(Math.Max(maxReadingLength, _builtInMaxLength), Math.Max(termMax, userTermMax));
             for (var length = Math.Min(longest, kana.Length - i); length >= minLength; length--)
             {
+                // 拗音・小さい母音 (じょ・ふぁ) の途中では切らない。本家 #1160: いしょくじょうたい が しょくじ|ょうたい で い食事ょうたい になっていた
+                if (i + length < kana.Length && IsSmallKana(kana[i + length])) continue;
                 var span = kana.AsSpan(i, length);
                 // 同じ長さなら: ユーザーの登録 → 自作の専門用語集 → 組み込み語句 → 同梱の専門用語集
                 if (length <= maxReadingLength && lookup.TryGetValue(span, out var own))
@@ -635,6 +637,10 @@ public sealed class UserDictionary
         if (plain.Length > 0) pieces.Add((plain.ToString(), null));
         return found ? pieces : null;
     }
+
+    /// <summary>前の文字と 1 つの音になる小さいかな (拗音・小さい母音。平仮名と片仮名)。っ・ッ は別の拍なので含めない。</summary>
+    private static bool IsSmallKana(char c) => c is 'ゃ' or 'ゅ' or 'ょ' or 'ぁ' or 'ぃ' or 'ぅ' or 'ぇ' or 'ぉ' or 'ゎ'
+        or 'ャ' or 'ュ' or 'ョ' or 'ァ' or 'ィ' or 'ゥ' or 'ェ' or 'ォ' or 'ヮ';
 
     // ---- 読み込み・保存 ----
 

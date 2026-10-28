@@ -192,7 +192,7 @@ beta cafe cage cane cape coma cone cube cure dine dire dome dope dude duke ego f
 lane logo meta mute nude nuke pane pine poke polo pope rage rake ripe rode rune sage sane soda solo tore
 wade wipe woke wore anime demo dojo emoji kimono karate tsunami typhoon tycoon
 # 技術用語 (日本語の文の中でもそのまま英字で書くことが多い)
-api apis url urls uri json yaml csv pdf png jpg jpeg gif svg html css xml sql ssh ssl tls dns ip tcp udp http https oem
+api apis url urls uri json yaml csv pdf png jpg jpeg gif svg html css xml sql ssh ssl tls dns ip tcp udp http https oem ost
 cpu gpu ram rom ssd hdd usb hdmi wifi bluetooth nfc os ui ux io ai ml llm gpt rag mcp sdk ide cli gui repo repos
 bug bugs issue issues pull push merge commit commits branch branches deploy build release tag tags diff patch
 token tokens prompt prompts model models agent agents tool tools server servers client clients browser
@@ -228,5 +228,13 @@ autoclicker
 clicker
 docs
 ext
+# --- 本家 #1191 bookoff (ぼおこっf になっていた)・#1131 の adb 単体 (あd… になっていた。adbyuukounisuru の adb + yu の形は、子音 + yu が拗音に読めるので直っていない) ---
+bookoff
+adb
 # --- 本家 #895 (2026-10-19): #887 exe (xe = ぇ と読めて えぇ になっていた) ---
 exe
+# --- 本家 #1148 (printenv・nohup・doomscroll)・本家の english-readable にある tmux・claudecode: ローマ字で最後まで読めず、pりんてんv・のふp・どおmscroll・tむx・claudecoで に割れていた ---
+printenv nohup doomscroll tmux claudecode
+# --- 本家の english-readable にある vocaloid・opencode: english-readable にも置くが、ここにも置く。english-readable にしか無い語は、
+# 確定直前の打ち間違いの補正 (CompositionText.FixTypos の EnglishMask) に守られず、表示 vocaloidは が Enter で ゔぉかぉいしゃ になっていた (査読 R-B) ---
+vocaloid opencode

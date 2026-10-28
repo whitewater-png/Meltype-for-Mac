@@ -24,6 +24,9 @@ vitamin warehouse warren whole whose
 # remain は入れない (remaindo = リマインド を re で打つ形が remainど になるため。査読 R33)。
 # まいんど (マインド) の頭なので、main + do・main + ku (マインクラフト) のように、続く 1 音とでよく使う語・ブランド名の読みの頭になるときは英語にしない (CompositionDetector.ContinuesJapaneseWord)。
 main domain
+# 本家 #1148 (vocaloid) と、本家に以前からあるツール名 (opencode)。
+# printenv・nohup・tmux・doomscroll・claudecode はローマ字で最後まで読めないので english.txt に置く (ここは読める語だけ。FeedbackTests の構造テスト)。
+vocaloid opencode
 # data: 入力の先頭と英語の後ろでは英語 (本家 #34)。日本語のすぐ後ろでは今までどおりかな (kyouhadatawo = きょうはだたを。NotAfterJapanese)
 data
 # overcute: over|cute に割れるが全体は日本語の語ではない (本家 #406、P45-1)

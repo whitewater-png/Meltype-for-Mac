@@ -94,6 +94,74 @@ internal static class MacSettingsTests
             Assert.True(!keys.Contains(excluded), $"{excluded} は入れない");
     }
 
+    /// <summary>
+    /// 設定タブの見た目の整理: 7 つのグループがこの順で出る・全項目に 1 行の要約がある・例は「→」を含む 1 行・
+    /// 画面に出る文 (説明・要約・例) に開発の事情 (本家・#番号・「Mac 版」) が無い・JSON に要約と例が出る。
+    /// </summary>
+    [Test]
+    public static void Catalog_GroupsSummariesAndExamples()
+    {
+        var groups = new List<string>();
+        foreach (var item in MacSettingsCatalog.Items)
+            if (!groups.Contains(item.Group)) groups.Add(item.Group);
+        Assert.Equal("変換の基本|英語と日本語の判定|キー操作|記号・句読点|候補に出すもの|辞書|ログ", string.Join("|", groups), "グループとその順");
+        // 同じグループの項目は続けて並ぶ (画面はグループの枠ごとに組むので、飛び地があると後ろの項目が別の枠に分かれる)
+        var seen = new HashSet<string>();
+        string? previous = null;
+        foreach (var item in MacSettingsCatalog.Items)
+        {
+            if (item.Group != previous) Assert.True(seen.Add(item.Group), $"「{item.Group}」の項目が離れて並んでいる ({item.Key})");
+            previous = item.Group;
+        }
+
+        var expected = string.Join(" / ", new[]
+        {
+            "変換の基本: LiveConversion Zenzai InputStyle CustomRomajiTable Prediction PredictionMinLength DownSelectsPrediction ContinueAfterConversion",
+            "英語と日本語の判定: DetectionLevel KanaInJapaneseMode KeepEnglishNameAfterEnglish DoubleSpaceToJapanese SpaceAroundEnglish ContextualLearning AutoCorrectAfterCommit CorrectTypos LaughterAfterKana",
+            "キー操作: TokMode TabConversion TabGridCandidates DeleteClauseOnBackspace ShiftEnterNewline EscStepsBack EnterCommitsAsShown AlphanumericKeyStartsAsTyped TypeDigitsAfterConversion ToggleLastWordCtrlKeys",
+            "記号・句読点: Punctuation FullWidthSymbols Parentheses Braces ZSymbolConversion SlashAsNakaguro",
+            "候補に出すもの: TranslationCandidates CalculatorCandidates ConsonantAbbreviations ClipboardCandidates ShowCandidateMeanings",
+            "辞書: DictionarySuggest DictionarySuggestThreshold",
+            "ログ: FileLog LogTypedText",
+        });
+        var actual = string.Join(" / ", MacSettingsCatalog.Items.GroupBy(i => i.Group).Select(g => g.Key + ": " + string.Join(" ", g.Select(i => i.Key))));
+        Assert.Equal(expected, actual, "項目の並びとグループ");
+
+        var examples = 0;
+        foreach (var item in MacSettingsCatalog.Items)
+        {
+            Assert.True(item.Summary is { Length: > 0 }, $"{item.Key} に要約が無い");
+            var summary = item.Summary!;
+            Assert.True(summary.Length <= 60 && !summary.Contains('\n'), $"{item.Key} の要約が長い ({summary.Length} 字)");
+            if (item.Example is { } example)
+            {
+                examples++;
+                Assert.True(example.Contains('→') && example.Length <= 60 && !example.Contains('\n'), $"{item.Key} の例は「→」を含む 60 字以内の 1 行: {example}");
+                Assert.True(!example.StartsWith("例"), $"{item.Key} の例に「例」を付けない (画面が付ける)");
+            }
+            // 入力メニューに無い切り替えを案内しない (メニューにあるのは辞書の登録提案だけ)
+            if (item.Key != nameof(Settings.DictionarySuggest))
+                foreach (var text in new[] { item.DisplayDescription, item.Summary ?? "", item.Example ?? "" })
+                    Assert.True(!text.Contains("入力メニュー"), $"{item.Key} の画面の文が入力メニューを案内している: {text}");
+            foreach (var text in new[] { item.DisplayDescription, summary, item.Example ?? "" })
+            {
+                foreach (var internalWord in new[] { "本家", "Mac 版", "Mac は", "Windows", "現在は" })
+                    Assert.True(!text.Contains(internalWord), $"{item.Key} の画面の文に開発の事情「{internalWord}」がある: {text}");
+                Assert.True(!System.Text.RegularExpressions.Regex.IsMatch(text, @"#\d"), $"{item.Key} の画面の文に issue / PR の番号がある: {text}");
+            }
+        }
+        Assert.True(examples >= 15, $"例のある項目が少ない ({examples})");
+
+        var json = MacSettingsCatalog.ToJson(new Settings());
+        var live = Item(json, nameof(Settings.LiveConversion));
+        Assert.Equal("変換の基本", live.GetProperty("group").GetString(), "ライブ変換のグループ");
+        Assert.True(live.GetProperty("summary").GetString()!.Length > 0, "JSON に要約がある");
+        Assert.True(live.GetProperty("example").GetString()!.Contains('→'), "JSON に例がある");
+        // 例の無い項目は、JSON に example を書かない (画面は例の行を出さない)
+        foreach (var item in MacSettingsCatalog.Items.Where(i => i.Example is null))
+            Assert.True(!Item(json, item.Key).TryGetProperty("example", out _), $"例の無い {item.Key} に example がある");
+    }
+
     [Test]
     public static void Catalog_DefaultsAndLimits_MatchSettings()
     {

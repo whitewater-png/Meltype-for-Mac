@@ -90,7 +90,7 @@ internal static class DoubleSpaceTests
         var item = Item(MacSettingsCatalog.ToJson(new Settings()), nameof(Settings.DoubleSpaceToJapanese));
         Assert.Equal("bool", item.GetProperty("kind").GetString());
         Assert.Equal(false, item.GetProperty("value").GetBoolean());
-        Assert.Equal("入力", item.GetProperty("group").GetString());
+        Assert.Equal("英語と日本語の判定", item.GetProperty("group").GetString());
         var attribute = typeof(Settings).GetProperty(nameof(Settings.DoubleSpaceToJapanese))!
             .GetCustomAttributes(typeof(System.ComponentModel.DisplayNameAttribute), false)
             .Cast<System.ComponentModel.DisplayNameAttribute>().Single();

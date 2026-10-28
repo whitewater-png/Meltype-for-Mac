@@ -4,7 +4,7 @@
 import AppKit
 import MeltypeDictionaryKit
 
-/// メインのウインドウ: 「ユーザー辞書」「専門用語集」「学習した語」「設定」「判定を調べる」のタブ。メニューの独自の項目 (登録・取り込み・書き出し・検索・タブの切り替え) を受ける
+/// メインのウインドウ: 「ユーザー辞書」「専門用語集」「学習した語」「判定を調べる」「設定」のタブ。メニューの独自の項目 (登録・取り込み・書き出し・検索・タブの切り替え) を受ける
 /// (ウインドウの delegate はアクションの responder chain に入る)。取り消す (⌘Z) は、ユーザー辞書・専門用語集のタブで 1 つの NSUndoManager を共有する
 /// (専門用語集の「直す」はユーザー辞書も変えるので、2 つのタブの変更は 1 本の履歴で戻す)。
 /// 「学習した語」「設定」「判定を調べる」のタブは辞書の取り消しを積まないので、そのタブを選んでいる間はタブごとに別の空の NSUndoManager を返す
@@ -38,7 +38,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         if let directory = dictionary.dataDirectory {
             window.subtitle = (directory as NSString).abbreviatingWithTildeInPath
         }
-        window.minSize = NSSize(width: 720, height: 460)
+        // 最小の大きさは、いちばん場所の要るタブ (専門用語集) に合わせる。幅約 778pt = 分野の一覧 + 右の列の下のボタンの列、
+        // 高さ約 476pt = 右の列 (説明・同梱の分野が OFF の案内・一覧の最小・ボタン・状態。自作の分野の名前がとても長いともう少し要る)。
+        // 窓の最小より狭い中身のタブがあると、そのタブを選んだだけで窓が広がり、ほかのタブに戻っても広いままになる。
+        window.minSize = NSSize(width: 780, height: 480)
         // ウインドウの状態を ~/Library/Saved Application State に残さない
         window.isRestorable = false
         super.init(window: window)
@@ -53,12 +56,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         let learnedTab = NSTabViewItem(viewController: learnedController)
         learnedTab.label = "学習した語"
         tabs.addTabViewItem(learnedTab)
-        let settingsTab = NSTabViewItem(viewController: settingsController)
-        settingsTab.label = "設定"
-        tabs.addTabViewItem(settingsTab)
+        // 「設定」は右端 (ほかのアプリの設定と同じく、いちばん端に置く)
         let judgeTab = NSTabViewItem(viewController: judgeController)
         judgeTab.label = "判定を調べる"
         tabs.addTabViewItem(judgeTab)
+        let settingsTab = NSTabViewItem(viewController: settingsController)
+        settingsTab.label = "設定"
+        tabs.addTabViewItem(settingsTab)
         window.contentViewController = tabs
         window.setContentSize(NSSize(width: 900, height: 620))
         window.delegate = self
@@ -103,12 +107,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     // ---- メニュー ----
 
     /// タブの位置 (表示メニューの ⌘1〜⌘5 と同じ順)。
-    private enum Tab: Int { case user = 0, term, learned, settings, judge }
+    private enum Tab: Int { case user = 0, term, learned, judge, settings }
 
-    /// 設定・判定を調べるのタブには検索が無い。
+    /// 判定を調べるのタブには検索が無い。
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(focusSearch(_:)): return ![Tab.settings.rawValue, Tab.judge.rawValue].contains(tabs.selectedTabViewItemIndex)
+        case #selector(focusSearch(_:)): return tabs.selectedTabViewItemIndex != Tab.judge.rawValue
         case #selector(moveToTermDomain(_:)): return tabs.selectedTabViewItemIndex == 0 && userController.hasSelection
         case #selector(exportTermDomain(_:)): return tabs.selectedTabViewItemIndex == 1 && termController.hasUserDomainSelected
         default: return true
@@ -135,7 +139,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case 0: userController.focusSearch()
         case 1: termController.focusSearch()
         case Tab.learned.rawValue: learnedController.focusSearch()
-        default: break   // 設定・判定を調べるのタブに検索は無い
+        case Tab.settings.rawValue: settingsController.focusSearch()
+        default: break   // 判定を調べるのタブに検索は無い
         }
     }
 

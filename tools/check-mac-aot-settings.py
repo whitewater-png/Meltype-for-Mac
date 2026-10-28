@@ -781,9 +781,9 @@ def check_settings_tab(lib_path, failures):
         expect(not {"Mode", "AutoUpdate", "AppRules", "Profiles"} & set(ops["keys"]), "Mac で効かない設定が一覧にある")
         # 入力方式 (かな入力 JIS) は Mac でも効く設定として一覧に出る。「両方を判定」(Both) は Windows の IME 自動切替用なので選択肢に出さない
         expect(ops["input_style"]["kind"] == "choice" and [o["value"] for o in ops["input_style"]["options"]] == ["Romaji", "Kana"], f"入力方式の選択肢が違う: {ops['input_style']}")
-        expect(ops["input_style"]["label"] == "入力方式" and ops["input_style"]["group"] == "入力" and ops["input_style"]["description"], "入力方式の名前・グループ・説明が違う")
+        expect(ops["input_style"]["label"] == "入力方式" and ops["input_style"]["group"] == "変換の基本" and ops["input_style"]["description"], "入力方式の名前・グループ・説明が違う")
         expect(ops["detection"]["kind"] == "choice" and [o["value"] for o in ops["detection"]["options"]] == ["Aggressive", "Balanced", "Conservative", "Manual"], f"選択肢が違う: {ops['detection']}")
-        expect(ops["detection"]["label"] == "自動判定の強さ" and ops["detection"]["group"] == "入力" and ops["detection"]["description"], "名前・グループ・説明が違う")
+        expect(ops["detection"]["label"] == "自動判定の強さ" and ops["detection"]["group"] == "英語と日本語の判定" and ops["detection"]["description"], "名前・グループ・説明が違う")
         expect(ops["min_length"]["kind"] == "int" and (ops["min_length"]["min"], ops["min_length"]["max"]) == (1, 5) and ops["min_length"]["value"] == 2, f"数の項目が違う: {ops['min_length']}")
         expect(ops["live_default"] is True, "ライブ変換が既定で ON でない")
         expect(ops["tab_default"] is False, f"Tab で変換が一覧に無い、または既定で OFF でない: {ops['tab_default']}")

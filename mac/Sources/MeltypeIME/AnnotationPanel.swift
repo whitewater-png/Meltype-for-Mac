@@ -116,14 +116,22 @@ final class AnnotationPanel {
         panel.orderFrontRegardless()
         hostFrame = frame
         startWatching()
+        // 意味のパネルは少し遅れて候補ウィンドウの横に出るので、「もしかして」の案内が重なっていれば置き直す。
+        SuggestionHint.misspelling.reposition()
         return .shown
     }
+
+    /// 出しているときの枠 (画面座標)。「もしかして」の案内が重ならないように避けるのに使う。出していなければ nil。
+    var visibleFrame: NSRect? { panel.isVisible ? panel.frame : nil }
 
     func hide() {
         watchTimer?.invalidate()
         watchTimer = nil
         hostFrame = nil
-        if panel.isVisible { panel.orderOut(nil) }
+        if panel.isVisible {
+            panel.orderOut(nil)
+            SuggestionHint.misspelling.reposition()
+        }
     }
 
     /// 出している間、候補ウィンドウが消えた・動いた・大きさが変わったら隠す。出し直すたびに古いタイマーを止めてから作る。

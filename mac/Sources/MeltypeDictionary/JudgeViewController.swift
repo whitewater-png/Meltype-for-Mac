@@ -107,12 +107,11 @@ final class JudgeViewController: NSViewController, NSTextFieldDelegate {
         let document = FlippedView()
         document.translatesAutoresizingMaskIntoConstraints = false
         document.addSubview(content)
-        let trailing = content.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -24)
-        trailing.priority = .defaultHigh
+        // 右端まで広げたいが、窓の大きさは動かさない (UI.fillWidth の説明。強さを高くすると、タブを選んだだけで窓が中身の幅まで縮む)
         NSLayoutConstraint.activate([
             content.topAnchor.constraint(equalTo: document.topAnchor, constant: 16),
             content.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 24),
-            trailing,
+        ] + UI.fillWidth(content, in: document, trailing: 24) + [
             content.widthAnchor.constraint(lessThanOrEqualToConstant: Self.maxContentWidth),
             content.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -20),
         ])

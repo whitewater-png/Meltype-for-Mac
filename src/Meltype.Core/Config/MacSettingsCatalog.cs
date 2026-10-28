@@ -35,6 +35,12 @@ internal sealed class MacSettingItem(string key, string label, string descriptio
 
     /// <summary>画面に出す説明。</summary>
     public string DisplayDescription => MacDescription ?? Description;
+
+    /// <summary>画面に常に出す 1 行の要約 (Mac の画面だけ)。</summary>
+    public string? Summary { get; set; }
+
+    /// <summary>要約の下に出す例 (打つもの → 結果)。無い項目もある。</summary>
+    public string? Example { get; set; }
     public string Group { get; } = group;
     public MacSettingKind Kind { get; } = kind;
     public IReadOnlyList<MacSettingOption> Options { get; init; } = [];
@@ -63,8 +69,12 @@ internal static class MacSettingsCatalog
     /// <summary>設定ファイルの場所。テストが差し替える。</summary>
     internal static Func<string> ConfigPath { get; set; } = () => AppPaths.ConfigFile;
 
-    private const string InputGroup = "入力";
-    private const string ConversionGroup = "変換・候補";
+    // グループ (画面の並び = 最初に出てくる順。Mac の一覧だけが持つ名前で、Windows の設定画面のカテゴリとは別)
+    private const string BasicGroup = "変換の基本";
+    private const string DetectionGroup = "英語と日本語の判定";
+    private const string KeysGroup = "キー操作";
+    private const string SymbolGroup = "記号・句読点";
+    private const string CandidateGroup = "候補に出すもの";
     private const string DictionaryGroup = "辞書";
     private const string LogGroup = "ログ";
 
@@ -76,13 +86,93 @@ internal static class MacSettingsCatalog
         [nameof(Settings.InputStyle)] = "ローマ字入力 / かな入力 (JIS)。かな入力は JIS キーボード専用の実験的な機能です (US 配列では使えません)。JIS かな配列で入力し (Shift+E = ぃ, Shift+Z = っ, Shift+ね = 、、濁点・半濁点は直前のかなに付く)、打ったキーの英字が英単語なら英字で見せます。JIS キーボード以外 (US 配列など) では、かな入力にしてもローマ字入力のまま動きます。変えると、次に打つ文字から効きます。",
         [nameof(Settings.CorrectTypos)] = "Space・Enter で変換・確定するときに打ち間違いを直します。ローマ字: 読めない子音が残ったとき、隣のキーの押し間違い・入れ替わり・抜けを 1 文字だけ直します (onegaishimsu → お願いします、sumimasne → すみません。よく使う語の読みになるときだけ)。英語: 同梱のよくある打ち間違いの一覧にある語を直します (teh → the、recieve → receive)。",
         [nameof(Settings.FileLog)] = "~/Library/Application Support/Meltype/meltype.log にログを書きます (OFF のときは書きません)。判定した語の先頭の数文字・アプリ名・入力欄の名前が含まれます。確定した文字列などは「ログに入力した文字を残す」が ON のときだけ残ります。",
-        [nameof(Settings.TabConversion)] = "打っている途中に Tab を押すと、Space と同じく変換を始めます。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、確定してから Tab をアプリに渡します。OFF のときは、今までどおり確定して Tab をアプリに渡します (フォームで日本語を打って Tab で次の欄へ移る操作が変わらないよう、Mac 版は既定 OFF。本家 Windows 版は既定 ON)。",
-        [nameof(Settings.DownSelectsPrediction)] = "入力中に ↓ を押したとき、予測候補が出ていれば Tab と同じく予測の選択に入ります。OFF のときは、今までどおり Space と同じく変換を始めます (本家 #993)。",
+        [nameof(Settings.TabConversion)] = "打っている途中に Tab を押すと、Space と同じく変換を始めます。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、確定してから Tab をアプリに渡します。OFF のときは、今までどおり確定して Tab をアプリに渡します (フォームで日本語を打って Tab で次の欄へ移る操作が変わらないよう、既定は OFF です)。",
+        [nameof(Settings.DownSelectsPrediction)] = "入力中に ↓ を押したとき、予測候補が出ていれば Tab と同じく予測の選択に入ります。OFF のときは、今までどおり Space と同じく変換を始めます。",
+        [nameof(Settings.ContinueAfterConversion)] = "Space で変換したあと、続けて文字を打っても確定せず、打った文字を含めて編集・変換を続けます。OFF のときは、今までどおり変換した結果を確定して新しい入力を始めます。",
+        [nameof(Settings.ShiftEnterNewline)] = "変換中に Shift+Enter を押すと、確定したうえで Shift+Enter をアプリに渡します (チャットや Web アプリでは改行)。OFF のときは Enter と同じく確定だけします。",
+        [nameof(Settings.DeleteClauseOnBackspace)] = "変換中に ← → で文節を選んでから BackSpace を押すと、その文節を消して、消した位置から打ち直せます。前の文節は変換したまま、後ろの文節も変換したままで、打ち直した文節の後ろに付けて確定します。文節を選ばずに BackSpace を押したときは、今までどおり変換を取り消してかなに戻ります。既定は OFF です。",
+        [nameof(Settings.TabGridCandidates)] = "変換中に Tab を押すと、候補の一覧を格子状 (5 列) に広げて出します。変換中は Tab で確定せず、次の候補へ移ります (Shift+Tab は前の候補、Enter で確定)。候補が 10 件以上あるときも、ページ送りをせずに一覧を見渡せます。OFF のときは、今までどおり変換中の Tab で確定してアプリに渡します。",
+        [nameof(Settings.ToggleLastWordCtrlKeys)] = "確定した直後の語を Ctrl+' (JIS キーボードは Ctrl+:) で英字に、Ctrl+J でかなに直します (F10 / F6 と同じ)。ターミナルの Ctrl+J (改行) と重なるので既定は OFF です。",
+        [nameof(Settings.Prediction)] = "ひらがなを数文字打つと、続きの候補 (ユーザー辞書・変換エンジン・過去に確定した語) を変換ボックスの下に出します。Tab で候補に入り、Enter で確定します。英語と判定した語には出しません。",
+        [nameof(Settings.DictionarySuggest)] = "選び直した変換 (漢字・カタカナ・英字を含む語) を数え、同じ読みと語を何度も確定したら、入力メニューに「辞書に登録」の提案を出します。数えるのは読みと語と回数だけで、前後の文章は保存しません。",
+        [nameof(Settings.CustomRomajiTable)] = "データフォルダー (~/Library/Application Support/Meltype) の dictionaries/romaji.tsv に、1 行 1 定義で「入力(英字)[タブ]出力(かな)」を書くと (例: ry[タブ]らい)、変換ボックスのかな変換で標準の綴りより優先します (最長一致。キーが全部揃ったときだけ置換。標準の綴りで先に読み終わるキー、たとえば ka があるのに kak だけ定義した場合は、キーボードで打つと ka が先に確定するので届きません)。入力は英字のほか、記号 ; : [ ] @ - , . / \u0027 ^ \\ もキーに使えます (記号入りのキーが揃ったときだけ表を優先)。表が無い・空・OFF のときは今までと同じです。英語かどうかの判定は、標準の綴りでは読めず表でだけ最後まで読める綴り (英単語として知られていない語) を日本語にするほかは表を使いません。書き方は GitHub の Meltype for Mac の docs/CUSTOM_ROMAJI.md にあります。",
+    };
+
+    /// <summary>画面に常に出す 1 行の要約 (Mac の画面だけ。全文の説明は「詳しく」の中)。全項目に書く (テストが確かめる)。</summary>
+    private static readonly Dictionary<string, string> MacSummaries = new()
+    {
+        [nameof(Settings.LiveConversion)] = "Space を押さなくても、打ったそばから漢字に変換して表示します。",
+        [nameof(Settings.Zenzai)] = "ON にすると、初回だけ変換モデル (約 74 MB) をダウンロードします。文脈に合う漢字が先頭に来やすくなります。",
+        [nameof(Settings.InputStyle)] = "ローマ字入力か、かな入力 (JIS キーボード専用・実験的) かを選びます。",
+        [nameof(Settings.CustomRomajiTable)] = "自分で書いたローマ字の綴り (dictionaries/romaji.tsv) を、標準の綴りより優先します。",
+        [nameof(Settings.Prediction)] = "ひらがなを数文字打つと、続きの候補を変換ボックスの下に出します (Tab で選ぶ)。",
+        [nameof(Settings.PredictionMinLength)] = "読みがこの文字数以上になってから、予測変換を出します。",
+        [nameof(Settings.DownSelectsPrediction)] = "予測候補が出ているとき、↓ で予測の選択に入ります (OFF のときは ↓ で変換)。",
+        [nameof(Settings.ContinueAfterConversion)] = "変換したあとに続けて打っても確定せず、そのまま編集・変換を続けます。",
+        [nameof(Settings.DetectionLevel)] = "英語か日本語かを自動で見分ける強さを選びます。",
+        [nameof(Settings.KanaInJapaneseMode)] = "一覧 (japanese-mode.txt) の語を、日本語の文の中ではかなで変換します。",
+        [nameof(Settings.KeepEnglishNameAfterEnglish)] = "英単語のすぐ後ろに打った大文字の名前を、英字のまま確定します。",
+        [nameof(Settings.DoubleSpaceToJapanese)] = "英語で確定した直後に Space をもう一度押すと、その語を日本語に読み直します。",
+        [nameof(Settings.SpaceAroundEnglish)] = "確定するとき、日本語と英単語の間に半角スペースを入れます。",
+        [nameof(Settings.ContextualLearning)] = "英字 / かなに直した学習を、直前が英語か日本語かで分けて覚えます。",
+        [nameof(Settings.AutoCorrectAfterCommit)] = "英語とも日本語とも読める語を、次の語で文脈が分かったら確定し直します。",
+        [nameof(Settings.CorrectTypos)] = "Space・Enter で変換・確定するときに、ローマ字と英単語の打ち間違いを直します。",
+        [nameof(Settings.LaughterAfterKana)] = "1 文字のかなの後ろの w を、英単語にせず笑いの w にします。",
+        [nameof(Settings.TokMode)] = "変換中の ← → ↓ などのキー操作を、ATOK と同じにします。",
+        [nameof(Settings.TabConversion)] = "入力中の Tab で、Space と同じく変換を始めます (OFF のときは確定して Tab を渡す)。",
+        [nameof(Settings.TabGridCandidates)] = "変換中の Tab で、候補を 5 列の格子に広げて見渡せるようにします。",
+        [nameof(Settings.DeleteClauseOnBackspace)] = "変換中に ← → で選んだ文節を BackSpace で消して、そこから打ち直せます。",
+        [nameof(Settings.ShiftEnterNewline)] = "変換中の Shift+Enter で、確定してから改行します (チャット向け)。",
+        [nameof(Settings.EscStepsBack)] = "入力中の Esc で全部消さず、一段ずつ戻します。",
+        [nameof(Settings.EnterCommitsAsShown)] = "Enter では打ち間違いを直さず、見えているとおりに確定します。",
+        [nameof(Settings.AlphanumericKeyStartsAsTyped)] = "F9 / F10 で英字にしたとき、1 回目は打ったままにし、続けて押すと大文字・小文字を切り替えます。",
+        [nameof(Settings.TypeDigitsAfterConversion)] = "変換した直後の数字を、候補の番号ではなく数字として入力します。",
+        [nameof(Settings.ToggleLastWordCtrlKeys)] = "確定した直後の語を、Ctrl+' (JIS は Ctrl+:) で英字に、Ctrl+J でかなに直します。",
+        [nameof(Settings.Punctuation)] = "日本語の中で , と . を打ったときの句読点を選びます。",
+        [nameof(Settings.FullWidthSymbols)] = "日本語の中で打った ! ? ~ などの記号を全角にします。",
+        [nameof(Settings.Parentheses)] = "日本語の中で打った ( ) を、半角にするか全角にするかを選びます。",
+        [nameof(Settings.Braces)] = "日本語の中で打った { } を、全角にするか半角にするかを選びます。",
+        [nameof(Settings.ZSymbolConversion)] = "z の直後に打った / . , - [ ] を記号にします。",
+        [nameof(Settings.SlashAsNakaguro)] = "日本語を確定した直後の / を、中黒 (・) にします (URL やパスを打つなら OFF)。",
+        [nameof(Settings.TranslationCandidates)] = "変換の候補の後ろに英訳も出します。",
+        [nameof(Settings.CalculatorCandidates)] = "計算式を打って変換すると、計算の結果を候補に出します。",
+        [nameof(Settings.ConsonantAbbreviations)] = "子音だけの略入力から、変換の候補を出します。",
+        [nameof(Settings.ClipboardCandidates)] = "「くりっぷぼーど」「ぺーすと」を変換すると、クリップボードの 1 行を候補に出します。",
+        [nameof(Settings.ShowCandidateMeanings)] = "変換中に候補で少し止まると、その意味を一覧の横に出します (橋・箸・端を選ぶ手がかりに)。",
+        [nameof(Settings.DictionarySuggest)] = "選び直して確定した語を何度も使うと、ユーザー辞書への登録を入力メニューで提案します。",
+        [nameof(Settings.DictionarySuggestThreshold)] = "同じ読みと語をこの回数確定したら、登録を提案します。",
+        [nameof(Settings.FileLog)] = "不具合を調べるためのログを meltype.log に書きます。",
+        [nameof(Settings.LogTypedText)] = "確定した文字や打った英字もログに残します (OFF のときは文字数だけ)。",
+    };
+
+    /// <summary>要約の下に出す例 (打つもの → 結果)。例を出せる項目だけ。説明文の例・実機で確かめた例だけを書く。</summary>
+    private static readonly Dictionary<string, string> MacExamples = new()
+    {
+        [nameof(Settings.LiveConversion)] = "kyouhagoogledekensaku → 今日はgoogleで検索 (Space なし)",
+        [nameof(Settings.InputStyle)] = "かな入力: Shift+E → ぃ、Shift+Z → っ",
+        [nameof(Settings.CustomRomajiTable)] = "表に ry[タブ]らい と書くと ry → らい",
+        [nameof(Settings.KanaInJapaneseMode)] = "日本語の中の exe → えぇ (拡張子の .exe は英字のまま)",
+        [nameof(Settings.KeepEnglishNameAfterEnglish)] = "Koki Ogawa → Koki Ogawa (OFF のときは Koki Oがわ)",
+        [nameof(Settings.DoubleSpaceToJapanese)] = "man Space Space → まん → 万",
+        [nameof(Settings.SpaceAroundEnglish)] = "今日はGitHubにpushした → 今日は GitHub に push した",
+        [nameof(Settings.AutoCorrectAfterCommit)] = "i → 胃 と確定したあとに want → I want",
+        [nameof(Settings.CorrectTypos)] = "onegaishimsu → お願いします、teh → the",
+        [nameof(Settings.LaughterAfterKana)] = "なるほどnew → なるほどねw",
+        [nameof(Settings.EscStepsBack)] = "漢字 → ひらがな → 打ったローマ字 → 消す",
+        [nameof(Settings.AlphanumericKeyStartsAsTyped)] = "hello F10 → hello、続けて F10 → HELLO → Hello",
+        [nameof(Settings.TypeDigitsAfterConversion)] = "zu Space 1 → 図1、hyou Space 10 → 表10",
+        [nameof(Settings.FullWidthSymbols)] = "!? → ！？",
+        [nameof(Settings.ZSymbolConversion)] = "z/ → ・、z. → …、z- → ～、z[ → 『",
+        [nameof(Settings.TranslationCandidates)] = "複雑な → complex, complicated",
+        [nameof(Settings.CalculatorCandidates)] = "1+2*3 Space → 候補に 7 と 1+2*3=7",
+        [nameof(Settings.ConsonantAbbreviations)] = "ast → 明日、ngt → ノート",
     };
 
     private static MacSettingItem WithMac(MacSettingItem item)
     {
         if (MacDescriptions.TryGetValue(item.Key, out var text)) item.MacDescription = text;
+        if (MacSummaries.TryGetValue(item.Key, out var summary)) item.Summary = summary;
+        if (MacExamples.TryGetValue(item.Key, out var example)) item.Example = example;
         return item;
     }
 
@@ -92,133 +182,136 @@ internal static class MacSettingsCatalog
     [
         Bool(nameof(Settings.LiveConversion), "ライブ変換",
             "Keyboard モードで、Space を押さなくても打ったそばから漢字に変換して表示します。",
-            InputGroup, s => s.LiveConversion, (s, v) => s.LiveConversion = v),
+            BasicGroup, s => s.LiveConversion, (s, v) => s.LiveConversion = v),
         Bool(nameof(Settings.Zenzai), "Zenzai (ニューラル変換、実験的)",
             "文脈に合う漢字が先頭に来やすくなります。ON にすると変換モデル (約 74 MB) を 1 回だけダウンロードします。ダウンロードが終わるまでは今までどおりの変換です。",
-            InputGroup, s => s.Zenzai, (s, v) => s.Zenzai = v),
-        Bool(nameof(Settings.ContinueAfterConversion), "変換後も続けて入力できる",
-            "Space で変換したあと、続けて文字を打っても確定せず、打った文字を含めて編集・変換を続ける。OFF のときは、今までどおり変換した結果を確定して新しい入力を始めます。現在は Mac 版だけで動きます (入力メニューの「変換後も続けて入力できる」で切り替え)。",
-            InputGroup, s => s.ContinueAfterConversion, (s, v) => s.ContinueAfterConversion = v),
-        Bool(nameof(Settings.TypeDigitsAfterConversion), "変換直後の数字は入力として打つ",
-            "Space や Tab で変換した直後に打った数字を、候補の番号ではなく、そのまま数字として入力します。例: zu Space 1 → 図1、hyou Space 3 → 表3、hyou Space 10 → 表10、denwa wa 03-1234-5678。OFF のときは、変換した直後から数字キーで候補を選びます (Space の直後の 2 で 2 番の候補)。ON にすると、Space の直後の数字では候補を選べなくなります。候補を動かした後 (↓・もう一度 Space・PageDown・← →) は、今までどおり数字キーで候補を選んで確定できます。",
-            InputGroup, s => s.TypeDigitsAfterConversion, (s, v) => s.TypeDigitsAfterConversion = v),
-        Bool(nameof(Settings.ShiftEnterNewline), "Shift+Enter で確定して改行",
-            "変換中に Shift+Enter を押すと、確定したうえで Shift+Enter をアプリに渡します (チャットや Web アプリでは改行)。OFF のときは Enter と同じく確定だけします。Mac 版は入力メニューの「Shift+Enter で確定して改行」で切り替え。",
-            InputGroup, s => s.ShiftEnterNewline, (s, v) => s.ShiftEnterNewline = v),
-        Bool(nameof(Settings.TokMode), "ATOK スタイルのキー操作",
-            "変換中のキー操作を ATOK と同じにします。← で文節を縮め、→ で文節を伸ばす (区切りを前 / うしろへ)。↓ で選んでいる文節までを確定 (部分確定)。Shift+← → で文節を移り、Ctrl+← → で先頭 / 最後の文節へ。次の候補は Space、前の候補は ↑。変換前の入力中は、Shift+↓ で先頭の 1 音だけを確定します (1 音確定)。OFF のときは、今までどおり ← → で文節を選び、↓ で次の候補、Shift+← → で区切りを変えます (Shift+↓ も ↓ と同じ)。",
-            InputGroup, s => s.TokMode, (s, v) => s.TokMode = v),
-        Bool(nameof(Settings.TabConversion), "Tab で変換",
-            "打っている途中に Tab を押すと、Space と同じく変換を始めます (Microsoft IME と同じ)。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、今までどおり確定してから Tab をアプリに渡します。",
-            InputGroup, s => s.TabConversion, (s, v) => s.TabConversion = v),
+            BasicGroup, s => s.Zenzai, (s, v) => s.Zenzai = v),
+        Choice(nameof(Settings.InputStyle), "入力方式",
+            "ローマ字入力 / かな入力 (JIS) / 両方を判定。Meltype キーボードでは、かな入力を選ぶと JIS かな配列で入力し (Shift+E = ぃ, Shift+Z = っ, Shift+ね = 、)、打ったキーの英字が英単語なら英字で見せます。「両方を判定」は IME 自動切替のみ (Meltype キーボードではローマ字入力)。",
+            BasicGroup, s => s.InputStyle, (s, v) => s.InputStyle = v,
+            (InputStyle.Romaji, "Romaji", "ローマ字入力"),
+            // 「両方を判定」(InputStyle.Both) は IME 自動切替 (Windows) 用で、Mac ではローマ字入力と同じ動きなので、選択肢に出さない。
+            (InputStyle.Kana, "Kana", "かな入力 (JIS)")),
+        Bool(nameof(Settings.CustomRomajiTable), "カスタムローマ字表を使う",
+            "データフォルダー (Mac は ~/Library/Application Support/Meltype) の dictionaries/romaji.tsv に、1 行 1 定義で「入力(英字)[タブ]出力(かな)」を書くと (例: ry[タブ]らい)、変換ボックスのかな変換で標準の綴りより優先します (最長一致。キーが全部揃ったときだけ置換。標準の綴りで先に読み終わるキー、たとえば ka があるのに kak だけ定義した場合は、キーボードで打つと ka が先に確定するので届きません)。入力は英字のほか、記号 ; : [ ] @ - , . / \u0027 ^ \\ もキーに使えます (記号入りのキーが揃ったときだけ表を優先)。表が無い・空・OFF のときは今までと同じです。英語かどうかの判定は、標準の綴りでは読めず表でだけ最後まで読める綴り (英単語として知られていない語) を日本語にするほかは表を使いません。書き方は docs/CUSTOM_ROMAJI.md を参照してください。",
+            BasicGroup, s => s.CustomRomajiTable, (s, v) => s.CustomRomajiTable = v),
+        Bool(nameof(Settings.Prediction), "予測変換",
+            "ひらがなを数文字打つと、続きの候補 (ユーザー辞書・変換エンジン・過去に確定した語) を変換ボックスの下に出します。Tab で候補に入り、Enter で確定します。英語と判定した語には出しません。現在は Mac 版だけで表示されます。",
+            BasicGroup, s => s.Prediction, (s, v) => s.Prediction = v),
+        Int(nameof(Settings.PredictionMinLength), "予測変換を出す最小の文字数",
+            "読みがこの文字数以上になってから予測変換を出します (1〜5)。",
+            BasicGroup, 1, 5, s => s.PredictionMinLength, (s, v) => s.PredictionMinLength = v),
         Bool(nameof(Settings.DownSelectsPrediction), "↓ で予測候補を選ぶ",
             "入力中に ↓ を押したとき、予測候補が出ていれば Tab と同じく予測の選択に入ります。OFF のときは、今までどおり Space と同じく変換を始めます (本家 #993)。",
-            InputGroup, s => s.DownSelectsPrediction, (s, v) => s.DownSelectsPrediction = v),
-        Bool(nameof(Settings.DeleteClauseOnBackspace), "変換中の BackSpace で選んだ文節を消す",
-            "変換中に ← → で文節を選んでから BackSpace を押すと、その文節を消して、消した位置から打ち直せます (本家 #972)。前の文節は変換したまま、後ろの文節も変換したままで、打ち直した文節の後ろに付けて確定します。文節を選ばずに BackSpace を押したときは、今までどおり変換を取り消してかなに戻ります。既定は OFF です。",
-            InputGroup, s => s.DeleteClauseOnBackspace, (s, v) => s.DeleteClauseOnBackspace = v),
-        Bool(nameof(Settings.TabGridCandidates), "Tab で候補を格子状に広げる",
-            "変換中に Tab を押すと、候補の一覧を格子状 (5 列) に広げて出します (本家 #1016)。変換中は Tab で確定せず、次の候補へ移ります (Shift+Tab は前の候補、Enter で確定)。候補が 10 件以上あるときも、ページ送りをせずに一覧を見渡せます。OFF のときは、今までどおり変換中の Tab で確定してアプリに渡します。",
-            InputGroup, s => s.TabGridCandidates, (s, v) => s.TabGridCandidates = v),
-        Bool(nameof(Settings.ToggleLastWordCtrlKeys), "確定した直後の語を Ctrl+' / Ctrl+J で直す",
-            "確定した直後の語を Ctrl+' で英字に、Ctrl+J でかなに直します (F10 / F6 と同じ)。ターミナルの Ctrl+J (改行) と重なるので既定は OFF。現在は Mac 版だけで動きます。",
-            InputGroup, s => s.ToggleLastWordCtrlKeys, (s, v) => s.ToggleLastWordCtrlKeys = v),
+            BasicGroup, s => s.DownSelectsPrediction, (s, v) => s.DownSelectsPrediction = v),
+        Bool(nameof(Settings.ContinueAfterConversion), "変換後も続けて入力できる",
+            "Space で変換したあと、続けて文字を打っても確定せず、打った文字を含めて編集・変換を続ける。OFF のときは、今までどおり変換した結果を確定して新しい入力を始めます。現在は Mac 版だけで動きます (入力メニューの「変換後も続けて入力できる」で切り替え)。",
+            BasicGroup, s => s.ContinueAfterConversion, (s, v) => s.ContinueAfterConversion = v),
+
         Choice(nameof(Settings.DetectionLevel), "自動判定の強さ",
             "積極的 = 英語らしければすぐ英字 / 標準 = 短い語 (no, to, ga) は前後が英語のときだけ英字 / 慎重 = 確信度が高いときだけ英字 / 手動 = 自動では切り替えず提案だけ (変換ボックスで Tab を押すと提案どおり英字に)。Meltype キーボード・IME 自動切替・英数状態の検知・かな入力のすべてに効きます。",
-            InputGroup, s => s.DetectionLevel, (s, v) => s.DetectionLevel = v,
+            DetectionGroup, s => s.DetectionLevel, (s, v) => s.DetectionLevel = v,
             (DetectionLevel.Aggressive, "Aggressive", "積極的 (Aggressive)"),
             (DetectionLevel.Balanced, "Balanced", "標準 (Balanced)"),
             (DetectionLevel.Conservative, "Conservative", "慎重 (Conservative)"),
             (DetectionLevel.Manual, "Manual", "手動 (提案のみ)")),
         Bool(nameof(Settings.KanaInJapaneseMode), "日本語入力中は一覧の語をかなで変換",
             "dictionaries/japanese-mode.txt に書いた語 (exe など) を、日本語の文脈で打ったときは英字ではなく かな (えぇ) として変換します。英語の文の中 (前が英単語) とファイルの拡張子 (.exe) は今までどおり英字のままです。",
-            InputGroup, s => s.KanaInJapaneseMode, (s, v) => s.KanaInJapaneseMode = v),
-        Bool(nameof(Settings.CustomRomajiTable), "カスタムローマ字表を使う",
-            "データフォルダー (Mac は ~/Library/Application Support/Meltype) の dictionaries/romaji.tsv に、1 行 1 定義で「入力(英字)[タブ]出力(かな)」を書くと (例: ry[タブ]らい)、変換ボックスのかな変換で標準の綴りより優先します (最長一致。キーが全部揃ったときだけ置換。標準の綴りで先に読み終わるキー、たとえば ka があるのに kak だけ定義した場合は、キーボードで打つと ka が先に確定するので届きません)。入力は英字のほか、記号 ; : [ ] @ - , . / \u0027 ^ \\ もキーに使えます (記号入りのキーが揃ったときだけ表を優先)。表が無い・空・OFF のときは今までと同じです。英語かどうかの判定は、標準の綴りでは読めず表でだけ最後まで読める綴り (英単語として知られていない語) を日本語にするほかは表を使いません。書き方は docs/CUSTOM_ROMAJI.md を参照してください。",
-            InputGroup, s => s.CustomRomajiTable, (s, v) => s.CustomRomajiTable = v),
+            DetectionGroup, s => s.KanaInJapaneseMode, (s, v) => s.KanaInJapaneseMode = v),
         Bool(nameof(Settings.KeepEnglishNameAfterEnglish), "英単語の後ろの英字の名前を英語にする",
             "英単語 (Koki など) のすぐ後ろに続けて打った大文字の英字 (Ogawa など) を、日本語の文の中でも英字のまま確定します。OFF のときは今までどおり、O|gawa のように 1 文字の大文字と助詞で始まる語に分かれます。",
-            InputGroup, s => s.KeepEnglishNameAfterEnglish, (s, v) => s.KeepEnglishNameAfterEnglish = v),
-        Choice(nameof(Settings.InputStyle), "入力方式",
-            "ローマ字入力 / かな入力 (JIS) / 両方を判定。Meltype キーボードでは、かな入力を選ぶと JIS かな配列で入力し (Shift+E = ぃ, Shift+Z = っ, Shift+ね = 、)、打ったキーの英字が英単語なら英字で見せます。「両方を判定」は IME 自動切替のみ (Meltype キーボードではローマ字入力)。",
-            InputGroup, s => s.InputStyle, (s, v) => s.InputStyle = v,
-            (InputStyle.Romaji, "Romaji", "ローマ字入力"),
-            // 「両方を判定」(InputStyle.Both) は IME 自動切替 (Windows) 用で、Mac ではローマ字入力と同じ動きなので、選択肢に出さない。
-            (InputStyle.Kana, "Kana", "かな入力 (JIS)")),
-        Bool(nameof(Settings.AutoCorrectAfterCommit), "確定後も文脈に合わせて直す",
-            "英語とも日本語とも読める語 (i, sushi など) を確定した後、次の語で英語か日本語かがはっきりしたら自動で確定し直します (i → 胃 と確定した後に want と打つと I want)。",
-            InputGroup, s => s.AutoCorrectAfterCommit, (s, v) => s.AutoCorrectAfterCommit = v),
-        Bool(nameof(Settings.CorrectTypos), "打ち間違いを直す",
-            "Space・Enter で変換・確定するときに打ち間違いを直します。ローマ字: 読めない子音が残ったとき、隣のキーの押し間違い・入れ替わり・抜けを 1 文字だけ直します (onegaishimsu → お願いします、sumimasne → すみません。よく使う語の読みになるときだけ)。英語: Windows の自動修正の一覧にある打ち間違いを直します (teh → the、recieve → receive)。",
-            InputGroup, s => s.CorrectTypos, (s, v) => s.CorrectTypos = v),
+            DetectionGroup, s => s.KeepEnglishNameAfterEnglish, (s, v) => s.KeepEnglishNameAfterEnglish = v),
+        Bool(nameof(Settings.DoubleSpaceToJapanese), "英語の直後の Space 2 回で日本語に読み直す",
+            "英語と判定された語を Space で確定して空白が入った直後に、Space をもう一度押すと、その空白を取り、直前の語だけを日本語として読み直して変換候補を開きます (man␣␣ → まん → 万)。Esc で元の英語に戻ります。英文の途中でも対象は直前の語だけです。英文で空白を 2 つ続けて打ちたい人は OFF のままにしてください。",
+            DetectionGroup, s => s.DoubleSpaceToJapanese, (s, v) => s.DoubleSpaceToJapanese = v),
         Bool(nameof(Settings.SpaceAroundEnglish), "英単語の前後に半角スペース",
             "確定するときに、日本語と英単語の間に半角スペースを入れます (今日はGitHubにpushした → 今日は GitHub に push した)。数字だけの語 (3時) には入れません。",
-            InputGroup, s => s.SpaceAroundEnglish, (s, v) => s.SpaceAroundEnglish = v),
+            DetectionGroup, s => s.SpaceAroundEnglish, (s, v) => s.SpaceAroundEnglish = v),
+        Bool(nameof(Settings.ContextualLearning), "英語 / 日本語の学習を前の文脈ごとに分ける",
+            "英字 / かなに直した語 (new → ねw など) の学習を、直前が英語だったか日本語だったかごとに別々に覚えます。同じローマ字でも、英語の文の中と日本語の文の中で使い分けられます。ON にする前に覚えた学習は、どちらの文脈でも使います。",
+            DetectionGroup, s => s.ContextualLearning, (s, v) => s.ContextualLearning = v),
+        Bool(nameof(Settings.AutoCorrectAfterCommit), "確定後も文脈に合わせて直す",
+            "英語とも日本語とも読める語 (i, sushi など) を確定した後、次の語で英語か日本語かがはっきりしたら自動で確定し直します (i → 胃 と確定した後に want と打つと I want)。",
+            DetectionGroup, s => s.AutoCorrectAfterCommit, (s, v) => s.AutoCorrectAfterCommit = v),
+        Bool(nameof(Settings.CorrectTypos), "打ち間違いを直す",
+            "Space・Enter で変換・確定するときに打ち間違いを直します。ローマ字: 読めない子音が残ったとき、隣のキーの押し間違い・入れ替わり・抜けを 1 文字だけ直します (onegaishimsu → お願いします、sumimasne → すみません。よく使う語の読みになるときだけ)。英語: Windows の自動修正の一覧にある打ち間違いを直します (teh → the、recieve → receive)。",
+            DetectionGroup, s => s.CorrectTypos, (s, v) => s.CorrectTypos = v),
+        Bool(nameof(Settings.LaughterAfterKana), "かな + w を笑い (ねw・さw) にする",
+            "ね・さ などの 1 文字のかなの後ろの w を、英単語 (new・saw) にせず笑いの w にします (なるほどnew → なるほどねw)。英単語の new や saw を打つ人は OFF のままにしてください。",
+            DetectionGroup, s => s.LaughterAfterKana, (s, v) => s.LaughterAfterKana = v),
+
+        Bool(nameof(Settings.TokMode), "ATOK スタイルのキー操作",
+            "変換中のキー操作を ATOK と同じにします。← で文節を縮め、→ で文節を伸ばす (区切りを前 / うしろへ)。↓ で選んでいる文節までを確定 (部分確定)。Shift+← → で文節を移り、Ctrl+← → で先頭 / 最後の文節へ。次の候補は Space、前の候補は ↑。変換前の入力中は、Shift+↓ で先頭の 1 音だけを確定します (1 音確定)。OFF のときは、今までどおり ← → で文節を選び、↓ で次の候補、Shift+← → で区切りを変えます (Shift+↓ も ↓ と同じ)。",
+            KeysGroup, s => s.TokMode, (s, v) => s.TokMode = v),
+        Bool(nameof(Settings.TabConversion), "Tab で変換",
+            "打っている途中に Tab を押すと、Space と同じく変換を始めます (Microsoft IME と同じ)。Tab で始めた変換の中では Tab で次の候補、Shift+Tab で前の候補、Enter で確定します。もしかして・手動の提案・予測変換の候補が出ているときは、今までどおりそちらに使います。英語で終わっているとき・Space で始めた変換の中では、今までどおり確定してから Tab をアプリに渡します。",
+            KeysGroup, s => s.TabConversion, (s, v) => s.TabConversion = v),
+        Bool(nameof(Settings.TabGridCandidates), "Tab で候補を格子状に広げる",
+            "変換中に Tab を押すと、候補の一覧を格子状 (5 列) に広げて出します (本家 #1016)。変換中は Tab で確定せず、次の候補へ移ります (Shift+Tab は前の候補、Enter で確定)。候補が 10 件以上あるときも、ページ送りをせずに一覧を見渡せます。OFF のときは、今までどおり変換中の Tab で確定してアプリに渡します。",
+            KeysGroup, s => s.TabGridCandidates, (s, v) => s.TabGridCandidates = v),
+        Bool(nameof(Settings.DeleteClauseOnBackspace), "変換中の BackSpace で選んだ文節を消す",
+            "変換中に ← → で文節を選んでから BackSpace を押すと、その文節を消して、消した位置から打ち直せます (本家 #972)。前の文節は変換したまま、後ろの文節も変換したままで、打ち直した文節の後ろに付けて確定します。文節を選ばずに BackSpace を押したときは、今までどおり変換を取り消してかなに戻ります。既定は OFF です。",
+            KeysGroup, s => s.DeleteClauseOnBackspace, (s, v) => s.DeleteClauseOnBackspace = v),
+        Bool(nameof(Settings.ShiftEnterNewline), "Shift+Enter で確定して改行",
+            "変換中に Shift+Enter を押すと、確定したうえで Shift+Enter をアプリに渡します (チャットや Web アプリでは改行)。OFF のときは Enter と同じく確定だけします。Mac 版は入力メニューの「Shift+Enter で確定して改行」で切り替え。",
+            KeysGroup, s => s.ShiftEnterNewline, (s, v) => s.ShiftEnterNewline = v),
+        Bool(nameof(Settings.EscStepsBack), "Esc で一段ずつ戻す",
+            "入力中の Esc を、打った内容を全部消すのではなく一段ずつ戻します (漢字 → ひらがな → 打ったローマ字 → 消す。見た目が変わらない段は飛ばします)。戻した語は、日本語 / 英語の判定として覚えません。",
+            KeysGroup, s => s.EscStepsBack, (s, v) => s.EscStepsBack = v),
+        Bool(nameof(Settings.EnterCommitsAsShown), "Enter は見えているとおりに確定",
+            "Enter で確定するとき、打ち間違いの自動修正をせず、変換ボックスに見えているとおりに確定します (Space で変換するときの修正は今までどおりです)。",
+            KeysGroup, s => s.EnterCommitsAsShown, (s, v) => s.EnterCommitsAsShown = v),
+        Bool(nameof(Settings.AlphanumericKeyStartsAsTyped), "F9 / F10 の 1 回目は打ったまま",
+            "入力中に F9 (全角) / F10 (半角) で英字にしたとき、1 回目は常に打ったまま (小文字) の英字にします。続けて押すと、すべて大文字 → 先頭だけ大文字 → 打ったまま と切り替わります。OFF のときは、何回押しても打ったままの英字で、大文字・小文字は切り替わりません。確定後の F10 / F6 には関係しません。",
+            KeysGroup, s => s.AlphanumericKeyStartsAsTyped, (s, v) => s.AlphanumericKeyStartsAsTyped = v),
+        Bool(nameof(Settings.TypeDigitsAfterConversion), "変換直後の数字は入力として打つ",
+            "Space や Tab で変換した直後に打った数字を、候補の番号ではなく、そのまま数字として入力します。例: zu Space 1 → 図1、hyou Space 3 → 表3、hyou Space 10 → 表10、denwa wa 03-1234-5678。OFF のときは、変換した直後から数字キーで候補を選びます (Space の直後の 2 で 2 番の候補)。ON にすると、Space の直後の数字では候補を選べなくなります。候補を動かした後 (↓・もう一度 Space・PageDown・← →) は、今までどおり数字キーで候補を選んで確定できます。",
+            KeysGroup, s => s.TypeDigitsAfterConversion, (s, v) => s.TypeDigitsAfterConversion = v),
+        Bool(nameof(Settings.ToggleLastWordCtrlKeys), "確定した直後の語を Ctrl+' / Ctrl+J で直す",
+            "確定した直後の語を Ctrl+' で英字に、Ctrl+J でかなに直します (F10 / F6 と同じ)。ターミナルの Ctrl+J (改行) と重なるので既定は OFF。現在は Mac 版だけで動きます。",
+            KeysGroup, s => s.ToggleLastWordCtrlKeys, (s, v) => s.ToggleLastWordCtrlKeys = v),
+
         Choice(nameof(Settings.Punctuation), "句読点の表記",
             "日本語の中で , と . を打ったときの句読点。技術文書・論文で「，．」を指定されるときに使います。変換ボックスに入っている間の入力から変わります。",
-            InputGroup, s => s.Punctuation, (s, v) => s.Punctuation = v,
+            SymbolGroup, s => s.Punctuation, (s, v) => s.Punctuation = v,
             (PunctuationStyle.Japanese, "Japanese", "、。"),
             (PunctuationStyle.Comma, "Comma", "，．"),
             (PunctuationStyle.CommaJapanese, "CommaJapanese", "，。")),
-        Bool(nameof(Settings.ZSymbolConversion), "z + 記号を変換する",
-            "z の直後に / . , - [ ] を打つと ・ … ‥ ～ 『 』 にします。OFF にすると打ったまま (z/ → z/) になります。z + h j k l の矢印 (← ↓ ↑ →) は、この設定にかかわらず今までどおりです。",
-            InputGroup, s => s.ZSymbolConversion, (s, v) => s.ZSymbolConversion = v),
-        Bool(nameof(Settings.SlashAsNakaguro), "日本語の直後の / を ・ にする",
-            "日本語を確定した直後に / を打つと、スラッシュではなく中黒 (・) を入れます。URL やパスを打つときは OFF のままにしてください。",
-            InputGroup, s => s.SlashAsNakaguro, (s, v) => s.SlashAsNakaguro = v),
-        Bool(nameof(Settings.DoubleSpaceToJapanese), "英語の直後の Space 2 回で日本語に読み直す",
-            "英語と判定された語を Space で確定して空白が入った直後に、Space をもう一度押すと、その空白を取り、直前の語だけを日本語として読み直して変換候補を開きます (man␣␣ → まん → 万)。Esc で元の英語に戻ります。英文の途中でも対象は直前の語だけです。英文で空白を 2 つ続けて打ちたい人は OFF のままにしてください。",
-            InputGroup, s => s.DoubleSpaceToJapanese, (s, v) => s.DoubleSpaceToJapanese = v),
-        Bool(nameof(Settings.EscStepsBack), "Esc で一段ずつ戻す",
-            "入力中の Esc を、打った内容を全部消すのではなく一段ずつ戻します (漢字 → ひらがな → 打ったローマ字 → 消す。見た目が変わらない段は飛ばします)。戻した語は、日本語 / 英語の判定として覚えません。",
-            InputGroup, s => s.EscStepsBack, (s, v) => s.EscStepsBack = v),
-        Bool(nameof(Settings.EnterCommitsAsShown), "Enter は見えているとおりに確定",
-            "Enter で確定するとき、打ち間違いの自動修正をせず、変換ボックスに見えているとおりに確定します (Space で変換するときの修正は今までどおりです)。",
-            InputGroup, s => s.EnterCommitsAsShown, (s, v) => s.EnterCommitsAsShown = v),
-        Bool(nameof(Settings.AlphanumericKeyStartsAsTyped), "F9 / F10 の 1 回目は打ったまま",
-            "入力中に F9 (全角) / F10 (半角) で英字にしたとき、1 回目は常に打ったまま (小文字) の英字にします。続けて押すと、すべて大文字 → 先頭だけ大文字 → 打ったまま と切り替わります。OFF のときは、何回押しても打ったままの英字で、大文字・小文字は切り替わりません。確定後の F10 / F6 には関係しません。",
-            InputGroup, s => s.AlphanumericKeyStartsAsTyped, (s, v) => s.AlphanumericKeyStartsAsTyped = v),
         Bool(nameof(Settings.FullWidthSymbols), "記号を全角にする",
             "日本語の中で打った ! ? ~ などの記号を全角 (！？～) にします。OFF にすると、打ったままの半角で入ります (チャットで !? を半角にしたいとき)。",
-            InputGroup, s => s.FullWidthSymbols, (s, v) => s.FullWidthSymbols = v),
+            SymbolGroup, s => s.FullWidthSymbols, (s, v) => s.FullWidthSymbols = v),
         Choice(nameof(Settings.Parentheses), "丸括弧 ( ) の幅",
             "日本語の中で打った ( ) を、半角 ( ) にするか全角 （ ） にするか。英語の中や、すぐ後ろが英語のときは、この設定にかかわらず半角です。[ ] は日本語と判定したときは「」、英語と判定したときは [ ] で、自動判定のままです。",
-            InputGroup, s => s.Parentheses, (s, v) => s.Parentheses = v,
+            SymbolGroup, s => s.Parentheses, (s, v) => s.Parentheses = v,
             (ParenthesisWidth.HalfWidth, "HalfWidth", "半角 ( )"),
             (ParenthesisWidth.FullWidth, "FullWidth", "全角 （ ）")),
         Choice(nameof(Settings.Braces), "中括弧 { } の幅",
             "日本語の中で打った { } を、全角 ｛ ｝ にするか半角 { } にするか。英語の中や、すぐ後ろが英語のときは、この設定にかかわらず半角です。",
-            InputGroup, s => s.Braces, (s, v) => s.Braces = v,
+            SymbolGroup, s => s.Braces, (s, v) => s.Braces = v,
             (BraceWidth.HalfWidth, "HalfWidth", "半角 { }"),
             (BraceWidth.FullWidth, "FullWidth", "全角 ｛ ｝")),
+        Bool(nameof(Settings.ZSymbolConversion), "z + 記号を変換する",
+            "z の直後に / . , - [ ] を打つと ・ … ‥ ～ 『 』 にします。OFF にすると打ったまま (z/ → z/) になります。z + h j k l の矢印 (← ↓ ↑ →) は、この設定にかかわらず今までどおりです。",
+            SymbolGroup, s => s.ZSymbolConversion, (s, v) => s.ZSymbolConversion = v),
+        Bool(nameof(Settings.SlashAsNakaguro), "日本語の直後の / を ・ にする",
+            "日本語を確定した直後に / を打つと、スラッシュではなく中黒 (・) を入れます。URL やパスを打つときは OFF のままにしてください。",
+            SymbolGroup, s => s.SlashAsNakaguro, (s, v) => s.SlashAsNakaguro = v),
 
         Bool(nameof(Settings.TranslationCandidates), "英訳の候補",
             "変換の候補の後ろに英訳も出します (複雑な → complex, complicated)。JMdict のよく使う語から。選んだ英訳は少しずつ前に出ます。",
-            ConversionGroup, s => s.TranslationCandidates, (s, v) => s.TranslationCandidates = v),
+            CandidateGroup, s => s.TranslationCandidates, (s, v) => s.TranslationCandidates = v),
         Bool(nameof(Settings.CalculatorCandidates), "計算式を変換すると結果を候補に出す",
             "数字と + - * / ( ) だけの式を打って Space で変換すると、計算した結果 (1+2*3 → 7) と「式=結果」を候補に出します。",
-            ConversionGroup, s => s.CalculatorCandidates, (s, v) => s.CalculatorCandidates = v),
+            CandidateGroup, s => s.CalculatorCandidates, (s, v) => s.CalculatorCandidates = v),
         Bool(nameof(Settings.ConsonantAbbreviations), "子音の略入力を候補に出す",
             "子音だけの略入力 (ast → 明日、ngt → ノート など) を、変換の候補に出します。候補は同梱の candidates.txt の英字の読みから出します。既定は OFF です。",
-            ConversionGroup, s => s.ConsonantAbbreviations, (s, v) => s.ConsonantAbbreviations = v),
-        Bool(nameof(Settings.ContextualLearning), "英語 / 日本語の学習を前の文脈ごとに分ける",
-            "英字 / かなに直した語 (new → ねw など) の学習を、直前が英語だったか日本語だったかごとに別々に覚えます。同じローマ字でも、英語の文の中と日本語の文の中で使い分けられます。ON にする前に覚えた学習は、どちらの文脈でも使います。",
-            ConversionGroup, s => s.ContextualLearning, (s, v) => s.ContextualLearning = v),
-        Bool(nameof(Settings.LaughterAfterKana), "かな + w を笑い (ねw・さw) にする",
-            "ね・さ などの 1 文字のかなの後ろの w を、英単語 (new・saw) にせず笑いの w にします (なるほどnew → なるほどねw)。英単語の new や saw を打つ人は OFF のままにしてください。",
-            ConversionGroup, s => s.LaughterAfterKana, (s, v) => s.LaughterAfterKana = v),
+            CandidateGroup, s => s.ConsonantAbbreviations, (s, v) => s.ConsonantAbbreviations = v),
         Bool(nameof(Settings.ClipboardCandidates), "クリップボードの文字を候補に出す",
             "くりっぷぼーど・ぺーすと を変換したときに、クリップボードの 1 行 (200 文字まで) を候補に出します。変換した瞬間に 1 回だけ読み、保存も送信もしません。パスワード管理ソフトなど「履歴に残さない」印のある内容は読みません。既定は OFF です。",
-            ConversionGroup, s => s.ClipboardCandidates, (s, v) => s.ClipboardCandidates = v),
+            CandidateGroup, s => s.ClipboardCandidates, (s, v) => s.ClipboardCandidates = v),
         Bool(nameof(Settings.ShowCandidateMeanings), "候補の意味を表示",
             "変換中に同じ候補で少し (約 1.5 秒) 止まると、その候補の意味をウィクショナリー日本語版から候補の一覧の横に出します (日本語の意味が無い語は JMdict の英訳: 橋 → bridge)。同音異義語を選ぶときの手がかりに。",
-            ConversionGroup, s => s.ShowCandidateMeanings, (s, v) => s.ShowCandidateMeanings = v),
-        Bool(nameof(Settings.Prediction), "予測変換",
-            "ひらがなを数文字打つと、続きの候補 (ユーザー辞書・変換エンジン・過去に確定した語) を変換ボックスの下に出します。Tab で候補に入り、Enter で確定します。英語と判定した語には出しません。現在は Mac 版だけで表示されます。",
-            ConversionGroup, s => s.Prediction, (s, v) => s.Prediction = v),
-        Int(nameof(Settings.PredictionMinLength), "予測変換を出す最小の文字数",
-            "読みがこの文字数以上になってから予測変換を出します (1〜5)。",
-            ConversionGroup, 1, 5, s => s.PredictionMinLength, (s, v) => s.PredictionMinLength = v),
+            CandidateGroup, s => s.ShowCandidateMeanings, (s, v) => s.ShowCandidateMeanings = v),
 
         Bool(nameof(Settings.DictionarySuggest), "ユーザー辞書への登録提案",
             "選び直した変換 (漢字・カタカナ・英字を含む語) を数え、同じ読みと語を何度も確定したら、入力メニューに「辞書に登録」の提案を出します。数えるのは読みと語と回数だけで、前後の文章は保存しません。現在は Mac 版だけで表示されます。",
@@ -291,7 +384,7 @@ internal static class MacSettingsCatalog
     private static MacSettingItem? Find(string key) => Items.FirstOrDefault(i => i.Key == key);
 
     /// <summary>
-    /// 画面に出す項目と今の値の JSON: {"items":[{"key","label","description","group","kind":"bool|choice|int","value", "options":[{"value","label"}] (choice), "min","max" (int)}]}。
+    /// 画面に出す項目と今の値の JSON: {"items":[{"key","label","description","summary","example" (無い項目もある),"group","kind":"bool|choice|int","value", "options":[{"value","label"}] (choice), "min","max" (int)}]}。
     /// 項目の並びと group の並びが、そのまま画面の並び。
     /// </summary>
     public static string ToJson(Settings settings)
@@ -307,6 +400,8 @@ internal static class MacSettingsCatalog
                 w.WriteString("key", item.Key);
                 w.WriteString("label", item.Label);
                 w.WriteString("description", item.DisplayDescription);
+                if (item.Summary is { } summary) w.WriteString("summary", summary);
+                if (item.Example is { } example) w.WriteString("example", example);
                 w.WriteString("group", item.Group);
                 w.WriteString("kind", item.Kind switch { MacSettingKind.Bool => "bool", MacSettingKind.Choice => "choice", _ => "int" });
                 w.WritePropertyName("value");
