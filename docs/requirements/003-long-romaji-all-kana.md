@@ -1,7 +1,7 @@
 ---
 title: 確定せずに長文を打ち続けたとき、途中から英字のまま残らないことを Core で測って守る
-status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-10-27.md 候補 3
-source: docs/voice/2026-10-27.md 候補 3 (note の Mac 利用記: 確定せずに長文を打ち続けると、途中からアルファベットのままになることがあった)
+status: approved   # 定期タスクによる自動承認 (定期タスクを設定したリョウさんの指示)。元: docs/voice/2026-10-27.md 候補 3
+source: docs/voice/2026-10-27.md 候補 3 (ブランチ voice/2026-10-27、まだ main に無い。note の Mac 利用記: 確定せずに長文を打ち続けると、途中からアルファベットのままになることがあった)
 scope: core
 ---
 
@@ -27,7 +27,7 @@ scope: core
 ## 完成条件 (先に決める。機械で判定できる形)
 - [x] テスト: `src/Meltype.Core.Tests/LongInputTests.cs` に `Req003_LongRomajiText_AllBecomesKana` を足す (420 文字超の日本語のローマ字文。確定前の表示に英字が無く、Enter 後の入力欄が期待のかな全文と一致)。
 - [x] 先に赤: 通る見込みの「守りのテスト」なので、実装前に赤にはならない。代わりに、期待のかなを 1 か所わざと変えると落ちることを確かめた。
-- [x] 回帰なし: Core のテスト全件通過。正解表は触らない (eval-compare は broken 0 のはず)。
+- [x] 回帰なし: Core のテスト全件通過。Core のテスト 1178/1178 通過。eval-compare は origin/main と比べて broken 0 / fixed 0 / added 0 / removed 0 (合計 534/648 で変化なし)。正解表は触っていない。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] TextEdit: 同じ文 (きょうはいいてんきですね…の繰り返し 400 文字超) を確定せずに打つ → 全部かなのまま、Enter で確定

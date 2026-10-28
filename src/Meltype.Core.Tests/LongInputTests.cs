@@ -339,6 +339,7 @@ internal static class LongInputTests
             var k = new CompositionTests.Keyboard();
             k.Type(romaji.ToString());
             Assert.True(k.Showing is not null && !k.Showing.Any(ch => ch is >= 'a' and <= 'z'), $"確定する前の表示に英字が残った: {k.Showing}");
+            Assert.Equal("", k.Host.Document, "Enter までは確定しない");
             k.Type("\n");
             Assert.Equal(kana.ToString(), k.Host.Document, "全部かなで確定する");
         }
