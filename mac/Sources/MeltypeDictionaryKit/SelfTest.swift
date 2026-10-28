@@ -410,7 +410,7 @@ public enum SelfTest {
             check(false, "設定の一覧を取れる")
             return
         }
-        check(catalog.items.count >= 15 && catalog.groups.map(\.name) == ["入力", "変換・候補", "辞書", "ログ"], "設定のグループ (\(catalog.groups.map(\.name)))")
+        check(catalog.items.count >= 15 && catalog.groups.map(\.name) == ["変換の基本", "英語と日本語の判定", "キー操作", "記号・句読点", "候補に出すもの", "辞書", "ログ"], "設定のグループ (\(catalog.groups.map(\.name)))")
         func item(_ key: String) -> SettingItem? { dictionary.settings()?.items.first { $0.key == key } }
         check(item("LiveConversion")?.value == .bool(true), "ライブ変換は既定で ON")
         check(dictionary.setSetting(key: "LiveConversion", value: .bool(false)) == nil && item("LiveConversion")?.value == .bool(false), "設定(真偽)を変えられる")
