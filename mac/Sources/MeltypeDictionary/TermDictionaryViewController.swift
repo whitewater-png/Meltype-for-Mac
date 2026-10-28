@@ -35,7 +35,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     private let statusLabel = UI.statusLabel()
     private let infoLabel = UI.wrapping("")
     private let offLabel = UI.wrapping("", secondary: false)
-    private let emptyLabel = UI.label(secondary: true, size: 13)
+    private let emptyLabel = UI.emptyLabel()
     private let spinner = NSProgressIndicator()
     private var excludeButton: NSButton!
     private var includeButton: NSButton!

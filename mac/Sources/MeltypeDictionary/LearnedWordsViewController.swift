@@ -14,7 +14,7 @@ final class LearnedWordsViewController: NSViewController, NSTableViewDataSource,
     private let tableView = KeyTableView()
     private let countLabel = UI.statusLabel()
     private let statusLabel = UI.statusLabel()
-    private let emptyLabel = UI.label(secondary: true, size: 13)
+    private let emptyLabel = UI.emptyLabel()
     private var addButton: NSButton!
     private var editButton: NSButton!
     private var deleteButton: NSButton!

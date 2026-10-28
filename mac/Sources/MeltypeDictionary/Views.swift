@@ -135,6 +135,18 @@ enum UI {
         return label
     }
 
+    /// 一覧が空のときの案内 (一覧の真ん中に出す)。長い案内は折り返し、窓を広げない
+    /// (1 行の文字のままだと、横に縮みにくい強さ 750 が窓の大きさを保つ強さ 500 に勝ち、窓が広がって、隠したあとも戻らない)。
+    /// 幅の上限 (一覧の幅 - 余白) は使う側が付ける。
+    static func emptyLabel() -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.textColor = .secondaryLabelColor
+        label.font = .systemFont(ofSize: 13)
+        label.alignment = .center
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return label
+    }
+
     static func spacer() -> NSView {
         let view = NSView()
         view.setContentHuggingPriority(.init(1), for: .horizontal)
