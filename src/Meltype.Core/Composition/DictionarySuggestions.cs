@@ -194,7 +194,7 @@ public sealed class DictionarySuggestions
             var word = _hintWord;
             _hintWord = null;
             if (word is null) return null;
-            var today = Clock().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture); // 仏暦だと日付の文字が変わり、1 日 1 回の判定が崩れる
+            var today = Clock().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture); // 本家 #1157: 保存する値を地域設定に依らない形にそろえる (地域設定を切り替えた日に、1 日 1 回のヒントが 2 回出ないように)
             if (_data.LastHint == today) return null;
             _data.LastHint = today;
             Save();
