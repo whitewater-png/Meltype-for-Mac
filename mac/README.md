@@ -32,7 +32,7 @@ cd mac
 1. 本体 (C#) を NativeAOT でビルドし、IME と辞書の管理画面 (Swift) をビルドして、`build/Meltype.app` を作ります (初回は azooKey の変換エンジンと辞書のダウンロードで時間がかかります)。
    辞書の管理画面は `build/Meltype.app/Contents/Helpers/MeltypeDictionary.app` に入れ、中から外へ署名して、最後に `codesign --verify --deep --strict` で確かめます
 2. `~/Library/Input Methods/Meltype.app` にインストールします
-3. 初めてのときは、入力ソースとして登録します (1 分ほどかかることがあります)。うまくいかなかったときは、いったんログアウトしてログインし直してから、**システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype** を追加します
+3. 初めてのときは、入力ソースとして登録します (1 分ほどかかることがあります)。うまくいかなかったときは、**システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype** を追加します。それでも出てこなければ、いったんログアウトしてログインし直します
 4. メニューバーの入力メニューで Meltype を選ぶと使えます
 
 作り直したときは `./build.sh` をもう一度実行すれば入れ替わります (動いている Meltype は自動で止め、次にキーを打ったときに新しい Meltype が起動します)。
@@ -290,7 +290,7 @@ cd .. && python3 tools/check-mac-aot-settings.py
 ## 困ったとき
 
 - F9 などが効かない: システム設定 → キーボード → キーボードショートカット で F キーの割り当てを外すか、上の Ctrl キーを使う。
-- 入力ソースに出てこない: ログアウトしてログインし直す。`~/Library/Input Methods/Meltype.app` があるか確かめる。「+」の一覧に出ないときは、ターミナルで次を実行してから入力メニューを見る (`install.sh` も登録できなかったときに同じことをします、#21)。
+- 入力ソースに出てこない: 先に、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype から追加する (macOS 27 では、これでログアウトしなくても選べるという本家の報告がある。このフォークでは未確認)。それでも出なければ、ログアウトしてログインし直す。`~/Library/Input Methods/Meltype.app` があるか確かめる。「+」の一覧に出ないときは、ターミナルで次を実行してから入力メニューを見る (`install.sh` も登録できなかったときに同じことをします、#21)。
   ただし、`defaults read com.apple.HIToolbox AppleEnabledInputSources` と `defaults read com.apple.inputsources AppleEnabledThirdPartyInputSources` のどちらにも Meltype が無いときだけにしてください (両方に入ると、入力ソースの一覧に Meltype が 2 つ出ます)
   ```bash
   defaults write com.apple.HIToolbox AppleEnabledInputSources -array-add \
