@@ -232,3 +232,6 @@ ext
 exe
 # --- 本家 #1148 (printenv・nohup・doomscroll)・本家の english-readable にある tmux・claudecode: ローマ字で最後まで読めず、pりんてんv・のふp・どおmscroll・tむx・claudecoで に割れていた ---
 printenv nohup doomscroll tmux claudecode
+# --- 本家の english-readable にある vocaloid・opencode: english-readable にも置くが、ここにも置く。english-readable にしか無い語は、
+# 確定直前の打ち間違いの補正 (CompositionText.FixTypos の EnglishMask) に守られず、表示 vocaloidは が Enter で ゔぉかぉいしゃ になっていた (査読 R-B) ---
+vocaloid opencode
