@@ -141,7 +141,8 @@ internal static class MacSettingsTests
             }
             // 入力メニューに無い切り替えを案内しない (メニューにあるのは辞書の登録提案だけ)
             if (item.Key != nameof(Settings.DictionarySuggest))
-                Assert.True(!item.DisplayDescription.Contains("入力メニュー"), $"{item.Key} の説明が入力メニューを案内している: {item.DisplayDescription}");
+                foreach (var text in new[] { item.DisplayDescription, item.Summary ?? "", item.Example ?? "" })
+                    Assert.True(!text.Contains("入力メニュー"), $"{item.Key} の画面の文が入力メニューを案内している: {text}");
             foreach (var text in new[] { item.DisplayDescription, summary, item.Example ?? "" })
             {
                 foreach (var internalWord in new[] { "本家", "Mac 版", "Mac は", "Windows", "現在は" })

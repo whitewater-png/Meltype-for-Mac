@@ -409,7 +409,11 @@ final class SettingsViewController: NSViewController, NSTableViewDataSource, NST
             line.widthAnchor.constraint(equalTo: left.widthAnchor).isActive = true
             line.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         }
-        if let details = row.detailsButton { left.setCustomSpacing(4, after: lines[lines.firstIndex(of: details)! - 1]) }
+        // 「詳しく」の上は少し空ける。直前が子の案内 (隠れることがある) のときも同じ余白になるよう、案内の前の行と案内の両方に付ける
+        if let details = row.detailsButton, let anchor = lines[..<lines.firstIndex(of: details)!].last(where: { $0 !== row.unavailableNote }) {
+            left.setCustomSpacing(4, after: anchor)
+            if let note = row.unavailableNote { left.setCustomSpacing(4, after: note) }
+        }
 
         // 右の列: 部品 (スイッチ・選択・数)。中身の幅だけ取り、残りを左の列に渡す
         let control: NSView
@@ -738,10 +742,12 @@ final class SettingsViewController: NSViewController, NSTableViewDataSource, NST
             let available = SettingsLayout.isAvailable(row.item.key, values: values)
             for control in row.controls { control.isEnabled = controlsEnabled && available }
             row.setDimmed(!available)
+            // 理由は 1 つだけ伝える: 設定ファイルを読めないあいだはそちら (親のスイッチも押せないので「ON にすると使えます」は出さない)
             var help = row.help
-            if !available, let parentLabel = row.parentLabel { help = "「\(parentLabel)」が OFF のため変更できません。\n" + help }
+            if !controlsEnabled { help = "設定ファイルを読めないため変更できません。\n" + help }
+            else if !available, let parentLabel = row.parentLabel { help = "「\(parentLabel)」が OFF のため変更できません。\n" + help }
             for control in row.controls where control.accessibilityHelp() != help { control.setAccessibilityHelp(help) }
-            row.unavailableNote?.isHidden = available
+            row.unavailableNote?.isHidden = !controlsEnabled || available
             row.detailsButton?.contentTintColor = available ? .controlAccentColor : .tertiaryLabelColor
         }
     }
