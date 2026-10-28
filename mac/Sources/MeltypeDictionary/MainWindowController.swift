@@ -105,10 +105,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// タブの位置 (表示メニューの ⌘1〜⌘5 と同じ順)。
     private enum Tab: Int { case user = 0, term, learned, settings, judge }
 
-    /// 設定・判定を調べるのタブには検索が無い。
+    /// 判定を調べるのタブには検索が無い。
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(focusSearch(_:)): return ![Tab.settings.rawValue, Tab.judge.rawValue].contains(tabs.selectedTabViewItemIndex)
+        case #selector(focusSearch(_:)): return tabs.selectedTabViewItemIndex != Tab.judge.rawValue
         case #selector(moveToTermDomain(_:)): return tabs.selectedTabViewItemIndex == 0 && userController.hasSelection
         case #selector(exportTermDomain(_:)): return tabs.selectedTabViewItemIndex == 1 && termController.hasUserDomainSelected
         default: return true
@@ -135,7 +135,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case 0: userController.focusSearch()
         case 1: termController.focusSearch()
         case Tab.learned.rawValue: learnedController.focusSearch()
-        default: break   // 設定・判定を調べるのタブに検索は無い
+        case Tab.settings.rawValue: settingsController.focusSearch()
+        default: break   // 判定を調べるのタブに検索は無い
         }
     }
 

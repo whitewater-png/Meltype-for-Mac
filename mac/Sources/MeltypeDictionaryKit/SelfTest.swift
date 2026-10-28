@@ -69,6 +69,28 @@ public enum SelfTest {
         check(catalog?.items[1].options?.map(\.label) == ["標準 (Balanced)", "手動 (提案のみ)"] && catalog?.items[2].min == 1 && catalog?.items[2].max == 5, "選択肢・範囲")
         check(catalog?.groups.map(\.name) == ["入力", "変換・候補"] && catalog?.groups[0].items.count == 2, "グループは出てきた順")
         check(SettingsCatalog.parse("{ 壊れた") == nil, "壊れた JSON は nil")
+        // 要約・例 (summary / example) は省略できる。無ければ説明の最初の文を要約にする (古い本体の JSON でも設定タブを出せるように)
+        let summaryJson = """
+        {"items":[{"key":"A","label":"名前","description":"一文目です。二文目です。","group":"g","kind":"bool","value":true},
+        {"key":"B","label":"Tab で変換","description":"全文の説明","summary":"要約だけの語","example":"例だけの語 → 結果","group":"g","kind":"bool","value":false},
+        {"key":"C","label":"子","description":"句点の無い説明","group":"g","kind":"int","value":2,"min":1,"max":5}]}
+        """
+        let summaryCatalog = SettingsCatalog.parse(summaryJson)
+        check(summaryCatalog?.items.count == 3 && summaryCatalog?.items[0].summary == nil && summaryCatalog?.items[0].example == nil, "要約・例の無い JSON も読める")
+        check(summaryCatalog?.items[0].displaySummary == "一文目です。" && summaryCatalog?.items[2].displaySummary == "句点の無い説明", "要約が無ければ説明の最初の文 (無ければ全文)")
+        check(summaryCatalog?.items[1].summary == "要約だけの語" && summaryCatalog?.items[1].example == "例だけの語 → 結果" && summaryCatalog?.items[1].displaySummary == "要約だけの語", "要約・例を読む")
+        if let fixture = summaryCatalog?.items, fixture.count == 3 {
+            let tab = fixture[1]
+            check(SettingsLayout.matches(tab, query: "Tab で") && SettingsLayout.matches(tab, query: "tab"), "設定の検索: 名前 (大文字・小文字をそろえる)")
+            check(SettingsLayout.matches(tab, query: "ｔａｂ") && SettingsLayout.matches(tab, query: "ＴＡＢ　変換"), "設定の検索: 全角の英字・全角の空白")
+            check(SettingsLayout.matches(tab, query: "要約だけ") && SettingsLayout.matches(tab, query: "例だけ") && SettingsLayout.matches(tab, query: "全文"), "設定の検索: 要約・例・説明")
+            check(!SettingsLayout.matches(tab, query: "一文目") && !SettingsLayout.matches(tab, query: "tab 一文目"), "設定の検索: 含まない語・キーワードはすべて含むときだけ")
+            check(SettingsLayout.matches(tab, query: "") && SettingsLayout.matches(tab, query: " 　"), "設定の検索: 空なら全部")
+        }
+        check(SettingsLayout.isAvailable("PredictionMinLength", values: ["Prediction": .bool(false)]) == false
+              && SettingsLayout.isAvailable("PredictionMinLength", values: ["Prediction": .bool(true)])
+              && SettingsLayout.isAvailable("PredictionMinLength", values: [:])
+              && SettingsLayout.isAvailable("Prediction", values: ["Prediction": .bool(false)]), "親が OFF の子だけ操作できない")
         check(SettingValue.bool(false).jsonLiteral == "false" && SettingValue.int(3).jsonLiteral == "3" && SettingValue.string("a\"b").jsonLiteral == "\"a\\\"b\"", "本体に渡す JSON の値")
         // Zenzai の状態ファイル (zenzai.json。IME が書き、設定タブが読む)
         let now = Date()
@@ -412,6 +434,23 @@ public enum SelfTest {
         }
         check(catalog.items.count >= 15 && catalog.groups.map(\.name) == ["変換の基本", "英語と日本語の判定", "キー操作", "記号・句読点", "候補に出すもの", "辞書", "ログ"], "設定のグループ (\(catalog.groups.map(\.name)))")
         func item(_ key: String) -> SettingItem? { dictionary.settings()?.items.first { $0.key == key } }
+        // 親子の関係 (SettingsLayout.parents) は Swift に鍵を直に書いているので、本体の一覧にあり、親が真偽の項目であることを確かめる
+        let byKey = Dictionary(catalog.items.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+        for (child, parent) in SettingsLayout.parents.sorted(by: { $0.key < $1.key }) {
+            check(byKey[child] != nil, "親子の子 \(child) が本体の一覧にある")
+            check(byKey[parent]?.kind == .bool, "親子の親 \(parent) が本体の一覧にあり、真偽の項目")
+            // 画面は子を親の下に字下げして出すので、子は親と同じグループで、親より後ろに並ぶ
+            let childIndex = catalog.items.firstIndex { $0.key == child }, parentIndex = catalog.items.firstIndex { $0.key == parent }
+            check(byKey[child]?.group == byKey[parent]?.group && (childIndex ?? -1) > (parentIndex ?? Int.max), "親子の子 \(child) は親 \(parent) と同じグループで、親より後ろ")
+        }
+        check(catalog.items.allSatisfy { $0.summary?.isEmpty == false }, "本体の一覧は全項目に要約がある")
+        if let tab = byKey["TabConversion"] {
+            check(SettingsLayout.matches(tab, query: "ｔａｂ") && SettingsLayout.matches(tab, query: "Tab で変換"), "設定の検索: 全角の ｔａｂ で「Tab で変換」が見つかる")
+        } else {
+            check(false, "TabConversion が本体の一覧にある")
+        }
+        check(catalog.items.filter { SettingsLayout.matches($0, query: "") }.count == catalog.items.count, "設定の検索: 空なら全項目")
+        check(SettingsLayout.isAvailable("LogTypedText", values: Dictionary(uniqueKeysWithValues: catalog.items.map { ($0.key, $0.value) })) == (byKey["FileLog"]?.value != .bool(false)), "本体の値で親子の操作可否を決める")
         check(item("LiveConversion")?.value == .bool(true), "ライブ変換は既定で ON")
         check(dictionary.setSetting(key: "LiveConversion", value: .bool(false)) == nil && item("LiveConversion")?.value == .bool(false), "設定(真偽)を変えられる")
         check(dictionary.setSetting(key: "DetectionLevel", value: .string("Conservative")) == nil && item("DetectionLevel")?.value == .string("Conservative"), "設定(選択肢)を変えられる")
