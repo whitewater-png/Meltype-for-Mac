@@ -24,14 +24,29 @@ final class SuggestionHint {
     }
 
     /// duration 秒後に消す。nil なら hide() まで出し続ける。
-    func show(_ text: String, near client: IMKTextInput, duration: TimeInterval? = 4) {
+    /// characterIndex: 位置を測る文字の添字。nil ならキャレット (selectedRange) で測る (確定の直後の登録提案のヒント)。
+    /// 変換中の文字があるときは 0 (変換中の文字の先頭) を渡す (格子の caretTopLeft と同じ測り方。打つたびに案内が横へ滑らない)。
+    func show(_ text: String, near client: IMKTextInput, duration: TimeInterval? = 4, characterIndex: Int? = nil) {
         // 入力位置 (キャレット) の行の矩形。取れなければマウスの位置の近くに出す。
         var rect = NSRect.zero
-        let location = client.selectedRange().location
+        let location = characterIndex ?? client.selectedRange().location
         _ = client.attributes(forCharacterIndex: location == NSNotFound ? 0 : location, lineHeightRectangle: &rect)
         var origin = rect == .zero
             ? NSPoint(x: NSEvent.mouseLocation.x, y: NSEvent.mouseLocation.y - 24)
             : NSPoint(x: rect.minX, y: above ? rect.maxY + 4 : rect.minY - 28)
+
+        // 同じ文を出し続けている (消えない案内で、打つたびに呼ばれる) ときは、作り直さず位置だけ合わせる (すりガラスの描き直しでちらつかないように)。
+        if duration == nil, text == shownText, let panel, panel.isVisible {
+            var frame = panel.frame
+            frame.origin = origin
+            if above, rect != .zero,
+               let screen = NSScreen.screens.first(where: { $0.frame.contains(NSPoint(x: rect.midX, y: rect.midY)) }) ?? NSScreen.main,
+               frame.maxY > screen.visibleFrame.maxY {
+                frame.origin.y = rect.minY - frame.height - 4
+            }
+            panel.setFrameOrigin(frame.origin)
+            return
+        }
 
         let label = NSTextField(labelWithString: text)
         label.font = .systemFont(ofSize: 12)

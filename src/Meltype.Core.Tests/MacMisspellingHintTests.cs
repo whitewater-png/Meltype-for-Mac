@@ -36,6 +36,17 @@ internal static class MacMisspellingHintTests
         Assert.True(json2.Contains("\"suggestion\":\"もしかして: クダサイ", StringComparison.Ordinal), json2);
     }
 
+    /// <summary>変換中も案内を返す (Mac は変換中も出す。変換中の Tab も書き間違いの修正が最優先なので、案内が無いと予告なしに直る)。</summary>
+    [Test]
+    public static void Json_CarriesSuggestion_WhileConverting()
+    {
+        var session = Create();
+        Type(session, "buresureddo");
+        var json = session.HandleKey(VirtualKeys.Space, ' ', false, false, false, false).ToJson();
+        Assert.True(json.Contains("\"converting\":true", StringComparison.Ordinal), "Space で変換中: " + json);
+        Assert.True(json.Contains("\"suggestion\":\"もしかして: ブレスレット", StringComparison.Ordinal), "変換中も案内がある: " + json);
+    }
+
     [Test]
     public static void Json_SuggestionIsNull_WhenNoMisspelling_AndAfterTab()
     {

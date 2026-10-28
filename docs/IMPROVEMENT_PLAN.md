@@ -3639,7 +3639,7 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **変更** (コミット 0a008d4):
   - `mac/Sources/MeltypeIME/NativeCore.swift`: `CompositionView` に `suggestion` (`String?`。無いキーも nil として読む)。
   - `mac/Sources/MeltypeIME/SuggestionHint.swift`: 登録提案のヒントと同じ作りの別のパネル `SuggestionHint.misspelling`。`duration: nil` で消えずに出し続け、`hide()` で消す。入力位置の行の上に出す (行の下は予測・変換の候補ウィンドウが使う)。画面の上端からはみ出すなら行の下に回す。登録提案のヒント (`shared`、行の下に 4 秒) は変えない。
-  - `mac/Sources/MeltypeIME/InputController.swift`: `showComposition` の最後で、案内があり変換中でなければ出し、無ければ消す。`hideComposition`・`deactivateServer` でも消す。
+  - `mac/Sources/MeltypeIME/InputController.swift`: `showComposition` の最後で、案内があれば出し (変換中も。本体は変換中も案内を返し、変換中の Tab も書き間違いの修正が最優先なので、案内が無いと予告なしに直る。査読の必須)、無ければ消す。位置は変換中の文字の先頭 (`forCharacterIndex: 0`、格子と同じ測り方) で測る。同じ文なら作り直さず位置だけ合わせる。`hideComposition`・`deactivateServer` でも消す。
 - **得と損**: 得: 書き間違いに気づける (Tab で直せることが分かる)。損: 入力中に小さな窓が 1 つ増える (書き間違いがあるときだけ)。
-- **テスト**: `MacMisspellingHintTests` (2 件): `buresureddo`・`kudasia` で `suggestion` に案内が入る、`kudasai` と Tab で直した後は null、Tab で ください に直る。Swift の変更は自動テストが無いので、Swift が頼る JSON の約束のガード (本体は変えていないので変更の前から緑)。全体 1213 → 1215。Mac ビルド・codesign・`check-mac-aot-settings.py` は確認。
-- **残る限界・未確認**: 実機での見え方 (位置・ちらつき・候補ウィンドウや意味のパネルとの重なり・画面の上端) は未確認。案内の語は本体の辞書の形 (カタカナ) で出る (くだしあ は「もしかして: クダサイ」。Windows 版の本家と同じ文)。判定の強さが「手動」のときの「Tab → 〜 (英字に)」の案内 (本体の `hint`) も、Mac では出していない (今回は触れていない)。
+- **テスト**: `MacMisspellingHintTests` (3 件): `buresureddo`・`kudasia` で `suggestion` に案内が入る、変換中 (Space の後) も入る、`kudasai` と Tab で直した後は null、Tab で ください に直る。Swift の変更は自動テストが無いので、Swift が頼る JSON の約束のガード (本体は変えていないので変更の前から緑)。全体 1213 → 1216。Mac ビルド・codesign・`check-mac-aot-settings.py` は確認。
+- **残る限界・未確認**: 実機での見え方 (位置・ちらつき・候補ウィンドウや意味のパネルとの重なり・画面の上端・長い文書の途中) は未確認。案内の語は本体の辞書の形 (カタカナ) で出る (くだしあ は「もしかして: クダサイ」。Windows 版の本家と同じ文)。判定の強さが「手動」のときの「Tab → 〜 (英字に)」の案内 (本体の `hint`) も、Mac では出していない (今回は触れていない)。
