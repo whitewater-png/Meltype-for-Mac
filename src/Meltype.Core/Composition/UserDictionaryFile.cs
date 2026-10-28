@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Yukishiro
 
+using System.Globalization;
 using System.Text;
 
 namespace Meltype.Composition;
@@ -52,8 +53,9 @@ public static class UserDictionaryFile
         builder.Append("!Format:WORDLIST\r\n");
         builder.Append("!User Dictionary Name: Meltype\r\n");
         builder.Append("!Output File Name:\r\n");
-        builder.Append($"!DateTime:{DateTime.Now:yyyy/MM/dd HH:mm:ss}\r\n\r\n");
-        foreach (var word in words) builder.Append($"{word.Reading}\t{word.Word}\t名詞\r\n");
+        // 本家 #1157: 地域設定 (タイの仏暦など) で年が変わらないよう、日時はいつも西暦の固定書式にする
+        builder.Append(CultureInfo.InvariantCulture, $"!DateTime:{DateTime.Now:yyyy/MM/dd HH:mm:ss}\r\n\r\n");
+        foreach (var word in words) builder.Append(CultureInfo.InvariantCulture, $"{word.Reading}\t{word.Word}\t名詞\r\n");
         return [.. Encoding.Unicode.GetPreamble(), .. Encoding.Unicode.GetBytes(builder.ToString())];
     }
 
