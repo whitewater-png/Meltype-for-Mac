@@ -155,7 +155,6 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         scroll.translatesAutoresizingMaskIntoConstraints = false
         emptyLabel.alignment = .center
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-        scroll.addSubview(emptyLabel)
 
         excludeButton = UI.button("除外する", target: self, action: #selector(excludeSelected(_:)))
         excludeButton.setAccessibilityHelp("選んだ語を変換に使わないようにします (Delete。元に戻せます)")
@@ -192,6 +191,9 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 880, height: 560))
         root.addSubview(left)
         root.addSubview(right)
+        // 一覧が空のときの案内は、一覧 (NSScrollView) の外の親に置いて上に重ねる。
+        // NSScrollView の直下に足すと、制約の結果が位置と大きさに当てはまらず、作ったときの 4×16 のまま描かれなかった (Q32)
+        root.addSubview(emptyLabel)
         NSLayoutConstraint.activate([
             left.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
             left.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),

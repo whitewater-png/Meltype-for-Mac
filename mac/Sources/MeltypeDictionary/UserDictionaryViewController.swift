@@ -73,7 +73,6 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
 
         emptyLabel.alignment = .center
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-        scroll.addSubview(emptyLabel)
 
         let add = UI.button("登録…", target: self, action: #selector(addWord(_:)))
         add.setAccessibilityHelp("新しい単語をユーザー辞書に登録します (⌘N)")
@@ -104,6 +103,9 @@ final class UserDictionaryViewController: NSViewController, NSTableViewDataSourc
         stack.translatesAutoresizingMaskIntoConstraints = false
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 820, height: 540))
         root.addSubview(stack)
+        // 一覧が空のときの案内は、一覧 (NSScrollView) の外の親に置いて上に重ねる。
+        // NSScrollView の直下に足すと、制約の結果が位置と大きさに当てはまらず、作ったときの 4×16 のまま描かれなかった (Q32)
+        root.addSubview(emptyLabel)
         for view in [problemLabel, top, scroll, bottom, statusLabel] {
             view.translatesAutoresizingMaskIntoConstraints = false
             view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32).isActive = true
