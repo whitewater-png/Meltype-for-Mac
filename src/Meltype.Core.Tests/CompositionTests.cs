@@ -1677,7 +1677,7 @@ internal static class CompositionTests
         var cases = new Dictionary<string, string> { ["[kagi]"] = "「かぎ」", ["-"] = "ー", ["/"] = "/", ["z/"] = "・", ["#"] = "#", ["("] = "(", [")"] = ")", ["]"] = "」", ["@"] = "@", [",,,"] = "...", ["\\"] = "\\", [","] = "、",
             // 報告: Shift で打つ記号が全角で打てない、/ が打てない。英語の中では半角のまま。
             ["$%&"] = "＄％＆", ["kyouha(tenki)"] = "きょうは(てんき)", ["hello@example"] = "hello@example",
-            ["tetr.io"] = "tetr.io", ["Wakatte.TV"] = "Wakatte.TV", ["J-core"] = "J-core", ["p-hub"] = "p-hub", ["talk-admin"] = "talk-admin",
+            ["tetr.io"] = "tetr.io", ["Tetr.TV"] = "Tetr.TV", ["J-core"] = "J-core", ["p-hub"] = "p-hub", ["talk-admin"] = "talk-admin",
             // 報告: ca / cu / co で か く こ
             ["cacuco"] = "かくこ", ["iijane"] = "いいじゃね", ["shoucanshi"] = "しょうかんし", ["vanpaia"] = "ゔぁんぱいあ", ["wyiwye"] = "ゐゑ", ["GPL3.0"] = "GPL3.0", ["3.14desu"] = "3.14です", ["oknotasuku"] = "okのたすく",
         };
@@ -1729,7 +1729,7 @@ internal static class CompositionTests
         {
             // 数字入りの拡張子・co.jp・TV・2 文字のドメインの後ろの助詞は、日本語にする (mp4wokesu を英字のまま残さない)
             ["Meltype.mp4wokesu"] = "Meltype.mp4をけす", ["Meltype.7zwojikkou"] = "Meltype.7zをじっこう", ["yahoo.co.jpde"] = "yahoo.co.jpで",
-            ["amazon.co.jpdekaimono"] = "amazon.co.jpでかいもの", ["Wakatte.TVde"] = "Wakatte.TVで", ["mail.google.comwo"] = "mail.google.comを",
+            ["amazon.co.jpdekaimono"] = "amazon.co.jpでかいもの", ["Tetr.TVde"] = "Tetr.TVで", ["mail.google.comwo"] = "mail.google.comを",
             ["Meltype.pdfnipush"] = "Meltype.pdfにpush", ["Meltype.prprojwokesu"] = "Meltype.prprojをけす", ["Meltype.json.jsonwo"] = "Meltype.json.jsonを",
             // よく使う拡張子の後ろの助詞だけでも日本語にする
             ["readme.mdwo"] = "readme.mdを", ["test.jsonha"] = "test.jsonは", ["index.htmlno"] = "index.htmlの",
