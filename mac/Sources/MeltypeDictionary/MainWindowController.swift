@@ -38,7 +38,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         if let directory = dictionary.dataDirectory {
             window.subtitle = (directory as NSString).abbreviatingWithTildeInPath
         }
-        window.minSize = NSSize(width: 720, height: 460)
+        // 最小の大きさは、いちばん場所の要るタブ (専門用語集: 分野の一覧 + 下のボタンの列で幅約 778pt、高さ約 476pt) に合わせる。
+        // 窓の最小より狭い中身のタブがあると、そのタブを選んだだけで窓が広がり、ほかのタブに戻っても広いままになる。
+        window.minSize = NSSize(width: 780, height: 480)
         // ウインドウの状態を ~/Library/Saved Application State に残さない
         window.isRestorable = false
         super.init(window: window)

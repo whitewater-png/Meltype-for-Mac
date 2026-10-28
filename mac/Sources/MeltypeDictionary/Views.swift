@@ -115,6 +115,16 @@ enum UI {
         return label
     }
 
+    /// view を container の右端 (余白 trailing) まで広げる制約。幅に上限 (lessThanOrEqualToConstant) がある中身に使う。
+    /// 「右端まで」は窓の大きさを保つ強さ (windowSizeStayPut) より弱くする: 強いと、上限のある中身に合わせて窓のほうが縮み、
+    /// タブを選んだだけで窓が狭くなって、ほかのタブに戻っても狭いままになる (判定を調べる・設定のタブで起きていた)。
+    /// はみ出さないこと (右端より内側) は必須のままにする。
+    static func fillWidth(_ view: NSView, in container: NSView, trailing: CGFloat) -> [NSLayoutConstraint] {
+        let fill = view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -trailing)
+        fill.priority = NSLayoutConstraint.Priority(NSLayoutConstraint.Priority.windowSizeStayPut.rawValue - 1)
+        return [fill, view.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -trailing)]
+    }
+
     static func spacer() -> NSView {
         let view = NSView()
         view.setContentHuggingPriority(.init(1), for: .horizontal)
