@@ -409,10 +409,13 @@ final class SettingsViewController: NSViewController, NSTableViewDataSource, NST
             line.widthAnchor.constraint(equalTo: left.widthAnchor).isActive = true
             line.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         }
-        // 「詳しく」の上は少し空ける。直前が子の案内 (隠れることがある) のときも同じ余白になるよう、案内の前の行と案内の両方に付ける
-        if let details = row.detailsButton, let anchor = lines[..<lines.firstIndex(of: details)!].last(where: { $0 !== row.unavailableNote }) {
-            left.setCustomSpacing(4, after: anchor)
-            if let note = row.unavailableNote { left.setCustomSpacing(4, after: note) }
+        // 「詳しく」の上は少し空ける。直前の行が隠れることがある (子の案内・Zenzai の状態) ときも同じ余白になるよう、
+        // 常に見えている行まで遡って全部に付ける (NSStackView は隠れた行の後ろの余白を使わない)
+        if let details = row.detailsButton, let index = lines.firstIndex(of: details) {
+            for line in lines[..<index].reversed() {
+                left.setCustomSpacing(4, after: line)
+                if line !== row.unavailableNote && line !== zenzaiStatusLabel { break }
+            }
         }
 
         // 右の列: 部品 (スイッチ・選択・数)。中身の幅だけ取り、残りを左の列に渡す
