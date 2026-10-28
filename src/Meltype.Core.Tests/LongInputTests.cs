@@ -310,4 +310,42 @@ internal static class LongInputTests
         Assert.True(last.View?.Predictions?.Contains("履歴の語") == true, "変換履歴の予測は長い読みでも出す");
         Assert.True(last.View?.Predictions?.Contains("エンジンの語") != true, "40 文字を超えたらエンジンの予測は出さない");
     }
+
+    /// <summary>要件 003: 確定せずに 400 文字を超えるローマ字文を打ち続けても、途中から英字のまま残らない (--repro は 300 文字で切るので、ここで測る)。</summary>
+    [Test]
+    public static void Req003_LongRomajiText_AllBecomesKana()
+    {
+        // 日本語として読める文 (英単語と読み違えやすい語を含めない) を 3 種類、つなげて 400 文字を超えるまで続ける。
+        (string Romaji, string Kana)[] parts =
+        [
+            ("kyouhaiitenkidesune", "きょうはいいてんきですね"),
+            ("watashihaasanohonwoyomimasu", "わたしはあさのほんをよみます"),
+            ("kinouhatomodachitoeigawomimashita", "きのうはともだちとえいがをみました"),
+        ];
+        var romaji = new System.Text.StringBuilder();
+        var kana = new System.Text.StringBuilder();
+        for (var i = 0; romaji.Length <= 420; i++)
+        {
+            romaji.Append(parts[i % parts.Length].Romaji);
+            kana.Append(parts[i % parts.Length].Kana);
+        }
+        Assert.True(romaji.Length > 400, "400 文字を超える入力にする");
+
+        // アプリ・--repro と同じく、同梱の英単語表をスペルチェッカーにして打つ。
+        var previous = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Meltype.Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(romaji.ToString());
+            Assert.True(k.Showing is not null && !k.Showing.Any(ch => ch is >= 'a' and <= 'z'), $"確定する前の表示に英字が残った: {k.Showing}");
+            Assert.Equal("", k.Host.Document, "Enter までは確定しない");
+            k.Type("\n");
+            Assert.Equal(kana.ToString(), k.Host.Document, "全部かなで確定する");
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = previous;
+        }
+    }
 }
