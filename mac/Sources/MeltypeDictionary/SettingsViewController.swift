@@ -350,7 +350,7 @@ final class SettingsViewController: NSViewController, NSTableViewDataSource, NST
         let id = NSUserInterfaceItemIdentifier(item.key)
         let isChild = SettingsLayout.parents[item.key] != nil
 
-        // 左の列: 名前・要約・例・(詳しく で開く) 説明。名前や要約が長くても折り返す (最小幅の 720pt でも切れないように)
+        // 左の列: 名前・要約・例・(詳しく で開く) 説明。名前や要約が長くても折り返す (窓の最小幅 (780pt) でも切れないように)
         let name = NSTextField(wrappingLabelWithString: item.label)
         name.font = .systemFont(ofSize: 13)
         name.textColor = .labelColor

@@ -125,6 +125,16 @@ enum UI {
         return [fill, view.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -trailing)]
     }
 
+    /// 件数・状態の 1 行の文字。長い文 (取り込みの結果など) は末尾を「…」で切り、窓を広げない
+    /// (横に縮みにくい強さが既定の 750 のままだと、窓の大きさを保つ強さ 500 に勝ち、窓のほうが広がって戻らない)。
+    /// 切れた文は、マウスを乗せると全文が出る。
+    static func statusLabel() -> NSTextField {
+        let label = UI.label(secondary: true)
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.allowsExpansionToolTips = true
+        return label
+    }
+
     static func spacer() -> NSView {
         let view = NSView()
         view.setContentHuggingPriority(.init(1), for: .horizontal)

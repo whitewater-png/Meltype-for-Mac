@@ -31,8 +31,8 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
     private let searchField = NSSearchField()
     private let searchDebouncer = SearchDebouncer()
     private let filterPopup = NSPopUpButton()
-    private let countLabel = UI.label(secondary: true)
-    private let statusLabel = UI.label(secondary: true)
+    private let countLabel = UI.statusLabel()
+    private let statusLabel = UI.statusLabel()
     private let infoLabel = UI.wrapping("")
     private let offLabel = UI.wrapping("", secondary: false)
     private let emptyLabel = UI.label(secondary: true, size: 13)
@@ -123,7 +123,7 @@ final class TermDictionaryViewController: NSViewController, NSTableViewDataSourc
         searchField.delegate = self
         UI.configure(search: searchField)
         searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 220).isActive = true
+        searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 180).isActive = true
         filterPopup.addItems(withTitles: ["すべての語", "使う語だけ", "除外した語だけ"])
         filterPopup.target = self
         filterPopup.action = #selector(filterChanged(_:))
