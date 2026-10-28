@@ -2818,8 +2818,19 @@ internal static class CompositionTests
         k.Type("osewa");
         k.Press(VirtualKeys.Tab);
         k.Type("n");
+        // 本家 #1187 #1214: 選んでいる予測は、続けて打った文字で捨てずに確定する (リョウさんが選んだ仕様変更)。
         Assert.Equal(-1, k.Host.View!.SelectedPrediction, "文字を打つと予測から抜ける");
-        Assert.Equal("おせわn", k.Showing, "打った文字は入力として続く");
+        Assert.Equal("n", k.Showing, "打った文字から新しい入力が始まる");
+        Assert.Equal(OsewaPredictions("おせわ")[0], k.Host.Document, "選んでいた予測は確定する");
+    }
+
+    [Test]
+    public static void Prediction_TypingWithoutSelection_Continues()
+    {
+        var k = new Keyboard(predictions: OsewaPredictions);
+        k.Type("osewa");
+        k.Type("n");
+        Assert.Equal("おせわn", k.Showing, "選んでいなければ入力として続く");
         Assert.Equal("", k.Host.Document, "予測は確定していない");
     }
 

@@ -1157,7 +1157,7 @@ public sealed class CompositionController
         }
 
         if (_converting && HandleConversionKey(vk)) return;
-        if (_predicting && HandlePredictionKey(vk)) return;
+        if (_predicting && HandlePredictionKey(e)) return;
 
         switch (vk)
         {
@@ -4169,10 +4169,12 @@ public sealed class CompositionController
 
     /// <summary>
     /// Tab で予測候補に入っている間のキー。処理したら true。↓ で次、↑ で前 (先頭から上は入力に戻る)、Tab で次・Shift+Tab で前 (一巡して入力に戻る)、Enter で確定、
-    /// Esc で入力に戻る。それ以外のキーは予測から抜けて、入力として普通に処理する (Space は今までどおり変換)。
+    /// Esc で入力に戻る。選んだ予測があるときに文字として入るキー (英字・数字・記号) を打つと、選んだ予測で確定してから、そのキーで新しい入力を始める (本家 #1187 #1214)。
+    /// それ以外のキーは予測から抜けて、入力として普通に処理する (Space は今までどおり変換、BackSpace は確定しない)。
     /// </summary>
-    private bool HandlePredictionKey(int vk)
+    private bool HandlePredictionKey(KeyEvent e)
     {
+        var vk = e.Vk;
         switch (vk)
         {
             case VirtualKeys.Tab:
@@ -4210,10 +4212,22 @@ public sealed class CompositionController
                 _predicting = false;
                 return true;
             default:
+                // 本家 #1187 #1214: Tab で選んだ語を、続けて打った文字に捨てられない。選んだ語で確定して、打った文字から新しい入力を始める。
+                if (_predictionIndex >= 0 && _predictionIndex < _predictions.Count && vk != VirtualKeys.Back && TypesCharacter(e))
+                {
+                    CommitPrediction(_predictions[_predictionIndex]);
+                    StartWith(e);
+                    return true;
+                }
                 _predicting = false;
                 return false;
         }
     }
+
+    /// <summary>通常の入力処理 (HandleKey の末尾) で未確定に文字を足すキーか。かな入力のかなキー、または空白・制御文字でない文字。</summary>
+    private bool TypesCharacter(KeyEvent e) =>
+        (_text.KanaInput && KanaOf(e) is not null) ||
+        (_host.CharFromKey(e, _swallowedShift.Count > 0) is { } ch && !char.IsControl(ch) && ch != ' ');
 
     /// <summary>予測候補を確定する。読み → 語を履歴に「予測から」の印つきで覚えて、次から予測の上位に出す (変換の最初の候補にはしない。Q17)。</summary>
     private void CommitPrediction(string text)
