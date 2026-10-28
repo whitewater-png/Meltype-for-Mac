@@ -2586,7 +2586,7 @@ public sealed class CompositionController
     /// <summary>
     /// いま・なう の文節に今の日時、きょう の文節に今日の日付を候補として出す (本家 #208。書式は本家と同じ)。
     /// いま → 17:22 / 17時22分 / 午後5時22分 / 2026年10月9日(金) 17時22分 / 10月9日(金) 17時22分 / 2026年10月9日(金) 17:22 / 2026/10/09 17:22
-    /// きょう → 2026年10月9日 / 2026年10月9日(金) / 10月9日 / 10月9日(金) / 2026/10/09 / 2026-10-09 / 金曜日
+    /// きょう → 2026年10月9日 / 2026年10月9日(金) / 10月9日 / 10月9日(金) / 2026/10/09 / 2026/10/09(金) / 10/9(金) / 2026-10-09 / 金曜日 / 20261009
     /// 文節の読みがまるごとこの語のときだけ (いまから・きょうは では出さない)。
     /// </summary>
     private IEnumerable<string> TimeCandidates(string reading)
@@ -2609,8 +2609,10 @@ public sealed class CompositionController
         // 区切りの / と : は、地域の設定に左右されないように数字から組み立てる (DateTime の書式の / : は地域の区切りになる)
         var slashDate = $"{now.Year:D4}/{now.Month:D2}/{now.Day:D2}";
         var clock = $"{now.Hour:D2}:{now.Minute:D2}";
+        // 本家 #1072 (f)・#1189: / 区切りの曜日つきと月日だけの曜日つき、8 桁 (yyyyMMdd)。既存の並びは変えず、/ 区切りの後ろ・日付の最後に足す。
         if (!isNow)
-            return [date, $"{date}({day})", monthDay, $"{monthDay}({day})", slashDate, $"{now.Year:D4}-{now.Month:D2}-{now.Day:D2}", $"{day}曜日"];
+            return [date, $"{date}({day})", monthDay, $"{monthDay}({day})", slashDate, $"{slashDate}({day})", $"{now.Month}/{now.Day}({day})",
+                $"{now.Year:D4}-{now.Month:D2}-{now.Day:D2}", $"{day}曜日", $"{now.Year:D4}{now.Month:D2}{now.Day:D2}"];
         var time = $"{now.Hour}時{now.Minute}分";
         return [clock, time, $"{(now.Hour < 12 ? "午前" : "午後")}{now.Hour % 12}時{now.Minute}分",
             $"{date}({day}) {time}", $"{monthDay}({day}) {time}", $"{date}({day}) {clock}", $"{slashDate} {clock}"];
