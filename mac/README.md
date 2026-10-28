@@ -290,7 +290,7 @@ cd .. && python3 tools/check-mac-aot-settings.py
 ## 困ったとき
 
 - F9 などが効かない: システム設定 → キーボード → キーボードショートカット で F キーの割り当てを外すか、上の Ctrl キーを使う。
-- 入力ソースに出てこない: 先に、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype から追加する (macOS 27 では、これでログアウトしなくても選べるという本家の報告がある。このフォークでは未確認)。それでも出なければ、ログアウトしてログインし直す。`~/Library/Input Methods/Meltype.app` があるか確かめる。「+」の一覧に出ないときは、ターミナルで次を実行してから入力メニューを見る (`install.sh` も登録できなかったときに同じことをします、#21)。
+- 入力ソースに出てこない: 先に、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype から追加する。それでも出なければ、ログアウトしてログインし直す。`~/Library/Input Methods/Meltype.app` があるか確かめる。「+」の一覧に出ないときは、ターミナルで次を実行してから入力メニューを見る (`install.sh` も登録できなかったときに同じことをします、#21)。
   ただし、`defaults read com.apple.HIToolbox AppleEnabledInputSources` と `defaults read com.apple.inputsources AppleEnabledThirdPartyInputSources` のどちらにも Meltype が無いときだけにしてください (両方に入ると、入力ソースの一覧に Meltype が 2 つ出ます)
   ```bash
   defaults write com.apple.HIToolbox AppleEnabledInputSources -array-add \
