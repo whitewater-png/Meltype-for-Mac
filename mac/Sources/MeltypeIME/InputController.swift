@@ -912,7 +912,11 @@ final class MeltypeInputController: IMKInputController {
                 // 候補ウィンドウを出し直すので、出していた意味は捨てる。
                 meaningKey = nil
                 candidateList = view.candidates
+                // 本家 #1250: 画面を移った直後に候補が前の画面に出るのを避けるため、更新前に隠し、
+                // 入力位置の更新後にもう一度 show して画面を選び直す。一覧が変わるとき・未表示のときだけなので、↑↓ では通らない。
+                columnWindow.hide()
                 columnWindow.update()
+                columnWindow.show(kIMKLocateCandidatesBelowHint)
                 columnWindow.show(kIMKLocateCandidatesBelowHint)
                 sendKeyEventsToServerFirst(columnWindow)
                 AnnotationPanel.raiseCandidateWindow()
