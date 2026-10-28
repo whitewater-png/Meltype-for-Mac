@@ -86,7 +86,30 @@ public enum SelfTest {
             check(SettingsLayout.matches(tab, query: "要約だけ") && SettingsLayout.matches(tab, query: "例だけ") && SettingsLayout.matches(tab, query: "全文"), "設定の検索: 要約・例・説明")
             check(!SettingsLayout.matches(tab, query: "一文目") && !SettingsLayout.matches(tab, query: "tab 一文目"), "設定の検索: 含まない語・キーワードはすべて含むときだけ")
             check(SettingsLayout.matches(tab, query: "") && SettingsLayout.matches(tab, query: " 　"), "設定の検索: 空なら全部")
+            // 隠れている説明でだけ一致する行は、画面が説明を開く
+            check(SettingsLayout.matchesOnlyInDescription(tab, query: "全文") && SettingsLayout.matchesOnlyInDescription(tab, query: "tab 全文"),
+                  "設定の検索: 説明にしか無い語で一致 → 説明でだけ一致")
+            check(!SettingsLayout.matchesOnlyInDescription(tab, query: "tab") && !SettingsLayout.matchesOnlyInDescription(tab, query: "要約だけ")
+                  && !SettingsLayout.matchesOnlyInDescription(tab, query: "例だけ") && !SettingsLayout.matchesOnlyInDescription(tab, query: "ＴＡＢ　変換"),
+                  "設定の検索: 名前・要約・例で一致 → 説明でだけ一致ではない")
+            check(!SettingsLayout.matchesOnlyInDescription(tab, query: "") && !SettingsLayout.matchesOnlyInDescription(tab, query: " 　")
+                  && !SettingsLayout.matchesOnlyInDescription(tab, query: "一文目"), "設定の検索: 空・一致しない語 → 説明でだけ一致ではない")
+            // 要約の無い項目は説明の最初の文が見えている。説明が要約と同じ (「詳しく」が無い) 項目は説明が常に見えている
+            check(!SettingsLayout.matchesOnlyInDescription(fixture[0], query: "一文目") && SettingsLayout.matchesOnlyInDescription(fixture[0], query: "二文目")
+                  && !SettingsLayout.matchesOnlyInDescription(fixture[2], query: "句点"), "設定の検索: 見えている最初の文・「詳しく」の無い説明")
+            check(SettingsLayout.isEmptyQuery(" 　") && !SettingsLayout.isEmptyQuery("ｔａｂ"), "設定の検索: 空白だけは空")
         }
+        // 検索で子が一致したら、親も出す (親が OFF のとき、薄い子だけが出ないように)
+        let parentChild = [
+            SettingItem(key: "Prediction", label: "予測変換", description: "予測を出す。", group: "g", kind: .bool, value: .bool(false)),
+            SettingItem(key: "PredictionMinLength", label: "予測変換を出す最小の文字数", description: "文字数。", group: "g", kind: .int, value: .int(2), min: 1, max: 5),
+            SettingItem(key: "Other", label: "ほか", description: "別の項目。", group: "g", kind: .bool, value: .bool(true)),
+        ]
+        check(SettingsLayout.shownKeys(parentChild, query: "最小") == ["Prediction", "PredictionMinLength"], "設定の検索: 子が一致したら親も出す")
+        check(SettingsLayout.shownKeys(parentChild, query: "予測を出す") == ["Prediction"] && SettingsLayout.shownKeys(parentChild, query: "別の") == ["Other"],
+              "設定の検索: 親だけ・関係の無い項目だけの一致では、ほかを出さない")
+        check(SettingsLayout.shownKeys(parentChild, query: "").count == 3 && SettingsLayout.shownKeys(Array(parentChild.dropFirst()), query: "最小") == ["PredictionMinLength"],
+              "設定の検索: 空なら全部・一覧に無い親は足さない")
         check(SettingsLayout.isAvailable("PredictionMinLength", values: ["Prediction": .bool(false)]) == false
               && SettingsLayout.isAvailable("PredictionMinLength", values: ["Prediction": .bool(true)])
               && SettingsLayout.isAvailable("PredictionMinLength", values: [:])
@@ -436,12 +459,18 @@ public enum SelfTest {
         func item(_ key: String) -> SettingItem? { dictionary.settings()?.items.first { $0.key == key } }
         // 親子の関係 (SettingsLayout.parents) は Swift に鍵を直に書いているので、本体の一覧にあり、親が真偽の項目であることを確かめる
         let byKey = Dictionary(catalog.items.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+        check(SettingsLayout.parents.count == 4, "親子の関係は 4 組 (\(SettingsLayout.parents.count))")
         for (child, parent) in SettingsLayout.parents.sorted(by: { $0.key < $1.key }) {
             check(byKey[child] != nil, "親子の子 \(child) が本体の一覧にある")
             check(byKey[parent]?.kind == .bool, "親子の親 \(parent) が本体の一覧にあり、真偽の項目")
             // 画面は子を親の下に字下げして出すので、子は親と同じグループで、親より後ろに並ぶ
             let childIndex = catalog.items.firstIndex { $0.key == child }, parentIndex = catalog.items.firstIndex { $0.key == parent }
             check(byKey[child]?.group == byKey[parent]?.group && (childIndex ?? -1) > (parentIndex ?? Int.max), "親子の子 \(child) は親 \(parent) と同じグループで、親より後ろ")
+            // 子は親のすぐ後ろに続ける: 親と子のあいだにあるのは、同じ親の子だけ (別の項目が挟まると、字下げした子がその項目の子に見える)
+            if let childIndex, let parentIndex, childIndex > parentIndex {
+                let between = catalog.items[(parentIndex + 1)..<childIndex].map(\.key)
+                check(between.allSatisfy { SettingsLayout.parents[$0] == parent }, "親子の子 \(child) は親 \(parent) のすぐ後ろ (あいだ: \(between))")
+            }
         }
         check(catalog.items.allSatisfy { $0.summary?.isEmpty == false }, "本体の一覧は全項目に要約がある")
         if let tab = byKey["TabConversion"] {
@@ -450,7 +479,19 @@ public enum SelfTest {
             check(false, "TabConversion が本体の一覧にある")
         }
         check(catalog.items.filter { SettingsLayout.matches($0, query: "") }.count == catalog.items.count, "設定の検索: 空なら全項目")
-        check(SettingsLayout.isAvailable("LogTypedText", values: Dictionary(uniqueKeysWithValues: catalog.items.map { ($0.key, $0.value) })) == (byKey["FileLog"]?.value != .bool(false)), "本体の値で親子の操作可否を決める")
+        check(SettingsLayout.isAvailable("LogTypedText", values: ["FileLog": .bool(false)]) == false
+              && SettingsLayout.isAvailable("LogTypedText", values: ["FileLog": .bool(true)]), "本体の親 (FileLog) の値で子 (LogTypedText) の操作可否を決める")
+        // 本体の一覧の値で、子の操作可否が親の値どおりになる (既定値に頼らず、親を両方の値にして確かめる)
+        for parentValue in [false, true] {
+            var values = Dictionary(catalog.items.map { ($0.key, $0.value) }, uniquingKeysWith: { first, _ in first })
+            values["FileLog"] = .bool(parentValue)
+            check(SettingsLayout.isAvailable("LogTypedText", values: values) == parentValue, "本体の一覧の値で、FileLog=\(parentValue) → LogTypedText の操作可否")
+        }
+        // 全文の ｔａｂ で「Tab で変換」が出るのは名前での一致なので、説明は開かない
+        if let tab = byKey["TabConversion"] {
+            check(!SettingsLayout.matchesOnlyInDescription(tab, query: "ｔａｂ"), "設定の検索: 「Tab で変換」は名前で一致 (説明を開かない)")
+        }
+        check(SettingsLayout.shownKeys(catalog.items, query: "最小").isSuperset(of: ["Prediction", "PredictionMinLength"]), "設定の検索: 本体の一覧で「最小」→ 予測変換と最小の文字数")
         check(item("LiveConversion")?.value == .bool(true), "ライブ変換は既定で ON")
         check(dictionary.setSetting(key: "LiveConversion", value: .bool(false)) == nil && item("LiveConversion")?.value == .bool(false), "設定(真偽)を変えられる")
         check(dictionary.setSetting(key: "DetectionLevel", value: .string("Conservative")) == nil && item("DetectionLevel")?.value == .string("Conservative"), "設定(選択肢)を変えられる")

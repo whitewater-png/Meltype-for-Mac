@@ -44,7 +44,8 @@ public struct SettingOption: Hashable, Decodable {
     public let label: String
 }
 
-/// 設定タブの項目 1 つ (名前・説明・グループは Windows の設定画面と同じ文言。本体の MacSettingsCatalog が決める)。
+/// 設定タブの項目 1 つ (本体の MacSettingsCatalog が決める)。グループ・要約・例は Mac だけのもの (Windows の設定画面には無い)。
+/// 説明は Windows と同じ文を基にしているが、Mac 向けに書き直したもの (MacDescriptions) もある。
 public struct SettingItem: Hashable, Decodable {
     public let key: String
     public let label: String
@@ -130,9 +131,35 @@ public enum SettingsLayout {
     /// 検索の文字が、項目の名前・要約・例・説明のどこかに含まれるか。全角英数・大文字・カタカナは SearchText でそろえ、
     /// 空白 (半角・全角) で区切ったキーワードはすべて含むときだけ一致にする (ほかのタブの検索と同じ)。空なら全部が一致。
     public static func matches(_ item: SettingItem, query: String) -> Bool {
-        let words = SearchText.normalize(query).components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        let words = searchWords(query)
         guard !words.isEmpty else { return true }
         let text = SearchText.normalize([item.label, item.summary ?? "", item.example ?? "", item.description].joined(separator: "\u{1}"))
         return words.allSatisfy { text.contains($0) }
+    }
+
+    /// 検索の文字が空 (空白だけを含む) か。空なら全部を出し、説明を開く / 閉じるも利用者の状態に戻す。
+    public static func isEmptyQuery(_ query: String) -> Bool { searchWords(query).isEmpty }
+
+    /// 一致はするが、画面に常に出ている文字 (名前・要約・例) だけでは一致しない (どれかのキーワードが「詳しく」の中の説明にしか無い) か。
+    /// そういう行は、画面が説明を開いて一致した理由を見せる。説明が要約と同じ (「詳しく」が無い) 項目は、説明が常に見えているので false。
+    public static func matchesOnlyInDescription(_ item: SettingItem, query: String) -> Bool {
+        let words = searchWords(query)
+        guard !words.isEmpty, item.description != item.displaySummary, matches(item, query: query) else { return false }
+        let visible = SearchText.normalize([item.label, item.displaySummary, item.example ?? ""].joined(separator: "\u{1}"))
+        return !words.allSatisfy { visible.contains($0) }
+    }
+
+    /// 検索で出す項目の鍵: 一致した項目と、一致した子の親 (薄くした子だけが、何の子か分からないまま出ないように)。
+    public static func shownKeys(_ items: [SettingItem], query: String) -> Set<String> {
+        let present = Set(items.map(\.key))
+        var keys = Set(items.filter { matches($0, query: query) }.map(\.key))
+        for key in keys {
+            if let parent = parents[key], present.contains(parent) { keys.insert(parent) }
+        }
+        return keys
+    }
+
+    private static func searchWords(_ query: String) -> [String] {
+        SearchText.normalize(query).components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
     }
 }

@@ -9,7 +9,7 @@ import MeltypeDictionaryKit
 /// 動いている IME の入力欄にも少し待つと反映される。入力メニューの切り替え (別のプロセス) は、定期的に読み直して画面に反映する。
 /// 見た目は Mac の「システム設定」に寄せる: 左に検索とグループの一覧、右にグループごとの見出しと角の丸いカード。
 /// 各項目は名前・1 行の要約・例を常に出し、全文の説明は「詳しく」で開く (説明が長い項目が多く、全部を出すと一覧が長くなりすぎるため)。
-final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
+final class SettingsViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
     /// 項目 1 つ分の画面の部品。
     private final class Row {
         let item: SettingItem
@@ -26,6 +26,16 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
         var texts: [(label: NSTextField, color: NSColor)] = []
         var description: NSTextField?
         var detailsButton: NSButton?
+        /// 部品の読み上げの補足 (要約 + 例 + 全文の説明)。親が OFF のあいだは、先頭に理由を足して部品に入れる。
+        var help = ""
+        /// 親の名前 (子の項目だけ)。操作できない理由の文に使う。
+        var parentLabel: String?
+        /// 親が OFF のあいだだけ要約の下に出す案内 (「「予測変換」を ON にすると使えます」)。
+        var unavailableNote: NSTextField?
+        /// 利用者が「詳しく」で開いた / 閉じた状態 (検索していないとき)。検索を消すとこの状態に戻す。
+        var userOpen = false
+        /// 検索中に利用者が「詳しく」を押した状態 (nil = 検索の結果に任せる)。検索を消すと忘れる。
+        var searchOpen: Bool?
 
         init(item: SettingItem) { self.item = item }
 
@@ -98,7 +108,9 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
         attributed.append(NSAttributedString(string: text, attributes: [.foregroundColor: NSColor.secondaryLabelColor, .font: font]))
         // 同じ内容なら書き換えない (1.5 秒ごとの読み直しで、読み上げ中の要素を作り直さないように)
         if zenzaiStatusLabel.attributedStringValue != attributed { zenzaiStatusLabel.attributedStringValue = attributed }
+        // 文字の欄の読み上げはセルが受け持つので、セルにも名前を付ける (欄だけだと読まれないことがある)
         zenzaiStatusLabel.setAccessibilityLabel("Zenzai の状態: \(text)")
+        zenzaiStatusLabel.cell?.setAccessibilityLabel("Zenzai の状態: \(text)")
         zenzaiStatusLabel.isHidden = false
     }
 
@@ -228,6 +240,9 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
         groupTable.allowsEmptySelection = true
         groupTable.dataSource = self
         groupTable.delegate = self
+        // 選んであるグループをもう一度押しても、そのグループの先頭へ戻す (選択が変わらないと tableViewSelectionDidChange は来ない)
+        groupTable.target = self
+        groupTable.action = #selector(groupClicked(_:))
         groupTable.setAccessibilityLabel("設定のグループ")
         let tableScroll = NSScrollView()
         tableScroll.documentView = groupTable
@@ -271,6 +286,7 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
     // ---- 項目の組み立て ----
 
     private func build(_ catalog: SettingsCatalog) {
+        let labels = Dictionary(catalog.items.map { ($0.key, $0.label) }, uniquingKeysWith: { first, _ in first })
         for (group, items) in catalog.groups {
             let heading = NSTextField(labelWithString: group)
             heading.font = .boldSystemFont(ofSize: 13)
@@ -312,7 +328,7 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
 
             let section = Section(name: group, view: sectionView)
             for item in items {
-                let row = makeRow(item)
+                let row = makeRow(item, parentLabel: SettingsLayout.parents[item.key].flatMap { labels[$0] })
                 cardStack.addArrangedSubview(row.separator)
                 cardStack.addArrangedSubview(row.view)
                 row.separator.widthAnchor.constraint(equalTo: cardStack.widthAnchor).isActive = true
@@ -328,8 +344,10 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
         applySearch()
     }
 
-    private func makeRow(_ item: SettingItem) -> Row {
+    private func makeRow(_ item: SettingItem, parentLabel: String?) -> Row {
         let row = Row(item: item)
+        row.parentLabel = parentLabel
+        row.help = Self.accessibilityHelp(for: item)
         let id = NSUserInterfaceItemIdentifier(item.key)
         let isChild = SettingsLayout.parents[item.key] != nil
 
@@ -339,13 +357,21 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
         name.textColor = .labelColor
         Self.hideFromAccessibility(name)   // 部品の名前として読ませる (同じ名前を 2 回読ませない)
         let summary = UI.wrapping(item.displaySummary)
-        Self.hideFromAccessibility(summary)   // 部品の補足 (ヘルプ = 全文の説明) として読ませる
+        Self.hideFromAccessibility(summary)   // 部品の補足 (ヘルプ = 要約 + 例 + 全文の説明) として読ませる
         var lines: [NSView] = [name, summary]
         row.texts = [(name, .labelColor), (summary, .secondaryLabelColor)]
+        // 子は、親が OFF のあいだだけ、要約の下に使えるようにする方法を出す (薄くした文字より読める濃さ。読み上げは部品のヘルプの先頭で伝える)
+        if let parentLabel {
+            let note = UI.wrapping("「\(parentLabel)」を ON にすると使えます")
+            note.isHidden = true
+            Self.hideFromAccessibility(note)
+            lines.append(note)
+            row.unavailableNote = note
+        }
         if let example = item.example, !example.isEmpty {
             // 例はダークでも読める濃さにする (tertiary だと暗い背景で読みにくい)。要約とは先頭の「例:」で見分ける
             let exampleLabel = UI.wrapping("例: \(example)")
-            Self.hideFromAccessibility(exampleLabel)
+            Self.hideFromAccessibility(exampleLabel)   // 部品のヘルプに「例: …」として入れてある
             lines.append(exampleLabel)
             row.texts.append((exampleLabel, .secondaryLabelColor))
         }
@@ -359,13 +385,15 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
             let description = UI.wrapping(item.description)
             description.isHidden = true
             description.setAccessibilityLabel("「\(item.label)」の説明")
+            description.cell?.setAccessibilityLabel("「\(item.label)」の説明")
             let details = NSButton(title: "詳しく", target: self, action: #selector(toggleDetails(_:)))
             details.identifier = NSUserInterfaceItemIdentifier(Self.detailsPrefix + item.key)
             details.isBordered = false
             details.controlSize = .small
             details.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
             details.contentTintColor = .controlAccentColor
-            details.setAccessibilityLabel("「\(item.label)」の詳しい説明")
+            details.setAccessibilityLabel(Self.detailsAccessibilityLabel(item.label, open: false))
+            details.setAccessibilityExpanded(false)
             lines.append(details)
             lines.append(description)
             row.texts.append((description, .secondaryLabelColor))
@@ -393,7 +421,6 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
             toggle.target = self
             toggle.action = #selector(boolChanged(_:))
             toggle.setAccessibilityLabel(item.label)
-            toggle.setAccessibilityHelp(item.description)
             row.controls = [toggle]
             row.refresh = { value in
                 if case let .bool(on) = value { toggle.state = on ? .on : .off }
@@ -411,7 +438,6 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
                 popup.lastItem?.representedObject = option.value
             }
             popup.setAccessibilityLabel(item.label)
-            popup.setAccessibilityHelp(item.description)
             row.controls = [popup]
             row.refresh = { value in
                 guard case let .string(name) = value else { return }
@@ -425,11 +451,9 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
             field.alignment = .right
             field.target = self
             field.action = #selector(intFieldChanged(_:))
-            field.delegate = self
             field.translatesAutoresizingMaskIntoConstraints = false
             field.widthAnchor.constraint(equalToConstant: 44).isActive = true
             field.setAccessibilityLabel(item.label)
-            field.setAccessibilityHelp(item.description)
             let stepper = NSStepper()
             stepper.identifier = id
             stepper.minValue = Double(item.min ?? 0)
@@ -456,6 +480,8 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
             stack.setHuggingPriority(.required, for: .horizontal)
             control = stack
         }
+        // 読み上げの補足は、どの種類の部品 (スイッチ・選択・数の欄・ステッパー) も同じ文 (要約 + 例 + 全文の説明)
+        for part in row.controls { part.setAccessibilityHelp(row.help) }
         control.translatesAutoresizingMaskIntoConstraints = false
         control.setContentHuggingPriority(.required, for: .horizontal)
         control.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -497,6 +523,19 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
 
     private static let detailsPrefix = "details:"
 
+    /// 部品の読み上げの補足: 要約 + 例 (画面の「例: …」と同じ) + 全文の説明 (要約と同じなら省く)。
+    /// 画面の要約と例は読み上げの要素にしていないので、ここで読ませる (要約・例を別の要素にすると、部品と離れて同じ内容を 2 回読む)。
+    private static func accessibilityHelp(for item: SettingItem) -> String {
+        var parts = [item.displaySummary]
+        if let example = item.example, !example.isEmpty { parts.append("例: \(example)") }
+        if item.description != item.displaySummary { parts.append(item.description) }
+        return parts.joined(separator: "\n")
+    }
+
+    private static func detailsAccessibilityLabel(_ label: String, open: Bool) -> String {
+        open ? "「\(label)」の詳しい説明を閉じる" : "「\(label)」の詳しい説明を開く"
+    }
+
     /// 読み上げの要素にしない (部品の名前・ヘルプと同じ内容を、別の文字として何度も読ませない)。
     /// 文字の欄の読み上げはセルが受け持つので、欄とセルの両方に指定する (欄だけでは AX の一覧に残った)。
     private static func hideFromAccessibility(_ label: NSTextField) {
@@ -507,10 +546,21 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
     @objc private func toggleDetails(_ sender: NSButton) {
         guard let key = sender.identifier?.rawValue, key.hasPrefix(Self.detailsPrefix),
               let row = rows[String(key.dropFirst(Self.detailsPrefix.count))], let description = row.description else { return }
-        description.isHidden.toggle()
-        sender.title = description.isHidden ? "詳しく" : "閉じる"
+        let open = description.isHidden
+        // 検索していないときは利用者の状態として覚える。検索中に押したものは、検索を消すまでのあいだだけ
+        if SettingsLayout.isEmptyQuery(searchField.stringValue) { row.userOpen = open } else { row.searchOpen = open }
+        setDescription(row, open: open)
         // 開いたら、読み上げにも説明が出たことを知らせる
-        if !description.isHidden { UI.announce(description.stringValue, in: window) }
+        if open { UI.announce(description.stringValue, in: window) }
+    }
+
+    /// 全文の説明を開く / 閉じる。ボタンの文字・読み上げの名前・開閉の状態 (AXExpanded) も合わせる。
+    private func setDescription(_ row: Row, open: Bool) {
+        guard let description = row.description, let button = row.detailsButton, description.isHidden == open else { return }
+        description.isHidden = !open
+        button.title = open ? "閉じる" : "詳しく"
+        button.setAccessibilityLabel(Self.detailsAccessibilityLabel(row.item.label, open: open))
+        button.setAccessibilityExpanded(open)
     }
 
     // ---- 検索 ----
@@ -523,14 +573,26 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
     }
 
     /// 検索の文字で行を絞る。一致しない行・その区切り線・一致の無いグループ (見出しとカード) を隠し、左の一覧では薄くする。
+    /// 子が一致したら親も出す (薄くした子だけが、何の子か分からないまま出ないように)。
+    /// 隠れている全文の説明でだけ一致した行は、説明を開いて一致した理由を見せる (検索を消すと、利用者が開いていた / 閉じていた状態に戻す)。
     private func applySearch() {
         let query = searchField.stringValue
+        let searching = !SettingsLayout.isEmptyQuery(query)
+        let shown = SettingsLayout.shownKeys(sections.flatMap { $0.rows.map(\.item) }, query: query)
+        let wasNoMatch = !noMatchLabel.isHidden
         var anyMatch = false
         for section in sections {
             var first = true
             for row in section.rows {
-                let match = SettingsLayout.matches(row.item, query: query)
+                let match = shown.contains(row.item.key)
                 row.view.isHidden = !match
+                if searching {
+                    let auto = match && SettingsLayout.matchesOnlyInDescription(row.item, query: query)
+                    setDescription(row, open: row.searchOpen ?? (row.userOpen || auto))
+                } else {
+                    row.searchOpen = nil
+                    setDescription(row, open: row.userOpen)
+                }
                 // カードの中で見えている最初の行には、上の区切り線を引かない
                 row.separator.isHidden = !match || first
                 if match { first = false }
@@ -540,7 +602,8 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
             anyMatch = anyMatch || !first
         }
         noMatchLabel.isHidden = anyMatch || sections.isEmpty
-        if !noMatchLabel.isHidden { UI.announce(noMatchLabel.stringValue, in: window) }
+        // 読み上げは、一致があった状態から無くなったときだけ (一致の無いまま打ち続けても、1 文字ごとに読ませない)
+        if !noMatchLabel.isHidden && !wasNoMatch { UI.announce(noMatchLabel.stringValue, in: window) }
         groupTable.reloadData()
         syncSelectionToScroll()
     }
@@ -555,7 +618,11 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
         cell.textField?.stringValue = section.name
         // 検索で一致が無いグループは薄くする (選べない)
         cell.textField?.textColor = section.hasMatch ? .labelColor : .tertiaryLabelColor
-        cell.setAccessibilityLabel(section.hasMatch ? section.name : "\(section.name) (一致なし)")
+        // 名前は、行の要素 (AXCell = NSTableCellView) と、その中の文字 (AXStaticText = 文字の欄のセル) の両方に付ける
+        // (どちらを読むかは読み上げの辿り方で変わる。AXCell の名前を外すと、行の名前が空になった)
+        let accessibilityName = section.hasMatch ? section.name : "\(section.name) (一致なし)"
+        cell.setAccessibilityLabel(accessibilityName)
+        cell.textField?.cell?.setAccessibilityLabel(accessibilityName)
         return cell
     }
 
@@ -566,6 +633,13 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !syncingSelection, sections.indices.contains(groupTable.selectedRow) else { return }
         scroll(to: sections[groupTable.selectedRow])
+    }
+
+    /// 一覧を押すたび (選んであるグループをもう一度押したときも) そのグループの先頭へスクロールする。
+    @objc private func groupClicked(_ sender: NSTableView) {
+        let index = sender.clickedRow
+        guard !syncingSelection, sections.indices.contains(index), sections[index].hasMatch else { return }
+        scroll(to: sections[index])
     }
 
     /// そのグループの見出しが右の一番上に来るまでスクロールする (最後のほうのグループは、下端までで止まる)。
@@ -633,31 +707,42 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
         showProblem(nil)
         if rows.isEmpty {
             build(catalog)
-            setEnabled(true)
+            setEnabled(true, force: true)
             return
         }
+        var changed = false
         for item in catalog.items {
             guard let row = rows[item.key], values[item.key] != item.value, !row.isBusy() else { continue }
             row.refresh(item.value)
             values[item.key] = item.value
+            changed = true
         }
-        // 親の値が変わったかもしれないので、子の操作可否も合わせ直す
-        setEnabled(true)
+        // 値が変わったとき (親の値が変わったかもしれない) と、読めない状態から戻ったときだけ、子の操作可否を合わせ直す
+        // (1.5 秒ごとの読み直しのたびに全部の部品を塗り直さない)
+        setEnabled(true, force: changed)
     }
 
     /// config.json を読めるかどうかで、全体を操作できる / できないにする。読めるときも、親が OFF の子は操作できないまま。
-    private func setEnabled(_ enabled: Bool) {
+    /// 操作できる / できないが変わったとき (または force) だけ、部品を合わせ直す。
+    private func setEnabled(_ enabled: Bool, force: Bool = false) {
+        let wasEnabled = controlsEnabled
         controlsEnabled = enabled
         resetButton?.isEnabled = enabled
-        updateAvailability()
+        if force || wasEnabled != enabled { updateAvailability() }
     }
 
-    /// 親が OFF の子を操作できなくして薄くする。値が変わるたび (自分の変更・戻し・既定値・読み直し) に呼ぶ。
+    /// 親が OFF の子を操作できなくして薄くする。値が変わるたび (自分の変更・戻し・既定値・読み直しで値が変わったとき) に呼ぶ。
+    /// 操作できない子は、読み上げのヘルプの先頭に理由を足し、要約の下に使えるようにする方法を出し、「詳しく」も薄い色にする (押せるまま)。
     private func updateAvailability() {
         for row in rows.values {
             let available = SettingsLayout.isAvailable(row.item.key, values: values)
             for control in row.controls { control.isEnabled = controlsEnabled && available }
             row.setDimmed(!available)
+            var help = row.help
+            if !available, let parentLabel = row.parentLabel { help = "「\(parentLabel)」が OFF のため変更できません。\n" + help }
+            for control in row.controls where control.accessibilityHelp() != help { control.setAccessibilityHelp(help) }
+            row.unavailableNote?.isHidden = available
+            row.detailsButton?.contentTintColor = available ? .controlAccentColor : .tertiaryLabelColor
         }
     }
 
@@ -736,7 +821,7 @@ final class SettingsViewController: NSViewController, NSTextFieldDelegate, NSTab
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "設定を既定値に戻しますか?"
-        alert.informativeText = "このタブにある設定をすべて、買ったときの状態に戻します。ユーザー辞書・専門用語集・ほかの設定は変わりません。"
+        alert.informativeText = "このタブにある設定をすべて、初めの状態に戻します。ユーザー辞書・専門用語集・ほかの設定は変わりません。"
         // 取り消せない操作なので、Return で押される先頭のボタンはキャンセルにする (入力メニューの「学習データをすべて消去」と同じ方針)。
         alert.addButton(withTitle: "キャンセル")
         let reset = alert.addButton(withTitle: "既定値に戻す")

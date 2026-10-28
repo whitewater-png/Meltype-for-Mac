@@ -139,6 +139,9 @@ internal static class MacSettingsTests
                 Assert.True(example.Contains('→') && example.Length <= 60 && !example.Contains('\n'), $"{item.Key} の例は「→」を含む 60 字以内の 1 行: {example}");
                 Assert.True(!example.StartsWith("例"), $"{item.Key} の例に「例」を付けない (画面が付ける)");
             }
+            // 入力メニューに無い切り替えを案内しない (メニューにあるのは辞書の登録提案だけ)
+            if (item.Key != nameof(Settings.DictionarySuggest))
+                Assert.True(!item.DisplayDescription.Contains("入力メニュー"), $"{item.Key} の説明が入力メニューを案内している: {item.DisplayDescription}");
             foreach (var text in new[] { item.DisplayDescription, summary, item.Example ?? "" })
             {
                 foreach (var internalWord in new[] { "本家", "Mac 版", "Mac は", "Windows", "現在は" })

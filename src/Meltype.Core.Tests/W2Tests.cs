@@ -56,7 +56,7 @@ internal static class W2Tests
         Assert.Equal("bool", item.GetProperty("kind").GetString());
         Assert.True(item.GetProperty("value").GetBoolean(), "設定タブでも既定は ON");
         Assert.True(item.GetProperty("description").GetString()!.Contains("z/ → z/"), "OFF のときにどうなるかを書く");
-        // 「記号・句読点」の組に出す (入力の変換の設定の並び)
+        // 「記号・句読点」の組に出す
         Assert.Equal("記号・句読点", item.GetProperty("group").GetString());
         // 設定タブの値が Settings と同じ (DisplayName / Description の一致は MacSettingsTests が見る)
         var attribute = typeof(Settings).GetProperty(nameof(Settings.ZSymbolConversion))!
