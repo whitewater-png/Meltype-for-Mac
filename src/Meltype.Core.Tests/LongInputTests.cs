@@ -136,7 +136,7 @@ internal static class LongInputTests
         string[] inputs =
         [
             "kyouhanihongonobunshouwonagakuutsu", "meetingnojikanwokakuninshitekudasai", "Githubnopushwosuru", "OCRwoshita", "dontwo", "don't", "it'sOK",
-            "stackoverflow", "alcoholicdrink", "taro@gmail.com", "user_namewo", "e-mailde", "ps5wokaitai", "win11pro", "2026nen3gatsu", "tetr.io", "Wakatte.TV",
+            "stackoverflow", "alcoholicdrink", "taro@gmail.com", "user_namewo", "e-mailde", "ps5wokaitai", "win11pro", "2026nen3gatsu", "tetr.io", "Tetr.TV",
             "sushiwotabeta", "iPhonedeshashin", "characteristicallyyoi", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaadon't",
             "kyouhaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "!?,.-nihongo#@", "tomatowotabeta", "kameranoremotedeoukuru",
