@@ -143,6 +143,8 @@ enum UI {
         label.textColor = .secondaryLabelColor
         label.font = .systemFont(ofSize: 13)
         label.alignment = .center
+        // 一覧の上に重ねるので、選べない文字にする (選べると I ビームのカーソルになり、クリックでキーボードの操作先を取る)
+        label.isSelectable = false
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return label
     }
