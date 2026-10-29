@@ -78,7 +78,7 @@ enable_input_source() {
         "<dict><key>Bundle ID</key><string>$ID</string><key>InputSourceKind</key><string>Keyboard Input Method</string></dict>" \
         "<dict><key>Bundle ID</key><string>$ID</string><key>Input Mode</key><string>$ID.Japanese</string><key>InputSourceKind</key><string>Input Mode</string></dict>" \
         "<dict><key>Bundle ID</key><string>$ID</string><key>Input Mode</key><string>com.apple.inputmethod.Roman</string><key>InputSourceKind</key><string>Input Mode</string></dict>"
-    echo "入力ソースに Meltype を追加しました"
+    echo "入力ソースに Meltype for Mac を追加しました"
 }
 
 # 初めて入れたとき: 入力ソースとして登録し (Meltype --register)、入力メニュー (TextInputMenuAgent) と
@@ -184,22 +184,22 @@ if [[ $FIRST_INSTALL -eq 0 ]]; then
     if is_registered; then
         echo "入れ替えました。次にキーを打ったときから新しい Meltype になります。"
     else
-        echo "入れ替えましたが、入力ソースの一覧に Meltype がありません (前に Meltype.app を消して入れ直したときなど)。"
-        echo "いったんログアウトしてログインし直してから、メニューバーの入力メニューで Meltype を選んでください。"
+        echo "入れ替えましたが、入力ソースの一覧に Meltype for Mac がありません (前に Meltype.app を消して入れ直したときなど)。"
+        echo "いったんログアウトしてログインし直してから、メニューバーの入力メニューで Meltype for Mac を選んでください。"
     fi
 elif [[ $STALE -eq 1 ]]; then
     enable_input_source
     echo "前の Meltype を消したあと、まだログアウトしていないようです。"
-    echo "いったんログアウトしてログインし直してから、メニューバーの入力メニューで Meltype を選んでください。"
+    echo "いったんログアウトしてログインし直してから、メニューバーの入力メニューで Meltype for Mac を選んでください。"
 elif register_input_source; then
-    echo "メニューバーの入力メニューで Meltype を選んでください。"
-    echo "(出ていなければ、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype を追加してください。"
+    echo "メニューバーの入力メニューで Meltype for Mac を選んでください。"
+    echo "(出ていなければ、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype for Mac を追加してください。"
     echo " それでも出てこなければ、いったんログアウトしてログインし直してください)"
 else
     # 登録できなかったときだけ、有効な入力ソースの一覧に直接書き込んでおく (#21)。
     enable_input_source
     echo "初めてのときは:"
     echo "  1. いったんログアウトしてログインし直す"
-    echo "  2. メニューバーの入力メニューで Meltype を選ぶ"
-    echo "     (出ていなければ、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype を追加)"
+    echo "  2. メニューバーの入力メニューで Meltype for Mac を選ぶ"
+    echo "     (出ていなければ、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype for Mac を追加)"
 fi

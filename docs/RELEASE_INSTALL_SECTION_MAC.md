@@ -4,7 +4,7 @@
 1. `Meltype-mac-<ver>.dmg` をダブルクリックして開く (開いたウインドウの背景に、開き方の図が出ます)
 2. 中の `Meltype-mac-<ver>.pkg` をダブルクリック (「開発元が未確認のため開けません」と出たら、下の「開けないとき」の手順で開きます)
 3. インストーラーの案内に従って進める (「このユーザーのみ」に入るので管理者パスワードは不要)
-4. 入力メニューで Meltype を選ぶ。出ていないときは、いったんログアウトしてログインし直す
+4. 入力メニューで Meltype for Mac を選ぶ。出ていないときは、いったんログアウトしてログインし直す
 
 ![dmg を開いたときのウインドウ](https://raw.githubusercontent.com/whitewater-png/Meltype-for-Mac/main/docs/images/mac-dmg-window.png)
 
@@ -13,7 +13,7 @@
 ### zip
 1. `Meltype-mac-<ver>.zip` を展開
 2. 「Install Meltype.command」をダブルクリック (「開発元が未確認のため開けません」と出たら、下の「開けないとき」の手順で開きます)
-3. 入力メニューで Meltype を選ぶ
+3. 入力メニューで Meltype for Mac を選ぶ
 
 ### Homebrew
 `brew install --cask whitewater-png/meltype-for-mac/meltype-for-mac` (更新は `brew upgrade --cask meltype-for-mac`)。**入れたあとはログアウトしてログインし直す**。

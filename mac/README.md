@@ -32,11 +32,11 @@ cd mac
 1. 本体 (C#) を NativeAOT でビルドし、IME と辞書の管理画面 (Swift) をビルドして、`build/Meltype.app` を作ります (初回は azooKey の変換エンジンと辞書のダウンロードで時間がかかります)。
    辞書の管理画面は `build/Meltype.app/Contents/Helpers/MeltypeDictionary.app` に入れ、中から外へ署名して、最後に `codesign --verify --deep --strict` で確かめます
 2. `~/Library/Input Methods/Meltype.app` にインストールします
-3. 初めてのときは、入力ソースとして登録します (1 分ほどかかることがあります)。うまくいかなかったときは、**システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype** を追加します。それでも出てこなければ、いったんログアウトしてログインし直します
-4. メニューバーの入力メニューで Meltype を選ぶと使えます
+3. 初めてのときは、入力ソースとして登録します (1 分ほどかかることがあります)。うまくいかなかったときは、**システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype for Mac** を追加します。それでも出てこなければ、いったんログアウトしてログインし直します
+4. メニューバーの入力メニューで Meltype for Mac を選ぶと使えます
 
 作り直したときは `./build.sh` をもう一度実行すれば入れ替わります (動いている Meltype は自動で止め、次にキーを打ったときに新しい Meltype が起動します)。
-`~/Library/Input Methods/Meltype.app` を自分で消して入れ直さないでください。macOS が入力ソースの一覧から Meltype を外し、
+`~/Library/Input Methods/Meltype.app` を自分で消して入れ直さないでください。macOS が入力ソースの一覧から Meltype for Mac を外し、
 ログアウトするまで入力メニューに出なくなります (`build.sh` / `install.sh` は Meltype.app を消さずに中身だけを入れ替えます)。
 `mac/.build` (Swift のビルド結果) は azooKey の辞書の置き場所として使われることがあるので、消さないでください。
 
@@ -174,8 +174,8 @@ bash uninstall.sh --yes --remove-data      # 設定・学習データ・ユー�
 - 変換ボックスが出ているときの Ctrl+H は BackSpace と同じ (かなを 1 音消す。変換中なら変換をやめてかなに戻す)。何も打っていないときはアプリに渡す
 - 設定「ATOK スタイルのキー操作」が ON のとき、入力中 (変換前) の Shift+↓ は、先頭の 1 音だけを確定して残りは入力のまま続けます (ATOK の 1 音確定。英字は 1 文字ずつ)。変換中の Shift+↓ は今までどおりです。OFF (既定) のときは ↓ と同じです
 - US 配列でも、ローマ字入力と英語・日本語の自動判定は同じように使えます。日本語の入力中に `\` を打つと、全角の ￥ ではなく半角の `\` が入ります (パスやエスケープに使うため)。`_` と `+` は、英字の識別子 (`snake_case`・`C++`) の一部として扱います。**かな入力 (JIS) は JIS キーボード専用**で、US 配列では使えません (記号キーの位置が違うため)。US 配列の実機での確認は、まだ十分ではありません
-- JIS キーボードの「英数」キーで英数 (直接入力)、「かな」キーで日本語に戻ります (入力メニューの表示も「英数 (Meltype)」「Meltype」に変わります)
-- Caps Lock で「Meltype」と「英数 (Meltype)」を切り替えられます (効かないときは入力メニューから選んでください)。US 配列では Caps Lock か入力メニューで切り替えます
+- JIS キーボードの「英数」キーで英数 (直接入力)、「かな」キーで日本語に戻ります (入力メニューの表示も「英数 (Meltype for Mac)」「Meltype for Mac」に変わります)
+- Caps Lock で「Meltype for Mac」と「英数 (Meltype for Mac)」を切り替えられます (効かないときは入力メニューから選んでください)。US 配列では Caps Lock か入力メニューで切り替えます
 - 入力メニューの「学習データをすべて消去…」で、変換・登録提案・英語/日本語・英訳・azooKey の学習を消せます (確認あり。ユーザー辞書と設定は消えません)。ログ (`meltype.log` など) と、学習データの退避コピー (読めない・大きすぎるために残した `.broken`・`.oversize`) も消えます。読めなくて保存を止めているファイルも、中身ごと消えます。英字のまま / かなにすると覚えた語は、「Meltype 辞書」の「学習した語」タブで 1 語ずつ確かめて削除できます。
 - 「設定・辞書…」の画面の「専門用語集(サンプル)」タブで、分野 (AI・土木・IT・医療・ネットスラング・映像など) ごとに専門用語の使用を ON/OFF できます (既定はすべて OFF、すぐ全入力欄に反映、`config.json` の `EnabledTermDomains` に保存。読めない `config.json` は上書きしません)。詳しくは [docs/DICTIONARY.md](../docs/DICTIONARY.md)
 - 入力メニューの「設定・辞書…」で、辞書の管理画面「Meltype 辞書」が開きます (下の「辞書の管理」)
@@ -291,8 +291,8 @@ cd .. && python3 tools/check-mac-aot-settings.py
 ## 困ったとき
 
 - F9 などが効かない: システム設定 → キーボード → キーボードショートカット で F キーの割り当てを外すか、上の Ctrl キーを使う。
-- 入力ソースに出てこない: 先に、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype から追加する。それでも出なければ、ログアウトしてログインし直す。`~/Library/Input Methods/Meltype.app` があるか確かめる。「+」の一覧に出ないときは、ターミナルで次を実行してから入力メニューを見る (`install.sh` も登録できなかったときに同じことをします、#21)。
-  ただし、`defaults read com.apple.HIToolbox AppleEnabledInputSources` と `defaults read com.apple.inputsources AppleEnabledThirdPartyInputSources` のどちらにも Meltype が無いときだけにしてください (両方に入ると、入力ソースの一覧に Meltype が 2 つ出ます)
+- 入力ソースに出てこない: 先に、システム設定 → キーボード → 入力ソース →「編集…」→「+」→ 日本語 → Meltype for Mac から追加する。それでも出なければ、ログアウトしてログインし直す。`~/Library/Input Methods/Meltype.app` があるか確かめる。「+」の一覧に出ないときは、ターミナルで次を実行してから入力メニューを見る (`install.sh` も登録できなかったときに同じことをします、#21)。
+  ただし、`defaults read com.apple.HIToolbox AppleEnabledInputSources` と `defaults read com.apple.inputsources AppleEnabledThirdPartyInputSources` のどちらにも Meltype が無いときだけにしてください (両方に入ると、入力ソースの一覧に Meltype for Mac が 2 つ出ます)
   ```bash
   defaults write com.apple.HIToolbox AppleEnabledInputSources -array-add \
     '<dict><key>Bundle ID</key><string>io.github.yksr-melt.inputmethod.Meltype</string><key>InputSourceKind</key><string>Keyboard Input Method</string></dict>' \
@@ -300,7 +300,7 @@ cd .. && python3 tools/check-mac-aot-settings.py
     '<dict><key>Bundle ID</key><string>io.github.yksr-melt.inputmethod.Meltype</string><key>Input Mode</key><string>com.apple.inputmethod.Roman</string><key>InputSourceKind</key><string>Input Mode</string></dict>'
   killall TextInputMenuAgent
   ```
-- 「英数 (Meltype)」が入力メニューに出ない (モードが増えた版に入れ替えたあと): いったんログアウトしてログインし直してください
+- 「英数 (Meltype for Mac)」が入力メニューに出ない (モードが増えた版に入れ替えたあと): いったんログアウトしてログインし直してください
 - 入力メニューに出ない・選んでも切り替わらない・打っても何も出ない (Meltype.app を消して入れ直したときなど):
   ログアウトしてログインし直すのが確実です。ログアウトしたくないときは、入力ソースとして登録し直し、入力メニューと
   IME を起動する imklaunchagent を起動し直します。それでも打っても何も出ないアプリは、そのアプリを終了して開き直します
@@ -309,7 +309,7 @@ cd .. && python3 tools/check-mac-aot-settings.py
   killall imklaunchagent TextInputMenuAgent
   ```
   `open` などで Meltype.app を自分で起動しないでください (macOS が起動したものでないと、止まったときに起動し直されません)
-- 入力メニューに Meltype がいくつも並ぶ: 同じ Meltype が二重に登録されています。どれを選んでも同じです。ログアウトしてログインし直すと 1 つに戻るはずです
+- 入力メニューに Meltype for Mac がいくつも並ぶ: 同じ Meltype が二重に登録されています。どれを選んでも同じです。ログアウトしてログインし直すと 1 つに戻るはずです
 - 動きがおかしい: ログを見る
 
   ```bash

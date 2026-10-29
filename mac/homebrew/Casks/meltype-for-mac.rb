@@ -68,7 +68,7 @@ cask "meltype-for-mac" do
     macOS 13.3 以降が必要です (13.0〜13.2 では Meltype が起動しません)。
 
     インストール後は、いったんログアウトしてログインし直してください (Homebrew の処理はサンドボックスの中で動くため、
-    入力ソースの登録を済ませられません。ログアウトせずに使うには、次を実行してから入力メニューで Meltype を選びます)。
+    入力ソースの登録を済ませられません。ログアウトせずに使うには、次を実行してから入力メニューで Meltype for Mac を選びます)。
       "$HOME/Library/Input Methods/Meltype.app/Contents/MacOS/Meltype" --register
 
     署名は ad-hoc で、Apple の公証は受けていません。そのまま起動できるよう、入れるときに quarantine 属性を外しています

@@ -3680,3 +3680,11 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **直し**: 3 つのタブ (ユーザー辞書・専門用語集・学習した語) とも、案内を一覧の外の親 (`root`) に足して一覧の上に重ねた。制約 (一覧の真ん中・幅は一覧 - 40 まで) と `UI.emptyLabel()` (折り返す・窓を広げない) はそのまま。一覧の上に重なるので、案内は選べない文字にした (査読: 選べると I ビームのカーソルになり、クリックで操作先を取る)。
 - **確認**: 空のデータで、ユーザー辞書・学習した語の一覧の真ん中に案内が出る (撮影、最小の窓 780×480 と 1200×800)。語のある専門用語集では案内は隠れていて、一覧に重ならない。窓の大きさは ⌘1〜⌘5 で変わらない。ビルド・codesign・self-test 255 PASS。
 - **未確認**: 実機。専門用語集の空の自作の分野・検索で「見つかりません」のときの表示は撮影していない (同じ作りなので出るはず)。
+
+## Q33 入力メニューなどに出る名前を「Meltype for Mac」にする (2026-10-29)
+
+- **依頼**: リョウさん (2026-10-29)。アプリの名前を Meltype から Meltype-for-Mac にできるか → 「表示名だけ」「スペース区切り (Meltype for Mac)」に決定。本家 (Windows 版) と見分けやすくするため (Homebrew の cask 名 `meltype-for-mac` と同じ考え)。
+- **変えたもの**: 入力ソースの名前 (入力メニュー・システム設定の一覧) を「Meltype」→「Meltype for Mac」、英数モードを「英数 (Meltype)」→「英数 (Meltype for Mac)」(優先する言語が英語のときは「Alphanumeric (Meltype for Mac)」)。`mac/Resources/Info.plist` の `CFBundleName`・`CFBundleDisplayName` と、`mac/Resources/{ja,en}.lproj/InfoPlist.strings`。今の手順を書いた文書で、入力メニュー・入力ソースの一覧に出る名前として書いた「Meltype」も直した (README.md・mac/README.md・mac/INSTALL.txt・mac/pkg のインストーラの結びと dmg の README・docs/RELEASE_INSTALL_SECTION_MAC.md・cask の caveats・docs/KNOWN_LIMITS.md の K50・docs/US_LAYOUT_CHECKLIST.md の U11・U12 (未実施の手順))。`mac/build.sh`・`mac/install.sh`・`mac/uninstall.sh` が端末に出す案内 (入力メニューで選ぶ・入力ソースに追加する/外す名前) も同じく直した。アプリそのものを指す「Meltype」(「Meltype を止める」「Meltype を入れ直して」など) と、入力メニュー (メニューバーのアイコン) を指す「メニューバーの Meltype」(mac/INSTALL.txt・docs/DICTIONARY.md) と、スクリプト・ソースのコメントはそのまま。
+- **変えないもの (リョウさんの決定)**: `Meltype.app` のファイル名、実行ファイル名 `Meltype` (`killall Meltype` などが使う)、バンドル ID・入力ソース ID (`io.github.yksr-melt.inputmethod.Meltype…`)、データの場所。これらを変えると、今の利用者のアプリ内の更新 (`~/Library/Input Methods/Meltype.app` のときだけ「更新する」を出す) が使えなくなり、macOS からは別の入力ソースに見える。辞書の管理画面「Meltype 辞書」と、通知・ダイアログの文の「Meltype」も今回は変えていない。古い記録 (HOST_COMPAT の実機結果・KNOWN_LIMITS の K34 など) は、その時点の表示なのでそのまま。
+- **確認**: `./build.sh --no-install`、codesign、組み立てたアプリの Info.plist と InfoPlist.strings の値 (`PlistBuddy`・`plutil -p`)、`tools/check-mac-aot-settings.py` PASS、`tools/check-release.py` PASS 24 / FAIL 0 / SKIP 1 (zip が無いため)。Core (C#) は変えていないので Core テストは回していない。
+- **未確認**: 実機の入力メニュー・システム設定の一覧での表示。macOS が入力ソースの名前を覚えているため、入れ替えたあとログアウト・ログインするまで古い名前のままのことがある (推測。実機で確かめる)。通知の見出しとシステム設定の「通知」の一覧に出るアプリ名も「Meltype for Mac」に変わる見込み (CFBundleDisplayName を使うため。推測。通知の許可は bundle ID に付くので消えないはず)。
