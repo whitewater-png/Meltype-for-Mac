@@ -3651,12 +3651,12 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 ## 本家追従 W18 (2026-10-30。#1185 は導入せず、辞書で直る語だけ足す)
 
 - **決定** (リョウさん、2026-10-30): 本家 PR #1185 (日英境界のラティス化) は導入しない (「悪化するのは良くないので」)。試作で「本家のほうが良い」だった 65 件を仕分けし、辞書だけで直り悪化の無いものだけ足す。B (小さな規則) の 26 件は今回は見送る。
-- **仕分け** ([UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv](UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv)): A 辞書 23 (悪化なし 21・悪化あり 2)、B 小さな規則 26、C ラティス必須 14、D 判断不能 2 (`site PR`、`my name is taro` = 人名 K02 の方針)。
-- **W18-1 (辞書)**: `english.txt` に env・into・instal・shat・app・oss・ppt・ffmpeg、`propernouns.txt` に holoX と pedia 系 6 語、`english-readable.txt` に dice。テスト `Upstream1030W18Tests.cs` (4 件。辞書を起点に戻すと 3 件が赤、日本語の隣人 13 入力は不変の確認)。
-- **足さなかった語と理由** (実測): `image` (`tadaimagenzai` → ただimageんざい)、`garage` (`nagarage-mu` → なgarageーむ)、`tone` (`zuttoneru` など 245 入力)、`insta` (`…insta` で終わる入力 20 件の補正が効かなくなる)、`UIKit` (悪化 4 件に対し直るのは 1 件)、`meta` を english-readable に (144 入力が悪化)、`Meta` を propernouns に (裸形 `meta` だけ直り `metawo` は不変の半端な修正)。
-- **確認**: 全テスト 1227/1227。`eval-compare` (654 件): broken 0、直る入力 10。前後比較 93,748 入力 (japanese.txt の語 1,207 と readings.txt の読み 1,910 件 × 新語を前後に置いた 9 形): 日本語の語単独・語 + desu/wo の入力の差は 0、差が出た 77,746 入力はすべて新語を含み、出力に新語が英字で出ていた。
+- **仕分け** ([UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv](UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv)): A 辞書 23 (表の上の悪化は insta・meta・UIKit の 3、悪化なし 20。独立査読のあと、打ち間違いの補正を壊す shat・oss・app も外したので、足したのは下の語。件数 65 は入力が重複する行を含み、種類では 62)、B 小さな規則 26、C ラティス必須 14、D 判断不能 2 (`site PR`、`my name is taro` = 人名 K02 の方針)。
+- **W18-1 (辞書)**: `english.txt` に env・into・instal・ppt・ffmpeg、`propernouns.txt` に holoX と pedia 系 5 語 (pedia・protopedia・protopedias・wikipedias・conservapedia。`worldpedia` は pedia だけで英字になるので入れない)、`english-readable.txt` に dice。テスト `Upstream1030W18Tests.cs` (5 件。辞書を起点に戻すと 3 件が赤。日本語の隣人 13 入力と、打ち間違いの補正 7 入力は不変の確認)。
+- **足さなかった語と理由** (実測): `shat`・`oss`・`app` (独立査読で発見: 1 文字落としの打ち間違いの補正が効かなくなる。`shats` → しゃつ が shatsが、`ossna` → おっさん が ossな、`appwo` → あっぷを が appを になる。綴りが正しい入力は悪化しない。直る `I shat`・`gpt-oss wo tsukau`・`npx create-next-app` は、悪化するのは良くないという方針で見送り)、`image` (`tadaimagenzai` → ただimageんざい)、`garage` (`nagarage-mu` → なgarageーむ)、`tone` (`zuttoneru` など 245 入力)、`insta` (`…insta` で終わる入力 20 件の補正が効かなくなる)、`UIKit` (悪化 4 件に対し直るのは 1 件)、`meta` を english-readable に (144 入力が悪化)、`Meta` を propernouns に (裸形 `meta` だけ直り `metawo` は不変の半端な修正)。
+- **確認**: 全テスト 1228/1228。`eval-compare` (654 件): broken 0 (shat・oss・app を外す前の測定。外したあとは再測定)。独立査読の前後比較: 日本語の語 (readings 19,686 語と japanese.txt 929 語) を 語・語+desu・語+wo にした 59,822 入力で差 0。1 文字落とし・入れ替えの打ち間違い約 9.4 万入力で、悪化は shat・oss・app の 3 語だけ (外した)。
 - **得と損**: 得: env・app・oss・ppt・ffmpeg・pedia 系などの英字の語と、`dive into summer` が崩れない。損: ラティスの根本的な精度向上は得られず、本家との差は個別の語で拾い続ける。B (短い語の英文 `Tell me more`、`i18n`・`l10n` などの数字入り略語、`ya` + 英単語、`cd ~/`) と C (`erroraru`・`cattodog`・`adbyuukounisuru` など) は直らない。
-- **残る限界・未確認**: 実機未確認。測ったのは Core のテスト用キーボードの結果 (漢字変換は含まない)。2 語連結のスイープは網羅ではない (`garage` の悪化は手書きの自然な日本語で見つかった)。
+- **残る限界・未確認**: 実機未確認。測ったのは Core のテスト用キーボードの結果 (漢字変換は含まない)。`env` は打った瞬間に英字表示になる (意図した変化)。2 語連結のスイープは網羅ではない (`garage` の悪化は手書きの自然な日本語で見つかった)。
 
 ## Q29 の修正 (Mac で「もしかして」の案内を出す、2026-10-28)
 

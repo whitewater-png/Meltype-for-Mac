@@ -17,19 +17,16 @@ internal static class Upstream1030W18Tests
     }
 
     [Test]
-    public static void Env_Into_Instal_Shat()
+    public static void Env_Into_Instal()
     {
         Assert.Equal("env", Committed("env"), "env");
         Assert.Equal("dive into summer", Committed("dive into summer"), "dive into summer");
         Assert.Equal("instal", Committed("instal"), "instal");
-        Assert.Equal("I shat", Committed("I shat"), "I shat");
     }
 
     [Test]
-    public static void App_Oss_Ppt_Ffmpeg()
+    public static void Ppt_Ffmpeg()
     {
-        Assert.Equal("npx create-next-app", Committed("npx create-next-app"), "npx create-next-app");
-        Assert.Equal("gpt-oss をつかう", Committed("gpt-oss wo tsukau"), "gpt-oss wo tsukau");
         Assert.Equal("excelとppt", Committed("exceltoppt"), "exceltoppt");
         Assert.Equal("pythonとffmpeg", Committed("pythontoffmpeg"), "pythontoffmpeg");
     }
@@ -53,6 +50,22 @@ internal static class Upstream1030W18Tests
             ["kippu"] = "きっぷ", ["happyou"] = "はっぴょう", ["enbu"] = "えんぶ", ["intoro"] = "いんとろ",
             ["shatsu"] = "しゃつ", ["kyoushatsuwokiru"] = "きょうしゃつをきる", ["tsumetai"] = "つめたい",
             ["metawo"] = "めたを", ["kyoudaisuki"] = "きょうだいすき",
+        };
+        foreach (var (typed, want) in expected)
+            Assert.Equal(want, Committed(typed), typed);
+    }
+
+    /// <summary>
+    /// 変わってはいけないもの: 1 文字落とした打ち間違いの補正 (査読 W18 R1)。shat・oss・app を辞書に入れると、
+    /// shats → shatsが・ossna → ossな・appwo → appを のように補正が効かなくなった。入れた語の周りでも補正が保たれることを守る。
+    /// </summary>
+    [Test]
+    public static void TypoCorrectionsAreUnchanged()
+    {
+        var expected = new Dictionary<string, string>
+        {
+            ["shats"] = "しゃつ", ["shatswokiru"] = "しゃつをきる", ["shatdesu"] = "しゃつです",
+            ["osshru"] = "おっしゃる", ["ossna"] = "おっさん", ["appwo"] = "あっぷを", ["appdesu"] = "あっぷです",
         };
         foreach (var (typed, want) in expected)
             Assert.Equal(want, Committed(typed), typed);

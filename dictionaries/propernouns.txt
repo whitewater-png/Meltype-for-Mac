@@ -93,6 +93,6 @@ Datamation OpenStreetMap
 # --- B-1/P48 (本家 2026-10-18): #268 DeVito ---
 DeVito
 # --- 本家追従 W18 (2026-10-30) ---
-# holoX (ホロライブの運営会社)。pedia は単独だと protopedia が proとpedia になるので、6 語を一組で足す。Meta は裸形だけ直る半端な修正なので入れない
+# holoX (ホロライブの運営会社)。pedia は単独だと protopedia が proとpedia になるので、一組で足す (worldpedia は pedia だけで英字になるので入れない)。Meta は裸形だけ直る半端な修正なので入れない
 holoX
-pedia protopedia protopedias wikipedias worldpedia conservapedia
+pedia protopedia protopedias wikipedias conservapedia
