@@ -7,11 +7,11 @@
 # IT・サービス
 Amazon Google Apple Microsoft Windows macOS iOS iPadOS Android Linux Ubuntu Debian Fedora
 GitHub Meltype GitLab Bitbucket Docker Kubernetes Azure AWS Heroku Vercel Netlify Firebase Supabase Cloudflare
-YouTube Twitter Facebook Instagram TikTok LINE Discord Slack Zoom Teams Notion Figma Canva Miro Trello Jira Confluence
+YouTube Twitter Facebook Instagram TikTok LINE mixi Discord Slack Zoom Teams Notion Figma Canva Miro Trello Jira Confluence
 Netflix Spotify Hulu Disney Prime Twitch Reddit Pinterest LinkedIn Tumblr Medium Substack
 Yahoo Bing DuckDuckGo Baidu Naver Kakao WeChat WhatsApp Telegram Signal Messenger Skype Webex
 ChatGPT OpenAI Claude Anthropic Gemini Copilot Midjourney Perplexity Bard DeepL
-iPhone iPad iPod iMac MacBook AirPods Pixel Galaxy Xperia Surface Kindle Echo Alexa Siri Cortana
+iPhone iPad iZotope iPod iMac MacBook AirPods Pixel Galaxy Xperia Surface Kindle Echo Alexa Siri Cortana
 Chrome Firefox Safari Edge Opera Brave Vivaldi
 Excel Word PowerPoint Outlook OneDrive OneNote SharePoint Access Visio Dropbox Evernote Box
 Photoshop Illustrator Premiere Lightroom Acrobat InDesign Adobe Unity Unreal Blender Maya
@@ -66,7 +66,7 @@ Coca Pepsi Nestle Danone Heineken Budweiser
 Microsoft Excel Word PowerPoint Outlook OneDrive OneNote SharePoint Bing Edge Chrome Firefox Safari Opera Brave Vivaldi Thunderbird
 Wikipedia Quora Medium Discord Mastodon Bluesky Threads Snapchat Pinterest Vimeo Dailymotion SoundCloud Bandcamp Deezer Tidal
 Minecraft Fortnite Roblox Valorant Overwatch Apex Steam Epic Xbox PlayStation Nintendo Switch Twitch
-VRC BPM DTM ASMR Zorin Luna Yann Tetr IIDX
+VRC BPM DTM ASMR Zorin Luna Yann Tetr IIDX Wakatte
 # 地名 (英語で書くことが多いもの)
 London Paris Berlin Madrid Rome Moscow Beijing Shanghai Seoul Singapore Bangkok Sydney Melbourne Toronto Vancouver Chicago Boston Seattle Texas California Florida Hawaii Alaska
 America Europe Africa Australia Canada Mexico Brazil Germany France Italy Spain England Ireland Scotland Sweden Norway Finland Denmark Netherlands Belgium Switzerland Austria Poland Russia Ukraine India China Korea Taiwan Vietnam Thailand Philippines Indonesia Malaysia
