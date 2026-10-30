@@ -47,19 +47,19 @@
 
 | 分類 | 件数 | 主な内容 |
 | --- | --- | --- |
-| 本家のほうが良い | 62 (表の差 56 + issue の例 6) | `erroraru` → errorある、`exceltoppt` → excelとppt、`env`、`gooddane` → goodだね、`dive into summer`、`meta`、`cd ~/Downloads`、`npx create-next-app`、`Tell me more`、`*pedia`・`i18n`・`l10n` |
+| 本家のほうが良い | 65 (表の差 56 + issue の例 9) | `erroraru` → errorある、`exceltoppt` → excelとppt、`env`、`gooddane` → goodだね、`dive into summer`、`meta`、`cd ~/Downloads`、`npx create-next-app`、`Tell me more`、`*pedia`・`i18n`・`l10n` |
 | フォークのほうが良い (回帰) | 84 | 短い語の英文 45 (`Welcome to Tokyo` は本家で `Welcome とTokyo`)、保護区間 21 (`--help`・`-la`・`/tmp/foo`・`$HOME/.zshrc`・`$100`)、括弧の後の空白 8 (`Japanese(nihongo) input`)、実機結果の表 9、ターミナル 1 |
 | 同等 | 15 | `Time to be` 系 14、`python3 -m venv .venv` 1 |
 | 判断不能 | 3 | `repo`、`GitHub no repo`、`zkai` (後者は ZSymbols の機能差で #1185 と無関係) |
 
-84 件の回帰は、フォークが自分で足した機能 (短い語の正解表 W12/W13、保護区間、括弧後の空白、実機の記録) の期待で、本家の表で測った回帰ではない。本家の状態にその機能が無い、という意味。#1185 が Fixes と書く 21 件の issue の例のうち、フォークが現状で同じ出力のものも多い (#1317 #1298 #1261 #1216 #1191 #1179 #1165 #1147 #1091 #920 #914 #544 など。期待は推定)。
+84 件の回帰は、フォークが自分で足した機能 (短い語の正解表 W12/W13、保護区間、括弧後の空白、実機の記録) の期待で、本家の表で測った回帰ではない。本家の状態にその機能が無い、という意味。#1185 が Fixes と書く 21 件の issue の例のうち、フォークが現状で同じ出力のものも多い (#1317 #1298 #1216 #1191 #1179 #1165 #1147 #1091 #920 #914 #544 など。期待は推定)。
 
-**性能**: 200 入力 2,646 キーの 1 キーあたり、フォーク 22.6〜28.2 µs、本家 54.2〜60.0 µs (約 2.4 倍、絶対値は 0.06 ms 未満。変換エンジンは含まない。実機のキー応答への影響は未確認)。`katakana.txt` は 1,037,357 バイト。NativeAOT dylib の増分は未計測。
+**性能** (子の報告値。再計測は未実施): 200 入力 2,646 キーの 1 キーあたり、フォーク 22.6〜28.2 µs、本家 54.2〜60.0 µs (約 2.4 倍、絶対値は 0.06 ms 未満。変換エンジンは含まない。実機のキー応答への影響は未確認)。`katakana.txt` は 1,037,357 バイト。NativeAOT dylib の増分は未計測。
 
 **取り込みの難しさ**: #1185 の diff を `git apply --check` で当てると、辞書を除く 29 ファイル中、クリーンに当たるのは 8 (`ReadingLattice.cs` の新規追加を含む)。中核の 5 ファイル (`CompositionDetector`・`CompositionText`・`CompositionController`・`RomajiTypoCorrector`・`MeltypeSession`) と `Settings.cs`、`ScoredSegmentation`・`CommonReadings`・複数のテスト (フォークに存在しない) を含む 21 は当たらない。フォークの土台は #1185 より前の本家で、中間の変更 (`ScoredSegmentation` など) も入っていない。`Composition/*.cs` 全体の差は 39 ファイル +5,856/−9,470 行 (本家 main の先行分すべてを含む)。`CompositionDetector.cs` はフォーク 1,680 行に対し本家 549 行。
 
 **判断材料 (結論は出さない。リョウさんの判断待ち)**:
-- 得: 日英境界の誤判定の 62 件が減る。損: フォーク固有の 84 件が崩れる。うち `Welcome to Tokyo` → `Welcome とTokyo` のような英文の崩れは目立つ。
+- 得: 日英境界の誤判定の 65 件が減る。損: フォーク固有の 84 件が崩れる。うち `Welcome to Tokyo` → `Welcome とTokyo` のような英文の崩れは目立つ。
 - PR だけを切り出せない。先に本家の中間の変更を入れるか、保護区間・短い語・括弧後の空白をラティスの上に載せ直す作業が要る (後者は未検証)。
 - 部分的に取り込める案は未検討 (例: `erroraru`・`exceltoppt` のような個別の規則だけ、katakana.txt のみ)。要るなら別に試作する。
 - 試作の入出力は使い捨ての場所 (`/var/folders/.../T/spike1185/`) にあり、消える。必要なら再実行できる (手順は上の方法)。
