@@ -25,13 +25,6 @@ internal static class Upstream1030W18Tests
     }
 
     [Test]
-    public static void Ppt_Ffmpeg()
-    {
-        Assert.Equal("excelとppt", Committed("exceltoppt"), "exceltoppt");
-        Assert.Equal("pythonとffmpeg", Committed("pythontoffmpeg"), "pythontoffmpeg");
-    }
-
-    [Test]
     public static void HoloX_Dice_Pedia()
     {
         Assert.Equal("holoX", Committed("holoX"), "holoX");
@@ -50,6 +43,8 @@ internal static class Upstream1030W18Tests
             ["kippu"] = "きっぷ", ["happyou"] = "はっぴょう", ["enbu"] = "えんぶ", ["intoro"] = "いんとろ",
             ["shatsu"] = "しゃつ", ["kyoushatsuwokiru"] = "きょうしゃつをきる", ["tsumetai"] = "つめたい",
             ["metawo"] = "めたを", ["kyoudaisuki"] = "きょうだいすき",
+            // ppt・ffmpeg を辞書に入れると英字のまま崩れた形 (査読 W18 R2)
+            ["pptdemo"] = "pptでも", ["pptmade"] = "pptまで", ["ffmpegdemo"] = "ffmpegでも", ["ffmpegtone"] = "ffmpegとね",
         };
         foreach (var (typed, want) in expected)
             Assert.Equal(want, Committed(typed), typed);
