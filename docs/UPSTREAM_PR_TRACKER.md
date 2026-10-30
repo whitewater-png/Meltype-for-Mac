@@ -122,10 +122,10 @@
 | W16-7 | #1191 #1131 #1190 (issue) | `bookoff`・`adb` を english.txt に (`adb` は単体と後ろが助詞のときだけ。`adbyuukou…` の adb + yu は直らない)、`misspellings.txt` に クダシア → クダサイ | 低 | main に統合 (2026-10-28)。実機 (2026-10-28、リョウさん): bookoff・adb は期待どおり、くだしあ は Tab で ください に直る。「もしかして」の案内は出なかった (Mac は案内を表示していなかった。Q29 で足した。案内の表示は実機未確認) | `7061829`・`4764b8b` | `bookoff` → bookoff、`adb` → adb、`kudasia` で「もしかして」が出て、Tab で ください に直る |
 | W16-8 | #1157 (Core の部分) | 日時・数値の書式を地域設定に依存させない: ユーザー辞書の書き出しの日時・バックアップの作成日時・元号の年の数字・1 日 1 回のヒントの日付を InvariantCulture に (タイ語の地域設定で仏暦にならない) | 低 | main に統合 (2026-10-28)。**実機未確認** | `755fdee`・`fe28a44` | (実機では、地域設定をタイ語にしたときだけ差が出る。確認は任意) |
 | W16-9 | #1026 #1027 (PR の文言) | `install.sh` (登録できたときの案内) と `mac/README.md` で、入力ソースが出てこないときはシステム設定からの追加を先に、ログアウトを次に案内する。登録できなかったとき (一覧に直接書き込む #21 の分岐) と、前の Meltype を消した直後の案内は元のまま | 低 | main に統合 (2026-10-28)。**実機未確認** | `e821ad6`・`ddbe42a` | (文言のみ) |
-| W17-1 | #1231 (issue)・本家 PR #1294 | W16-1 の損 (`Wakatte.TV` → わかって。TV) を無くす。`propernouns.txt` に `Wakatte` を戻し、`japanese.txt` に `wakatte` を足す (本家が #1231 を直した方式。本家は `Symbols_StartComposition` の `Wakatte.TV` を守るために外さなかった) | 低 | **コミット済み・実機未確認** (2026-10-30) | 本コミット (`upstream/u2-1030`) | `wakatte` → わかって、`sorewakatte` → それわかって、`Wakatte.TV` → Wakatte.TV (英字のまま)、Shift で打った `Wakatte` は英字のまま |
-| W17-2 | 本家 PR #1280 | `mixi`・`mixi2` が みぃ・みぃ2 になる。`propernouns.txt` に `mixi` | 低 | **コミット済み・実機未確認** (2026-10-30) | 同上 | `mixi` → mixi、`mixi2wohajimeta` → mixi2をはじめた、`mixidetomodachi` → mixiでともだち |
-| W17-3 | 本家 issue #1318 #1319 (本家は未修正) | `iZotope` が いZotope になる。`propernouns.txt` に `iZotope` (iPhone と同じ形)。小文字の `izotope` も英字になる (以前は いぞとぺ)。カタカナ読みから iZotope を出す案 (#1318) は入れていない | 低 | **コミット済み・実機未確認** (2026-10-30) | 同上 | `iZotope` → iZotope、`iZotopede` → iZotopeで |
-| W17-4 | 本家 PR #1294 (issue #1268 #1278 #1286) | `phrases.txt` に ふぉろばく→フォロ爆・きゅうくらりん・ぶいすぽ、`candidates.txt` に ぶいすぽ→ぶいすぽっ！ (Space で選ぶ候補)。Mac は読みを複数の文節に分けるので、`phrases.txt` 側が要る (候補だけでは届かない可能性) | 低 | **コミット済み・Core のテストのみ。実機未確認** (2026-10-30) | 同上 | `forobaku` Space → フォロ爆、`kyuukurarinn` Space → きゅうくらりん (旧クラリン にならない)、`buisupo` Space → ぶいすぽ (部位スポ にならない)、さらに Space で ぶいすぽっ！ |
+| W17-1 | #1231 (issue)・本家 PR #1294 | W16-1 の損 (`Wakatte.TV` → わかって。TV) を無くす。`propernouns.txt` に `Wakatte` を戻し、`japanese.txt` に `wakatte` を足す (本家が #1231 を直した方式。本家は `Symbols_StartComposition` の `Wakatte.TV` を守るために外さなかった) | 低 | main に統合 (2026-10-30)。実機確認済み (2026-10-30、リョウさん) | `9bfaa72` | `wakatte` → わかって、`sorewakatte` → それわかって、`Wakatte.TV` → Wakatte.TV (英字のまま)、Shift で打った `Wakatte` は英字のまま |
+| W17-2 | 本家 PR #1280 | `mixi`・`mixi2` が みぃ・みぃ2 になる。`propernouns.txt` に `mixi` | 低 | main に統合 (2026-10-30)。実機確認済み (2026-10-30、リョウさん) | 同上 | `mixi` → mixi、`mixi2wohajimeta` → mixi2をはじめた、`mixidetomodachi` → mixiでともだち |
+| W17-3 | 本家 issue #1318 #1319 (本家は未修正) | `iZotope` が いZotope になる。`propernouns.txt` に `iZotope` (iPhone と同じ形)。小文字の `izotope` も英字になる (以前は いぞとぺ)。カタカナ読みから iZotope を出す案 (#1318) は入れていない | 低 | main に統合 (2026-10-30)。実機確認済み (2026-10-30、リョウさん) | 同上 | `iZotope` → iZotope、`iZotopede` → iZotopeで |
+| W17-4 | 本家 PR #1294 (issue #1268 #1278 #1286) | `phrases.txt` に ふぉろばく→フォロ爆・きゅうくらりん・ぶいすぽ、`candidates.txt` に ぶいすぽ→ぶいすぽっ！ (Space で選ぶ候補)。Mac は読みを複数の文節に分けるので、`phrases.txt` 側が要る (候補だけでは届かない可能性) | 低 | main に統合 (2026-10-30)。実機確認済み (2026-10-30、リョウさん。漢字の候補を含む) | 同上 | `forobaku` Space → フォロ爆、`kyuukurarinn` Space → きゅうくらりん (旧クラリン にならない)、`buisupo` Space → ぶいすぽ (部位スポ にならない)、さらに Space で ぶいすぽっ！ |
 
 
 
@@ -187,7 +187,7 @@
 
 | 日付 | 内容 |
 | --- | --- |
-| 2026-10-30 | 本家追従 W17: 本家 main `27f12e8` (v1.4.1-pre.1) までの新着を精査し ([UPSTREAM_REVIEW_2026-10-30.md](UPSTREAM_REVIEW_2026-10-30.md))、辞書だけの 4 件を W17-1〜W17-4 として 1 ブランチで実装 (Core 1219 → 1223)。本家 PR #1185 (日英の境界判定をラティスに置き換える大改修) は試作で比べた (本家のほうが良い 65・フォーク固有の期待が崩れる 84。導入はリョウさんの判断待ち、UPSTREAM_REVIEW_2026-10-30.md)。**push 前・実機未確認** |
+| 2026-10-30 | 本家追従 W17: 本家 main `27f12e8` (v1.4.1-pre.1) までの新着を精査し ([UPSTREAM_REVIEW_2026-10-30.md](UPSTREAM_REVIEW_2026-10-30.md))、辞書だけの 4 件を W17-1〜W17-4 として 1 ブランチで実装 (Core 1219 → 1223)。本家 PR #1185 (日英の境界判定をラティスに置き換える大改修) は試作で比べた (本家のほうが良い 65・フォーク固有の期待が崩れる 84。導入はリョウさんの判断待ち、UPSTREAM_REVIEW_2026-10-30.md)。実機で確認済み (2026-10-30、リョウさん)。**push 前** |
 | 2026-10-29 | Q33 (表示名を「Meltype for Mac」にする) を足して直した。**push 前・実機未確認** |
 | 2026-10-28 | リョウさんが実機で確認 (報告は項目ごとの記録なしの「OK」「確認済み」): 要件 002 / PR #7 (`ost` が英字のまま) は確認済み、Q30 (設定タブの画面・「設定」タブを右端へ入れ替えた ⌘4 / ⌘5) は OK、Q31 (タブを選んでも窓の大きさが変わらない) は OK。**Q32・W16-8・W16-9・要件 003 は実機未確認のまま** |
 | 2026-10-28 | Q32 (一覧が空のときの案内が出ない) を足して直した。Q31 に、空の一覧の案内でも窓を広げない直しを足した。**push 前・実機未確認** |
