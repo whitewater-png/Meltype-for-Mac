@@ -126,6 +126,7 @@
 | W17-2 | 本家 PR #1280 | `mixi`・`mixi2` が みぃ・みぃ2 になる。`propernouns.txt` に `mixi` | 低 | main に統合 (2026-10-30)。実機確認済み (2026-10-30、リョウさん) | 同上 | `mixi` → mixi、`mixi2wohajimeta` → mixi2をはじめた、`mixidetomodachi` → mixiでともだち |
 | W17-3 | 本家 issue #1318 #1319 (本家は未修正) | `iZotope` が いZotope になる。`propernouns.txt` に `iZotope` (iPhone と同じ形)。小文字の `izotope` も英字になる (以前は いぞとぺ)。カタカナ読みから iZotope を出す案 (#1318) は入れていない | 低 | main に統合 (2026-10-30)。実機確認済み (2026-10-30、リョウさん) | 同上 | `iZotope` → iZotope、`iZotopede` → iZotopeで |
 | W17-4 | 本家 PR #1294 (issue #1268 #1278 #1286) | `phrases.txt` に ふぉろばく→フォロ爆・きゅうくらりん・ぶいすぽ、`candidates.txt` に ぶいすぽ→ぶいすぽっ！ (Space で選ぶ候補)。Mac は読みを複数の文節に分けるので、`phrases.txt` 側が要る (候補だけでは届かない可能性) | 低 | main に統合 (2026-10-30)。実機確認済み (2026-10-30、リョウさん。漢字の候補を含む) | 同上 | `forobaku` Space → フォロ爆、`kyuukurarinn` Space → きゅうくらりん (旧クラリン にならない)、`buisupo` Space → ぶいすぽ (部位スポ にならない)、さらに Space で ぶいすぽっ！ |
+| W18-1 | 本家 PR #1185 の試作 (65 件のうち辞書で直る A) | 日英判定のラティス化 (#1185) は導入しない (リョウさんの決定 2026-10-30: 悪化するのは良くないので)。代わりに、本家のほうが良かった 65 件のうち、辞書を足すだけで直り悪化が無いと測れた語を足す: `english.txt` に env・into・instal・shat・app・oss・ppt・ffmpeg、`propernouns.txt` に holoX と pedia 系 6 語 (pedia・protopedia・protopedias・wikipedias・worldpedia・conservapedia。一組で)、`english-readable.txt` に dice。**足さない**: image・garage・tone・insta・UIKit・meta (悪化あり)、Meta (裸形だけ直る半端な修正) | 低 | **コミット済み・実機未確認** (2026-10-30) | 本コミット (`upstream/w18-1030`) | `env` → env、`dive into summer`、`npx create-next-app`、`exceltoppt` → excelとppt、`gpt-oss wo tsukau` → gpt-oss をつかう、`pythontoffmpeg` → pythonとffmpeg、`holoX`、`dice`、`pedia`・`protopedia`・`wikipedias` などが英字のまま。`kappa`・`ossan`・`appurodo` は日本語のまま |
 
 
 
@@ -187,6 +188,7 @@
 
 | 日付 | 内容 |
 | --- | --- |
+| 2026-10-30 | 本家追従 W18: 本家 PR #1185 は導入しない (リョウさんの決定)。試作の 65 件を仕分け (A 辞書 23・B 小さな規則 26・C ラティス必須 14・D 判断不能 2。[UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv](UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv))、A のうち悪化の無い語を W18-1 として実装 (Core 1223 → 1227)。B の 26 件は今回は見送り (リョウさんの決定)。**push 前・実機未確認** |
 | 2026-10-30 | 本家追従 W17: 本家 main `27f12e8` (v1.4.1-pre.1) までの新着を精査し ([UPSTREAM_REVIEW_2026-10-30.md](UPSTREAM_REVIEW_2026-10-30.md))、辞書だけの 4 件を W17-1〜W17-4 として 1 ブランチで実装 (Core 1219 → 1223)。本家 PR #1185 (日英の境界判定をラティスに置き換える大改修) は試作で比べた (本家のほうが良い 65・フォーク固有の期待が崩れる 84。導入はリョウさんの判断待ち、UPSTREAM_REVIEW_2026-10-30.md)。実機で確認済み (2026-10-30、リョウさん)。**push 前** |
 | 2026-10-29 | Q33 (表示名を「Meltype for Mac」にする) を足して直した。**push 前・実機未確認** |
 | 2026-10-28 | リョウさんが実機で確認 (報告は項目ごとの記録なしの「OK」「確認済み」): 要件 002 / PR #7 (`ost` が英字のまま) は確認済み、Q30 (設定タブの画面・「設定」タブを右端へ入れ替えた ⌘4 / ⌘5) は OK、Q31 (タブを選んでも窓の大きさが変わらない) は OK。**Q32・W16-8・W16-9・要件 003 は実機未確認のまま** |

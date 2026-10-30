@@ -238,3 +238,7 @@ printenv nohup doomscroll tmux claudecode
 # --- 本家の english-readable にある vocaloid・opencode: english-readable にも置くが、ここにも置く。english-readable にしか無い語は、
 # 確定直前の打ち間違いの補正 (CompositionText.FixTypos の EnglishMask) に守られず、表示 vocaloidは が Enter で ゔぉかぉいしゃ になっていた (査読 R-B) ---
 vocaloid opencode
+# --- 本家追従 W18 (2026-10-30。本家 PR #1185 の試作で、本家のほうが良かった入力のうち、辞書を足すだけで直り、悪化が無いと測れた語) ---
+# env (本家 #1185 も同じ)・into (前が英語のときだけ効く: dive into summer)・instal (install の途中。insta は ...insta で終わる入力 20 件が悪化するので入れない)
+# shat (I shat)・app (create-next-app)・oss (gpt-oss)・ppt (excelトppt)・ffmpeg (pythonトffmpeg)
+env into instal shat app oss ppt ffmpeg

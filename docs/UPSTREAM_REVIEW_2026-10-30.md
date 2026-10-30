@@ -58,7 +58,9 @@
 
 **取り込みの難しさ**: #1185 の diff を `git apply --check` で当てると、辞書を除く 29 ファイル中、クリーンに当たるのは 8 (`ReadingLattice.cs` の新規追加を含む)。中核の 5 ファイル (`CompositionDetector`・`CompositionText`・`CompositionController`・`RomajiTypoCorrector`・`MeltypeSession`) と `Settings.cs`、`ScoredSegmentation`・`CommonReadings`・複数のテスト (フォークに存在しない) を含む 21 は当たらない。フォークの土台は #1185 より前の本家で、中間の変更 (`ScoredSegmentation` など) も入っていない。`Composition/*.cs` 全体の差は 39 ファイル +5,856/−9,470 行 (本家 main の先行分すべてを含む)。`CompositionDetector.cs` はフォーク 1,680 行に対し本家 549 行。
 
-**判断材料 (結論は出さない。リョウさんの判断待ち)**:
+**決定 (リョウさん、2026-10-30)**: 導入しない (悪化するのは良くないので)。代わりに、本家のほうが良かった 65 件を仕分けし ([UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv](UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv))、辞書で直り悪化の無い語を W18-1 として入れた ([IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) の「本家追従 W18」)。
+
+**判断材料 (当時)**:
 - 得: 日英境界の誤判定の 65 件が減る。損: フォーク固有の 84 件が崩れる。うち `Welcome to Tokyo` → `Welcome とTokyo` のような英文の崩れは目立つ。
 - PR だけを切り出せない。先に本家の中間の変更を入れるか、保護区間・短い語・括弧後の空白をラティスの上に載せ直す作業が要る (後者は未検証)。
 - 部分的に取り込める案は未検討 (例: `erroraru`・`exceltoppt` のような個別の規則だけ、katakana.txt のみ)。要るなら別に試作する。

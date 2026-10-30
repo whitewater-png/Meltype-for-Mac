@@ -35,3 +35,5 @@ overcute
 datamation enshittification
 # 本家 #712: japanese が じゃぱねせ になっていた (english.txt にはあるが、全体がローマ字として読めるので日本語側が勝っていた)
 japanese
+# 本家追従 W18 (2026-10-30): dice (4 文字。だいせ…の日本語の語と衝突しない。測定済み)
+dice

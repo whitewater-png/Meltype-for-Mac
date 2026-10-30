@@ -3648,6 +3648,16 @@ P2 の対応: 相対 RPATH の文言を「相対・絶対パスの RPATH」に�
 - **実機確認**: 2026-10-30 にリョウさんが TextEdit で確認済み (W17-1〜W17-4 すべて期待どおり。W17-4 の漢字・候補を含む)。
 - **残る限界・未確認**: `iZotopeNeutron` のように大文字で続く綴りは いZotopeNeutron のまま。カタカナ読みから iZotope を出す案 (#1318) は入れていない。
 
+## 本家追従 W18 (2026-10-30。#1185 は導入せず、辞書で直る語だけ足す)
+
+- **決定** (リョウさん、2026-10-30): 本家 PR #1185 (日英境界のラティス化) は導入しない (「悪化するのは良くないので」)。試作で「本家のほうが良い」だった 65 件を仕分けし、辞書だけで直り悪化の無いものだけ足す。B (小さな規則) の 26 件は今回は見送る。
+- **仕分け** ([UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv](UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv)): A 辞書 23 (悪化なし 21・悪化あり 2)、B 小さな規則 26、C ラティス必須 14、D 判断不能 2 (`site PR`、`my name is taro` = 人名 K02 の方針)。
+- **W18-1 (辞書)**: `english.txt` に env・into・instal・shat・app・oss・ppt・ffmpeg、`propernouns.txt` に holoX と pedia 系 6 語、`english-readable.txt` に dice。テスト `Upstream1030W18Tests.cs` (4 件。辞書を起点に戻すと 3 件が赤、日本語の隣人 13 入力は不変の確認)。
+- **足さなかった語と理由** (実測): `image` (`tadaimagenzai` → ただimageんざい)、`garage` (`nagarage-mu` → なgarageーむ)、`tone` (`zuttoneru` など 245 入力)、`insta` (`…insta` で終わる入力 20 件の補正が効かなくなる)、`UIKit` (悪化 4 件に対し直るのは 1 件)、`meta` を english-readable に (144 入力が悪化)、`Meta` を propernouns に (裸形 `meta` だけ直り `metawo` は不変の半端な修正)。
+- **確認**: 全テスト 1227/1227。`eval-compare` (654 件): broken 0、直る入力 10。前後比較 93,748 入力 (japanese.txt の語 1,207 と readings.txt の読み 1,910 件 × 新語を前後に置いた 9 形): 日本語の語単独・語 + desu/wo の入力の差は 0、差が出た 77,746 入力はすべて新語を含み、出力に新語が英字で出ていた。
+- **得と損**: 得: env・app・oss・ppt・ffmpeg・pedia 系などの英字の語と、`dive into summer` が崩れない。損: ラティスの根本的な精度向上は得られず、本家との差は個別の語で拾い続ける。B (短い語の英文 `Tell me more`、`i18n`・`l10n` などの数字入り略語、`ya` + 英単語、`cd ~/`) と C (`erroraru`・`cattodog`・`adbyuukounisuru` など) は直らない。
+- **残る限界・未確認**: 実機未確認。測ったのは Core のテスト用キーボードの結果 (漢字変換は含まない)。2 語連結のスイープは網羅ではない (`garage` の悪化は手書きの自然な日本語で見つかった)。
+
 ## Q29 の修正 (Mac で「もしかして」の案内を出す、2026-10-28)
 
 - **目的**: W16-7 の実機確認 (リョウさん) で、`kudasia` に「もしかして」の案内が出ず、Tab で ください に直ることだけ確かめられた。本体は読みに書き間違いがあると、変換ボックスの表示 (`CompositionView`) に「もしかして: ブレスレット　<Tab>で修正」を入れて返す (JSON の `suggestion`) が、Mac の IME はこの項目を読んでいなかった。既存の書き間違い (ブレスレッド など) も同じで、Mac では案内が無いまま Tab だけが効いていた。

@@ -1,0 +1,66 @@
+typed	fork(試作時=今)	本家	分類	segments(今のbase)	原因と根拠
+Go on	Go おん	Go on	B	EN:Go | JA: on	英語+空白の次の短い語 (on/me/do) が日本語区間 (segments: EN:前語 | JA: 短い語)。辞書に語は既にある (K96 の me/no/do 型)。W12 (CompositionController.cs の前語一覧) の拡張。W12 文書 §8: 広い一覧は日本語対照 63 件を壊したので、狭い一覧+悪化測定が要る
+I shat	I しゃt	I shat	A	EN:I | JA: shat	shat は english-words/english.txt に無く しゃt。english.txt に shat を足すと直る (悪化なし)
+Let me go	Let めご	Let me go	B	EN:Let | JA: me go	英語+空白の次の短い語 (on/me/do) が日本語区間 (segments: EN:前語 | JA: 短い語)。辞書に語は既にある (K96 の me/no/do 型)。W12 (CompositionController.cs の前語一覧) の拡張。W12 文書 §8: 広い一覧は日本語対照 63 件を壊したので、狭い一覧+悪化測定が要る
+Not me	Not め	Not me	B	EN:Not | JA: me	英語+空白の次の短い語 (on/me/do) が日本語区間 (segments: EN:前語 | JA: 短い語)。辞書に語は既にある (K96 の me/no/do 型)。W12 (CompositionController.cs の前語一覧) の拡張。W12 文書 §8: 広い一覧は日本語対照 63 件を壊したので、狭い一覧+悪化測定が要る
+Protopedia	Proとぺぢあ	Protopedia	A	EN:Pro | JA:topedia	-pedia 語。segments が EN:Pro|JA:topedia のように割れる。propernouns に pedia と 5 語を足すと全部直る (eval +8、broken 0、悪化 0)。pedia 単独だと protopedia が proとpedia になる。K16 の -pedia 規則 (B) の代わり
+Protopedias	Proとぺぢas	Protopedias	A	EN:Pro | JA:topedi | EN:as	-pedia 語。segments が EN:Pro|JA:topedia のように割れる。propernouns に pedia と 5 語を足すと全部直る (eval +8、broken 0、悪化 0)。pedia 単独だと protopedia が proとpedia になる。K16 の -pedia 規則 (B) の代わり
+Tell me more	Tell めもれ	Tell me more	B	EN:Tell | JA: me more	英語+空白の次の短い語 (on/me/do) が日本語区間 (segments: EN:前語 | JA: 短い語)。辞書に語は既にある (K96 の me/no/do 型)。W12 (CompositionController.cs の前語一覧) の拡張。W12 文書 §8: 広い一覧は日本語対照 63 件を壊したので、狭い一覧+悪化測定が要る
+We do	We ど	We do	B	EN:We | JA: do	英語+空白の次の短い語 (on/me/do) が日本語区間 (segments: EN:前語 | JA: 短い語)。辞書に語は既にある (K96 の me/no/do 型)。W12 (CompositionController.cs の前語一覧) の拡張。W12 文書 §8: 広い一覧は日本語対照 63 件を壊したので、狭い一覧+悪化測定が要る
+Why do we go	Why どうぇご	Why do we go	B	EN:Why | JA: do we go	英語+空白の次の短い語 (on/me/do) が日本語区間 (segments: EN:前語 | JA: 短い語)。辞書に語は既にある (K96 の me/no/do 型)。W12 (CompositionController.cs の前語一覧) の拡張。W12 文書 §8: 広い一覧は日本語対照 63 件を壊したので、狭い一覧+悪化測定が要る
+adbyuukounisuru	あdびゅうこうにする	adbゆうこうにする	C	JA:adbyuukounisuru	segments が JA:adbyuukounisuru 全部。adb の b と yu が びゅ に結合する境界の共有 (adb|yuukou)。経路選択が要る
+adbyuukounisuru	あdびゅうこうにする	adbゆうこうにする	C	JA:adbyuukounisuru	segments が JA:adbyuukounisuru 全部。adb の b と yu が びゅ に結合する境界の共有 (adb|yuukou)。経路選択が要る
+api	あぴ	api	B	JA:api	JA:api (あぴ)。api は english.txt にあるが 3 文字で あぴ と全部読めるため効かない。english/english-readable/propernouns のどれに足しても直らず (実測 0/1)。3 文字語の経路の規則 (CompositionDetector.cs。箇所は未特定)
+cattodog	かっとdog	catとdog	C	JA:catto | EN:dog	JA:catto | EN:dog。cat+to+dog と catto(かっと)+dog の選び直しが要る
+cattodoghakenkasuru	かっとどはけんかする	catとdogはけんかする	C	EN:cattodoghakenkasuru	EN:cattodoghakenkasuru 全部英字。cat/to/dog/ha/kenka の分割選びが要る
+cd ~/Documents/Meltype	cd～/Documents/Meltype	cd ~/Documents/Meltype	B	JA:cd  | EN:~/Documents/Meltype	segments は EN:~/Documents/Meltype だが出力で ~ が ～ に変わる。CompositionText.cs:1674 の '~' => '～' を「次が / なら半角」にする案
+cd ~/Downloads	cd～/Downloads	cd ~/Downloads	B	JA:cd  | EN:~/Downloads	同上
+conservapedia	こんせらゔぁぺぢあ	conservapedia	A	EN:conservapedia	-pedia 語。segments が EN:Pro|JA:topedia のように割れる。propernouns に pedia と 5 語を足すと全部直る (eval +8、broken 0、悪化 0)。pedia 単独だと protopedia が proとpedia になる。K16 の -pedia 規則 (B) の代わり
+devtoprod	devtoprod	devとprod	C	EN:dev | EN:top | EN:rod	EN:dev | EN:top | EN:rod。dev+to+prod か dev+top+rod かの選択 (to を と にする) が要る
+dice	ぢせ	dice	A	JA:dice	JA:dice (ぢせ)。english-readable に dice を足すと直る (JA 悪化 0)
+die	ぢえ	die	B	JA:die	JA:die (ぢえ)。3 文字で、english/english-readable/propernouns に足しても直らない (実測 0/1)。api と同じ 3 文字語の経路の規則
+dive into summer	dive いんとsummer	dive into summer	A	EN:dive | JA: into  | EN:summer	into が JA ( into )。english.txt に into を足すと直る。前が英語のときだけ効き、単独 into・intoro・intowo は不変
+dive into summer	dive いんとsummer	dive into summer	A	EN:dive | JA: into  | EN:summer	into が JA ( into )。english.txt に into を足すと直る。前が英語のときだけ効き、単独 into・intoro・intowo は不変
+dottonet	どっとnet	dotとnet	C	JA:dotto | EN:net	JA:dotto | EN:net。dot+to+net と dotto+net の選択。dot/net/pc を足しても不変 (実測)
+e2e	え2え	e2e	B	JA:e2e	JA:e2e (え2え)。english/propernouns に足しても直らない (実測 0/1)。英数字略語 (数字字形の略語) の規則
+edittopub	えdittopub	editとpub	C	JA:edittopub	JA:edittopub 全部。edit+to+pub。pub を足しても不変 (実測)
+env	えんv	env	A	JA:env	JA:env (えんv)。english.txt に env を足すと直る (本家 #1185 も同じ行を足している)
+env	えんv	env	A	JA:env	JA:env (えんv)。english.txt に env を足すと直る (本家 #1185 も同じ行を足している)
+erroraru	えっろらる	errorある	C	JA:erroraru	JA:erroraru 全部 (えっろらる)。error+aru の境界。error は english.txt にあるが ローマ字に最後まで読めてしまう
+exceltoppt	excelとっpt	excelとppt	A	EN:excel | JA:toppt	EN:excel | JA:toppt。ppt が未知語なので excel+to+ppt に割れない。english.txt に ppt を足すと直る
+garagewokiku	がらげをきく	garageをきく	B	JA:garagewokiku	JA:garagewokiku (がらげをきく)。garage を足すと直るが、tabenagarage-mu (食べながらゲーム) が たべなgarageーむ に悪化 → 辞書だけでは不可。english-readable+継続ガード (CompositionDetector.cs の english-readable 規則) が要る
+githubya	ぎてゅびゃ	githubや	C	JA:githubya	JA:githubya。github の b と ya が びゃ に結合。経路選択が要る
+gooddane	ごおっだね	goodだね	C	JA:gooddane	JA:gooddane (ごおっだね)。good+da+ne。経路選択が要る
+gpt-oss wo tsukau	gpt-おっsをつかう	gpt-oss をつかう	A	EN:gpt | EN:- | JA:oss wo tsukau	EN:gpt | EN:- | JA:oss wo tsukau。oss が日本語 (おっs)。english.txt に oss を足すと直る
+h2o	h2お	h2o	B	JA:h2o	JA:h2o (h2お)。数字入りの略語。足しても直らない (実測 0/1)。letter+digit+letter の規則
+holoX	ほぉX	holoX	A	JA:holo | EN:X	JA:holo | EN:X。propernouns に holoX を足すと直る
+i18n	い18ん	i18n	B	JA:i18n	JA:i18n。同上 (numeronym)
+image	いまげ	image	B	JA:image	JA:image (いまげ)。english-readable に足すと直るが、tadaimagenzai (ただいま現在) が ただimageんざい に悪化 → 採用不可。継続ガードが要る
+imagewohiraku	いまげをひらく	imageをひらく	B	JA:imagewohiraku	同上 (image)
+indexiana	indexいあな	いんでぃあな	C	EN:index | JA:iana	EN:index | JA:iana。index+iana と inde+xi+a+na (いんでぃあな) の経路選択
+insta	insた	insta	A	EN:insta	segments は EN:insta だが確定で insた に変わる (表示は insta)。english.txt に足すと直るが、…insta で終わる打ち間違いの補正が効かなくなる (20 入力) → 採用不可
+instal	insたl	instal	A	JA:instal	JA:instal (insたl)。english.txt に instal を足すと直る (悪化なし)
+l10n	l10ん	l10n	B	JA:l10n	JA:l10n。同上 (numeronym)
+meta	めた	meta	A	JA:meta	JA:meta (めた)。propernouns に Meta を足すと直る (裸形のみ。meta+助詞は日本語のまま不変)。english-readable に足すと 144 入力悪化 (採用不可)
+my name is taro	my name is たろ	my name is taro	D	EN:my | JA: name  | EN:is | JA: taro	JA: taro (たろ)。人名の小文字は K02 の方針 (taro は 太郎 の読み)。足すと直るが、tarou 系は不変なのを実測しただけで、方針判断はリョウさん
+npx create-next-app	npx create-next-あっp	npx create-next-app	A	EN:npx | JA:  | EN:create | EN:- | EN:next | EN:- | JA:app	EN:create | EN:- | EN:next | EN:- | JA:app。english.txt に app を足すと直る (appu・appurodo・kappa などは不変)
+o2o	お2お	o2o	B	JA:o2o	JA:o2o。同上 (numeronym)
+pedia	ぺぢあ	pedia	A	JA:pedia	-pedia 語。segments が EN:Pro|JA:topedia のように割れる。propernouns に pedia と 5 語を足すと全部直る (eval +8、broken 0、悪化 0)。pedia 単独だと protopedia が proとpedia になる。K16 の -pedia 規則 (B) の代わり
+protopedia	proとぺぢあ	protopedia	A	EN:pro | JA:topedia	-pedia 語。segments が EN:Pro|JA:topedia のように割れる。propernouns に pedia と 5 語を足すと全部直る (eval +8、broken 0、悪化 0)。pedia 単独だと protopedia が proとpedia になる。K16 の -pedia 規則 (B) の代わり
+protopedias	proとぺぢas	protopedias	A	EN:pro | JA:topedi | EN:as	-pedia 語。segments が EN:Pro|JA:topedia のように割れる。propernouns に pedia と 5 語を足すと全部直る (eval +8、broken 0、悪化 0)。pedia 単独だと protopedia が proとpedia になる。K16 の -pedia 規則 (B) の代わり
+pushoyobi	ぷしょよび	pushおよび	C	JA:pushoyobi	JA:pushoyobi。push の sh と o が しょ に結合 (push|oyobi)
+pythontoffmpeg	pythonとっfmぺg	pythonとffmpeg	A	EN:python | JA:toffmpeg	EN:python | JA:toffmpeg。ffmpeg が未知語。english.txt に ffmpeg を足すと直る
+rdstoredshift	rdstoredshift	rdsとredshift	C	EN:rdstoredshift	EN:rdstoredshift 全部。rds/redshift を足しても不変 (実測)。rds+to+redshift の分割選び
+site PR	site PR	して PR	D	JA:site  | EN:PR	JA:site | EN:PR。フォークは site のまま (PR が英語)。本家と表は して。どちらが望ましいかは文脈次第 (判断不能)
+tonewochouseisuru	とねをちょうせいする	toneをちょうせいする	B	JA:tonewochouseisuru	JA:tonewochouseisuru。tone を足すと直るが、zuttoneru (ずっと寝る)・hontoneru が悪化 (245 入力) → 採用不可。継続ガードが要る
+uikittoswiftui	ういきっとswiftui	uikitとswiftui	A	JA:uikitto | EN:swiftui	JA:uikitto | EN:swiftui。propernouns に UIKit を足すと直る。ただし構成入力 4 件が悪化 (UIKitheta → うIKitheta、douikitte → どuikitて 等) → 保留
+watasinopcdemo	わたしのpcdemo	わたしのpcでも	C	JA:watasino | EN:pc | EN:demo	JA:watasino | EN:pc | EN:demo。pc+demo と pc+de+mo の選択。pc を足しても不変 (実測)
+wikipedias	うぃきぺぢas	wikipedias	A	JA:wikipedi | EN:as	-pedia 語。segments が EN:Pro|JA:topedia のように割れる。propernouns に pedia と 5 語を足すと全部直る (eval +8、broken 0、悪化 0)。pedia 単独だと protopedia が proとpedia になる。K16 の -pedia 規則 (B) の代わり
+worldpedia	worldぺぢあ	worldpedia	A	EN:world | JA:pedia	-pedia 語。segments が EN:Pro|JA:topedia のように割れる。propernouns に pedia と 5 語を足すと全部直る (eval +8、broken 0、悪化 0)。pedia 単独だと protopedia が proとpedia になる。K16 の -pedia 規則 (B) の代わり
+yabaiTshatuyasann	やばいTshatuyasann	やばいTしゃつやさん	B	JA:yabai | EN:Tshatuyasann	JA:yabai | EN:Tshatuyasann。大文字 1 字+ローマ字が英語 1 区間にまとまる。shat を足しても不変。大文字 1 字の後ろの扱いの規則 (CompositionText.cs。低確信)
+yacursor	yacursor	やcursor	B	EN:yacursor	EN:yacursor 全部。や+英単語。K16 の「や+英単語」(CompositionDetector.cs の助詞 ya の扱い)
+yaplay	yaplay	やplay	B	JA:ya | EN:play	JA:ya | EN:play なのに出力は yaplay。同上
+yapython	yapython	やpython	B	EN:yapython	同上
+yaslack	yaslack	やslack	B	EN:yaslack	同上
+yastack	yastack	やstack	B	EN:yastack	同上
+yasync	yasync	やsync	B	EN:yasync	同上 (sync を足しても不変、実測)
