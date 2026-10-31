@@ -277,7 +277,7 @@ public sealed class CompositionText
             }
         }
         // 長音はかなの母音の後ろにしか意味が無い。変換ボックスの先頭 (箇条書きの - kyou wa)・数字の後ろ (10-ji、03-1234-5678)・
-        // 半角のままにした - の後ろ (--) の - は区切りや記号なので、長音 ー にせず打ったままの半角で残す。
+        // 半角のままにした - の後ろ (--)・母音の無い英字の後ろ (pt-query、ls-files) の - は区切りや記号なので、長音 ー にせず打ったままの半角で残す。
         if (c == '-' && IsPlainHyphenPosition())
         {
             _units.Add(new CompositionUnit("-", "-"));
@@ -320,12 +320,13 @@ public sealed class CompositionText
         return true;
     }
 
-    /// <summary>今打った - が、長音ではなく半角の - のままにする位置か (数字の後ろ・半角の - の後ろ)。</summary>
+    /// <summary>今打った - が、長音ではなく半角の - のままにする位置か (数字の後ろ・半角の - の後ろ・母音の無い英字 2 文字以上の後ろ)。</summary>
     private bool IsPlainHyphenPosition()
     {
         if (_pending.Length > 0 || _units.Count == 0) return false;
         var last = _units[^1];
-        return last.Raw.Length > 0 && (char.IsAsciiDigit(last.Raw[^1]) || last.Raw == "-" && last.Kana == "-") || EndsWithConsonantOnlyLetters();
+        if (EndsWithConsonantOnlyLetters()) return true;
+        return last.Raw.Length > 0 && (char.IsAsciiDigit(last.Raw[^1]) || last.Raw == "-" && last.Kana == "-");
     }
 
     /// <summary>
