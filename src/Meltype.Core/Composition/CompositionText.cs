@@ -325,7 +325,23 @@ public sealed class CompositionText
     {
         if (_pending.Length > 0 || _units.Count == 0) return false;
         var last = _units[^1];
-        return last.Raw.Length > 0 && (char.IsAsciiDigit(last.Raw[^1]) || last.Raw == "-" && last.Kana == "-");
+        return last.Raw.Length > 0 && (char.IsAsciiDigit(last.Raw[^1]) || last.Raw == "-" && last.Kana == "-") || EndsWithConsonantOnlyLetters();
+    }
+
+    /// <summary>
+    /// 末尾が、かなにならなかった英字 2 文字以上で母音 (aiueo) を含まないか (pt・ls・cd・rm)。母音の無い並びの後ろの - は長音になれないので、コマンド名のハイフンとして半角のまま残す。
+    /// </summary>
+    private bool EndsWithConsonantOnlyLetters()
+    {
+        var count = 0;
+        for (var i = _units.Count - 1; i >= 0; i--)
+        {
+            var u = _units[i];
+            if (u.Raw.Length != 1 || !char.IsAsciiLetter(u.Raw[0]) || u.Kana != u.Raw) break;
+            if (char.ToLowerInvariant(u.Raw[0]) is 'a' or 'i' or 'u' or 'e' or 'o') return false;
+            count++;
+        }
+        return count >= 2;
     }
 
     /// <summary>

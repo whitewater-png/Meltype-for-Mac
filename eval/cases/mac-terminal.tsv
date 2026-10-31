@@ -36,3 +36,10 @@ sushinoset	すしのset	full	docs/requirements/001-api-no-error.md
 kanjinoinput	かんじのinput	full	docs/requirements/001-api-no-error.md
 takenoset	たけのset	full	docs/requirements/001-api-no-error.md
 namenoset	なめのset	full	docs/requirements/001-api-no-error.md
+pt-query-digest	pt-query-digest	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
+ls-files	ls-files	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
+cd-rom	cd-rom	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
+rm-rf	rm-rf	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
+kyouhapt-query	きょうはpt-query	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
+kyouhals-files	きょうはls-files	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
+kyouhara-men	きょうはらーめん	full	docs/requirements/004-consonant-hyphen.md (長音を守る)

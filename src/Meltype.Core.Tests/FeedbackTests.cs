@@ -1191,6 +1191,29 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
+    {
+        // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
+        // 母音のあるかな (ra-men・ko-hi-・ssu-pa-) の長音は変わらない。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+        foreach (var (typed, expected) in new[]
+        {
+            ("pt-query-digest", "pt-query-digest"), ("ls-files", "ls-files"), ("cd-rom", "cd-rom"), ("rm-rf", "rm-rf"),
+            ("kyouhapt-query", "きょうはpt-query"), ("kyouhals-files", "きょうはls-files"),
+            ("ra-men", "らーめん"), ("kyouhara-men", "きょうはらーめん"), ("kyouhako-hi-", "きょうはこーひー"), ("ssu-pa-", "っすーぱー"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        }
+        finally { CompositionTests.Detector.SpellChecker = null; }
+    }
+
+    [Test]
     public static void Q3_ReadableEnglishWords_LeaveJapaneseAndTheKnownLimitsAlone()
     {
         // english-readable.txt に語を足したとき、日本語の語の中・前後に偶然その綴りが現れても日本語のままであること。
