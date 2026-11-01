@@ -248,6 +248,7 @@ IME が背面専用のアプリ (`LSBackgroundOnly`) で、自分のウインド
 cd mac && ./build.sh --no-install
 D="$(mktemp -d)/data"
 MELTYPE_DATA_DIR="$D" build/Meltype.app/Contents/Helpers/MeltypeDictionary.app/Contents/MacOS/MeltypeDictionary --self-test   # ロジック + 本体を通した操作 (PASS が出る)
+build/Meltype.app/Contents/MacOS/Meltype --self-test   # IME 本体の Swift の計算 (キー対応・案内の位置・本体の応答の読み取り)。本体・通信・データに触れない (PASS が出る)
 MELTYPE_DATA_DIR="$D" build/Meltype.app/Contents/Helpers/MeltypeDictionary.app/Contents/MacOS/MeltypeDictionary              # 画面を出す (ウインドウの副題が $D になっていること)
 ```
 
