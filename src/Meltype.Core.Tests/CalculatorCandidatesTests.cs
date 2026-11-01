@@ -32,6 +32,17 @@ internal static class CalculatorCandidatesTests
     }
 
     [Test]
+    public static void SettingOn_OffersPowerResult()
+    {
+        // 要件 006 (本家 #1403): ^ のべき乗も結果と「式=結果」を候補に出す。
+        var k = new CompositionTests.Keyboard { CalculatorCandidates = true };
+        k.Type("2^10 ");
+        var candidates = k.Host.View?.Candidates.ToList() ?? [];
+        Assert.True(candidates.Contains("1024"), "結果: " + string.Join("|", candidates));
+        Assert.True(candidates.Contains("2^10=1024"), "式=結果: " + string.Join("|", candidates));
+    }
+
+    [Test]
     public static void SettingOff_DoesNotOfferResult()
     {
         var k = new CompositionTests.Keyboard();
