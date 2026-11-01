@@ -141,7 +141,7 @@ internal static class DictionaryManagement
     {
         var trimmed = text.Trim();
         var kana = trimmed.Any(char.IsAsciiLetter) ? s_romaji.Value.ConvertLenient(trimmed.ToLowerInvariant(), final: true) : trimmed;
-        return new string(kana.Select(c => c is >= 'ァ' and <= 'ヶ' ? (char)(c - 0x60) : c).ToArray());
+        return ReadingNormalizer.KatakanaToHiragana(kana);
     }
 
     // ---- 判定を調べる (「判定を調べる」タブ) ----
@@ -313,7 +313,7 @@ internal static class DictionaryManagement
     public static string? EditTerm(UserDictionary dictionary, UserWord original, string reading, string word, out bool added)
     {
         added = false;
-        reading = UserDictionary.NormalizeReading(reading);
+        reading = ReadingNormalizer.ForUserDictionary(reading);
         word = word.Trim();
         if (UserDictionary.Validate(reading, word) is { } invalid) return invalid;
         switch (dictionary.AddNew(reading, word))
@@ -326,7 +326,7 @@ internal static class DictionaryManagement
             case var error:
                 return error;
         }
-        var unchanged = TermDictionary.Normalize(reading) == TermDictionary.Normalize(original.Reading.Trim()) && word == original.Word.Trim();
+        var unchanged = ReadingNormalizer.ForTermDictionary(reading) == ReadingNormalizer.ForTermDictionary(original.Reading.Trim()) && word == original.Word.Trim();
         if (unchanged) return null;
         if (TermDomains.SetExcluded([(original.Reading, original.Word)], excluded: true) is not { } excludeError) return null;
         if (!added) return $"元の語を除外できませんでした: {excludeError}";

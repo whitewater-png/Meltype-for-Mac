@@ -3,7 +3,7 @@
 
 namespace Meltype.Composition;
 
-/// <summary>専門用語集の 1 語 (ファイルの 1 行)。読みは正規化したもの (TermDictionary.Normalize)、注記は 3 つ目の欄 (無ければ空)。</summary>
+/// <summary>専門用語集の 1 語 (ファイルの 1 行)。読みは正規化したもの (ReadingNormalizer.ForTermDictionary)、注記は 3 つ目の欄 (無ければ空)。</summary>
 public sealed record TermEntry(string Reading, string Word, string Note);
 
 /// <summary>
@@ -238,32 +238,10 @@ public sealed class TermDictionary
         if (wordSpan.Length == 0 || wordSpan.Length > UserDictionary.MaxLength) return false;
         // 注記の欄 (3 つ目) は読まない (4 つ目は「強制」の印だけ読む)。改行・タブは、欄の区切りで切っているのでここでは入らない (\r・\n は念のため)。
         if (wordSpan.IndexOfAny('\r', '\n') >= 0 || readingSpan.IndexOfAny('\r', '\n') >= 0) return false;
-        reading = Normalize(readingSpan);
+        reading = ReadingNormalizer.ForTermDictionary(readingSpan);
         word = wordSpan.ToString();
         // 正規化のあとでも、読みの長さの下限は守る (全角英数などの置き換えは同じ長さなので変わらないが念のため)
         return reading.Length >= UserDictionary.MinReadingLength;
-    }
-
-    /// <summary>読みの正規化: カタカナ → ひらがな、全角英数 → 半角、英大文字 → 小文字 (UserDictionaryFile の取り込みと同じ考え方)。</summary>
-    internal static string Normalize(ReadOnlySpan<char> reading)
-    {
-        var needs = false;
-        foreach (var c in reading)
-        {
-            if (c is >= 'ァ' and <= 'ヶ' or >= '！' and <= '～' or >= 'A' and <= 'Z') { needs = true; break; }
-        }
-        if (!needs) return reading.ToString();
-        return string.Create(reading.Length, reading.ToString(), static (buffer, source) =>
-        {
-            for (var i = 0; i < source.Length; i++)
-            {
-                var c = source[i];
-                if (c is >= 'ァ' and <= 'ヶ') c = (char)(c - 0x60);
-                else if (c is >= '！' and <= '～') c = (char)(c - 0xFEE0);
-                if (c is >= 'A' and <= 'Z') c = char.ToLowerInvariant(c);
-                buffer[i] = c;
-            }
-        });
     }
 
     /// <summary>kana の start から始まる強制型の読みの最大の長さ (先頭の文字が強制型の読みの先頭に無ければ 0)。</summary>

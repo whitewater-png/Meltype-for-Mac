@@ -222,7 +222,7 @@ internal static partial class TermDomains
     /// <summary>自作の分野に入れる 1 語を整える (読み: カタカナ→ひらがな・全角英数→半角・英大文字→小文字)。入れられなければ理由。</summary>
     internal static string? NormalizeUserWord(string reading, string word, out string normalizedReading, out string normalizedWord)
     {
-        normalizedReading = TermDictionary.Normalize(UserDictionary.NormalizeReading(reading));
+        normalizedReading = ReadingNormalizer.ForUserTermDomain(reading);
         normalizedWord = word.Trim();
         if (UserDictionary.Validate(normalizedReading, normalizedWord) is { } invalid) return invalid;
         // ファイルの 1 行に書いて、読み直したときに同じ語になること (TryParseLine と同じ決まり)
@@ -623,7 +623,7 @@ internal static partial class TermDomains
     /// </summary>
     public static string? RemoveUserWords(string id, IEnumerable<(string Reading, string Word)> items, out IReadOnlyList<(int Index, TermEntry Entry)> removed)
     {
-        var targets = items.Select(i => (Reading: TermDictionary.Normalize(UserDictionary.NormalizeReading(i.Reading)), Word: i.Word.Trim())).ToHashSet();
+        var targets = items.Select(i => (Reading: ReadingNormalizer.ForUserTermDomain(i.Reading), Word: i.Word.Trim())).ToHashSet();
         var list = new List<(int, TermEntry)>();
         string? error;
         CheckExternal(force: true);
@@ -675,7 +675,7 @@ internal static partial class TermDomains
     public static string? UpdateUserWord(string id, (string Reading, string Word) old, string reading, string word)
     {
         if (NormalizeUserWord(reading, word, out var r, out var w) is { } invalid) return invalid;
-        var oldReading = TermDictionary.Normalize(UserDictionary.NormalizeReading(old.Reading));
+        var oldReading = ReadingNormalizer.ForUserTermDomain(old.Reading);
         var oldWord = old.Word.Trim();
         CheckExternal(force: true);
         lock (Lock)
@@ -706,7 +706,7 @@ internal static partial class TermDomains
         lock (Lock)
         {
             if (ReadUserLines(id, out var lines) is { } readError) return readError;
-            var exceptKey = except is { } e ? (TermDictionary.Normalize(UserDictionary.NormalizeReading(e.Reading)), e.Word.Trim()) : default((string, string)?);
+            var exceptKey = except is { } e ? (ReadingNormalizer.ForUserTermDomain(e.Reading), e.Word.Trim()) : default((string, string)?);
             if (exceptKey == (r, w)) return null;
             return EntryLines(lines).Any(x => x.Entry.Reading == r && x.Entry.Word == w) ? UserDictionary.DuplicateMessage : null;
         }

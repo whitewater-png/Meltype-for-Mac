@@ -58,7 +58,7 @@ public sealed class UserDictionary
         if (word.Length == 0) return "単語を入力してください。";
         if (reading.Length > MaxLength || word.Length > MaxLength) return $"読みも単語も {MaxLength} 文字までにしてください。";
         // 変換はひらがなで引くので、ひらがなを 1 文字も含まない読み (ローマ字・カタカナだけ) は、登録しても変換に一度も出ない。
-        if (!reading.Any(IsHiragana) || !reading.All(IsReadingChar)) return "読みはひらがなで入力してください (カタカナは自動でひらがなになります)。";
+        if (!reading.Any(ReadingNormalizer.IsHiragana) || !reading.All(ReadingNormalizer.IsReadingChar)) return "読みはひらがなで入力してください (カタカナは自動でひらがなになります)。";
         // 改行はファイルの 1 行に収まらず、タブは「読み<Tab>単語」の区切りと衝突する。
         if (reading.Any(c => c is '\t' or '\r' or '\n') || word.Any(c => c is '\t' or '\r' or '\n')) return "改行・タブ文字は使えません。";
         // 制御文字 (ESC・Ctrl+O など) は、確定した先がターミナルだと「行の実行」や画面の書き換えになりうる。
@@ -68,17 +68,11 @@ public sealed class UserDictionary
         return null;
     }
 
-    private static bool IsHiragana(char c) => c is >= 'ぁ' and <= 'ゖ' or 'ゔ';
-
-    // 読みに使える文字: ひらがな・長音・中点・数字・英字 (50cc のように、数字や英字を含むかなの並びの読みがある)
-    private static bool IsReadingChar(char c) => IsHiragana(c) || c is 'ー' or '・' or >= '0' and <= '9' or >= 'a' and <= 'z' or >= 'A' and <= 'Z';
-
-    /// <summary>登録・編集・確認の前に読みをそろえる: 前後の空白を取り、カタカナをひらがなにする (変換側はひらがなで引くため。取り込みと同じ考え方)。</summary>
-    public static string NormalizeReading(string reading)
-    {
-        reading = reading.Trim();
-        return reading.Any(c => c is >= 'ァ' and <= 'ヶ') ? new string(reading.Select(c => c is >= 'ァ' and <= 'ヶ' ? (char)(c - 0x60) : c).ToArray()) : reading;
-    }
+    /// <summary>
+    /// 登録・編集・確認の前に読みをそろえる: 前後の空白を取り、カタカナをひらがなにする (変換側はひらがなで引くため)。
+    /// 中身は <see cref="ReadingNormalizer.ForUserDictionary"/> (読みのそろえ方は ReadingNormalizer に集めてある)。
+    /// </summary>
+    public static string NormalizeReading(string reading) => ReadingNormalizer.ForUserDictionary(reading);
 
     /// <summary>
     /// 語・名前に入れてはいけない文字を含むか: 制御文字 (Cc)・書式文字 (Cf)・行/段落区切り (Zl・Zp)・対になっていないサロゲート。
