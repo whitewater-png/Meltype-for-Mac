@@ -69,19 +69,19 @@ public static unsafe class Exports
 
     /// <summary>「変換後も続けて入力できる」が ON なら 1、OFF なら 0。入力メニューのチェック表示用。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_get_continue_after_conversion")]
-    public static int GetContinueAfterConversion() => Config.ContinueAfterConversionSetting.IsOn ? 1 : 0;
+    public static int GetContinueAfterConversion() => Guard("「変換後も続けて入力できる」の取得", 0, () => Config.ContinueAfterConversionSetting.IsOn ? 1 : 0);
 
     /// <summary>「変換後も続けて入力できる」を切り替えて config.json に保存する。すべての入力欄にすぐ反映される。保存できたら 1、できなければ 0。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_continue_after_conversion")]
-    public static int SetContinueAfterConversion(int on) => Config.ContinueAfterConversionSetting.Set(on != 0) ? 1 : 0;
+    public static int SetContinueAfterConversion(int on) => Guard("「変換後も続けて入力できる」の保存", 0, () => Config.ContinueAfterConversionSetting.Set(on != 0) ? 1 : 0);
 
     /// <summary>「Shift+Enter で確定して改行」が ON なら 1、OFF なら 0。入力メニューのチェック表示用。既定は ON。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_get_shift_enter_newline")]
-    public static int GetShiftEnterNewline() => Config.ShiftEnterNewlineSetting.IsOn ? 1 : 0;
+    public static int GetShiftEnterNewline() => Guard("「Shift+Enter で確定して改行」の取得", 0, () => Config.ShiftEnterNewlineSetting.IsOn ? 1 : 0);
 
     /// <summary>「Shift+Enter で確定して改行」を切り替えて config.json に保存する。すべての入力欄にすぐ反映される。保存できたら 1、できなければ 0。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_shift_enter_newline")]
-    public static int SetShiftEnterNewline(int on) => Config.ShiftEnterNewlineSetting.Set(on != 0) ? 1 : 0;
+    public static int SetShiftEnterNewline(int on) => Guard("「Shift+Enter で確定して改行」の保存", 0, () => Config.ShiftEnterNewlineSetting.Set(on != 0) ? 1 : 0);
 
     /// <summary>
     /// 入力方式が「かな入力 (JIS)」なら 1、そうでなければ (ローマ字入力・読めないとき) 0。Swift 側が、キーを JIS かな配列の仮想キーにするかを決めるのに使う。
@@ -295,11 +295,11 @@ public static unsafe class Exports
     /// 読みに戻せなければ consumed が false (キーはアプリに渡す)。
     /// </summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_reconvert")]
-    public static byte* Reconvert(IntPtr handle, byte* text)
+    public static byte* Reconvert(IntPtr handle, byte* text) => Run(handle, session =>
     {
         var selected = FromUtf8(text) ?? "";
-        return Run(handle, session => session.Reconvert(selected));
-    }
+        return session.Reconvert(selected);
+    });
 
     /// <summary>英数 (直接入力) にするか (1) 日本語にするか (0)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_direct")]
@@ -432,7 +432,7 @@ public static unsafe class Exports
 
     /// <summary>データの保存場所 (設定・学習・ユーザー辞書)。meltype_free で解放する。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_data_directory")]
-    public static byte* DataDirectory() => ToUtf8(Config.AppPaths.DataDirectory);
+    public static byte* DataDirectory() => Text("データの保存場所の取得", () => Config.AppPaths.DataDirectory);
 
     // ---- 辞書の管理画面 (mac/Sources/MeltypeDictionary、IME とは別のプロセス) 用 ----
     // 返す文字列はどれも meltype_free で解放する。「理由」を返す関数は、成功なら NULL、だめなら理由の文字列 (画面にそのまま出す)。
@@ -466,22 +466,22 @@ public static unsafe class Exports
 
     /// <summary>登録・編集してよいか (保存はしない)。不正な入力・重複なら理由、よければ NULL。exceptReading / exceptWord は編集中の元の語 (どちらかが NULL なら無し)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_userdict_check")]
-    public static byte* UserDictCheck(byte* reading, byte* word, byte* exceptReading, byte* exceptWord)
+    public static byte* UserDictCheck(byte* reading, byte* word, byte* exceptReading, byte* exceptWord) => Reason("ユーザー辞書の入力チェック", () =>
     {
         var readingText = FromUtf8(reading) ?? "";
         var wordText = FromUtf8(word) ?? "";
         var except = exceptReading == null || exceptWord == null ? null : new UserWord(FromUtf8(exceptReading)!, FromUtf8(exceptWord)!);
-        return Reason("ユーザー辞書の入力チェック", () => DictionaryManagement.UserWords.Check(readingText, wordText, except));
-    }
+        return DictionaryManagement.UserWords.Check(readingText, wordText, except);
+    });
 
     /// <summary>ユーザー辞書に登録する (すぐ保存。すでにあれば重複の理由)。だめなら理由、できたら NULL。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_userdict_add")]
-    public static byte* UserDictAdd(byte* reading, byte* word)
+    public static byte* UserDictAdd(byte* reading, byte* word) => Reason("ユーザー辞書への登録", () =>
     {
         var readingText = FromUtf8(reading) ?? "";
         var wordText = FromUtf8(word) ?? "";
-        return Reason("ユーザー辞書への登録", () => DictionaryManagement.UserWords.AddNew(readingText, wordText));
-    }
+        return DictionaryManagement.UserWords.AddNew(readingText, wordText);
+    });
 
     /// <summary>
     /// まとめて登録する (lines は「読み\t単語」の行。管理画面の「ユーザー辞書へ複製」)。1 回の読み直し・保存で済ませる。
@@ -517,13 +517,13 @@ public static unsafe class Exports
 
     /// <summary>登録した語 (oldReading, oldWord) を直す (位置はそのまま)。だめなら理由、できたら NULL。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_userdict_update")]
-    public static byte* UserDictUpdate(byte* oldReading, byte* oldWord, byte* reading, byte* word)
+    public static byte* UserDictUpdate(byte* oldReading, byte* oldWord, byte* reading, byte* word) => Reason("ユーザー辞書の編集", () =>
     {
         var old = new UserWord(FromUtf8(oldReading) ?? "", FromUtf8(oldWord) ?? "");
         var readingText = FromUtf8(reading) ?? "";
         var wordText = FromUtf8(word) ?? "";
-        return Reason("ユーザー辞書の編集", () => DictionaryManagement.UserWords.Update(old, readingText, wordText));
-    }
+        return DictionaryManagement.UserWords.Update(old, readingText, wordText);
+    });
 
     /// <summary>
     /// 語を消す (lines は「読み\t単語」の行)。消した語と元の位置を「位置\t読み\t単語」の行で *removed に返す (元に戻すとき meltype_userdict_restore に渡す。
@@ -548,11 +548,11 @@ public static unsafe class Exports
 
     /// <summary>消した語を元の位置に戻す (lines は meltype_userdict_remove が返した「位置\t読み\t単語」の行)。だめなら理由、できたら NULL。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_userdict_restore")]
-    public static byte* UserDictRestore(byte* lines)
+    public static byte* UserDictRestore(byte* lines) => Reason("ユーザー辞書の復元", () =>
     {
         var text = FromUtf8(lines);
-        return Reason("ユーザー辞書の復元", () => DictionaryManagement.UserWords.Restore(DictionaryManagement.ParseIndexed(text)));
-    }
+        return DictionaryManagement.UserWords.Restore(DictionaryManagement.ParseIndexed(text));
+    });
 
     /// <summary>
     /// ほかの日本語入力の辞書ファイル (path) を取り込む。*summary に「登録した数\t登録済み・登録できなかった数\t飛ばした行の数\t文字コード」、
@@ -596,21 +596,21 @@ public static unsafe class Exports
 
     /// <summary>読みの入力をひらがなにしたもの (ローマ字 → ひらがな、カタカナ → ひらがな)。画面の「ひらがなにする」用。取れなければ NULL。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_to_reading")]
-    public static byte* ToReading(byte* text)
+    public static byte* ToReading(byte* text) => Text("読みの変換", () =>
     {
         var input = FromUtf8(text) ?? "";
-        return Text("読みの変換", () => DictionaryManagement.ToReading(input));
-    }
+        return DictionaryManagement.ToReading(input);
+    });
 
     /// <summary>
     /// 専門用語集の分野 (ID) の語。「読み\t語\t注記\t除外していれば 1」を改行でつなぐ (ファイルの順)。未知の ID・取れなければ NULL。
     /// </summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_words")]
-    public static byte* TermWords(byte* id)
+    public static byte* TermWords(byte* id) => Text("専門用語集の語の一覧", () =>
     {
         var name = FromUtf8(id) ?? "";
-        return Text("専門用語集の語の一覧", () => TermDomains.Words(name) is { } words ? DictionaryManagement.FormatTermWords(words) : null);
-    }
+        return TermDomains.Words(name) is { } words ? DictionaryManagement.FormatTermWords(words) : null;
+    });
 
     /// <summary>除外した専門用語 (すべての分野)。「読み\t語」を改行でつなぐ (無ければ空文字列)。取れなければ NULL。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_excluded")]
@@ -619,11 +619,11 @@ public static unsafe class Exports
 
     /// <summary>専門用語を除外する (excluded != 0) / 元に戻す (0)。lines は「読み\t語」の行。すべての入力欄にすぐ反映される。だめなら理由、できたら NULL。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_set_excluded")]
-    public static byte* TermSetExcluded(byte* lines, int excluded)
+    public static byte* TermSetExcluded(byte* lines, int excluded) => Reason("専門用語の除外", () =>
     {
         var items = DictionaryManagement.ParseWords(FromUtf8(lines)).Select(w => (w.Reading, w.Word)).ToList();
-        return Reason("専門用語の除外", () => TermDomains.SetExcluded(items, excluded != 0));
-    }
+        return TermDomains.SetExcluded(items, excluded != 0);
+    });
 
     /// <summary>
     /// 専門用語を直す: 直した語をユーザー辞書に登録し、元の語を除外する (DictionaryManagement.EditTerm)。
@@ -742,11 +742,11 @@ public static unsafe class Exports
     /// NULL を渡すと外す (同梱の英単語表に戻る)。
     /// </summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_word_checker")]
-    public static void SetWordChecker(delegate* unmanaged<byte*, int> isWord)
+    public static void SetWordChecker(delegate* unmanaged<byte*, int> isWord) => Guard("英単語を調べる関数の登録", () =>
     {
         s_isWord = isWord;
         DictionaryManagement.ExternalWordChecker = isWord == null ? null : new CallbackWordChecker();
-    }
+    });
 
     /// <summary>
     /// 打ったローマ字 (typed) の区間分けと、条件を 1 つだけ変えたときに変わるかを返す (形は DictionaryManagement.ExplainDetection)。
@@ -755,14 +755,14 @@ public static unsafe class Exports
     /// 登録したスペルチェッカー (NSSpellChecker) を呼ぶので、メインスレッドから呼ぶこと (それ以外では登録した関数が -1 =「分からない」を返し、同梱の英単語表で答える)。
     /// </summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_explain_detection")]
-    public static byte* ExplainDetection(byte* typed, byte* before, byte* after, int level)
+    public static byte* ExplainDetection(byte* typed, byte* before, byte* after, int level) => Text("判定の調べもの", () =>
     {
         var typedText = FromUtf8(typed) ?? "";
         var beforeText = FromUtf8(before) ?? "";
         var afterText = FromUtf8(after) ?? "";
         var detectionLevel = Enum.IsDefined((Config.DetectionLevel)level) ? (Config.DetectionLevel)level : Config.DetectionLevel.Balanced;
-        return Text("判定の調べもの", () => DictionaryManagement.ExplainDetection(typedText, beforeText, afterText, detectionLevel));
-    }
+        return DictionaryManagement.ExplainDetection(typedText, beforeText, afterText, detectionLevel);
+    });
 
     /// <summary>理由 (null なら成功) を返り値にする: 成功なら NULL、理由があればその文字列。</summary>
     private static byte* ReasonText(string? reason) => reason is null ? null : ToUtf8(reason);
@@ -781,12 +781,12 @@ public static unsafe class Exports
     /// (真偽は true / false、数は 3、選択肢は "Balanced" のように名前の文字列)。だめなら理由、できたら NULL。
     /// </summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_settings_set")]
-    public static byte* SettingsSet(byte* key, byte* valueJson)
+    public static byte* SettingsSet(byte* key, byte* valueJson) => Reason("設定の保存", () =>
     {
         var name = FromUtf8(key) ?? "";
         var value = FromUtf8(valueJson) ?? "";
-        return Reason("設定の保存", () => Config.MacSettingsCatalog.Apply(name, value));
-    }
+        return Config.MacSettingsCatalog.Apply(name, value);
+    });
 
     /// <summary>設定タブにある項目をすべて既定値に戻して保存する (ほかの設定は触らない)。だめなら理由、できたら NULL。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_settings_reset")]
@@ -815,12 +815,12 @@ public static unsafe class Exports
 
     /// <summary>自作の専門用語集の名前を変える。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_rename")]
-    public static byte* TermRename(byte* id, byte* name)
+    public static byte* TermRename(byte* id, byte* name) => Reason("専門用語集の名前の変更", () =>
     {
         var idText = FromUtf8(id) ?? "";
         var nameText = FromUtf8(name) ?? "";
-        return Reason("専門用語集の名前の変更", () => TermDomains.RenameUserDomain(idText, nameText));
-    }
+        return TermDomains.RenameUserDomain(idText, nameText);
+    });
 
     /// <summary>自作の専門用語集を消す。*content に消す前の中身、*wasEnabled に有効だったか (1/0)。元に戻すとき meltype_term_restore_domain に渡す。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_delete")]
@@ -844,23 +844,23 @@ public static unsafe class Exports
 
     /// <summary>消した自作の専門用語集を、同じ ID・中身で戻す。enabled != 0 なら有効にする。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_restore_domain")]
-    public static byte* TermRestoreDomain(byte* id, byte* content, int enabled)
+    public static byte* TermRestoreDomain(byte* id, byte* content, int enabled) => Reason("専門用語集の復元", () =>
     {
         var idText = FromUtf8(id) ?? "";
         var text = FromUtf8(content) ?? "";
-        return Reason("専門用語集の復元", () => TermDomains.RestoreUserDomain(idText, text, enabled != 0));
-    }
+        return TermDomains.RestoreUserDomain(idText, text, enabled != 0);
+    });
 
     /// <summary>自作の専門用語集に語を登録・編集してよいか (保存しない)。exceptReading / exceptWord は編集中の元の語 (どちらかが NULL なら無し)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_user_check")]
-    public static byte* TermUserCheck(byte* id, byte* reading, byte* word, byte* exceptReading, byte* exceptWord)
+    public static byte* TermUserCheck(byte* id, byte* reading, byte* word, byte* exceptReading, byte* exceptWord) => Reason("専門用語の入力チェック", () =>
     {
         var idText = FromUtf8(id) ?? "";
         var readingText = FromUtf8(reading) ?? "";
         var wordText = FromUtf8(word) ?? "";
         (string, string)? except = exceptReading == null || exceptWord == null ? null : (FromUtf8(exceptReading)!, FromUtf8(exceptWord)!);
-        return Reason("専門用語の入力チェック", () => TermDomains.CheckUserWord(idText, readingText, wordText, except));
-    }
+        return TermDomains.CheckUserWord(idText, readingText, wordText, except);
+    });
 
     /// <summary>自作の専門用語集に語を足す。*added に実際に足した語 (「読み\t語\t注記」の行)、*skipped に入れられなかった語 (「読み\t語\t理由」の行。すでにある語は含めない)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_user_add")]
@@ -903,23 +903,23 @@ public static unsafe class Exports
 
     /// <summary>消した語を元の位置に戻す (lines は meltype_term_user_remove が返した行)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_user_restore")]
-    public static byte* TermUserRestore(byte* id, byte* lines)
+    public static byte* TermUserRestore(byte* id, byte* lines) => Reason("専門用語の復元", () =>
     {
         var idText = FromUtf8(id) ?? "";
         var text = FromUtf8(lines);
-        return Reason("専門用語の復元", () => TermDomains.RestoreUserWords(idText, DictionaryManagement.ParseIndexedTerms(text)));
-    }
+        return TermDomains.RestoreUserWords(idText, DictionaryManagement.ParseIndexedTerms(text));
+    });
 
     /// <summary>自作の専門用語集の語を直す (位置はそのまま)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_term_user_update")]
-    public static byte* TermUserUpdate(byte* id, byte* oldReading, byte* oldWord, byte* reading, byte* word)
+    public static byte* TermUserUpdate(byte* id, byte* oldReading, byte* oldWord, byte* reading, byte* word) => Reason("専門用語の編集", () =>
     {
         var idText = FromUtf8(id) ?? "";
         var old = (FromUtf8(oldReading) ?? "", FromUtf8(oldWord) ?? "");
         var readingText = FromUtf8(reading) ?? "";
         var wordText = FromUtf8(word) ?? "";
-        return Reason("専門用語の編集", () => TermDomains.UpdateUserWord(idText, old, readingText, wordText));
-    }
+        return TermDomains.UpdateUserWord(idText, old, readingText, wordText);
+    });
 
     /// <summary>
     /// ユーザー辞書の語 (lines は「読み\t単語」の行) を、自作の専門用語集へ移す。専門用語集に入れられない語は、ユーザー辞書に残す。
@@ -1015,6 +1015,33 @@ public static unsafe class Exports
     {
         Diagnostics.Log.Error($"Mac: {what}で例外: {ex}");
         return ToUtf8($"{what}に失敗しました: {ex.Message}");
+    }
+
+    /// <summary>数を返す処理を、例外で落ちないように包む (例外は UnmanagedCallersOnly の外へ出せない)。失敗は failed を返す。</summary>
+    private static T Guard<T>(string what, T failed, Func<T> action)
+    {
+        try
+        {
+            return action();
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"Mac: {what}で例外: {ex}");
+            return failed;
+        }
+    }
+
+    /// <summary>何も返さない処理を、例外で落ちないように包む (例外は UnmanagedCallersOnly の外へ出せない)。</summary>
+    private static void Guard(string what, Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"Mac: {what}で例外: {ex}");
+        }
     }
 
     /// <summary>
