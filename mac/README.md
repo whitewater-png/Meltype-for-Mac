@@ -242,13 +242,13 @@ IME が背面専用のアプリ (`LSBackgroundOnly`) で、自分のウインド
 
 ### 実機での確認の手順 (画面の自動テストは無い)
 
-実際のデータに触らないよう、空の一時フォルダーを保存場所にして、ビルドした画面を直接起動します (IME は起動しません)。
+実際のデータに触らないよう、空の一時フォルダーを保存場所にして、ビルドした画面を直接起動します (IME の入力の仕組みは起動しません。IME の実行ファイルは `--self-test` の確認だけに使います)。
 
 ```bash
 cd mac && ./build.sh --no-install
 D="$(mktemp -d)/data"
 MELTYPE_DATA_DIR="$D" build/Meltype.app/Contents/Helpers/MeltypeDictionary.app/Contents/MacOS/MeltypeDictionary --self-test   # ロジック + 本体を通した操作 (PASS が出る)
-build/Meltype.app/Contents/MacOS/Meltype --self-test   # IME 本体の Swift の計算 (キー対応・案内の位置・本体の応答の読み取り)。本体・通信・データに触れない (PASS が出る)
+build/Meltype.app/Contents/MacOS/Meltype --self-test   # IME 本体の Swift の計算 (キー対応・候補の意味・案内の位置・本体の応答の読み取り)。入力の仕組み (IMKServer)・本体・通信・データに触れない (PASS が出る)
 MELTYPE_DATA_DIR="$D" build/Meltype.app/Contents/Helpers/MeltypeDictionary.app/Contents/MacOS/MeltypeDictionary              # 画面を出す (ウインドウの副題が $D になっていること)
 ```
 
