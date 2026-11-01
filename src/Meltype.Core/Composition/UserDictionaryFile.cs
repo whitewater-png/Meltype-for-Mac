@@ -32,9 +32,9 @@ public static class UserDictionaryFile
                 skipped++;
                 continue;
             }
-            var reading = ToHiragana(fields[0].Trim());
+            var reading = ReadingNormalizer.KatakanaToHiragana(fields[0].Trim());
             var word = fields[1].Trim();
-            if (reading.Length < UserDictionary.MinReadingLength || word.Length == 0 || !reading.All(IsReadingChar))
+            if (reading.Length < UserDictionary.MinReadingLength || word.Length == 0 || !reading.All(ReadingNormalizer.IsReadingChar))
             {
                 skipped++;
                 continue;
@@ -87,8 +87,4 @@ public static class UserDictionaryFile
             throw new InvalidDataException("文字コードを読めませんでした。UTF-8 か UTF-16 で保存したファイルを選んでください (Shift_JIS のファイルは、メモ帳などで UTF-8 で保存し直すと取り込めます)。");
         }
     }
-
-    private static string ToHiragana(string text) => new(text.Select(c => c is >= 'ァ' and <= 'ヶ' ? (char)(c - 0x60) : c).ToArray());
-
-    private static bool IsReadingChar(char c) => c is >= 'ぁ' and <= 'ゖ' or 'ー' or 'ゔ' or '・' or >= '0' and <= '9' or >= 'a' and <= 'z' or >= 'A' and <= 'Z';
 }
