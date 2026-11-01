@@ -43,6 +43,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_RomajiSentence_ShowsJapaneseCandidate_EnterReplaces()
     {
         // #332: ローマ字のまま入った文を選んで Shift+Space → 日本語の所だけ日本語にした文を候補に出し、Enter で置き換える
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -66,7 +67,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -75,6 +76,7 @@ internal static class ReconvertRomajiTests
     {
         // 再変換の候補は 2 つ (日本語にした文 → 選んだままの文)。数字キーは番号として使う (0 だけは番号に無いので入力として素通し)。
         // 「変換直後の数字は入力として打つ」が ON でも、再変換は何も打っていないので、候補の番号のまま
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -88,13 +90,14 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
     [Test]
     public static void Reconvert_RomajiSentence_SpaceShowsOriginal_AndEscCancels()
     {
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -125,7 +128,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -134,6 +137,7 @@ internal static class ReconvertRomajiTests
     {
         // 日本語にした文 (読みではない) を、変換エンジンにも履歴にも覚えさせない。
         // 日本語だけの文 (読みに英字が入らない) は、そのまま確定すると変換エンジンに「読み = 日本語にした文」として渡されてしまう。Space で選び直すと履歴にも入る
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -152,13 +156,14 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
     [Test]
     public static void Reconvert_RomajiSentence_ShiftArrowsDoNotResize()
     {
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -176,13 +181,14 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
     [Test]
     public static void Reconvert_RomajiSentence_SpaceAroundEnglishDoesNotDoubleSpaces()
     {
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -192,7 +198,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -212,6 +218,7 @@ internal static class ReconvertRomajiTests
         // to・no・so・do・name のような英語とも日本語とも読める語が入っていても、それだけでは日本語にしない。
         foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
         {
+            var savedChecker = CompositionTests.Detector.SpellChecker;
             CompositionTests.Detector.SpellChecker = checker;
             try
             {
@@ -237,7 +244,7 @@ internal static class ReconvertRomajiTests
             }
             finally
             {
-                CompositionTests.Detector.SpellChecker = null;
+                CompositionTests.Detector.SpellChecker = savedChecker;
             }
         }
     }
@@ -246,6 +253,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_RomajiMixedWithCode_KeepsCodeTokensAsTyped()
     {
         // 日本語の所があれば変換するが、URL・パス・ファイル名・コマンドの引数は英字のまま残す
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -280,7 +288,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -288,6 +296,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_RomajiWithoutSpaces_AddsNoSpacesInsideAWord()
     {
         // 空白なしで打った語の中 (kyouhagoogledekensaku) は、打ったときと同じく空白を足さない。空白で区切って打った所だけ、英語の前後に空白を残す
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -304,13 +313,14 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
     [Test]
     public static void Reconvert_RomajiNeedsEvidence_ShortAmbiguousWordsAreNotEnough()
     {
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -327,7 +337,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -343,6 +353,7 @@ internal static class ReconvertRomajiTests
     {
         // 辞書が naka・mako・kana を英単語と答えると、人名 Nakamura・Makoto・Kanade が Naka|mura・Mako|to・Kana|de に切れる。
         // 大文字で始まる語の後ろに続く部分は、日本語の証拠にしない (名前だけの選択を日本語にしない)
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = new FewWordsChecker("naka", "mako", "kana");
         try
         {
@@ -356,7 +367,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -364,6 +375,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_RomajiTypos_AreFixedLikeTyping()
     {
         // 打ち間違い (onegaishimsu) は、打ったときの Enter と同じく直す。端末に入れた文は打ち間違いを直せていないので、直す価値が高い
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -377,7 +389,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -385,6 +397,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_AsciiTextWithoutJapanese_StillUsesHistoryReading()
     {
         // 日本語だと言える所が無い ASCII の文字でも、変換履歴に読みがあれば今までどおり読みに戻す (確定した GitHub → ぎっとはぶ)
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -401,7 +414,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -410,6 +423,7 @@ internal static class ReconvertRomajiTests
     {
         // 直前に英語で確定した、英語とも日本語とも読める語 (I want sushi の sushi) を、選んだ文字の再変換の確定で日本語に確定し直さない
         // (確定し直しは手前の文字を消すので、選んだ文字ではなく sushi が消える)
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -422,7 +436,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -433,6 +447,7 @@ internal static class ReconvertRomajiTests
         // 大文字で始まる語と、敬称だけの語 (san・kun・chan・sama) は、日本語の証拠にしない (査読 R18b。以前は名前の直後の ! . , ? で候補が出ていた)。
         foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
         {
+            var savedChecker = CompositionTests.Detector.SpellChecker;
             CompositionTests.Detector.SpellChecker = checker;
             try
             {
@@ -451,7 +466,7 @@ internal static class ReconvertRomajiTests
             }
             finally
             {
-                CompositionTests.Detector.SpellChecker = null;
+                CompositionTests.Detector.SpellChecker = savedChecker;
             }
         }
     }
@@ -461,6 +476,7 @@ internal static class ReconvertRomajiTests
     {
         // 文頭の語 (Make・Run・You) は小文字にすると日本語に読める。その字数を日本語の割合に数えると、辞書に無い語が 1 つある英文 (zipapp) が割合の下限を越えて候補になる。
         // 小文字に直した語の字数は割合の分子に数えない (分母には数える) ので、今までどおり候補なし。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -471,13 +487,14 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
     [Test]
     public static void Reconvert_CapitalizedWords_KnownLimitsAndWhatStillWorks()
     {
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -499,7 +516,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -508,6 +525,7 @@ internal static class ReconvertRomajiTests
     {
         // アプリは英数で打つと文頭を自動で大文字にする (Asita no meeting …)。先頭の語だけ英語のまま残らず、小文字で打ったときと同じに日本語にする。
         // 先頭の 1 文字だけが大文字の語を、判定と変換のために小文字に直して扱う。この語自体は日本語の証拠に数えない (他の語に証拠があるときだけ)。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -543,7 +561,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -562,6 +580,7 @@ internal static class ReconvertRomajiTests
         // ASCII の複数語の選択では OS の読みを使わない = キーはアプリに渡す (Consumed=false)。履歴・意味辞書の読みは残す。
         foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
         {
+            var savedChecker = CompositionTests.Detector.SpellChecker;
             CompositionTests.Detector.SpellChecker = checker;
             try
             {
@@ -579,7 +598,7 @@ internal static class ReconvertRomajiTests
             }
             finally
             {
-                CompositionTests.Detector.SpellChecker = null;
+                CompositionTests.Detector.SpellChecker = savedChecker;
             }
         }
     }
@@ -588,6 +607,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_SingleAsciiWord_StillUsesTheOsReading()
     {
         // 空白の無い 1 語の選択 (名前 Takeshi → たけし → 武史) は、従来どおり OS の読みを使う (複数語だけ使わない)。前後の空白は語の数に数えない
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -605,7 +625,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -613,6 +633,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_AsciiSelection_StillUsesHistoryMeaningAndKanaReadings()
     {
         // OS の読みを使わなくなっても、履歴・意味辞書の読み、かな・漢字の選択の読み (OS を含む) は今までどおり
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -632,7 +653,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -640,6 +661,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_RomajiNeedsEvidence_ShareAndLengthBoundaries()
     {
         // 変異テストで見つかった穴: 日本語の割合の下限 (0.25) と、証拠の語の最低文字数 (3) を踏む入力が無く、0.20 や 4 に変えても赤にならなかった
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -655,7 +677,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -675,6 +697,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_RomajiWithEdgeNewlinesAndTabs_ShowsCandidateKeepingTheEdges()
     {
         // 選んだ文字の前後の改行・タブ (段落の 3 回クリック・\r\n・表計算のセル) は、ローマ字として扱う本体から切り離し、候補と置き換えにそのまま付け直す
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -727,7 +750,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -735,6 +758,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_RomajiWithEdgeNewlines_BodyResultEqualsTheResultWithoutThem()
     {
         // 前後の改行・タブを足しても、本体の結果は変わらない (改行を除いた文字の候補と一致する)
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -751,7 +775,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -759,6 +783,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_RomajiWithNewlineInside_OrNothingElse_IsLeftAlone()
     {
         // 安全側: 選択の途中に改行・タブがある (複数行・複数セルの選択) は、これまでどおり候補を出さない。前後を除いて何も残らない選択、200 文字の上限も同じ
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -780,7 +805,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -790,6 +815,7 @@ internal static class ReconvertRomajiTests
         // 英文・コード・URL・パスの前後に改行・タブが付いても、候補なしのまま (OS の読みの候補も出ない)
         foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
         {
+            var savedChecker = CompositionTests.Detector.SpellChecker;
             CompositionTests.Detector.SpellChecker = checker;
             try
             {
@@ -809,7 +835,7 @@ internal static class ReconvertRomajiTests
             }
             finally
             {
-                CompositionTests.Detector.SpellChecker = null;
+                CompositionTests.Detector.SpellChecker = savedChecker;
             }
         }
     }
@@ -820,6 +846,7 @@ internal static class ReconvertRomajiTests
         // 空白の無い 1 語は、前後に改行が付いても付かないときと同じ (OS の読みを使う / 使わないも、候補が出る / 出ないも)
         foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
         {
+            var savedChecker = CompositionTests.Detector.SpellChecker;
             CompositionTests.Detector.SpellChecker = checker;
             try
             {
@@ -839,7 +866,7 @@ internal static class ReconvertRomajiTests
             }
             finally
             {
-                CompositionTests.Detector.SpellChecker = null;
+                CompositionTests.Detector.SpellChecker = savedChecker;
             }
         }
     }
@@ -954,6 +981,7 @@ internal static class ReconvertRomajiTests
     public static void Reconvert_StandaloneHyphenWords_StayHyphen()
     {
         // 英字を含まない語の - (箇条書きの -、電話番号・日付) は長音 ー にせず、前後の空白ごとそのまま残す。語の中の長音 (ra-men) は今までどおり ー
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -987,7 +1015,7 @@ internal static class ReconvertRomajiTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 

@@ -40,15 +40,30 @@ internal static class TestHost
         foreach (var test in tests)
         {
             var name = $"{test.DeclaringType!.Name}.{test.Name}";
+            // 共有の判定器 (CompositionTests.Detector) は全テストで使い回す。テストの中で差し替えたスペルチェッカー・学習を
+            // 元へ戻し忘れると、後ろのテストが本番と違う構成で走る (どのテストが残したかわからなくなる) ので、そのテストを失敗にする。
+            var shared = CompositionTests.Detector;
+            var (checkerBefore, memoryBefore) = (shared.SpellChecker, shared.Memory);
             try
             {
                 test.Invoke(null, null);
+                if (!ReferenceEquals(shared.SpellChecker, checkerBefore) || !ReferenceEquals(shared.Memory, memoryBefore))
+                {
+                    var leaked = $"共有の判定器を元に戻していない: SpellChecker {checkerBefore?.GetType().Name ?? "null"} → {shared.SpellChecker?.GetType().Name ?? "null"}, " +
+                        $"Memory {(memoryBefore is null ? "null" : "あり")} → {(shared.Memory is null ? "null" : "あり")}";
+                    throw new TargetInvocationException(new AssertionException(leaked));
+                }
                 Console.WriteLine($"  PASS  {name}");
             }
             catch (TargetInvocationException ex) when (ex.InnerException is not null)
             {
                 failed++;
                 Console.WriteLine($"  FAIL  {name}\n        {ex.InnerException.Message.Replace("\n", "\n        ")}");
+            }
+            finally
+            {
+                // 失敗したテストが残したものも、次のテストへ持ち越さない
+                (shared.SpellChecker, shared.Memory) = (checkerBefore, memoryBefore);
             }
         }
         Console.WriteLine();

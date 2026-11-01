@@ -364,6 +364,7 @@ Dictionary<string, (int Pass, int Total)> ByCategory, List<string> Failures, Lis
         // Windows のスペルチェッカーが無い環境 (Linux・Mac の CI) では、アプリの Mac 版・Linux 版と同じく同梱の英単語の一覧を使う。
         IWordChecker? spell = Environment.GetEnvironmentVariable("MELTYPE_NO_SPELLCHECK") is not null ? null
             : TestSupport.WordChecker is { IsAvailable: true } checker ? checker : Detection.BuiltInWordChecker.Shared;
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = spell;
         try
         {
@@ -378,7 +379,7 @@ Dictionary<string, (int Pass, int Total)> ByCategory, List<string> Failures, Lis
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
 
         // かな入力 (JIS)

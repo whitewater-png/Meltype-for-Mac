@@ -12,7 +12,33 @@ namespace Meltype.Tests;
 /// <summary>Meltype キーボード (変換ボックス)。</summary>
 internal static class CompositionTests
 {
-    internal static readonly CompositionDetector Detector = CompositionDetector.CreateDefault();
+    /// <summary>
+    /// テストが共有する判定器。本番 (Mac の MeltypeSession.CreateDefault) と同じく、スペルチェッカーを必ず付ける。
+    /// 本番は macOS のスペルチェッカー (無ければ同梱の英単語の一覧) を使う。テストでは --repro・--eval と同じく同梱の一覧 (BuiltInWordChecker) を使う。
+    /// 学習 (Memory) は空 (null と同じ。利用者の学習は読まない)。設定に関わる項目 (KanaInJapaneseMode など) は既定の OFF のまま。
+    /// スペルチェッカー無しで試したいテストは <see cref="WithoutSpellChecker"/> を使う (理由をコメントに書く)。
+    /// 差し替えたテストは finally で元へ戻す (戻し忘れは TestHost が失敗にする)。
+    /// </summary>
+    internal static readonly CompositionDetector Detector = CreateProductionLike();
+
+    private static CompositionDetector CreateProductionLike()
+    {
+        var detector = CompositionDetector.CreateDefault();
+        detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        return detector;
+    }
+
+    /// <summary>共有の判定器のスペルチェッカーを外し、Dispose で元へ戻す (英単語の知識に関係ない仕組みを、入力を変えずに試すとき)。</summary>
+    internal static IDisposable WithoutSpellChecker() => new SpellCheckerScope(null);
+
+    private sealed class SpellCheckerScope : IDisposable
+    {
+        private readonly Detection.IWordChecker? _saved = Detector.SpellChecker;
+
+        public SpellCheckerScope(Detection.IWordChecker? checker) => Detector.SpellChecker = checker;
+
+        public void Dispose() => Detector.SpellChecker = _saved;
+    }
 
     internal sealed class FakeConverter : IKanjiConverter
     {
@@ -792,6 +818,7 @@ internal static class CompositionTests
     public static void ZArrows_WorkEvenIfSpellCheckerKnowsZh()
     {
         // Mac 実機の報告: macOS のスペルチェッカーが zh を英単語と答えるため、zh だけ矢印にならなかった (zj・zk・zl は矢印になる)。
+        var savedChecker = Detector.SpellChecker;
         Detector.SpellChecker = new ZhIsWordChecker();
         try
         {
@@ -808,7 +835,7 @@ internal static class CompositionTests
         }
         finally
         {
-            Detector.SpellChecker = null;
+            Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -827,6 +854,7 @@ internal static class CompositionTests
         })
         {
             // 実際と同じく、辞書にない英単語 (buzzkill) はスペルチェッカーで見る
+            var savedChecker = Detector.SpellChecker;
             Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
             try
             {
@@ -836,7 +864,7 @@ internal static class CompositionTests
             }
             finally
             {
-                Detector.SpellChecker = null;
+                Detector.SpellChecker = savedChecker;
             }
         }
     }
@@ -2641,6 +2669,7 @@ internal static class CompositionTests
         })
         {
             // 実際と同じく、辞書にない英単語 (website) はスペルチェッカーで見る
+            var savedChecker = Detector.SpellChecker;
             Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
             try
             {
@@ -2650,7 +2679,7 @@ internal static class CompositionTests
             }
             finally
             {
-                Detector.SpellChecker = null;
+                Detector.SpellChecker = savedChecker;
             }
         }
     }
@@ -2680,6 +2709,7 @@ internal static class CompositionTests
     public static void SpaceAroundEnglish_WhenTypingInTheCompositionBox()
     {
         // #248: 英数を使わず、変換ボックスの中で英語と日本語を判定して打っても、設定「英単語の前後に半角スペース」が効く
+        var savedChecker = Detector.SpellChecker;
         Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -2700,7 +2730,7 @@ internal static class CompositionTests
         }
         finally
         {
-            Detector.SpellChecker = null;
+            Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -2718,6 +2748,7 @@ internal static class CompositionTests
         // 英語の一覧 (english.txt) に ping・pong を足して、どちらでも ping のまま
         foreach (Detection.IWordChecker checker in new Detection.IWordChecker[] { Detection.BuiltInWordChecker.Shared, new PingIsWordChecker() })
         {
+            var savedChecker = Detector.SpellChecker;
             Detector.SpellChecker = checker;
             try
             {
@@ -2733,7 +2764,7 @@ internal static class CompositionTests
             }
             finally
             {
-                Detector.SpellChecker = null;
+                Detector.SpellChecker = savedChecker;
             }
         }
     }
