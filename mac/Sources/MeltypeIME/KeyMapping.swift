@@ -85,6 +85,17 @@ enum KeyMapping {
         return virtualKey(for: event)
     }
 
+    /// 本体 (meltype_handle_key) に渡す修飾キーのビット: Shift = 1・Control = 2・Option = 4・Command = 8。
+    /// Caps Lock・fn などほかの印は渡さない。
+    static func modifierBits(_ flags: NSEvent.ModifierFlags) -> Int32 {
+        var modifiers: Int32 = 0
+        if flags.contains(.shift) { modifiers |= 1 }
+        if flags.contains(.control) { modifiers |= 2 }
+        if flags.contains(.option) { modifiers |= 4 }
+        if flags.contains(.command) { modifiers |= 8 }
+        return modifiers
+    }
+
     static func virtualKey(for event: NSEvent) -> Int32? {
         switch Int(event.keyCode) {
         case kVK_Return, kVK_ANSI_KeypadEnter: return 0x0D

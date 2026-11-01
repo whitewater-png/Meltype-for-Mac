@@ -123,9 +123,17 @@ final class SuggestionHint {
     private func avoided(_ frame: NSRect) -> NSRect {
         let blocks = (obstacles?() ?? []).filter { !$0.isEmpty }
         guard blocks.contains(where: { $0.intersects(frame) }) else { return frame }
-        let all = blocks.dropFirst().reduce(blocks[0]) { $0.union($1) }
         let center = NSPoint(x: frame.midX, y: frame.midY)
         guard let screen = (NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main)?.visibleFrame else { return frame }
+        return Self.avoided(frame, blocks: blocks, screen: screen)
+    }
+
+    /// avoided(_:) の位置の計算だけ (画面・窓を見ない純粋な関数。`Meltype --self-test` で確かめる)。
+    /// blocks は避ける窓の枠、screen は収める範囲 (visibleFrame)。空の枠は無視する。
+    static func avoided(_ frame: NSRect, blocks: [NSRect], screen: NSRect) -> NSRect {
+        let blocks = blocks.filter { !$0.isEmpty }
+        guard blocks.contains(where: { $0.intersects(frame) }) else { return frame }
+        let all = blocks.dropFirst().reduce(blocks[0]) { $0.union($1) }
         let tries = [
             NSRect(x: all.maxX + 4, y: frame.minY, width: frame.width, height: frame.height),
             NSRect(x: frame.minX, y: all.maxY + 4, width: frame.width, height: frame.height),
