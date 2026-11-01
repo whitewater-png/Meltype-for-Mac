@@ -1191,6 +1191,22 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req005_Beep_StaysEnglish_AndBeeWordsDoNot()
+    {
+        // 本家 #1377: beep が べえp になる (be + e は読めるが、最後の p が残って日本語にも英語にも決まらない)。dictionaries/english.txt に足した。
+        // bee 始まりの日本語の読み (beeru) と、辞書にある beeper は変わらない。
+        foreach (var (typed, expected) in new[]
+        {
+            ("beep", "beep"), ("beep sound", "beep sound"), ("beep wo narasu", "beep をならす"), ("beeru", "べえる"), ("bee", "べえ"), ("beeper", "beeper"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
