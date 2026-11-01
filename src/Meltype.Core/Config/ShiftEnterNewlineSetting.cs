@@ -9,7 +9,11 @@ namespace Meltype.Config;
 /// </summary>
 internal static class ShiftEnterNewlineSetting
 {
-    private static readonly ConfigFlag Flag = new("Shift+Enter で確定して改行", true, s => s.ShiftEnterNewline, (s, on) => s.ShiftEnterNewline = on);
+    /// <summary>既定値 (ON)。config.json に項目が無い・読めないときの値で、FFI の入口 (Exports.cs) が例外のときに返す値もこれ。
+    /// 定数なので、読んでも型の初期化 (設定ファイルの場所の取得など) は起きない。</summary>
+    internal const bool Default = true;
+
+    private static readonly ConfigFlag Flag = new("Shift+Enter で確定して改行", Default, s => s.ShiftEnterNewline, (s, on) => s.ShiftEnterNewline = on);
 
     /// <summary>設定ファイルの場所。テストが差し替える。</summary>
     internal static Func<string> ConfigPath { get => Flag.ConfigPath; set => Flag.ConfigPath = value; }

@@ -67,17 +67,17 @@ public static unsafe class Exports
     [UnmanagedCallersOnly(EntryPoint = "meltype_abi_version")]
     public static int GetAbiVersion() => AbiVersion;
 
-    /// <summary>「変換後も続けて入力できる」が ON なら 1、OFF なら 0。入力メニューのチェック表示用。</summary>
+    /// <summary>「変換後も続けて入力できる」が ON なら 1、OFF なら 0。入力メニューのチェック表示用。例外のときは既定値 (OFF = 0)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_get_continue_after_conversion")]
-    public static int GetContinueAfterConversion() => Guard("「変換後も続けて入力できる」の取得", 0, () => Config.ContinueAfterConversionSetting.IsOn ? 1 : 0);
+    public static int GetContinueAfterConversion() => Guard("「変換後も続けて入力できる」の取得", Config.ContinueAfterConversionSetting.Default ? 1 : 0, () => Config.ContinueAfterConversionSetting.IsOn ? 1 : 0);
 
     /// <summary>「変換後も続けて入力できる」を切り替えて config.json に保存する。すべての入力欄にすぐ反映される。保存できたら 1、できなければ 0。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_continue_after_conversion")]
     public static int SetContinueAfterConversion(int on) => Guard("「変換後も続けて入力できる」の保存", 0, () => Config.ContinueAfterConversionSetting.Set(on != 0) ? 1 : 0);
 
-    /// <summary>「Shift+Enter で確定して改行」が ON なら 1、OFF なら 0。入力メニューのチェック表示用。既定は ON。</summary>
+    /// <summary>「Shift+Enter で確定して改行」が ON なら 1、OFF なら 0。入力メニューのチェック表示用。既定は ON で、例外のときも既定値 (1) を返す。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_get_shift_enter_newline")]
-    public static int GetShiftEnterNewline() => Guard("「Shift+Enter で確定して改行」の取得", 0, () => Config.ShiftEnterNewlineSetting.IsOn ? 1 : 0);
+    public static int GetShiftEnterNewline() => Guard("「Shift+Enter で確定して改行」の取得", Config.ShiftEnterNewlineSetting.Default ? 1 : 0, () => Config.ShiftEnterNewlineSetting.IsOn ? 1 : 0);
 
     /// <summary>「Shift+Enter で確定して改行」を切り替えて config.json に保存する。すべての入力欄にすぐ反映される。保存できたら 1、できなければ 0。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_shift_enter_newline")]

@@ -9,7 +9,11 @@ namespace Meltype.Config;
 /// </summary>
 internal static class ContinueAfterConversionSetting
 {
-    private static readonly ConfigFlag Flag = new("変換後も続けて入力", false, s => s.ContinueAfterConversion, (s, on) => s.ContinueAfterConversion = on);
+    /// <summary>既定値 (OFF)。config.json に項目が無い・読めないときの値で、FFI の入口 (Exports.cs) が例外のときに返す値もこれ。
+    /// 定数なので、読んでも型の初期化 (設定ファイルの場所の取得など) は起きない。</summary>
+    internal const bool Default = false;
+
+    private static readonly ConfigFlag Flag = new("変換後も続けて入力", Default, s => s.ContinueAfterConversion, (s, on) => s.ContinueAfterConversion = on);
 
     /// <summary>設定ファイルの場所。テストが差し替える。</summary>
     internal static Func<string> ConfigPath { get => Flag.ConfigPath; set => Flag.ConfigPath = value; }
