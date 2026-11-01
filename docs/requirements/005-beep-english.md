@@ -21,9 +21,9 @@ scope: dictionary
 - `beep` 以外の語の追加。
 
 ## 完成条件
-- [ ] 正解表 `eval/cases/short-words-in-english.tsv` に `beep`・`beep sound`・`beep wo narasu` と守る 3 行。実装前は `beep` 系 3 行が外れ、実装後は当たる
-- [ ] テスト `FeedbackTests.cs` の `Req005_Beep_StaysEnglish_AndBeeWordsDoNot`。実装前は赤
-- [ ] 回帰なし: eval-compare broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` エラー 0
+- [x] 正解表 `eval/cases/short-words-in-english.tsv` に `beep`・`beep sound`・`beep wo narasu` と守る 3 行。実装前は `beep` 系 3 行が外れ、実装後は当たる
+- [x] テスト `FeedbackTests.cs` の `Req005_Beep_StaysEnglish_AndBeeWordsDoNot`。実装前は赤
+- [x] 回帰なし: eval-compare broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` エラー 0
 
 ## Mac 実機チェックリスト (人が確かめる。すべて未確認)
 - [ ] TextEdit: `beep` + Enter → `beep`
@@ -36,3 +36,6 @@ scope: dictionary
 
 ## 記録
 - 定期タスクによる自動実行 (2026-11-01)。
+- 周回数 1 (査読 1 回、止める指摘なし)。査読員が境界例 50 件を base と比べ、変わったのは `beep` をそのまま含む打鍵 (`kyouhabeepga`・`nobeep`・`beep.` など) だけで、どれも base では `べえp`・`べえぺ` に崩れていた。`beepu`・`beppu`・`abeepo` など日本語として読める形は変わらない。
+- 結果: Core 1229/1229、eval-compare broken 0 / fixed 3、品質テストは base と同一。
+- `beepon` は `beep` を足した後も `べえぽん` のまま (本家の期待 `beep音` とは別。`beepu` と同じく日本語として読める形を優先)。`beeps`・`beeping`・`beeped` は崩れる (非目標。次の候補)。
