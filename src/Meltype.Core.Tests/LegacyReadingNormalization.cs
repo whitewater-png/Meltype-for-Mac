@@ -77,6 +77,36 @@ internal static class LegacyReadingNormalization
 
     public static string TermDomainsUserReading(string reading) => TermDictionaryNormalize(UserDictionaryNormalizeReading(reading));
 
+    /// <summary>集める前の TermDomains.NormalizeUserWord が返す理由 (入れられるなら null)。読みの検査のあと、1 行に書いて読み直せるかも見る。</summary>
+    public static string? TermDomainsNormalizeUserWordReason(string reading, string word)
+    {
+        var normalizedReading = TermDomainsUserReading(reading);
+        var normalizedWord = word.Trim();
+        if (UserDictionaryValidate(normalizedReading, normalizedWord) is { } invalid) return invalid;
+        // ファイルの 1 行に書いて、読み直したときに同じ語になること (TryParseLine と同じ決まり)
+        return TermDictionaryTryParseLine($"{normalizedReading}\t{normalizedWord}", out var r, out var w) && r == normalizedReading && w == normalizedWord
+            ? null
+            : "この語は専門用語集に入れられません。";
+    }
+
+    /// <summary>集める前の TermDictionary.TryParseLine (読み・語の部分。注記・強制の印は読み飛ばす)。</summary>
+    public static bool TermDictionaryTryParseLine(ReadOnlySpan<char> line, out string reading, out string word)
+    {
+        reading = word = "";
+        var first = line.IndexOf('\t');
+        if (first < 0) return false;
+        var rest = line[(first + 1)..];
+        var second = rest.IndexOf('\t');
+        var wordSpan = (second < 0 ? rest : rest[..second]).Trim();
+        var readingSpan = line[..first].Trim();
+        if (readingSpan.Length < UserDictionary.MinReadingLength || readingSpan.Length > UserDictionary.MaxLength) return false;
+        if (wordSpan.Length == 0 || wordSpan.Length > UserDictionary.MaxLength) return false;
+        if (wordSpan.IndexOfAny('\r', '\n') >= 0 || readingSpan.IndexOfAny('\r', '\n') >= 0) return false;
+        reading = TermDictionaryNormalize(readingSpan);
+        word = wordSpan.ToString();
+        return reading.Length >= UserDictionary.MinReadingLength;
+    }
+
     // ---- DictionaryManagement (集める前) ----
 
     private static readonly Lazy<Meltype.Detection.RomajiDetector> s_romaji = new(() => new Meltype.Detection.RomajiDetector());

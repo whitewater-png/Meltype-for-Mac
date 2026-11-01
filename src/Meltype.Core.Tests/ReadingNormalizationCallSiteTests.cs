@@ -89,11 +89,13 @@ internal static class ReadingNormalizationCallSiteTests
         foreach (var text in AllSingleChars().Select(c => "あ" + c).Concat(LegacyReadingNormalization.Samples))
         {
             var legacyReading = LegacyReadingNormalization.TermDomainsUserReading(text);
-            var legacyInvalid = LegacyReadingNormalization.UserDictionaryValidate(legacyReading, Word);
+            var legacyInvalid = LegacyReadingNormalization.TermDomainsNormalizeUserWordReason(text, Word);
             var invalid = TermDomains.NormalizeUserWord(text, Word, out var reading, out var word);
             Assert.Equal(legacyReading, reading, $"NormalizeUserWord の読み U+{Codes(text)}");
             Assert.Equal(Word, word);
-            if (legacyInvalid is not null) Assert.Equal(legacyInvalid, invalid, $"NormalizeUserWord の理由 U+{Codes(text)}");
+            // 入れられるかどうかと理由の文言は、どちらの側が null でも比べる (旧実装で通る読みに新実装が理由を返しても、その逆でも落ちる)
+            Assert.Equal(legacyInvalid is null, invalid is null, $"NormalizeUserWord で入れられるか U+{Codes(text)}: 旧={legacyInvalid ?? "null"} 新={invalid ?? "null"}");
+            Assert.Equal(legacyInvalid ?? "null", invalid ?? "null", $"NormalizeUserWord の理由 U+{Codes(text)}");
         }
     }
 
@@ -194,7 +196,8 @@ internal static class ReadingNormalizationCallSiteTests
             log.Add("check-except=" + (TermDomains.CheckUserWord(id, "abcケイ", "ABC系", ("ＡＢＣけい", "ABC系")) ?? "ok"));
             log.Add("update=" + (TermDomains.UpdateUserWord(id, ("ﾗｰﾒﾝ・ﾔ", "ラーメン屋"), "ラーメン・ヤ", "ラーメン屋") ?? "ok"));
             log.Add("update2=" + (TermDomains.UpdateUserWord(id, (" ラーメン・ヤ ", "ラーメン屋"), "ラーメン・ヤ", "らーめん屋") ?? "ok"));
-            log.Add("remove=" + (TermDomains.RemoveUserWords(id, [(" ＫＩＧＯＵ ", "記号")], out var removed) ?? "ok") + " removed=" + string.Join("|", removed.Select(r => $"{r.Index}:{r.Entry.Reading}:{r.Entry.Word}")));
+            // 消す側も追加と同じ深さでそろえる: 全角・大文字・カタカナ・前後の空白の読みで、保存済みの abcけい の行を消せる (ＫＩＧＯＵ は追加で弾かれたので消す行が無い)
+            log.Add("remove=" + (TermDomains.RemoveUserWords(id, [(" ＫＩＧＯＵ ", "記号"), (" ＡＢＣケイ ", "ABC系")], out var removed) ?? "ok") + " removed=" + string.Join("|", removed.Select(r => $"{r.Index}:{r.Entry.Reading}:{r.Entry.Word}")));
             log.Add("exclude=" + (TermDomains.SetExcluded([(" キゴウ ", "記号"), ("ＡＢＣケイ", "ABC系")], excluded: true) ?? "ok"));
 
             Assert.Equal(string.Join("\n", ExpectedTermLog), string.Join("\n", log), "操作の結果");
@@ -228,13 +231,64 @@ internal static class ReadingNormalizationCallSiteTests
         "check-except=ok",
         "update=元の語が見つかりません (ほかの画面で変更・削除された可能性があります)。一覧を読み直してください。",
         "update2=ok",
-        "remove=ok removed=",
+        "remove=ok removed=1:abcけい:ABC系",
         "exclude=ok",
     ];
 
-    private const string ExpectedTermFile = "# 名称: R3\n# 出典: 自作\n# 作成: *\n# 1 行に「読み<Tab>語」(3 つ目の欄は注記。省略できます)。「Meltype 辞書」の画面で作った専門用語集です。\nきごう\t記号\tメモ\nabcけい\tABC系\nゔぁいおりん\tバイオリン\nらーめん・や\tらーめん屋\nゕげつ\tか月\n";
+    private const string ExpectedTermFile = "# 名称: R3\n# 出典: 自作\n# 作成: *\n# 1 行に「読み<Tab>語」(3 つ目の欄は注記。省略できます)。「Meltype 辞書」の画面で作った専門用語集です。\nきごう\t記号\tメモ\nゔぁいおりん\tバイオリン\nらーめん・や\tらーめん屋\nゕげつ\tか月\n";
 
     private const string ExpectedExcludedFile = "# Meltype 専門用語集で使わない語 (「Meltype 辞書」の画面で除外したもの): 1 行に「読み<Tab>語」\nabcけい\tABC系\nきごう\t記号\n";
+
+    /// <summary>
+    /// 専門用語集の「編集」(DictionaryManagement.EditTerm): 読みも語も変えていないかは専門用語集の深さ (全角→半角・大文字→小文字まで) で比べる。
+    /// 大文字・全角の違いだけなら「変えていない」なので、元の語を除外しない (ユーザー辞書への複製だけ)。
+    /// </summary>
+    [Test]
+    public static void DictionaryManagement_EditTerm_ComparesAtTermDictionaryDepth()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "meltype-r3-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var previousConfig = TermDomains.ConfigPath;
+        var previousExclusion = TermDomains.ExclusionPath;
+        var previousSource = TermDomains.Source;
+        var previousInterval = TermDomains.ExternalCheckIntervalMs;
+        TermDomains.ConfigPath = () => Path.Combine(directory, "config.json");
+        TermDomains.ExclusionPath = () => Path.Combine(directory, "terms-excluded.txt");
+        TermDomains.Source = () => [("civil", () => "abcけい\tABC系\n")];
+        TermDomains.ExternalCheckIntervalMs = 0;
+        TermDomains.Reset();
+        try
+        {
+            var gui = new UserDictionary(Path.Combine(directory, "userdict.txt"), builtIn: false);
+            string Excluded() => string.Join("|", TermDomains.Excluded().Select(e => $"{e.Reading}:{e.Word}"));
+            var log = new List<string>();
+            // 編集後の読みが大文字・カタカナ・前後の空白 (元は半角小文字)
+            log.Add("upper=" + (DictionaryManagement.EditTerm(gui, new UserWord("abcけい", "ABC系"), " ABCケイ ", "ABC系", out var added) ?? "ok") + $" added={added} excluded={Excluded()}");
+            // 元の語の読みが全角大文字 (編集後は半角小文字)
+            log.Add("fullwidth=" + (DictionaryManagement.EditTerm(gui, new UserWord(" ＡＢＣけい ", "ABC系"), "abcけい", "ABC系", out added) ?? "ok") + $" added={added} excluded={Excluded()}");
+            // 対照: 語を変えたら元の語を除外する (除外の一覧に書ける構成であることの確認)
+            log.Add("changed=" + (DictionaryManagement.EditTerm(gui, new UserWord("abcけい", "ABC系"), "ABCけい", "ABC形", out added) ?? "ok") + $" added={added} excluded={Excluded()}");
+            log.Add("words=" + string.Join("|", gui.Words.Select(w => $"{w.Reading}:{w.Word}")));
+            Assert.Equal(string.Join("\n", ExpectedEditTermLog), string.Join("\n", log), "操作の結果");
+        }
+        finally
+        {
+            TermDomains.ConfigPath = previousConfig;
+            TermDomains.ExclusionPath = previousExclusion;
+            TermDomains.Source = previousSource;
+            TermDomains.ExternalCheckIntervalMs = previousInterval;
+            TermDomains.Reset();
+            try { Directory.Delete(directory, recursive: true); } catch { }
+        }
+    }
+
+    private static readonly string[] ExpectedEditTermLog =
+    [
+        "upper=ok added=True excluded=",
+        "fullwidth=ok added=True excluded=",
+        "changed=ok added=True excluded=abcけい:ABC系",
+        "words=ABCけい:ABC系|abcけい:ABC系|ABCけい:ABC形",
+    ];
 
     private static string Codes(string text) => string.Join(" ", text.Select(c => ((int)c).ToString("X4")));
 
