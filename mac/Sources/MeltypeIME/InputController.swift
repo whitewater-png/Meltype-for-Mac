@@ -192,12 +192,7 @@ final class MeltypeInputController: IMKInputController {
         // 矢印・Home などの機能キーの characters は Unicode 私用領域の文字 (U+F700〜U+F8FF。右矢印は U+F703) なので、文字としては渡さない。
         // 渡すと英数字だけの変換ボックス (「2」など) で矢印がその文字を変換ボックスに足し、Google ドキュメントが変換中の範囲を広げて後ろの文字を消す。
         let character: Int32 = utf16.count == 1 && !(0xF700...0xF8FF).contains(utf16[0]) ? Int32(utf16[0]) : 0
-        let flags = event.modifierFlags
-        var modifiers: Int32 = 0
-        if flags.contains(.shift) { modifiers |= 1 }
-        if flags.contains(.control) { modifiers |= 2 }
-        if flags.contains(.option) { modifiers |= 4 }
-        if flags.contains(.command) { modifiers |= 8 }
+        let modifiers = KeyMapping.modifierBits(event.modifierFlags)
 
         // 辞書の管理画面 (Meltype 辞書) の登録シートでは、入力中の Tab は「次の欄へ」の意味なので、未確定の文字をそのまま確定してからアプリに渡す
         // (ふつうのアプリでは Tab は予測候補・格子に使うので変えない)。

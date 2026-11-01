@@ -409,13 +409,16 @@ final class NativeCore {
     func suggestions(_ session: UnsafeMutableRawPointer?) -> [(reading: String, word: String)] {
         guard isCompatible, let pointer = suggestionsFunction?(session) else { return [] }
         defer { freeFunction?(pointer) }
-        let pairs: [(reading: String, word: String)] = String(cString: pointer)
-            .split(separator: "\n", omittingEmptySubsequences: true)
+        return Self.parseSuggestions(String(cString: pointer))
+    }
+
+    /// meltype_suggestions の文字列 (「読み\t語」を改行でつないだもの) を読む。Tab の無い行は飛ばす。
+    static func parseSuggestions(_ text: String) -> [(reading: String, word: String)] {
+        text.split(separator: "\n", omittingEmptySubsequences: true)
             .compactMap { (line: Substring) -> (reading: String, word: String)? in
                 let parts = line.split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false)
                 return parts.count == 2 ? (String(parts[0]), String(parts[1])) : nil
             }
-        return pairs
     }
 
     /// 提案を受けてユーザー辞書に登録し、提案待ちから消す。登録できなければ理由を返し、できたら nil。
@@ -504,7 +507,12 @@ final class NativeCore {
     var showCandidateMeanings: Bool {
         guard isCompatible, let settingsGetFunction, let pointer = settingsGetFunction() else { return true }
         defer { freeFunction?(pointer) }
-        guard let object = try? JSONSerialization.jsonObject(with: Data(String(cString: pointer).utf8)) as? [String: Any],
+        return Self.showCandidateMeanings(settingsJson: String(cString: pointer))
+    }
+
+    /// meltype_settings_get の JSON から ShowCandidateMeanings の値を読む。読めない・項目が無いときは本体の既定 (ON) と同じ true。
+    static func showCandidateMeanings(settingsJson: String) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: Data(settingsJson.utf8)) as? [String: Any],
               let items = object["items"] as? [[String: Any]],
               let item = items.first(where: { $0["key"] as? String == "ShowCandidateMeanings" }),
               let value = item["value"] as? Bool else { return true }
@@ -524,8 +532,12 @@ final class NativeCore {
     var termDomains: [TermDomain] {
         guard isCompatible, let pointer = termDomainsFunction?() else { return [] }
         defer { freeFunction?(pointer) }
-        return String(cString: pointer)
-            .split(separator: "\n", omittingEmptySubsequences: true)
+        return Self.parseTermDomains(String(cString: pointer))
+    }
+
+    /// meltype_term_domains の文字列 (1 行 = ID・名称・語数・有効か・自作か を Tab で区切ったもの) を読む。
+    static func parseTermDomains(_ text: String) -> [TermDomain] {
+        text.split(separator: "\n", omittingEmptySubsequences: true)
             .compactMap { (line: Substring) -> TermDomain? in
                 let parts = line.split(separator: "\t", omittingEmptySubsequences: false)
                 // 5 つ目の欄 (自作なら 1) は、このメニューでは使わない。欄が増えても読めるよう、4 つ以上あればよい。
@@ -573,11 +585,16 @@ final class NativeCore {
         defer { freeFunction?(pointer) }
         let json = Data(bytes: pointer, count: strlen(pointer))
         do {
-            return try JSONDecoder().decode(SessionResult.self, from: json)
+            return try Self.decodeResult(json)
         } catch {
             NSLog("Meltype: 結果を読めませんでした: %@", String(describing: error))
             return nil
         }
+    }
+
+    /// 本体の結果の JSON (SessionResult.ToJson) を読む。形が合わなければ投げる。
+    static func decodeResult(_ json: Data) throws -> SessionResult {
+        try JSONDecoder().decode(SessionResult.self, from: json)
     }
 
     private func withOptionalCString<R>(_ text: String?, _ body: (UnsafePointer<CChar>?) -> R) -> R {
