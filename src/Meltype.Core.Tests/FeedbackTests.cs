@@ -1195,6 +1195,9 @@ internal static class RomajiTypoTests
     {
         // 本家 #1377: beep が べえp になる (be + e は読めるが、最後の p が残って日本語にも英語にも決まらない)。dictionaries/english.txt に足した。
         // bee 始まりの日本語の読み (beeru) と、辞書にある beeper は変わらない。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
         foreach (var (typed, expected) in new[]
         {
             ("beep", "beep"), ("beep sound", "beep sound"), ("beep wo narasu", "beep をならす"), ("beeru", "べえる"), ("bee", "べえ"), ("beeper", "beeper"),
@@ -1204,6 +1207,8 @@ internal static class RomajiTypoTests
             k.Type(typed + "\n");
             Assert.Equal(expected, k.Host.Document, typed);
         }
+        }
+        finally { CompositionTests.Detector.SpellChecker = null; }
     }
 
     [Test]
