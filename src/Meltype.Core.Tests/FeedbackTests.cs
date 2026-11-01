@@ -23,6 +23,7 @@ internal static class FeedbackTests
     private static string? TypeWithSpellChecker(string typed, DetectionLevel level = DetectionLevel.Balanced)
     {
         if (TestSupport.WordChecker is not { IsAvailable: true } checker) return null;
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = checker;
         try
         {
@@ -32,7 +33,7 @@ internal static class FeedbackTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -72,6 +73,7 @@ internal static class FeedbackTests
         // 記号入りの名前の規則は「入力全体が 英字 1 文字ずつを . でつないだ略語」か「大文字で始まり、語の中に $ がある名前」のときだけ。
         // 日本語としてよく打つ . や $ (数字・単位・ドメイン・文の終わり・語末の $) と、前後に日本語が続く形は今までの判定のまま。
         // 期待値は変更前の Core の答え (スペルチェッカーは同梱の英単語表)。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -100,7 +102,7 @@ internal static class FeedbackTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -141,6 +143,7 @@ internal static class FeedbackTests
         // 辞書だけで決まるように、スペルチェッカー無しと、同梱の英単語表 (BuiltInWordChecker。--repro と同じ) の両方で確かめる。
         foreach (var checker in new Detection.IWordChecker?[] { null, Detection.BuiltInWordChecker.Shared })
         {
+            var savedChecker = CompositionTests.Detector.SpellChecker;
             CompositionTests.Detector.SpellChecker = checker;
             try
             {
@@ -168,7 +171,7 @@ internal static class FeedbackTests
             }
             finally
             {
-                CompositionTests.Detector.SpellChecker = null;
+                CompositionTests.Detector.SpellChecker = savedChecker;
             }
         }
     }
@@ -188,6 +191,7 @@ internal static class FeedbackTests
     {
         // 日本語の語と同じ綴り (kimi = きみ、sora = そら、haiku = はいく、yi = い) や、打ち間違いの直し (olmo = omo の o の隣の l、molmo = momo) で
         // 日本語になる綴りは辞書に入れない (入れると、日本語を打ったのに英字で確定する)。大文字で始めれば辞書が無くても英字。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -203,7 +207,7 @@ internal static class FeedbackTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -214,6 +218,7 @@ internal static class FeedbackTests
         // 日本語の語の末尾が、辞書の語の頭と同じ綴りになる語 (〜みに = mini、〜ねも = nemo、あうと = auto、あいで = aide) は
         // 表示が崩れるので、その頭を持つ語 (MiniMax・Ministral・Nemotron・AutoGPT・AutoGen・Aider・Manus) は辞書に入れなかった。
         // 入れたときに表示も確定も変わらないことを、今の答えで固定する。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -237,7 +242,7 @@ internal static class FeedbackTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -669,6 +674,7 @@ internal static class LanguageLearningTests
         // kyouhameetinggaarimasu が きょうはめえちんっがあります になっていた (meeting の g が が とつながって っが)。
         // また、表示では きょうはmeetingです なのに、確定したら打ち間違いとして g を直されて めえちんがです になっていた。
         // meeting を英単語と知るのに、スペルチェッカー (Windows) か同梱の英単語の一覧 (Mac・Linux) を使う。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = TestSupport.WordChecker is { IsAvailable: true } checker ? checker : Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -685,7 +691,7 @@ internal static class LanguageLearningTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -817,6 +823,7 @@ internal static class LanguageLearningTests
     public static void TesterReports_20261003()
     {
         // テスターの報告 (2026-10-03): これあれか、開きの記号の全角、Ah!、swingin'、a / u / r
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = TestSupport.WordChecker is { IsAvailable: true } checker ? checker : Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -875,7 +882,7 @@ internal static class LanguageLearningTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -884,6 +891,7 @@ internal static class LanguageLearningTests
     {
         // 日本語の後ろの u + ni + t (そう|u|ni|t の unit) で、t と s が つ にならず英単語 unit になっていた (sounitsuite が そunitsuite。
         // 古いブランチ e8fbc64 の修正の移植、本家 7a20aff)。英単語 + する (commitする・editする) と、入力の先頭・英文の中の unit は今までどおり
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = TestSupport.WordChecker is { IsAvailable: true } checker ? checker : Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -902,7 +910,7 @@ internal static class LanguageLearningTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -955,6 +963,10 @@ internal static class LanguageLearningTests
     [Test]
     public static void F6_TeachesJapanese()
     {
+        // スペルチェッカー無しで試す (F6 で覚えた「日本語」が次の打鍵で効く仕組みを守る)。本番と同じくスペルチェッカーがあると、
+        // 覚えたあとの google の表示が ごogle になる (ogle を英単語と答えるため。go|ogle に切れる)。製品の不具合の可能性として
+        // 記録済みで、ここでは直さない。直したら、このスコープを外して本番の構成で同じ期待値を確かめる。
+        using var noChecker = CompositionTests.WithoutSpellChecker();
         var memory = new LanguageMemory(null);
         CompositionTests.Detector.Memory = memory;
         try
@@ -1089,6 +1101,7 @@ internal static class RomajiTypoTests
     public static void RomajiTypos_LoneKanaThenStrayConsonant_DoesNotTouchEnglishOrOtherFixes()
     {
         // Q1 の規則 (前が 1 音だけなら消さない) が、英単語・略語・ほかの打ち間違いの直しを変えない
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -1113,7 +1126,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -1124,6 +1137,7 @@ internal static class RomajiTypoTests
         // 既知の限界: 前が 2 音以上で、最後が 1 文字の付属語 (ば・は・た) で終わるものは、z・q が今も消える
         // (foobaz → ふぉおば、kyouhaz → きょうは)。直すと tabetaz → たべた のような本物の打ち間違いの補正も失われるので、直していない。
         // 将来この限界を塞ぐ・広げるときに赤になるよう、現在の答えを固定する
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -1140,7 +1154,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -1150,6 +1164,7 @@ internal static class RomajiTypoTests
         // 本家 #411: 英語を打つつもりの change が ちゃんげ になる (これは change してほしい → これはちゃんげしてほしい)。
         // change・chance・before・season などは、ローマ字として最後まで読めて日本語の語にならず、英語の中でよく使う語なので、
         // dictionaries/english-readable.txt に入れて、日本語の文の中でも英字にする。BuiltIn の英単語表で確かめる (NSSpellChecker でも同じ答えになることは別に比べた)。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -1170,7 +1185,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -1196,6 +1211,7 @@ internal static class RomajiTypoTests
         // english-readable.txt に語を足したとき、日本語の語の中・前後に偶然その綴りが現れても日本語のままであること。
         // 下の入力は、足す語を選ぶときに readings.txt のローマ字 (単独・助詞つき・語の組み合わせ) と辞書の説明文のローマ字で悪化した形 (ride・shade・nine・gone・note・mouse など)。
         // 助詞と同じ綴りで始まる・終わる語 (note・mouse・nine・side・code・line・white) は、日本語の語と区別できないので入れていない。今の答えを固定する (限界)。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -1224,7 +1240,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -1251,6 +1267,7 @@ internal static class RomajiTypoTests
         // P34 の補足 (査読 R6): 記号入りの名前の規則は「空白で区切った 1 語が名前の形のとき」だけ働く。
         // 名前の直後に記号が付く形 (Ke$ha, / (B.o.B) / U.S.A.,) は効かず、変更前の崩れた答えのまま (本家 PR #315 の正規表現も入力全体に当てる形で、同じ制限)。
         // 広げるときに赤になるよう、現在の答えを固定する。空白で区切った文の中では名前になる
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -1274,7 +1291,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -1338,6 +1355,7 @@ internal static class RomajiTypoTests
         // 本家 c6b281e (#69): v を含むスペルチェッカーの 5 文字以上の英単語は、ゔぃ と読める綴りでも英語 (いんviteしました になっていた)。
         // 本家のままだと de|vote (= devote) も 1 語の英語になり、githubdevote が githubでvote でなく githubdevote になる。
         // 助詞 + 英単語 とも読める語は今までどおり (devotewo = でゔぉてを も変わらない。既知の限界として固定する)。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -1356,7 +1374,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -1373,6 +1391,7 @@ internal static class RomajiTypoTests
         // 実機 (2026-10-16): deriveyadevote が でりゔぇやでvote になった。#69 の守り (助詞 + 英単語) が残りの rive を
         // スペルチェッカーに聞き、実機の NSSpellChecker は rive を英単語と答えるので、derive が de|rive として日本語に戻っていた。
         // 守りは同梱の表だけで見る。rive を英単語と答えるスペルチェッカーでも derive は英語のまま、de|vote の守りは今までどおり。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = new RiveIsWordChecker();
         try
         {
@@ -1391,7 +1410,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -1414,6 +1433,7 @@ internal static class RomajiTypoTests
         // (dochira|mo|user) が残りの rive をスペルチェッカーに聞き、実機の NSSpellChecker は rive を英単語と答えるので、
         // derive が de|rive として分かれていた。区間全体が同梱の一覧の語なら、守りは残りが同梱の表の語のときだけ分ける
         // (#69 の守りと同じ表)。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = new FragmentsAreWordsChecker();
         try
         {
@@ -1437,7 +1457,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -1458,6 +1478,7 @@ internal static class RomajiTypoTests
         // スペルチェッカー起因の実機だけの外れ (2026-10-16、T1): overdesu が英字のまま、emailto が えmailto、candidatedesu が かndidatedeす。
         // 見つけた英語の区間 (over) の途中から始まって後ろの日本語にはみ出す長い語 (o|verde|su) を NSSpellChecker が英単語と答え、
         // 見つけた区間を捨てていた。見つけた区間が同梱の一覧の語で、長い語が「区間の後ろの部分 + 助詞 1 つ」で同梱の一覧に無い語なら、それでは捨てない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = new TailFragmentsAreWordsChecker();
         try
         {
@@ -1483,7 +1504,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 
@@ -1500,6 +1521,7 @@ internal static class RomajiTypoTests
         // スペルチェッカー起因の実機だけの外れ (2026-10-16、H1 の一部): kyoumolike が きょumolいけ。l を小書き (ぃ) にしない守り
         // (EndsWithEnglishWordFromUnit) が、英字の並びの途中の単位から始まる umol をスペルチェッカーに聞き、l を英字に残していた。
         // 英字の並びの途中にある母音 1 つの単位 (kyo|u) から始まる語は、同梱の一覧だけで見る。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = new MidSoundWordsChecker();
         try
         {
@@ -1522,7 +1544,7 @@ internal static class RomajiTypoTests
         }
         finally
         {
-            CompositionTests.Detector.SpellChecker = null;
+            CompositionTests.Detector.SpellChecker = savedChecker;
         }
     }
 }
