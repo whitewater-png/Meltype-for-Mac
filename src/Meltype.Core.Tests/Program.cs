@@ -10,6 +10,7 @@ namespace Meltype.Tests;
 ///   dotnet run --project src/Meltype.Core.Tests -- --eval       … 品質テストの正解率と外れた例
 ///   dotnet run --project src/Meltype.Core.Tests -- --expect-all eval/cases out.json … 正解表 (eval/cases/*.tsv) の判定結果
 ///   dotnet run --project src/Meltype.Core.Tests -- --explain konnichiwa hello … 1 文字ずつの判定理由
+///   dotnet run --project src/Meltype.Core.Tests -- --self-check   … テストランナー自身の検査 (取りこぼしが FAIL になるか)
 /// Windows では src/Meltype.Tests から実行すると、Windows のスペルチェッカーを使い、Windows 専用のテストもまとめて流す。
 /// </summary>
 internal static class Program
@@ -78,6 +79,9 @@ internal static class Program
                 if (Environment.GetEnvironmentVariable("MELTYPE_UTF8") == "1") Console.OutputEncoding = new System.Text.UTF8Encoding(false);
                 TestHost.Explain(args.Skip(1));
                 return 0;
+            case "--self-check":
+                // テストランナー自身の検査 (static でない・引数つきの [Test]、0 件一致、呼び出しの失敗が FAIL として数えられるか)
+                return RunnerSelfCheck.Run();
             default:
                 return TestHost.Run([typeof(Program).Assembly], args.FirstOrDefault());
         }
