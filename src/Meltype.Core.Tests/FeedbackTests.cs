@@ -1197,7 +1197,7 @@ internal static class RomajiTypoTests
         // pure・purege など pre を単独で含まない打鍵と、preview・pre-release は変わらない。
         foreach (var (typed, expected) in new[]
         {
-            ("pre", "pre"), ("prenoerror", "preのerror"), ("pure", "ぷれ"), ("purege", "ぷれげ"), ("preview", "preview"), ("pre-release", "pre-release"),
+            ("pre", "pre"), ("pre wo", "pre を"), ("prenoerror", "preのerror"), ("pure", "ぷれ"), ("purege", "ぷれげ"), ("preview", "preview"), ("pre-release", "pre-release"),
         })
         {
             var k = new CompositionTests.Keyboard();

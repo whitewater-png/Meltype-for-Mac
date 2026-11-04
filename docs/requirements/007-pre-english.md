@@ -18,7 +18,7 @@ scope: dictionary
 
 ## minimum の要件
 1. `pre` と打って Enter で確定すると `pre` になる。
-2. `pure`・`purege`・`pretty`・`preview`・`pre-release` など、`pre` を単独で含まない打鍵の判定は変わらない。
+2. `pure`・`purege`・`pretty`・`preview`・`pre-release` など、日本語として読める形と `pre` を含む英単語の判定は変わらない。例外として、`ka` + `pre` の打ち間違いの直し (`kapre` → `かおれ`) は効かなくなり `かpre` になる (査読で確認。`kaprega` ほか 9 形。受け入れる)。
 
 ## 非目標
 - `pre` 以外の語の追加。
@@ -40,3 +40,4 @@ scope: dictionary
 
 ## 記録
 - 定期タスクによる自動実行 (2026-11-04)。
+- 査読 1 周 (止める指摘なし)。境界例約 130 件を base と比べた。`prekana` は `pれかな` → `prekana` (かなの部分も英字になる)。`presu`・`prege` などは崩れ方が変わるだけ。`pre` を打ち間違いの直しの対象に加えることはしていない。
