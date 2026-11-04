@@ -1191,6 +1191,22 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req007_Pre_StaysEnglish_AndJapaneseSpellingsAroundItDoNot()
+    {
+        // 本家 #1489: pre が pれ になる (p が単独で残り、日本語にも英語にも決まらない)。dictionaries/english.txt の技術用語に足した。
+        // pure・purege など pre を単独で含まない打鍵と、preview・pre-release は変わらない。
+        foreach (var (typed, expected) in new[]
+        {
+            ("pre", "pre"), ("prenoerror", "preのerror"), ("pure", "ぷれ"), ("purege", "ぷれげ"), ("preview", "preview"), ("pre-release", "pre-release"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
