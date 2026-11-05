@@ -31,7 +31,7 @@ scope: dictionary
 - [x] 文書: `docs/KNOWN_LIMITS.md` に iCloud・iTunes の記載なし (grep で確認)。直すものなし
 
 ## Mac 実機チェックリスト (人が確かめる。すべて未確認)
-- [ ] TextEdit: `iCloud` + Enter → `iCloud`
+- [x] TextEdit: `iCloud` + Enter → `iCloud` … リョウさんの実機 (2026-11-05。「1～3＞OK」の一括報告で、項目ごとの記録は無い)
 - [ ] ターミナル (zsh): `iTunes` + Enter → `iTunes`
 - [ ] TextEdit: `ichi` → いち (変わらない)
 

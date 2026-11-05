@@ -26,7 +26,7 @@ scope: dictionary
 - [x] 回帰なし: eval-compare broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` エラー 0
 
 ## Mac 実機チェックリスト (人が確かめる。すべて未確認)
-- [ ] TextEdit: `beep` + Enter → `beep`
+- [x] TextEdit: `beep` + Enter → `beep` … リョウさんの実機 (2026-11-05。「1～3＞OK」の一括報告で、項目ごとの記録は無い)
 - [ ] ターミナル (zsh): `beep sound` → `beep sound`
 - [ ] TextEdit: `beeru` → べえる (変わらない)
 - [ ] ChatGPT (ブラウザー): `beepon` + Enter の見え方 (期待は `beep音`。Core では測れない)
