@@ -1212,6 +1212,22 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req008_ICloud_ITunes_StayEnglish_AndJapaneseISpellingsDoNot()
+    {
+        // 本家 #1530: iCloud が いCloud になる (i が読めて残りが英字)。dictionaries/propernouns.txt の Apple 製品名の行に iCloud・iTunes を足した。
+        foreach (var (typed, expected) in new[]
+        {
+            ("iCloud", "iCloud"), ("iTunes", "iTunes"), ("iCloud wo", "iCloud を"), ("iCloudnoerror", "iCloudのerror"),
+            ("iPhone", "iPhone"), ("ichi", "いち"), ("ikou", "いこう"), ("iCloudnihozon", "iCloudにほぞん"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
