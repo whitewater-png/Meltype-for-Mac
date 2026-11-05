@@ -28,7 +28,7 @@ scope: dictionary
 - [x] 正解表: `eval/cases/short-words-in-english.tsv` に `iCloud`・`iTunes`・`iCloud wo tsukau`・`iCloudnoerror` と守る行 (`ichi`・`ikou`・`iPhone`・`iCloudnihozon`) を足す。実装前は外れ、実装後は当たる
 - [x] テスト: `FeedbackTests.cs` に `Req008_ICloud_ITunes_StayEnglish_AndJapaneseISpellingsDoNot`。実装前は赤
 - [x] 回帰なし: eval-compare の broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` が通る
-- [ ] 文書: `docs/KNOWN_LIMITS.md` に該当の記載があれば直す
+- [x] 文書: `docs/KNOWN_LIMITS.md` に iCloud・iTunes の記載なし (grep で確認)。直すものなし
 
 ## Mac 実機チェックリスト (人が確かめる。すべて未確認)
 - [ ] TextEdit: `iCloud` + Enter → `iCloud`
@@ -40,3 +40,4 @@ scope: dictionary
 
 ## 記録
 - 定期タスクによる自動実行 (2026-11-05)。
+- 査読 1 周 (止める指摘なし)。境界例 100 件を base と比較。日本語側で変わったのは「…tunes / …icloud で打ち終えてすぐ Enter」の 8 件だけ (`kitunes` きつね → きつねs、`haitunes` はいつね → はitunes、`haicloud` はいcloud → はicloud など)。後ろに 1 文字でも続けば base と同じ。受け入れる。

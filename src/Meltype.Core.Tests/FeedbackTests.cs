@@ -1193,7 +1193,7 @@ internal static class RomajiTypoTests
     [Test]
     public static void Req008_ICloud_ITunes_StayEnglish_AndJapaneseISpellingsDoNot()
     {
-        // 本家 #1530: iCloud が いCloud になる (i が読めて残りが英字)。dictionaries/english.txt の製品名の行に icloud・itunes を足した。
+        // 本家 #1530: iCloud が いCloud になる (i が読めて残りが英字)。dictionaries/propernouns.txt の Apple 製品名の行に iCloud・iTunes を足した。
         foreach (var (typed, expected) in new[]
         {
             ("iCloud", "iCloud"), ("iTunes", "iTunes"), ("iCloud wo", "iCloud を"), ("iCloudnoerror", "iCloudのerror"),
