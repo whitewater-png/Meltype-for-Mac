@@ -58,4 +58,29 @@ internal static class CalculatorTests
         Assert.Equal("0", Calculator.Evaluate("0*-1"));
         Assert.Equal("0", Calculator.Evaluate("-0"));
     }
+    [Test]
+    public static void Evaluate_Power()
+    {
+        // 要件 006 (本家 #1403): ^ はべき乗。右結合で、* / より先、単項の - より先。
+        Assert.Equal("1024", Calculator.Evaluate("2^10"));
+        Assert.Equal("1024", Calculator.Evaluate("2^10="), "= つき");
+        Assert.Equal("8", Calculator.Evaluate("(1+1)^3"), "括弧");
+        Assert.Equal("1024", Calculator.Evaluate("２＾１０"), "全角");
+        Assert.Equal("512", Calculator.Evaluate("2^3^2"), "右結合 (2^(3^2))");
+        Assert.Equal("-4", Calculator.Evaluate("-2^2"), "単項の - より先 (-(2^2))");
+        Assert.Equal("4", Calculator.Evaluate("(-2)^2"), "括弧の中の負の数");
+        Assert.Equal("0.5", Calculator.Evaluate("2^-1"), "負の指数");
+        Assert.Equal("13", Calculator.Evaluate("1+3*2^2"), "* より先");
+        Assert.Equal("1.4142135624", Calculator.Evaluate("2^0.5"), "小数の指数");
+        Assert.Equal("100000000000000", Calculator.Evaluate("10^14"), "1e14 は出せる");
+        Assert.Equal("95367431640625", Calculator.Evaluate("5^20"), "本家 #1403 の例 (約 95 兆) は上限 1e15 の内側なので出す");
+    }
+
+    [Test]
+    public static void Evaluate_Power_RejectsHugeAndInvalid()
+    {
+        // 途中の値でも 1e15 以上・実数でない・無限大になるべき乗は出さない (固まらない・表示を崩さない)。
+        foreach (var text in new[] { "5^25", "10^15", "10^100", "10^100/10^90", "9^9^9", "(-8)^0.5", "0^-1", "^^", "^_^", "3^", "^3", "2^^3", "2^(1" })
+            Assert.True(Calculator.Evaluate(text) is null, text + " は null: " + Calculator.Evaluate(text));
+    }
 }

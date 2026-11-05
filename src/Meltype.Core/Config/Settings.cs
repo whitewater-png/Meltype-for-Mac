@@ -256,7 +256,7 @@ public sealed class Settings
     public bool TranslationCandidates { get; set; } = true;
 
     [Category("1. 全般"), DisplayName("計算式を変換すると結果を候補に出す"),
-     Description("数字と + - * / ( ) だけの式を打って Space で変換すると、計算した結果 (1+2*3 → 7) と「式=結果」を候補に出します。")]
+     Description("数字と + - * / ^ ( ) だけの式を打って Space で変換すると、計算した結果 (1+2*3 → 7、2^10 → 1024) と「式=結果」を候補に出します。")]
     public bool CalculatorCandidates { get; set; }
 
     [Category("1. 全般"), DisplayName("子音の略入力を候補に出す"),

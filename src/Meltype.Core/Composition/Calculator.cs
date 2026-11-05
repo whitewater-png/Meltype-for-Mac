@@ -5,15 +5,15 @@ using System.Globalization;
 namespace Meltype.Composition;
 
 /// <summary>
-/// 数字と + - * / ( ) だけの式を計算する (変換の候補に結果を出す。本家 #796)。
-/// 式として読めない・0 で割る・桁が大きすぎるときは null。外部の入力を実行しないよう、四則演算だけを自前で読む。
+/// 数字と + - * / ^ ( ) だけの式を計算する (変換の候補に結果を出す。本家 #796。^ は要件 006・本家 #1403)。
+/// 式として読めない・0 で割る・桁が大きすぎるときは null。外部の入力を実行しないよう、四則演算とべき乗だけを自前で読む。
 /// </summary>
 public static class Calculator
 {
     private const int MaxLength = 80;
 
     /// <summary>式 (末尾の = は除く) を計算した結果の文字列。演算子を 1 つも含まなければ null。
-    /// = で終わらない式は、- 以外の二項演算子 (+ * /) を含むか - が 1 個のときだけ受ける (日付・電話番号を式にしない。Q24)。</summary>
+    /// = で終わらない式は、- 以外の二項演算子 (+ * / ^) を含むか - が 1 個のときだけ受ける (日付・電話番号を式にしない。Q24)。</summary>
     public static string? Evaluate(string expression)
     {
         var trimmed = expression.Trim();
@@ -21,14 +21,14 @@ public static class Calculator
         // 本家は半角の数字だけ。Mac では全角の数字 (１＋２) も受ける (本家の式が null だった入力だけが対象なので、既存の結果は変わらない)。
         var text = new string(trimmed.TrimEnd('=').Select(c => c switch
         {
-            '×' => '*', '÷' => '/', '＋' => '+', '－' => '-',
+            '×' => '*', '÷' => '/', '＋' => '+', '－' => '-', '＾' => '^',
             >= '０' and <= '９' => (char)(c - '０' + '0'),
             _ => c,
         }).ToArray()).Replace(" ", "");
-        if (text.Length is 0 or > MaxLength || !text.Any(c => c is '+' or '-' or '*' or '/') || !text.Any(char.IsAsciiDigit)) return null;
+        if (text.Length is 0 or > MaxLength || !text.Any(c => c is '+' or '-' or '*' or '/' or '^') || !text.Any(char.IsAsciiDigit)) return null;
         // - だけが演算子の列 (2026-10-27、03-1234-5678) は日付・電話番号のことが多いので、= で終わらなければ - が 2 個以上なら式としない。
-        if (!endsWithEquals && !text.Any(c => c is '+' or '*' or '/') && text.Count(c => c == '-') > 1) return null;
-        if (!text.All(c => char.IsAsciiDigit(c) || c is '+' or '-' or '*' or '/' or '(' or ')' or '.')) return null;
+        if (!endsWithEquals && !text.Any(c => c is '+' or '*' or '/' or '^') && text.Count(c => c == '-') > 1) return null;
+        if (!text.All(c => char.IsAsciiDigit(c) || c is '+' or '-' or '*' or '/' or '^' or '(' or ')' or '.')) return null;
         var position = 0;
         try
         {
@@ -76,6 +76,26 @@ public static class Calculator
             i++;
             return -ParseUnary(s, ref i);
         }
+        return ParsePower(s, ref i);
+    }
+
+    /// <summary>べき乗 (^)。右結合で、単項の - より先 (-2^2 = -4)。指数には単項の - を許す (2^-1 = 0.5)。
+    /// 途中の値でも 1e15 以上・実数でない・無限大になったら式全体を出さない (5^20・10^100/10^90・(-8)^0.5・0^-1)。</summary>
+    private static double ParsePower(string s, ref int i)
+    {
+        var value = ParsePrimary(s, ref i);
+        if (i < s.Length && s[i] == '^')
+        {
+            i++;
+            var exponent = ParseUnary(s, ref i);
+            value = Math.Pow(value, exponent);
+            if (double.IsNaN(value) || double.IsInfinity(value) || Math.Abs(value) >= 1e15) throw new FormatException("べき乗の結果が大きすぎるか、実数ではありません");
+        }
+        return value;
+    }
+
+    private static double ParsePrimary(string s, ref int i)
+    {
         if (i < s.Length && s[i] == '(')
         {
             i++;
