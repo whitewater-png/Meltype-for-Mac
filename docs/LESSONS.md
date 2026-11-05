@@ -13,3 +13,4 @@
 | 2026-10-24 | 要件 001 の背景を `--explain` だけで書いて「全体が英語になる」と誤認した (実際は `あぴのerror`)。完成条件に「既に通る行」(`urlnoerror`) を入れた | 決まり | 要件の「今の挙動」は `--repro` と `--segments` の結果を写す。完成条件の正解表の行は、書く前に `--repro` で外れることを確かめる (`docs/requirements/README.md`) |
 | 2026-10-24 | 判定ロジックの変更が「辞書の英単語 + 助詞」全般に効き、`sorenoerror` → `soreのerror` などが悪化した。正解表にその形が無く、eval-guard は通った。別モデルの査読員が境界例を自分で作って見つけた | 決まり | `CLAUDE.md` §4 に「判定ロジックを変えたら、査読員が境界例を自分で作って base と比べる」を足した |
 | 2026-10-24 | 2 つのエージェントが同じブランチを `git worktree add` で取ろうとして衝突した | 決まり | `CLAUDE.md` §3 の worktree コマンドと `.claude/agents/eval-guard.md`・`reviewer.md` を `--detach` にした |
+| 2026-11-01 | 声の収集で、既にある設定「↓ で予測候補を選ぶ」(`DownSelectsPrediction`) を見落とし、「予測候補を矢印キーで選べるようにする」を要件の候補に出した (`docs/USAGE.md` の Tab の行だけを見た) | 決まり | 声の収集の候補は、出す前に `src/Meltype.Core/Config/Settings.cs` の設定の一覧と `docs/USAGE.md` を語句で探し、既にあるものは候補にしない (`docs/voice/2026-11-01.md` の「人の判断」に記録) |

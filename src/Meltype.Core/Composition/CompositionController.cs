@@ -1961,7 +1961,7 @@ public sealed class CompositionController
         _tabStartedConversion = false;
         _gridCandidates = false;
         _clauseMoved = false;
-        // 設定「計算式を変換すると結果を候補に出す」: 数字と + - * / ( ) だけの式 (本家 #796)
+        // 設定「計算式を変換すると結果を候補に出す」: 数字と + - * / ^ ( ) だけの式 (本家 #796。^ は要件 006)
         if (_options.CalculatorCandidates() && !_text.KanaInput && _text.Mode == DisplayMode.Auto && Calculator.Evaluate(_text.Raw) is { } result)
         {
             var expression = _text.Raw.TrimEnd('=');

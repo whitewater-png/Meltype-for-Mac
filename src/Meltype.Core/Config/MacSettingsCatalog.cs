@@ -301,7 +301,7 @@ internal static class MacSettingsCatalog
             "変換の候補の後ろに英訳も出します (複雑な → complex, complicated)。JMdict のよく使う語から。選んだ英訳は少しずつ前に出ます。",
             CandidateGroup, s => s.TranslationCandidates, (s, v) => s.TranslationCandidates = v),
         Bool(nameof(Settings.CalculatorCandidates), "計算式を変換すると結果を候補に出す",
-            "数字と + - * / ( ) だけの式を打って Space で変換すると、計算した結果 (1+2*3 → 7) と「式=結果」を候補に出します。",
+            "数字と + - * / ^ ( ) だけの式を打って Space で変換すると、計算した結果 (1+2*3 → 7、2^10 → 1024) と「式=結果」を候補に出します。",
             CandidateGroup, s => s.CalculatorCandidates, (s, v) => s.CalculatorCandidates = v),
         Bool(nameof(Settings.ConsonantAbbreviations), "子音の略入力を候補に出す",
             "子音だけの略入力 (ast → 明日、ngt → ノート など) を、変換の候補に出します。候補は同梱の candidates.txt の英字の読みから出します。既定は OFF です。",

@@ -1206,6 +1206,66 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req005_Beep_StaysEnglish_AndBeeWordsDoNot()
+    {
+        // 本家 #1377: beep が べえp になる (be + e は読めるが、最後の p が残って日本語にも英語にも決まらない)。dictionaries/english.txt に足した。
+        // bee 始まりの日本語の読み (beeru) と、辞書にある beeper は変わらない。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+        foreach (var (typed, expected) in new[]
+        {
+            ("beep", "beep"), ("beep sound", "beep sound"), ("beep wo narasu", "beep をならす"), ("beeru", "べえる"), ("bee", "べえ"), ("beeper", "beeper"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        }
+        finally { CompositionTests.Detector.SpellChecker = null; }
+    }
+
+    [Test]
+    public static void Req008_ICloud_ITunes_StayEnglish_AndJapaneseISpellingsDoNot()
+    {
+        // 本家 #1530: iCloud が いCloud になる (i が読めて残りが英字)。dictionaries/propernouns.txt の Apple 製品名の行に iCloud・iTunes を足した。
+        foreach (var (typed, expected) in new[]
+        {
+            ("iCloud", "iCloud"), ("iTunes", "iTunes"), ("iCloud wo", "iCloud を"), ("iCloudnoerror", "iCloudのerror"),
+            ("iPhone", "iPhone"), ("ichi", "いち"), ("ikou", "いこう"), ("iCloudnihozon", "iCloudにほぞん"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
+    {
+        // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
+        // 母音のあるかな (ra-men・ko-hi-・ssu-pa-) の長音は変わらない。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+        foreach (var (typed, expected) in new[]
+        {
+            ("pt-query-digest", "pt-query-digest"), ("ls-files", "ls-files"), ("cd-rom", "cd-rom"), ("rm-rf", "rm-rf"),
+            ("kyouhapt-query", "きょうはpt-query"), ("kyouhals-files", "きょうはls-files"),
+            ("ra-men", "らーめん"), ("kyouhara-men", "きょうはらーめん"), ("kyouhako-hi-", "きょうはこーひー"), ("ssu-pa-", "っすーぱー"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        }
+        finally { CompositionTests.Detector.SpellChecker = null; }
+    }
+
+    [Test]
     public static void Q3_ReadableEnglishWords_LeaveJapaneseAndTheKnownLimitsAlone()
     {
         // english-readable.txt に語を足したとき、日本語の語の中・前後に偶然その綴りが現れても日本語のままであること。

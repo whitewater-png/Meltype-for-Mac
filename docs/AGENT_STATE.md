@@ -14,6 +14,11 @@
 ## 進行中の要件
 - 002 ost が おst に崩れる (`dictionaries/english.txt` に 1 語。ブランチ req/002-short-english-words、PR #7 で main に統合済み)。定期タスクが docs/voice/2026-10-26.md の候補 1 から自動承認で着手。Core 1146/1146、eval-compare broken 0 / fixed 2。Mac 実機チェックリストはリョウさんが確認済み (2026-10-28。項目ごとの記録なし)。`gooddane` (本家 #1192) は判定ロジックの変更が要るため別の要件に残す。
 - 003 (長いローマ字文が全部かなになることを Core で守るテスト): PR #8 で main に統合済み・Mac 実機チェックリストは未確認。守りのテストで判定ロジックは未変更。外れは出なかった (400 文字超でも全部かな)。
+- 004 母音の無い英字 + ハイフンを長音にしない (ブランチ req/004-hyphen-english、PR 作成後に番号を記す)。docs/voice/2026-10-30.md 候補 2 から自動承認で着手。Core 1228/1228、eval-compare broken 0 / fixed 6。別エージェントの査読 1 周 (止める指摘なし)。Mac 実機チェックリストは未確認。日本語の直後の `git-log` (候補 1) は別の要件に残す。
+- 005 beep が べえp に崩れる (`dictionaries/english.txt` に 1 語。ブランチ req/005-beep-english)。docs/voice/2026-10-31.md 候補 1 から自動承認で着手。Core 1229/1229、eval-compare broken 0 / fixed 3。別エージェントの査読 1 周 (止める指摘なし)。Mac 実機チェックリストは未確認。`beepon` は `べえぽん` のまま (`beep音` は漢字なので Core では測れない)。候補 2 (未確定中の機能キー、Swift) は人が実機で扱う要件に残す。
+- 006 計算の候補で `^` (べき乗) を読む (ブランチ claude/wizardly-cori-v99xo5)。docs/voice/2026-11-01.md 追記の候補 2 から、リョウさんの指示 (2026-11-01) で着手。Core 1231/1231、eval-compare broken 0 / fixed 0 (555/661)、品質テスト 1294/1295 (base と同じ)。別エージェントの査読 1 周 (止める指摘なし)。Mac 実機チェックリストは未確認。
+- 008 iCloud・iTunes の頭の i がかなになる (`dictionaries/propernouns.txt` に 2 語。ブランチ req/008-icloud-english)。docs/voice/2026-11-04.md 候補 1 から自動承認で着手。Core 1229/1229、eval-compare broken 0 / fixed 4。別エージェントの査読 1 周 (止める指摘なし)。`english.txt` に小文字で足しても大文字入りは直らず、`propernouns.txt` に足した。Mac 実機チェックリストは未確認。
+- 007 pre が pれ に崩れる (本家 #1489): `english.txt` に `pre` を足す案 (PR #12) は **取り込まず閉じた** (2026-11-05、リョウさんが判断)。独立査読 (約 198 万入力) で、正しく打った日本語は変わらないが、1 打鍵多い打ち間違いの補正 (`koprekara`→これから、`oprenzi`→おれんじ など) が 89 語・229 形で効かなくなる (PR の記載は 9 形) ため。辞書への追加で日本語が悪化する語は入れない方針。`pre` の別の直し方 (直前が日本語のときは英語にしない等) は未着手の候補。ブランチ req/007-pre-english は残してある。
 - (無し)。001 は PR #5 として base ブランチ `ccr-27ad1b0c-qzazzd` にマージ済み (2026-10-24、人の判断)。main へは PR #4 に含めて出す。Mac 実機チェックリスト (PR #5 本文) は未確認。
 - 実装した範囲: 英字 1 文字ずつ読む略語 (`loanwords.txt` の大文字語) + の + 英字の残る英単語。新しく英字になるのは `api`・`ide`・`uri`・`gui`・`who` の 5 語。
 
