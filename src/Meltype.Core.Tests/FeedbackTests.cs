@@ -1210,6 +1210,7 @@ internal static class RomajiTypoTests
     {
         // 本家 #1377: beep が べえp になる (be + e は読めるが、最後の p が残って日本語にも英語にも決まらない)。dictionaries/english.txt に足した。
         // bee 始まりの日本語の読み (beeru) と、辞書にある beeper は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -1223,7 +1224,7 @@ internal static class RomajiTypoTests
             Assert.Equal(expected, k.Host.Document, typed);
         }
         }
-        finally { CompositionTests.Detector.SpellChecker = null; }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
     }
 
     [Test]
@@ -1247,6 +1248,7 @@ internal static class RomajiTypoTests
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
         // 母音のあるかな (ra-men・ko-hi-・ssu-pa-) の長音は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
         {
@@ -1262,7 +1264,7 @@ internal static class RomajiTypoTests
             Assert.Equal(expected, k.Host.Document, typed);
         }
         }
-        finally { CompositionTests.Detector.SpellChecker = null; }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
     }
 
     [Test]
