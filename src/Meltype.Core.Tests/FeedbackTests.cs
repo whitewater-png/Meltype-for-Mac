@@ -1191,6 +1191,27 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req005_Beep_StaysEnglish_AndBeeWordsDoNot()
+    {
+        // 本家 #1377: beep が べえp になる (be + e は読めるが、最後の p が残って日本語にも英語にも決まらない)。dictionaries/english.txt に足した。
+        // bee 始まりの日本語の読み (beeru) と、辞書にある beeper は変わらない。
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+        foreach (var (typed, expected) in new[]
+        {
+            ("beep", "beep"), ("beep sound", "beep sound"), ("beep wo narasu", "beep をならす"), ("beeru", "べえる"), ("bee", "べえ"), ("beeper", "beeper"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        }
+        finally { CompositionTests.Detector.SpellChecker = null; }
+    }
+
+    [Test]
     public static void Req008_ICloud_ITunes_StayEnglish_AndJapaneseISpellingsDoNot()
     {
         // 本家 #1530: iCloud が いCloud になる (i が読めて残りが英字)。dictionaries/propernouns.txt の Apple 製品名の行に iCloud・iTunes を足した。
