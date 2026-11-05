@@ -30,3 +30,4 @@ Core のテストは偽の変換エンジンで動くので、漢字変換と実
 | 001 | 短い英単語の直後の「の」が英語に吸われる (apinoerror → apiのerror) | done (PR #5) |
 | 002 | ost が おst に崩れる (3 文字で o + 子音 2 つの英語) | approved (定期タスクによる自動承認。PR 作成済み) |
 | 004 | 母音の無い英字 + ハイフン (pt-query-digest・ls-files) が長音になる | approved (定期タスクによる自動承認。元: docs/voice/2026-10-30.md 候補 2) |
+| 005 | beep が べえp に崩れる (be + e が読めて p が残る英語) | approved (定期タスクによる自動承認。元: docs/voice/2026-10-31.md 候補 1) |
