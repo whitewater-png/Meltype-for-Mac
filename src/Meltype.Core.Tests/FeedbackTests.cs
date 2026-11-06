@@ -1228,6 +1228,22 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req009_Syi_BecomesSmallI_AndNeighborsDoNotChange()
+    {
+        // 本家 #1464: syi が sい になる。しぃ の綴り syi を CompositionTable に足した。shi・sya・tyi と英語の語は変わらない。
+        foreach (var (typed, expected) in new[]
+        {
+            ("syi", "しぃ"), ("syisai", "しぃさい"), ("kyouhasyi", "きょうはしぃ"),
+            ("shi", "し"), ("syu", "しゅ"), ("sya", "しゃ"), ("tyi", "ちぃ"), ("busy", "busy"), ("easy", "easy"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req008_ICloud_ITunes_StayEnglish_AndJapaneseISpellingsDoNot()
     {
         // 本家 #1530: iCloud が いCloud になる (i が読めて残りが英字)。dictionaries/propernouns.txt の Apple 製品名の行に iCloud・iTunes を足した。
