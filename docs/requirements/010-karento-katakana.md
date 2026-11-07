@@ -13,12 +13,17 @@ scope: core
 - 番号は 009 (PR #14) の次の 010。
 
 ## 今の動き
-- `karen` は英語の固有名詞 (`dictionaries/english.txt`)。`CompositionDetector.IsEnglishSpanCore` の固有名詞の守り (「続きと合わせて日本語の語になるなら固有名詞にしない」。`karenda-` → カレンダー、本家 #920・#965) は、続きが助詞で始まる (`to`) と効かない。そのため `karen` + `to` に分かれる。
+- `karen` は英語の固有名詞 (`dictionaries/propernouns.txt` の `Karen`。この守りが見るのはこちら)。`CompositionDetector.IsEnglishSpanCore` の固有名詞の守り (「続きと合わせて日本語の語になるなら固有名詞にしない」。`karenda-` → カレンダー、本家 #920・#965) は、続きが助詞で始まる (`to`) と効かない。そのため `karen` + `to` に分かれる。
 - 他の「ローマ字で読める英単語」(`nana`・`sushi`・`kimono` など) + `to` は、すでに全部かなになる。`karen` だけが固有名詞として残る。
 
 ## minimum の要件
 1. `karento`・`karentodesu`・`kyouhakarentode` が、全部かな (`かれんと`…) になる。
 2. `karen` 単独 (英字のまま)・`karenda`・`karendaha`・`karenga` (`karenが`)・`karende` の今の値は変えない。
+
+## 受け入れる変化 (査読で判明。リョウさんの判断をお願いします)
+- 得: `karento` → かれんと (カレント)。
+- 損: 小文字で打った人名の Karen + と も かな になる (`kinouhakarentoaimashita` → きのうはかれんとあいました、`karentohanashita` → かれんとはなした)。大文字の `Karento` は `Karenと` のまま。綴りでは カレント と Karen と を区別できない。正解表 2 行で固定した。
+- 広がる崩れ: `karent` + 子音・記号 (`karentdesu` → かrentです、`karent.` → かrent。)。base でも `karend.` → かrend。 と同じ崩れ方がある (既存の動きの広がり)。直すなら別の要件。
 
 ## 非目標
 - 固有名詞 + 助詞 全般の見直し (`appleto` など)。今の値のまま。

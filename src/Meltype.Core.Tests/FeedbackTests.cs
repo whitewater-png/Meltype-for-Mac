@@ -1252,6 +1252,7 @@ internal static class RomajiTypoTests
         {
             ("karento", "かれんと"), ("karentodesu", "かれんとです"), ("kyouhakarentode", "きょうはかれんとで"),
             ("karen", "karen"), ("karenda", "かれんだ"), ("karenda-", "かれんだー"), ("karenga", "karenが"), ("appleto", "appleと"),
+            ("karendaha", "かれんだは"), ("karende", "karenで"), ("kinouhakarentoaimashita", "きのうはかれんとあいました"), ("Karentohanashita", "Karenとはなした"),
         })
         {
             var k = new CompositionTests.Keyboard();
