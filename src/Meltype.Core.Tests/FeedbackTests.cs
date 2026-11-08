@@ -1228,6 +1228,29 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req011_Colab_Collab_Kaggle_StayEnglish_AndJapaneseSpellingsDoNot()
+    {
+        // 本家 #1607・#1609: colab が こlab、kaggle が かっがぇ になる (頭が読めて、残りが英字)。dictionaries/english.txt の技術用語に足した。
+        // 日本語の読み (korabo・kore・kaketa・kagu・kagaku) は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("colab", "colab"), ("collab", "collab"), ("kaggle", "kaggle"), ("colab wo tsukau", "colab をつかう"), ("kaggle wo tsukau", "kaggle をつかう"),
+                ("korabo", "こらぼ"), ("kore", "これ"), ("kaketa", "かけた"), ("kagu", "かぐ"), ("kagaku", "かがく"), ("kyouhakorabo", "きょうはこらぼ"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
     public static void Req008_ICloud_ITunes_StayEnglish_AndJapaneseISpellingsDoNot()
     {
         // 本家 #1530: iCloud が いCloud になる (i が読めて残りが英字)。dictionaries/propernouns.txt の Apple 製品名の行に iCloud・iTunes を足した。
