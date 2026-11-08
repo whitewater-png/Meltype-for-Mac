@@ -23,14 +23,14 @@ scope: dictionary
 2. `korabo`・`kore`・`kaketa`・`kagu`・`kagaku`・`kyouhakorabo` の今の値は変えない。
 
 ## 非目標
-- `colabde` (`colabで` にする。今は全体が英字) の助詞の分け方。
+- `colabde` (`colabで` にする) の助詞の分け方を狙って変えること。結果として `colabde` → `colabで`、`colabwo` → `colabを`、`kagglede` → `kaggleで` になった (査読で確認。良くなる方向)。
 - `colab`・`collab`・`kaggle` 以外の語の追加。判定ロジックの変更。
 
 ## 完成条件
-- [ ] 正解表: `eval/cases/short-words-in-english.tsv` に `colab`・`collab`・`kaggle`・`colab wo tsukau`・`kaggle wo tsukau` と守る行 (`korabo`・`kore`・`kaketa`・`kagu`・`kagaku`・`kyouhakorabo`) を足す。実装前は外れ、実装後は当たる
-- [ ] テスト: `FeedbackTests.cs` に `Req011_Colab_Collab_Kaggle_StayEnglish_AndJapaneseSpellingsDoNot`。実装前は赤
-- [ ] 回帰なし: eval-compare の broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` が通る
-- [ ] 文書: `docs/KNOWN_LIMITS.md` に該当の記載なし (grep で確認)
+- [x] 正解表: `eval/cases/short-words-in-english.tsv` に `colab`・`collab`・`kaggle`・`colab wo tsukau`・`kaggle wo tsukau` と守る行 (`korabo`・`kore`・`kaketa`・`kagu`・`kagaku`・`kyouhakorabo`) を足す。実装前は外れ、実装後は当たる
+- [x] テスト: `FeedbackTests.cs` に `Req011_Colab_Collab_Kaggle_StayEnglish_AndJapaneseSpellingsDoNot`。実装前は赤
+- [x] 回帰なし: eval-compare の broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` が通る
+- [x] 文書: `docs/KNOWN_LIMITS.md` に該当の記載なし (grep で確認)
 
 ## Mac 実機チェックリスト (人が確かめる。すべて未確認)
 - [ ] TextEdit: `colab` + Enter → `colab`、`collab` → `collab`
@@ -43,3 +43,5 @@ scope: dictionary
 
 ## 記録
 - 定期タスクによる自動実行 (2026-11-08)。
+- 査読 1 周 (止める指摘なし)。約 372 万入力 (日本語の語の打ち間違い 4 種 + 語の前後の組み合わせ 6 万) を base と比較し、3 語の綴りを含まない入力で変わったものは 0 件。要件 007 (PR #12) と同じ「打ち間違い補正が効かなくなる」問題は無し。
+- Core 1255/1255、eval-compare broken 0 / fixed 5。直らずに残る形: `kaggles` → かっgぇs、`colaboratory` → こlaboratory、`collabo` → こっぁぼ (範囲外)。
