@@ -1244,6 +1244,24 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req012_PreprocessorDirectives_StayEnglish_AndKanaWordsDoNot()
+    {
+        // 本家 #1625: endif が えんぢf、ifndef が ifんdef、undef が うんdef になる。dictionaries/english.txt に 5 語を足した。
+        // define (でふぃね と全部読める) は辞書では直らないので対象外。
+        foreach (var (typed, expected) in new[]
+        {
+            ("endif", "endif"), ("ifndef", "ifndef"), ("elifndef", "elifndef"), ("undef", "undef"), ("pragma", "pragma"),
+            ("#endif", "#endif"), ("#ifndef", "#ifndef"), ("#undef", "#undef"), ("#pragma", "#pragma"),
+            ("ima", "いま"), ("unde", "うんで"), ("enda", "えんだ"), ("ifu", "いふ"), ("dekiru", "できる"), ("denwa", "でんわ"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
