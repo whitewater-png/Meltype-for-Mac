@@ -23,8 +23,8 @@ scope: dictionary
 ## 完成条件
 - [x] 正解表: `eval/cases/short-words-in-english.tsv` に 4 語 (`endif`・`ifndef`・`elifndef`・`undef`) と守る行を足す。実装前は外れ (eval-compare で fixed 4)。`#` 付きは表で書けない (`#` で始まる行は注釈) ので C# のテストだけで守る
 - [x] テスト: `FeedbackTests.cs` に `Req012_PreprocessorDirectives_StayEnglish_AndKanaWordsDoNot`。実装前は赤 (`endif` → `えんぢf`) を確認
-- [ ] 回帰なし: eval-compare の broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` が通る
-- [ ] 査読 (別エージェント) の指摘なし
+- [x] 回帰なし: eval-compare の broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` が通る
+- [x] 査読 (別エージェント) の指摘なし (2 周)
 
 ## Mac 実機チェックリスト (人が確かめる。すべて未確認)
 - [ ] TextEdit: `#endif` + Enter → `#endif`、`undef` + Enter → `undef`
@@ -36,3 +36,5 @@ scope: dictionary
 
 ## 記録
 - 定期タスクによる自動実行 (2026-11-09)。番号は 009〜011 が PR #14〜#16 で open のため 012 にした。
+- 査読 2 周。1 周目の指摘: 正解表の `#` 始まりの 4 行が注釈として読み飛ばされ測れていなかった → 表から外してテストで守る形に直した。境界例 82 件を base と比較し、日本語として正しく出ていた入力で崩れたものは 0 件 (助詞が続く形 `undefde` → `undefで` などは良くなった)。
+- 測れていないこと: `define` (`でふぃね`、判定ロジックの変更が要るので別の要件)、実機の入力欄・実機の NSSpellChecker。
