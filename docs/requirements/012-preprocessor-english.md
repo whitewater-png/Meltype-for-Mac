@@ -21,7 +21,7 @@ scope: dictionary
 - 判定ロジックの変更、ほかの語の追加。
 
 ## 完成条件
-- [x] 正解表: `eval/cases/short-words-in-english.tsv` に上の行と守る行を足す。実装前は外れ
+- [x] 正解表: `eval/cases/short-words-in-english.tsv` に 4 語 (`endif`・`ifndef`・`elifndef`・`undef`) と守る行を足す。実装前は外れ (eval-compare で fixed 4)。`#` 付きは表で書けない (`#` で始まる行は注釈) ので C# のテストだけで守る
 - [x] テスト: `FeedbackTests.cs` に `Req012_PreprocessorDirectives_StayEnglish_AndKanaWordsDoNot`。実装前は赤 (`endif` → `えんぢf`) を確認
 - [ ] 回帰なし: eval-compare の broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` が通る
 - [ ] 査読 (別エージェント) の指摘なし
