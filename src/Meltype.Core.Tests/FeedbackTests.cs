@@ -1228,6 +1228,24 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req013_WikiLinkDoubleBrackets_StayHalfWidth_AndSingleBracketsDoNot()
+    {
+        // 本家 #1676: Obsidian のウィキリン [[link]] が 「「link」」 になる。[[ と、あとに続く ]] で閉じる形は半角で確定する。
+        // [ が 1 つ・閉じない [[・開かない ]] は今までどおり 「」 (Microsoft IME と同じ)。
+        foreach (var (typed, expected) in new[]
+        {
+            ("[[link]]", "[[link]]"), ("[[nikki]]", "[[にっき]]"), ("kyouha[[nikki]]", "きょうは[[にっき]]"), ("[[]]", "[[]]"),
+            ("[[kyouha", "「「きょうは"), ("kyouha]]", "きょうは」」"), ("[kyouha]", "「きょうは」"), ("[kyouha", "「きょうは"), ("kyouha]", "きょうは」"),
+            ("[kagi]", "「かぎ」"), ("[[a]", "「「あ」"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req008_ICloud_ITunes_StayEnglish_AndJapaneseISpellingsDoNot()
     {
         // 本家 #1530: iCloud が いCloud になる (i が読めて残りが英字)。dictionaries/propernouns.txt の Apple 製品名の行に iCloud・iTunes を足した。
