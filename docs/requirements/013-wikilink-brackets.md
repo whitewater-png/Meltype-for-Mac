@@ -33,12 +33,13 @@ scope: core
 - [x] 正解表: `eval/cases/mac-protected-spans.tsv` に 7 行 (`[[link]]`・`[[nikki]]`・`kyouha[[nikki]]`・`[[]]` と守る 3 行)。実装前は 4 行外れ (eval-compare で fixed 4)
 - [x] テスト: `FeedbackTests.cs` に `Req013_WikiLinkDoubleBrackets_StayHalfWidth_AndSingleBracketsDoNot`。実装前は赤 (`[[link]]` → `「「link」」`) を確認
 - [x] 回帰なし: eval-compare の broken 0、Core 全件通過
-- [ ] 査読 (別エージェント) の指摘なし。境界例を自分で作って base と比べる
+- [x] 査読 (別エージェント) の指摘なし (3 周)。境界例を自分で作って base と比べる
 
 ## Mac 実機チェックリスト (人が確かめる。すべて未確認)
 - [ ] Obsidian・TextEdit: `[[link]]` + Enter → `[[link]]`
 - [ ] Obsidian: `[[nikki]]` + Space → 候補が `[[日記]]` (`[` が半角のまま。azooKey の変換は Core では測れない)
 - [ ] `[[Hello World]]` + Enter → 今は `「「Hello World」」` のまま (限界)
+- [ ] `[[nikki]]` + Space で候補を回す (Shift+↓) と、先頭の `[[` だけ全角 `［［` の候補が混ざる (半角の記号は別の文節になるため。今の半角の記号と同じ動き)
 - [ ] `[[nikki` + Space → `]]` → 今は `「「日記」」` のまま (限界)
 - [ ] TextEdit: `[kagi]` + Enter → `「かぎ」` (変わらない)
 - [ ] TextEdit: `[[nikki` を打っている途中の見え方 (`「「にっき` → `]]` で `[[にっき]]`) が気にならないか
