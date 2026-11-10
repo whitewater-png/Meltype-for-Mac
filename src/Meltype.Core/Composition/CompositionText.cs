@@ -1174,7 +1174,11 @@ public sealed class CompositionText
             if (i + 2 < units.Count && units[i + 2].Raw == "[") continue;
             var closing = -1;
             for (var k = i + 2; k + 1 < units.Count; k++)
+            {
+                // 閉じの前に別の [[ があれば、その内側の [[ と組ませる (この [[ は組ませない)
+                if (units[k].Raw == "[" && units[k + 1].Raw == "[") break;
                 if (units[k].Raw == "]" && units[k + 1].Raw == "]") { closing = k; break; }
+            }
             if (closing < 0) continue;
             adjusted ??= [.. units];
             foreach (var at in new[] { i, i + 1, closing, closing + 1 }) adjusted[at] = units[at] with { Kana = units[at].Raw };
