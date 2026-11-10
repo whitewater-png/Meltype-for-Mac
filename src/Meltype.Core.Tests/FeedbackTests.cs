@@ -1230,13 +1230,13 @@ internal static class RomajiTypoTests
     [Test]
     public static void Req013_WikiLinkDoubleBrackets_StayHalfWidth_AndSingleBracketsDoNot()
     {
-        // 本家 #1676: Obsidian のウィキリン [[link]] が 「「link」」 になる。[[ と、あとに続く ]] で閉じる形は半角で確定する。
+        // 本家 #1676: Obsidian のウィキリンク [[link]] が 「「link」」 になる。[[ と、あとに続く ]] で閉じる形は半角で確定する。
         // [ が 1 つ・閉じない [[・開かない ]] は今までどおり 「」 (Microsoft IME と同じ)。
         foreach (var (typed, expected) in new[]
         {
             ("[[link]]", "[[link]]"), ("[[nikki]]", "[[にっき]]"), ("kyouha[[nikki]]", "きょうは[[にっき]]"), ("[[]]", "[[]]"),
             ("[[kyouha", "「「きょうは"), ("kyouha]]", "きょうは」」"), ("[kyouha]", "「きょうは」"), ("[kyouha", "「きょうは"), ("kyouha]", "きょうは」"),
-            ("[kagi]", "「かぎ」"), ("[[a]", "「「あ」"),
+            ("[kagi]", "「かぎ」"), ("[[a]", "「「あ」"), ("[[[a]]]", "「[[あ]]」"), ("[[a]]]", "[[あ]]」"), ("[[a]b]]", "[[あ」b]]"),
         })
         {
             var k = new CompositionTests.Keyboard();

@@ -1170,6 +1170,8 @@ public sealed class CompositionText
         for (var i = 0; i + 1 < units.Count; i++)
         {
             if (units[i].Raw != "[" || units[i + 1].Raw != "[") continue;
+            // [ が 3 つ以上続くときは、閉じにいちばん近い [[ と組ませる (Shift+↓ で 1 音ずつ確定しても、見えていた形が変わらない)
+            if (i + 2 < units.Count && units[i + 2].Raw == "[") continue;
             var closing = -1;
             for (var k = i + 2; k + 1 < units.Count; k++)
                 if (units[k].Raw == "]" && units[k + 1].Raw == "]") { closing = k; break; }
