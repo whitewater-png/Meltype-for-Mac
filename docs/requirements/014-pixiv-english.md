@@ -60,4 +60,4 @@ scope: dictionary
 - 周回数: 実装 1 周、査読 1 周 (止める指摘なし。直す 1 件 = AGENT_STATE、任意 3 件のうち辞書の見出し・本文の件数・`Pixiv` の記録を反映)。
 - 数字: Core 1255/1255、eval-compare broken 0 / fixed 5 (576→581/687)、`check-dictionaries.mjs`・`check-terms.mjs` エラー 0 (警告の数は base と同じ)。
 - 査読の境界例: 25,159 入力 (readings.txt の ぴ・ぃ・ゔ を含む 410 語 + 手作りの例と、それぞれの 1 打鍵の打ち間違い) を base と比べ、変わったのは `pixiv` を含む 1,157 件だけ。pixiv を含まない入力の変化は 0 件 (要件 007 の型の回帰なし)。
-- PR: (作成後に記入)
+- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/19
