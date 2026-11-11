@@ -1305,6 +1305,29 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req014_Pixiv_StaysEnglish_AndPiSpellingsDoNot()
+    {
+        // 本家 #1696: pixiv が ぴぃv になる (pi + xi が読めて v が残る)。pixivnitoukou は丸ごと英字のまま残っていた。
+        // dictionaries/english.txt に足した。pi で始まる日本語 (pinku・piza・pittari) と pixi は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("pixiv", "pixiv"), ("pixivnitoukou", "pixivにとうこう"), ("pixivde", "pixivで"), ("pixivga", "pixivが"), ("pixiv wo miru", "pixiv をみる"),
+                ("pixi", "ぴぃ"), ("pixel", "pixel"), ("booth", "booth"), ("fanbox", "fanbox"), ("pinku", "ぴんく"), ("piza", "ぴざ"), ("pittari", "ぴったり"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
