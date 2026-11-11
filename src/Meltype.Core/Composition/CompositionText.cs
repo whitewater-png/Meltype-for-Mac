@@ -1155,6 +1155,40 @@ public sealed class CompositionText
     /// </summary>
     private List<CompositionUnit>? HalfWidthOpeners(IReadOnlyList<CompositionSegment> segments)
     {
+        var adjusted = HalfWidthOpenersCore(segments);
+        return HalfWidthWikiLinks(adjusted ?? _units) is { } linked ? linked : adjusted;
+    }
+
+    /// <summary>
+    /// [[ と、あとに続く ]] (Obsidian のウィキリンク [[ノート名]]。本家 #1676) は、4 つとも半角にした単位の並びを返す。変えなければ null (要件 013)。
+    /// [ が 1 つの「」と、閉じない [[・開かない ]] は今までどおり (日本語の入力では [ ] は「」)。
+    /// </summary>
+    private List<CompositionUnit>? HalfWidthWikiLinks(IReadOnlyList<CompositionUnit> units)
+    {
+        if (KanaInput) return null;
+        List<CompositionUnit>? adjusted = null;
+        for (var i = 0; i + 1 < units.Count; i++)
+        {
+            if (units[i].Raw != "[" || units[i + 1].Raw != "[") continue;
+            // [ が 3 つ以上続くときは、閉じにいちばん近い [[ と組ませる (Shift+↓ で 1 音ずつ確定しても、見えていた形が変わらない)
+            if (i + 2 < units.Count && units[i + 2].Raw == "[") continue;
+            var closing = -1;
+            for (var k = i + 2; k + 1 < units.Count; k++)
+            {
+                // 閉じの前に別の [[ があれば、その内側の [[ と組ませる (この [[ は組ませない)
+                if (units[k].Raw == "[" && units[k + 1].Raw == "[") break;
+                if (units[k].Raw == "]" && units[k + 1].Raw == "]") { closing = k; break; }
+            }
+            if (closing < 0) continue;
+            adjusted ??= [.. units];
+            foreach (var at in new[] { i, i + 1, closing, closing + 1 }) adjusted[at] = units[at] with { Kana = units[at].Raw };
+            i = closing + 1;
+        }
+        return adjusted;
+    }
+
+    private List<CompositionUnit>? HalfWidthOpenersCore(IReadOnlyList<CompositionSegment> segments)
+    {
         if (KanaInput || !_units.Any(u => Openers.ContainsKey(u.Raw) && u.Kana != u.Raw)) return null;
         // 打った英字の 1 文字ずつが英語の区間か
         var english = new List<bool>();
