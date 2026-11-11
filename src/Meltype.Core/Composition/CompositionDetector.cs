@@ -856,7 +856,9 @@ public sealed class CompositionDetector
         // 固有名詞ではなく日本語の語の途中 (karenda- → カレンダー。本家 #920・#965)。
         if (lower.Length >= 4 && _proper.Contains(lower) && next is { Length: > 0 } && char.IsAsciiLetter(next[0]) &&
             (_romaji.Analyze(lower) is { IsValid: true, Partial: "" } || _japanese.IsPrefix(lower + next.ToLowerInvariant())) &&
-            Detection.DictionaryDetector.StartsWithParticle(next.ToLowerInvariant()) is null)
+            (Detection.DictionaryDetector.StartsWithParticle(next.ToLowerInvariant()) is null ||
+             // 続きが助詞で始まっても、続きと合わせて japanese.txt の語の頭になる (karen + to = karento = カレント。本家 #1596) なら日本語の語の途中
+             _japanese.IsPrefix(lower + next.ToLowerInvariant())))
         {
             return false;
         }

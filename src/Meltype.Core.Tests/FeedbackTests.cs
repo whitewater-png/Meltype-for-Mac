@@ -1244,6 +1244,24 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req010_Karento_BecomesKana_AndKarenAndOthersDoNotChange()
+    {
+        // 本家 #1596: karento が karenと になる (固有名詞 karen + 助詞 to)。続きと合わせて日本語の語 (japanese.txt の karento) になるなら、固有名詞にしない。
+        // karen 単独・karenda-・karenga (karenが)・appleto は変わらない。
+        foreach (var (typed, expected) in new[]
+        {
+            ("karento", "かれんと"), ("karentodesu", "かれんとです"), ("kyouhakarentode", "きょうはかれんとで"),
+            ("karen", "karen"), ("karenda", "かれんだ"), ("karenda-", "かれんだー"), ("karenga", "karenが"), ("appleto", "appleと"),
+            ("karendaha", "かれんだは"), ("karende", "karenで"), ("kinouhakarentoaimashita", "きのうはかれんとあいました"), ("Karentohanashita", "Karenとはなした"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
