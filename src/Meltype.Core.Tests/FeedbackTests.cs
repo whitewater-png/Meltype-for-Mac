@@ -1285,6 +1285,26 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req013_WikiLinkDoubleBrackets_StayHalfWidth_AndSingleBracketsDoNot()
+    {
+        // 本家 #1676: Obsidian のウィキリンク [[link]] が 「「link」」 になる。[[ と、あとに続く ]] で閉じる形は半角で確定する。
+        // [ が 1 つ・閉じない [[・開かない ]] は今までどおり 「」 (Microsoft IME と同じ)。
+        foreach (var (typed, expected) in new[]
+        {
+            ("[[link]]", "[[link]]"), ("[[nikki]]", "[[にっき]]"), ("kyouha[[nikki]]", "きょうは[[にっき]]"), ("[[]]", "[[]]"),
+            // 引用符で囲んだ [[link]] は、引用符の半角 (HalfWidthOpenersCore の結果) とウィキリンクの半角が両方残る
+            ("\"[[link]]\"", "\"[[link]]\""),
+            ("[[kyouha", "「「きょうは"), ("kyouha]]", "きょうは」」"), ("[kyouha]", "「きょうは」"), ("[kyouha", "「きょうは"), ("kyouha]", "きょうは」"),
+            ("[kagi]", "「かぎ」"), ("[[a]", "「「あ」"), ("[[[a]]]", "「[[あ]]」"), ("[[a]]]", "[[あ]]」"), ("[[a]b]]", "[[あ」b]]"), ("[[a[[b]]", "「「あ[[b]]"), ("[[a][[b]]", "「「あ」[[b]]"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
