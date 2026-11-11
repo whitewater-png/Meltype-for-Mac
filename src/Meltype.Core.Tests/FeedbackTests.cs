@@ -1246,12 +1246,14 @@ internal static class RomajiTypoTests
     [Test]
     public static void Req012_PreprocessorDirectives_StayEnglish_AndKanaWordsDoNot()
     {
-        // 本家 #1625: endif が えんぢf、ifndef が ifんdef、undef が うんdef になる。dictionaries/english.txt に 5 語を足した。
-        // define (でふぃね と全部読める) は辞書では直らないので対象外。
+        // 本家 #1625: endif が えんぢf、elifndef が elifんdef になる。dictionaries/english.txt に endif・elifndef・pragma を足した。
+        // undef・ifndef は入れない: 〜んで + 余計な f の打ち間違い (jibundeftotemo) とシフォンで + ふ… の o 抜け (shifndefure) が直らなくなる (独立査読 2026-11-11)。
+        // 下の 4 つの打ち間違いの行は、どちらかを辞書に戻すと赤になる。define (でふぃね と全部読める) は辞書では直らないので対象外。
         foreach (var (typed, expected) in new[]
         {
-            ("endif", "endif"), ("ifndef", "ifndef"), ("elifndef", "elifndef"), ("undef", "undef"), ("pragma", "pragma"),
-            ("#endif", "#endif"), ("#ifndef", "#ifndef"), ("#undef", "#undef"), ("#pragma", "#pragma"),
+            ("endif", "endif"), ("elifndef", "elifndef"), ("pragma", "pragma"), ("endifwo", "endifを"), ("kyouhapragmawo", "きょうはpragmaを"),
+            ("#endif", "#endif"), ("#pragma", "#pragma"),
+            ("jibundeftotemo", "じぶんでとても"), ("yasundefgohan", "やすんでごはん"), ("shinbundefdasu", "しんぶんでだす"), ("shifndefure", "しふぉんでふれ"),
             ("ima", "いま"), ("unde", "うんで"), ("enda", "えんだ"), ("ifu", "いふ"), ("dekiru", "できる"), ("denwa", "でんわ"),
         })
         {
