@@ -209,10 +209,12 @@ bot bots chatbot chatbots
 av vr ar tv pc pv mv cg sns rta fps rpg nft dm dlc npc pvp pve mvp cv bgm geoguessr geoguesser
 vc vrc bpm mac dtm pro gb jk asmr luna yann tetr iidx
 # --- テスターのチャット (summary.json) で英字のまま打たれていた語 (ローマ字として読めない、または日本語でまず使わない綴り) ---
-everyone jc revanced lavalink skeb vol rtx fanbox pixiv ryzen wav mov unix lim lite launcher intellisense zenfone firmware llm npm
+everyone jc revanced lavalink skeb vol rtx fanbox ryzen wav mov unix lim lite launcher intellisense zenfone firmware llm npm
 riverside seaside teenage teenager woah mod mods hardcore tacz nsfw sfw fbc mineall probot carlbot disboard
 # --- Issue #12 ---
 online
+# --- 本家 #1696 (pixiv が ぴぃv になる。pi + xi が読めて v が残る) ---
+pixiv
 # --- 英単語 + する (pushして) の site と同じ綴りで終わる語 (web + site で分けない) ---
 website websites campsite worksite onsite offsite
 # --- 本家 #538 / PR #609 (infobesity = 情報過多。ty が残って いんふぉべしty になっていた) ---
