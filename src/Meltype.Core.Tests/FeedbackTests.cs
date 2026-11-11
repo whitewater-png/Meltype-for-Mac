@@ -1292,6 +1292,8 @@ internal static class RomajiTypoTests
         foreach (var (typed, expected) in new[]
         {
             ("[[link]]", "[[link]]"), ("[[nikki]]", "[[にっき]]"), ("kyouha[[nikki]]", "きょうは[[にっき]]"), ("[[]]", "[[]]"),
+            // 引用符で囲んだ [[link]] は、引用符の半角 (HalfWidthOpenersCore の結果) とウィキリンクの半角が両方残る
+            ("\"[[link]]\"", "\"[[link]]\""),
             ("[[kyouha", "「「きょうは"), ("kyouha]]", "きょうは」」"), ("[kyouha]", "「きょうは」"), ("[kyouha", "「きょうは"), ("kyouha]", "きょうは」"),
             ("[kagi]", "「かぎ」"), ("[[a]", "「「あ」"), ("[[[a]]]", "「[[あ]]」"), ("[[a]]]", "[[あ]]」"), ("[[a]b]]", "[[あ」b]]"), ("[[a[[b]]", "「「あ[[b]]"), ("[[a][[b]]", "「「あ」[[b]]"),
         })
