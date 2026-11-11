@@ -35,9 +35,9 @@ scope: core
 - [x] 回帰なし: eval-compare の broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` が通る
 - [x] 文書: `docs/KNOWN_LIMITS.md` に karen の記載なし (grep で確認)
 
-## Mac 実機チェックリスト (人が確かめる。すべて未確認)
-- [ ] TextEdit: `karento` + Enter → `かれんと` (Space で `カレント` が候補に出るかは変換エンジン次第)
-- [ ] TextEdit: `karen` + Enter → `karen`、`karenda-` → `かれんだー`
+## Mac 実機チェックリスト (人が確かめる。[x] は 2026-11-11 にリョウさんが確認、ほかは未確認)
+- [x] TextEdit: `karento` + Enter → `かれんと` (Space で `カレント` が候補に出るかは変換エンジン次第。こちらは記録だけの項目で、結果の詳細は無い)
+- [ ] TextEdit: `karen` + Enter → `karen`、`karenda-` → `かれんだー` (`karenda-` → かれんだー と `Karento` → Karenと は確認済み。`karen` 単独は未確認)
 - [ ] ターミナル (zsh): `karen` → `karen`
 
 ## 止める条件
@@ -45,3 +45,4 @@ scope: core
 
 ## 記録
 - 定期タスクによる自動実行 (2026-11-07)。
+- 2026-11-11 リョウさんの Mac 実機 (TextEdit、Enter で確定。試し版 int/q41-q43 に main を合わせた手元の版 verify/q41-q43-plus-1111 を入れて確認。19 行の確認表への「全て期待結果通り」の一括報告で、項目ごとの記録は無い): `karento` → かれんと、`Karento` → Karenと、`karenda-` → かれんだー。

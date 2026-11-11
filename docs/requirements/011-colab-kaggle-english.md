@@ -32,10 +32,10 @@ scope: dictionary
 - [x] 回帰なし: eval-compare の broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` が通る
 - [x] 文書: `docs/KNOWN_LIMITS.md` に該当の記載なし (grep で確認)
 
-## Mac 実機チェックリスト (人が確かめる。すべて未確認)
-- [ ] TextEdit: `colab` + Enter → `colab`、`collab` → `collab`
-- [ ] TextEdit: `kaggle` + Enter → `kaggle`
-- [ ] TextEdit: `korabo` → こらぼ、`kore` → これ (変わらない)
+## Mac 実機チェックリスト (人が確かめる。[x] は 2026-11-11 にリョウさんが確認、ほかは未確認)
+- [x] TextEdit: `colab` + Enter → `colab`、`collab` → `collab`
+- [x] TextEdit: `kaggle` + Enter → `kaggle`
+- [ ] TextEdit: `korabo` → こらぼ、`kore` → これ (変わらない) (`korabo` → こらぼ は確認済み。`kore` は未確認)
 
 ## 止める条件
 - 語を足して日本語の語の正解表の行が 1 件でも崩れる。
@@ -45,3 +45,4 @@ scope: dictionary
 - 定期タスクによる自動実行 (2026-11-08)。
 - 査読 1 周 (止める指摘なし)。約 372 万入力 (日本語の語の打ち間違い 4 種 + 語の前後の組み合わせ 6 万) を base と比較し、3 語の綴りを含まない入力で変わったものは 0 件。要件 007 (PR #12) と同じ「打ち間違い補正が効かなくなる」問題は無し。
 - Core 1255/1255、eval-compare broken 0 / fixed 5。直らずに残る形: `kaggles` → かっgぇs、`colaboratory` → こlaboratory、`collabo` → こっぁぼ (範囲外)。
+- 2026-11-11 リョウさんの Mac 実機 (TextEdit、Enter で確定。試し版 int/q41-q43 に main を合わせた手元の版 verify/q41-q43-plus-1111 を入れて確認。19 行の確認表への「全て期待結果通り」の一括報告で、項目ごとの記録は無い): `colab`・`collab`・`kaggle` は英字のまま、`korabo` → こらぼ。

@@ -35,13 +35,13 @@ scope: core
 - [x] 回帰なし: eval-compare の broken 0、Core 全件通過
 - [x] 査読 (別エージェント) の指摘なし (3 周)。境界例を自分で作って base と比べる
 
-## Mac 実機チェックリスト (人が確かめる。すべて未確認)
-- [ ] Obsidian・TextEdit: `[[link]]` + Enter → `[[link]]`
+## Mac 実機チェックリスト (人が確かめる。[x] は 2026-11-11 にリョウさんが確認、ほかは未確認)
+- [ ] Obsidian・TextEdit: `[[link]]` + Enter → `[[link]]` (TextEdit は確認済み。Obsidian は未確認)
 - [ ] Obsidian: `[[nikki]]` + Space → 候補が `[[日記]]` (`[` が半角のまま。azooKey の変換は Core では測れない)
-- [ ] `[[Hello World]]` + Enter → 今は `「「Hello World」」` のまま (限界)
+- [x] `[[Hello World]]` + Enter → 今は `「「Hello World」」` のまま (限界)
 - [ ] `[[nikki]]` + Space で候補を回す (Shift+↓) と、先頭の `[[` だけ全角 `［［` の候補が混ざる (半角の記号は別の文節になるため。今の半角の記号と同じ動き)
 - [ ] `[[nikki` + Space → `]]` → 今は `「「日記」」` のまま (限界)
-- [ ] TextEdit: `[kagi]` + Enter → `「かぎ」` (変わらない)
+- [x] TextEdit: `[kagi]` + Enter → `「かぎ」` (変わらない)
 - [ ] TextEdit: `[[nikki` を打っている途中の見え方 (`「「にっき` → `]]` で `[[にっき]]`) が気にならないか
 
 ## 止める条件
@@ -50,3 +50,4 @@ scope: core
 ## 記録
 - 定期タスクによる自動実行 (2026-11-10)。番号は 009〜012 が PR #14〜#17 で open のため 013 にした。
 - 独立査読 (2026-11-11、約 4.7 万入力を base と比較。`[[ ]]` を含まない入力の変化 0 件)。指摘のテストの穴 (`HalfWidthWikiLinks(adjusted ?? _units)` を `(_units)` にして既存の引用符の半角を捨てても通る) を、`"[[link]]"` の行で塞いだ (変異を入れると赤になるのを確認)。
+- 2026-11-11 リョウさんの Mac 実機 (TextEdit、Enter で確定。試し版 int/q41-q43 に main を合わせた手元の版 verify/q41-q43-plus-1111 を入れて確認。19 行の確認表への「全て期待結果通り」の一括報告で、項目ごとの記録は無い): `[[link]]` → [[link]]、`kyouha[[nikki]]desu` → きょうは[[にっき]]です (ライブ変換の漢字は正常の扱い)、`"[[link]]"` → "[[link]]"、`[kagi]` → 「かぎ」、`[[Hello World]]` → 「「Hello World」」 (限界のとおり)。`[[nikki]]` + Space の候補と、予測候補を選んだときの括弧は記録だけの項目で、結果の詳細は無い。
