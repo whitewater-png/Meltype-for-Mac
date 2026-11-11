@@ -1228,6 +1228,29 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req011_Colab_Collab_Kaggle_StayEnglish_AndJapaneseSpellingsDoNot()
+    {
+        // 本家 #1607・#1609: colab が こlab、kaggle が かっがぇ になる (頭が読めて、残りが英字)。dictionaries/english.txt の技術用語に足した。
+        // 日本語の読み (korabo・kore・kaketa・kagu・kagaku) は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("colab", "colab"), ("collab", "collab"), ("kaggle", "kaggle"), ("colab wo tsukau", "colab をつかう"), ("kaggle wo tsukau", "kaggle をつかう"),
+                ("korabo", "こらぼ"), ("kore", "これ"), ("kaketa", "かけた"), ("kagu", "かぐ"), ("kagaku", "かがく"), ("kyouhakorabo", "きょうはこらぼ"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
     public static void Req008_ICloud_ITunes_StayEnglish_AndJapaneseISpellingsDoNot()
     {
         // 本家 #1530: iCloud が いCloud になる (i が読めて残りが英字)。dictionaries/propernouns.txt の Apple 製品名の行に iCloud・iTunes を足した。
@@ -1235,6 +1258,87 @@ internal static class RomajiTypoTests
         {
             ("iCloud", "iCloud"), ("iTunes", "iTunes"), ("iCloud wo", "iCloud を"), ("iCloudnoerror", "iCloudのerror"),
             ("iPhone", "iPhone"), ("ichi", "いち"), ("ikou", "いこう"), ("iCloudnihozon", "iCloudにほぞん"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Req010_Karento_BecomesKana_AndKarenAndOthersDoNotChange()
+    {
+        // 本家 #1596: karento が karenと になる (固有名詞 karen + 助詞 to)。続きと合わせて日本語の語 (japanese.txt の karento) になるなら、固有名詞にしない。
+        // karen 単独・karenda-・karenga (karenが)・appleto は変わらない。
+        foreach (var (typed, expected) in new[]
+        {
+            ("karento", "かれんと"), ("karentodesu", "かれんとです"), ("kyouhakarentode", "きょうはかれんとで"),
+            ("karen", "karen"), ("karenda", "かれんだ"), ("karenda-", "かれんだー"), ("karenga", "karenが"), ("appleto", "appleと"),
+            ("karendaha", "かれんだは"), ("karende", "karenで"), ("kinouhakarentoaimashita", "きのうはかれんとあいました"), ("Karentohanashita", "Karenとはなした"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Req013_WikiLinkDoubleBrackets_StayHalfWidth_AndSingleBracketsDoNot()
+    {
+        // 本家 #1676: Obsidian のウィキリンク [[link]] が 「「link」」 になる。[[ と、あとに続く ]] で閉じる形は半角で確定する。
+        // [ が 1 つ・閉じない [[・開かない ]] は今までどおり 「」 (Microsoft IME と同じ)。
+        foreach (var (typed, expected) in new[]
+        {
+            ("[[link]]", "[[link]]"), ("[[nikki]]", "[[にっき]]"), ("kyouha[[nikki]]", "きょうは[[にっき]]"), ("[[]]", "[[]]"),
+            // 引用符で囲んだ [[link]] は、引用符の半角 (HalfWidthOpenersCore の結果) とウィキリンクの半角が両方残る
+            ("\"[[link]]\"", "\"[[link]]\""),
+            ("[[kyouha", "「「きょうは"), ("kyouha]]", "きょうは」」"), ("[kyouha]", "「きょうは」"), ("[kyouha", "「きょうは"), ("kyouha]", "きょうは」"),
+            ("[kagi]", "「かぎ」"), ("[[a]", "「「あ」"), ("[[[a]]]", "「[[あ]]」"), ("[[a]]]", "[[あ]]」"), ("[[a]b]]", "[[あ」b]]"), ("[[a[[b]]", "「「あ[[b]]"), ("[[a][[b]]", "「「あ」[[b]]"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Req014_Pixiv_StaysEnglish_AndPiSpellingsDoNot()
+    {
+        // 本家 #1696: pixiv が ぴぃv になる (pi + xi が読めて v が残る)。pixivnitoukou は丸ごと英字のまま残っていた。
+        // dictionaries/english.txt に足した。pi で始まる日本語 (pinku・piza・pittari) と pixi は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("pixiv", "pixiv"), ("pixivnitoukou", "pixivにとうこう"), ("pixivde", "pixivで"), ("pixivga", "pixivが"), ("pixiv wo miru", "pixiv をみる"),
+                ("pixi", "ぴぃ"), ("pixel", "pixel"), ("booth", "booth"), ("fanbox", "fanbox"), ("pinku", "ぴんく"), ("piza", "ぴざ"), ("pittari", "ぴったり"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
+    public static void Req012_PreprocessorDirectives_StayEnglish_AndKanaWordsDoNot()
+    {
+        // 本家 #1625: endif が えんぢf、elifndef が elifんdef になる。dictionaries/english.txt に endif・elifndef・pragma を足した。
+        // undef・ifndef は入れない: 〜んで + 余計な f の打ち間違い (jibundeftotemo) とシフォンで + ふ… の o 抜け (shifndefure) が直らなくなる (独立査読 2026-11-11)。
+        // 下の 4 つの打ち間違いの行は、どちらかを辞書に戻すと赤になる。define (でふぃね と全部読める) は辞書では直らないので対象外。
+        foreach (var (typed, expected) in new[]
+        {
+            ("endif", "endif"), ("elifndef", "elifndef"), ("pragma", "pragma"), ("endifwo", "endifを"), ("kyouhapragmawo", "きょうはpragmaを"),
+            ("#endif", "#endif"), ("#pragma", "#pragma"),
+            ("jibundeftotemo", "じぶんでとても"), ("yasundefgohan", "やすんでごはん"), ("shinbundefdasu", "しんぶんでだす"), ("shifndefure", "しふぉんでふれ"),
+            ("ima", "いま"), ("unde", "うんで"), ("enda", "えんだ"), ("ifu", "いふ"), ("dekiru", "できる"), ("denwa", "でんわ"),
         })
         {
             var k = new CompositionTests.Keyboard();

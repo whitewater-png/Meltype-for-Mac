@@ -192,7 +192,7 @@ beta cafe cage cane cape coma cone cube cure dine dire dome dope dude duke ego f
 lane logo meta mute nude nuke pane pine poke polo pope rage rake ripe rode rune sage sane soda solo tore
 wade wipe woke wore anime demo dojo emoji kimono karate tsunami typhoon tycoon
 # 技術用語 (日本語の文の中でもそのまま英字で書くことが多い)
-api apis url urls uri json yaml csv pdf png jpg jpeg gif svg html css xml sql ssh ssl tls dns ip tcp udp http https oem ost beep
+api apis url urls uri json yaml csv pdf png jpg jpeg gif svg html css xml sql ssh ssl tls dns ip tcp udp http https oem ost beep colab collab kaggle
 cpu gpu ram rom ssd hdd usb hdmi wifi bluetooth nfc os ui ux io ai ml llm gpt rag mcp sdk ide cli gui repo repos
 bug bugs issue issues pull push merge commit commits branch branches deploy build release tag tags diff patch
 token tokens prompt prompts model models agent agents tool tools server servers client clients browser
@@ -213,6 +213,8 @@ everyone jc revanced lavalink skeb vol rtx fanbox ryzen wav mov unix lim lite la
 riverside seaside teenage teenager woah mod mods hardcore tacz nsfw sfw fbc mineall probot carlbot disboard
 # --- Issue #12 ---
 online
+# --- 本家 #1696 (pixiv が ぴぃv になる。pi + xi が読めて v が残る) ---
+pixiv
 # --- 英単語 + する (pushして) の site と同じ綴りで終わる語 (web + site で分けない) ---
 website websites campsite worksite onsite offsite
 # --- 本家 #538 / PR #609 (infobesity = 情報過多。ty が残って いんふぉべしty になっていた) ---
@@ -243,3 +245,7 @@ vocaloid opencode
 # 入れない: shat・oss・app (shats → しゃつ・ossna → おっさん・appwo → あっぷを のような 1 文字落としの打ち間違いの補正が効かなくなる。査読 W18 R1)
 # 入れない: ppt・ffmpeg (exceltoppt・pythontoffmpeg は直るが、pptdemo → pptでも・ffmpegdemo → ffmpegでも が英字のまま崩れる。査読 W18 R2)
 env into instal
+
+# C/C++ のプリプロセッサの指令名 (本家 #1625。define は でふぃね と全部読めるため辞書では直らず、ここには入れない)
+# 入れない: undef・ifndef (jibundeftotemo → じぶんでとても・shifndefure → しふぉんでふれ のような 1 打鍵の打ち間違いの補正が効かなくなる。undef は 〜んで の 179 語・18,136 形、ifndef は 1 語・24 形。独立査読 2026-11-11)
+endif elifndef pragma
