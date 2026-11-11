@@ -20,7 +20,7 @@ scope: core
 1. `karento`・`karentodesu`・`kyouhakarentode` が、全部かな (`かれんと`…) になる。
 2. `karen` 単独 (英字のまま)・`karenda`・`karendaha`・`karenga` (`karenが`)・`karende` の今の値は変えない。
 
-## 受け入れる変化 (査読で判明。リョウさんの判断をお願いします)
+## 受け入れる変化 (査読で判明。2026-11-11 リョウさんが受け入れた)
 - 得: `karento` → かれんと (カレント)。
 - 損: 小文字で打った人名の Karen + と も かな になる (`kinouhakarentoaimashita` → きのうはかれんとあいました、`karentohanashita` → かれんとはなした)。大文字の `Karento` は `Karenと` のまま。綴りでは カレント と Karen と を区別できない。正解表 2 行で固定した。
 - 広がる崩れ: `karent` + 子音・記号 (`karentdesu` → かrentです、`karent.` → かrent。)。base でも `karend.` → かrend。 と同じ崩れ方がある (既存の動きの広がり)。直すなら別の要件。

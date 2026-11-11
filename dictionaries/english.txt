@@ -245,3 +245,7 @@ vocaloid opencode
 # 入れない: shat・oss・app (shats → しゃつ・ossna → おっさん・appwo → あっぷを のような 1 文字落としの打ち間違いの補正が効かなくなる。査読 W18 R1)
 # 入れない: ppt・ffmpeg (exceltoppt・pythontoffmpeg は直るが、pptdemo → pptでも・ffmpegdemo → ffmpegでも が英字のまま崩れる。査読 W18 R2)
 env into instal
+
+# C/C++ のプリプロセッサの指令名 (本家 #1625。define は でふぃね と全部読めるため辞書では直らず、ここには入れない)
+# 入れない: undef・ifndef (jibundeftotemo → じぶんでとても・shifndefure → しふぉんでふれ のような 1 打鍵の打ち間違いの補正が効かなくなる。undef は 〜んで の 179 語・18,136 形、ifndef は 1 語・24 形。独立査読 2026-11-11)
+endif elifndef pragma
