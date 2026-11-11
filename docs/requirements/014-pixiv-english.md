@@ -61,4 +61,4 @@ scope: dictionary
 - 数字: Core 1255/1255、eval-compare broken 0 / fixed 5 (576→581/687)、`check-dictionaries.mjs`・`check-terms.mjs` エラー 0 (警告の数は base と同じ)。
 - 査読の境界例: 25,159 入力 (readings.txt の ぴ・ぃ・ゔ を含む 410 語 + 手作りの例と、それぞれの 1 打鍵の打ち間違い) を base と比べ、変わったのは `pixiv` を含む 1,157 件だけ。pixiv を含まない入力の変化は 0 件 (要件 007 の型の回帰なし)。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/19
-- 2026-11-11 リョウさんの Mac 実機 (TextEdit、Enter で確定。試し版 int/q41-q43 に main を合わせた手元の版 verify/q41-q43-plus-1111 を入れて確認。19 行の確認表への「全て期待結果通り」の一括報告で、項目ごとの記録は無い): `pixiv` → pixiv、`pixivnitoukou` → pixivにとうこう、`pinku` → ぴんく。Safari の `pixivde` は未確認。
+- 2026-11-11 リョウさんの Mac 実機 (TextEdit、Enter で確定。試し版 int/q41-q43 に main を合わせた手元の版 verify/q41-q43-plus-1111 を入れて確認。19 行の確認表と記録だけの 4 行への「全て期待結果通り」の一括報告で、項目ごとの記録は無い): `pixiv` → pixiv、`pixivnitoukou` → pixivにとうこう、`pinku` → ぴんく。Safari の `pixivde` は未確認。

@@ -45,4 +45,4 @@ scope: core
 
 ## 記録
 - 定期タスクによる自動実行 (2026-11-07)。
-- 2026-11-11 リョウさんの Mac 実機 (TextEdit、Enter で確定。試し版 int/q41-q43 に main を合わせた手元の版 verify/q41-q43-plus-1111 を入れて確認。19 行の確認表への「全て期待結果通り」の一括報告で、項目ごとの記録は無い): `karento` → かれんと、`Karento` → Karenと、`karenda-` → かれんだー。
+- 2026-11-11 リョウさんの Mac 実機 (TextEdit、Enter で確定。試し版 int/q41-q43 に main を合わせた手元の版 verify/q41-q43-plus-1111 を入れて確認。19 行の確認表と記録だけの 4 行への「全て期待結果通り」の一括報告で、項目ごとの記録は無い): `karento` → かれんと、`Karento` → Karenと、`karenda-` → かれんだー。
