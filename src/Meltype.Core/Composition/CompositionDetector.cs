@@ -238,13 +238,19 @@ public sealed class CompositionDetector
         {
             return [new CompositionSegment(true, "", stylized)];
         }
-        var segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, startsWord: startsWord, precedingOpener: precedingOpener, afterNewline: afterNewline);
-        if (kanaInput) return segments;
-        // 英語の後ろの , . は半角にしたが、すぐ後ろに日本語が続いた (Ok,konnna → Ok、こんな) なら、日本語の文の句読点にして分け直す。
-        if (PunctuationBeforeJapanese(units, segments) is { } japanesePunctuation)
+        List<CompositionSegment> Spans(bool wordHeadCi)
         {
-            segments = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation, startsWord, precedingOpener, afterNewline);
+            var found = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, startsWord: startsWord, precedingOpener: precedingOpener, afterNewline: afterNewline, wordHeadCi: wordHeadCi);
+            if (kanaInput) return found;
+            // 英語の後ろの , . は半角にしたが、すぐ後ろに日本語が続いた (Ok,konnna → Ok、こんな) なら、日本語の文の句読点にして分け直す。
+            if (PunctuationBeforeJapanese(units, found) is { } japanesePunctuation)
+            {
+                found = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, japanesePunctuation, startsWord, precedingOpener, afterNewline, wordHeadCi);
+            }
+            return found;
         }
+        var segments = Spans(wordHeadCi: false);
+        if (kanaInput) return segments;
         // 辞書にない英単語 (stackoverflow など) を最初から打っているなら全体を英語にする (カスタム表でしか読めない綴りは除く)。
         // 途中の区間 (… flow) だけを英語にすると「sたcこvえrflow」のようになってしまう。
         // ただし先頭が辞書の英単語として区切れている (github に push) ならその区切りを使う。
@@ -254,6 +260,10 @@ public sealed class CompositionDetector
         {
             return [new CompositionSegment(true, "", whole)];
         }
+        // 語の頭の ci (CI が落ちた の ci。本家 #1734、要件 015): c はかなにできず i だけ い になって cい に崩れていた。
+        // 上の「全体を英語にする」決まり (citrix・cilium + が) が当たらなかったときだけ、語の頭の ci を英字に残して分け直す
+        // (先に FindSpans の中で ci を英語にすると、先頭が英語の区間になって上の決まりが効かなくなる)。
+        if (level != DetectionLevel.Manual && Enumerable.Range(0, units.Count).Any(k => IsWordHeadCi(units, k))) return Spans(wordHeadCi: true);
         return segments;
     }
 
@@ -317,7 +327,7 @@ public sealed class CompositionDetector
     }
 
     private List<CompositionSegment> FindSpans(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish, bool? followingEnglish, DetectionLevel level, bool englishSentence, bool kanaInput, bool final,
-        HashSet<int>? japanesePunctuation = null, bool startsWord = true, string? precedingOpener = null, bool afterNewline = false)
+        HashSet<int>? japanesePunctuation = null, bool startsWord = true, string? precedingOpener = null, bool afterNewline = false, bool wordHeadCi = false)
     {
         var n = units.Count;
         var segments = new List<CompositionSegment>();
@@ -427,11 +437,11 @@ public sealed class CompositionDetector
                     }
                 }
             }
-            // 語の頭の ci (CI が落ちた の ci。本家 #1734、要件 015): c はかなにできず i だけ い になって cい に崩れていた。
-            // ほかの判定で英語にならなかったときだけ、ci の 2 文字を英字のまま残す (city・cinema は上で先に英語の区間になる)。
+            // 語の頭の ci (要件 015。Segment が、全体を英語にする決まりが当たらなかったときだけ wordHeadCi を立てて呼び直す)。
+            // この位置から始まる英語の区間が上で見つからなかったときだけ、ci の 2 文字を英字のまま残す (city・cinema は上で先に英語の区間になる)。
             // 語の途中の ci (docira・ocitsuku) は chi の h 落ちで、打ち間違いの補正が直すので触らない
             // (english.txt に ci を足すと、その補正が止まる)。
-            if (found < 0 && !kanaInput && level != DetectionLevel.Manual && IsWordHeadCi(units, i)) found = i + 2;
+            if (wordHeadCi && found < 0 && !kanaInput && level != DetectionLevel.Manual && IsWordHeadCi(units, i)) found = i + 2;
             if (found < 0)
             {
                 i++;
@@ -669,6 +679,9 @@ public sealed class CompositionDetector
     private static int Score(bool? english) => english switch { true => 1, false => -1, null => 0 };
 
     /// <summary>英文の中では半角のままにする記号。[ ] は日本語の入力では「」なので含めない (英単語の後ろでも「」: bot「Thinking」)。</summary>
+    private static bool IsAsciiSymbol(CompositionUnit unit) =>
+        unit.Raw.Length == 1 && unit.Raw[0] is >= '!' and <= '~' && !char.IsAsciiLetterOrDigit(unit.Raw[0]) && unit.Raw[0] is not ('[' or ']');
+
     /// <summary>
     /// 語の頭 (未確定の文字列の先頭、または空白・半角の記号・[ の直後) の小文字の ci か (要件 015)。
     /// c がかなにできない 1 文字として残り、次が i (い) のときだけ。大文字入り (Ci・CI) はほかの決まりに任せる。
@@ -681,9 +694,6 @@ public sealed class CompositionDetector
         var before = units[i - 1];
         return before.Raw != "-" && (IsAsciiSymbol(before) || before.Raw == "[" || before.Raw.All(char.IsWhiteSpace));
     }
-
-    private static bool IsAsciiSymbol(CompositionUnit unit) =>
-        unit.Raw.Length == 1 && unit.Raw[0] is >= '!' and <= '~' && !char.IsAsciiLetterOrDigit(unit.Raw[0]) && unit.Raw[0] is not ('[' or ']');
 
 
     /// <param name="final">打ち終わった (Space・Enter)。末尾の区間でも、英単語の打ちかけ (amaz) は英語の根拠にしない。</param>
