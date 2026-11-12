@@ -1343,6 +1343,8 @@ internal static class RomajiTypoTests
                 ("ci ga ochita", "ci がおちた"), ("kono ci", "このci"), ("[ci]", "「ci」"),
                 ("docira", "どちら"), ("ocitsuku", "おちつく"), ("shakuhaci", "しゃくはち"), ("chiisai", "ちいさい"), ("chotto", "ちょっと"), ("ui", "うい"),
                 ("CI", "CI"), ("Ci", "Ci"), ("city", "city"), ("cinema", "cinema"), ("cicd", "cicd"), ("cd", "cd"),
+                // 一覧に無い ci で始まる英字の語は、全体を英字にする既存の決まり (IsUnknownEnglishWord・UnknownWordThenJapanese) のまま (査読 1 周目の指摘)
+                ("citrix", "citrix"), ("cilantro", "cilantro"), ("circom", "circom"), ("cici", "cici"), ("ciliumga", "ciliumが"), ("use cidr", "use cidr"),
             })
             {
                 var k = new CompositionTests.Keyboard();
