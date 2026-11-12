@@ -1345,6 +1345,8 @@ internal static class RomajiTypoTests
                 ("CI", "CI"), ("Ci", "Ci"), ("city", "city"), ("cinema", "cinema"), ("cicd", "cicd"), ("cd", "cd"),
                 // 一覧に無い ci で始まる英字の語は、全体を英字にする既存の決まり (IsUnknownEnglishWord・UnknownWordThenJapanese) のまま (査読 1 周目の指摘)
                 ("citrix", "citrix"), ("cilantro", "cilantro"), ("circom", "circom"), ("cici", "cici"), ("ciliumga", "ciliumが"), ("use cidr", "use cidr"),
+                // c + i で始まる英単語 (c|int、c|index) は、後ろの英単語の区間を ci の守りが潰さない (査読 2 周目の指摘)
+                ("cint", "cint"), ("cindex", "cindex"), ("cinput", "cinput"), ("cissue", "cissue"), ("cint ga", "cint が"),
             })
             {
                 var k = new CompositionTests.Keyboard();
