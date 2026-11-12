@@ -427,6 +427,11 @@ public sealed class CompositionDetector
                     }
                 }
             }
+            // 語の頭の ci (CI が落ちた の ci。本家 #1734、要件 015): c はかなにできず i だけ い になって cい に崩れていた。
+            // ほかの判定で英語にならなかったときだけ、ci の 2 文字を英字のまま残す (city・cinema は上で先に英語の区間になる)。
+            // 語の途中の ci (docira・ocitsuku) は chi の h 落ちで、打ち間違いの補正が直すので触らない
+            // (english.txt に ci を足すと、その補正が止まる)。
+            if (found < 0 && !kanaInput && level != DetectionLevel.Manual && IsWordHeadCi(units, i)) found = i + 2;
             if (found < 0)
             {
                 i++;
@@ -664,6 +669,19 @@ public sealed class CompositionDetector
     private static int Score(bool? english) => english switch { true => 1, false => -1, null => 0 };
 
     /// <summary>英文の中では半角のままにする記号。[ ] は日本語の入力では「」なので含めない (英単語の後ろでも「」: bot「Thinking」)。</summary>
+    /// <summary>
+    /// 語の頭 (未確定の文字列の先頭、または空白・半角の記号・[ の直後) の小文字の ci か (要件 015)。
+    /// c がかなにできない 1 文字として残り、次が i (い) のときだけ。大文字入り (Ci・CI) はほかの決まりに任せる。
+    /// - の直後は語の頭にしない (日本語の後ろの - は長音で、語の途中)。
+    /// </summary>
+    private static bool IsWordHeadCi(IReadOnlyList<CompositionUnit> units, int i)
+    {
+        if (i + 1 >= units.Count || units[i].Raw != "c" || units[i].Kana != "c" || units[i + 1].Raw != "i") return false;
+        if (i == 0) return true;
+        var before = units[i - 1];
+        return before.Raw != "-" && (IsAsciiSymbol(before) || before.Raw == "[" || before.Raw.All(char.IsWhiteSpace));
+    }
+
     private static bool IsAsciiSymbol(CompositionUnit unit) =>
         unit.Raw.Length == 1 && unit.Raw[0] is >= '!' and <= '~' && !char.IsAsciiLetterOrDigit(unit.Raw[0]) && unit.Raw[0] is not ('[' or ']');
 
