@@ -40,19 +40,23 @@ scope: core
   | `sore ci` | `それcい` | `sore ci` | `sore cli` → `sore cli` |
   | `kore made ci` | `これまでcい` | `これmade ci` | `kore made cli` → `これmade cli` |
   | `kyou ha ci.` | `今日はcい。` | `今日はci.` | `kyou ha cli.` → `今日はcli.` |
+  | `anime ci` | `あにめcい` | `anime ci` | `anime cli` → `anime cli` |
+  | `i ci` | `いcい` | `I ci` (大文字にもなる) | `i cli` → `I cli` |
   | `ago ci ago` | `あごcいあご` | `ago ci ago` | — |
 
-  - 前の語が `no`・`to`・`so`・`do`・`yo`・`sore`・`made`・`dame`・`home`・`are`・`game`・`more`・`api` など、英語にも読める語のとき。`ci` が英語の区間になったので、後ろの語を見て前の語を英字に確定し直す既存の決まり (`docs/W12_SHORTWORDS_2026-10-24.md`) に乗る。
+  - 前の語が `no`・`to`・`so`・`do`・`yo`・`me`・`he`・`ya`・`a`・`i`・`sore`・`made`・`dame`・`home`・`are`・`game`・`more`・`demo`・`date`・`tame`・`mama`・`papa`・`api`、日本語由来の英語 (`anime`・`manga`・`emoji`・`karaoke`・`sushi`・`sake`・`tofu`) など、英語にも読める語のとき (日本語として普通に打つ語を含む)。`ci` が英語の区間になったので、後ろの語を見て前の語を英字に確定し直す既存の決まり (`docs/W12_SHORTWORDS_2026-10-24.md`) に乗る。
   - 最初の完成条件に入れていた `github no ci` → `github のci` はこのため届かない。行を `kono ci` → `このci` に差し替えた (実装前は `このcい` で赤)。前の語を英字に戻す決まりの直し方は別の要件。
   - 空白を入れない `kyounoci` は変わらない (`きょうのcい`。非目標)。`ci no kekka` → `ci のけっか`、`ci to cd` → `ci とcd`、`slack de ci wo mawasu` → `slack でci をまわす`、`kore ha ci to iu` → `これはci という`、英文の `run ci on push`・`npm ci` は良くなる。
 - `ci` で始まる崩れた入力の見た目が変わる (どれも base で既に崩れている形): `cikai` → `ciかい` (base `cいかい`)、`cia` → `cia` (base `cいあ`)、`ci-zu` → `ci-ず` (base `cいーず`)、`ciage` → `ciage` (base `cいあげ`。`ci` の後ろの `age` が英単語にも読めるため)。
 - `ci` の前後の記号が半角になることがある (base で崩れている形の見た目): `"cigau"` → `"ciがう”` (base `”cいがう”`)、`kon'ci` → `こん'ci` (base `こん’cい`)。
-- `ci` まで打った時点の表示が `ci` になる (base は `cい`)。`city`・`cinema`・`chi` を打つ途中のほかの表示は base と同じ。
+- 打つ途中の表示: `ci` の後ろの綴りが英単語として決まるまでは、`cい` の代わりに `ci` で表示される (`ci` → `ci`、`cit` → `cit` (base `cいt`)、`cin` → `cin` (base `cいn`)、`cine` → `ciね` (base `cいね`)、`cila` → `ciぁ` (base `cいぁ`))。どれも base で `cい` と崩れていた表示。`city`・`cinema` と打ち終えた時点の表示と、`chi` を打つ途中の表示は base と同じ。
 - 変えないもの (査読 1 周目の指摘で直した): 同梱の一覧に無い `ci` で始まる英字の語 (`citrix`・`cilantro`・`circom`・`cici`・`cihkai`、`ciliumga` → `ciliumが`) は、全体を英字にする既存の決まりのまま。守りは、その決まりが当たらなかったときだけ効く。
+- 変えないもの (査読 2 周目の指摘で直した): c + i で始まる英単語 (`cint`・`cindex`・`cinput`・`cissue`。base は `c` + 英単語 `int` に分けて英字のまま) は今までどおり。守りは、今の分け方で c と i がどちらも日本語の区間に入っている (`cい` と出る) ci にだけ効く。利用者が `ci` を日本語と決めて学習していれば (`LanguageMemory`)、守りは効かない。
+- **変わるのは、base の結果に `cい` が出ていた入力だけ** (境界例 約 11.2 万件で、base に `cい` が無いのに変わった入力は 0 件)。
 
 ## 非目標 (今回はやらない)
 - 空白で区切った「英語にも読める語」+ 英単語 (`kyou no cli`・`kyou no ci`・`sore ci`) の前の語を かなにすること (上の「受け入れる変化」)。
-- 日本語のすぐ後ろの `ci` (`kyouhacigaochita` → 今は `きょうはcいがおちた`)。語の途中の h 落ちの補正と見分けられないので扱わない (空白を挟めば直る)。
+- 日本語のすぐ後ろの `ci` (`kyouhacigaochita` → 今は表示 `きょうはcいがおちた`・確定 `きょうはくがおちた`。変えない)。語の途中の h 落ちの補正と見分けられないので扱わない (空白を挟めば直る)。
 - `ci` で始まる h 落ちの打ち間違い (`cikai` = ちかい、`cigau` = ちがう) を かなに直すこと。base は `cいかい`・`cいがう`、変更後は `ciかい`・`ciがう` (どちらも崩れたまま。見た目だけ変わる)。
 - `qi`・`qa` など、ほかの「読めない 1 文字 + 母音」。
 - 辞書の変更、Swift 側の変更、手動モード (判定レベル Manual)・かな入力の挙動。
@@ -69,10 +73,10 @@ scope: core
   ci ga ochita	ci がおちた	full
   kono ci	このci	full
   ```
-  守る行 (今も当たる。実装後も当たる): `docira` → `どちら`、`ocitsuku` → `おちつく`、`shakuhaci` → `しゃくはち`、`chiisai` → `ちいさい`、`chotto` → `ちょっと`、`ui` → `うい`、`CI` → `CI`、`city` → `city`、`cinema` → `cinema`、`cicd` → `cicd`、`citrix` → `citrix`、`cilantro` → `cilantro`、`circom` → `circom`、`cici` → `cici`、`ciliumga` → `ciliumが`、`use cidr` → `use cidr`、`kyou ha citrix` → `今日はcitrix` (後ろの 7 行は査読 1 周目で足した。最初の実装では外れ、直して当たる)
+  守る行 (今も当たる。実装後も当たる): `docira` → `どちら`、`ocitsuku` → `おちつく`、`shakuhaci` → `しゃくはち`、`chiisai` → `ちいさい`、`chotto` → `ちょっと`、`ui` → `うい`、`CI` → `CI`、`city` → `city`、`cinema` → `cinema`、`cicd` → `cicd`、`citrix` → `citrix`、`cilantro` → `cilantro`、`circom` → `circom`、`cici` → `cici`、`ciliumga` → `ciliumが`、`use cidr` → `use cidr`、`kyou ha citrix` → `今日はcitrix` (後ろの 7 行は査読 1 周目で足した。最初の実装では外れ、直して当たる)、`cint` → `cint`、`cindex` → `cindex`、`cinput` → `cinput`、`cissue` → `cissue`、`cint ga` → `cint が` (査読 2 周目で足した。2 番目の実装では外れ、直して当たる)
 - [ ] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req015_Ci_AtWordHead_StaysEnglish_AndChiTyposStillCorrected` を足す (要点: 上の行を `BuiltInWordChecker` で打って Enter の確定を比べる)。実装前は赤。
 - [ ] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過、品質テスト (`--eval`) の数字が base と同じ
-- [ ] 査読: 判定ロジックの変更なので、査読員が境界例を自分で作って base と比べ、「base で全部かなだった入力が変わる」形が 0 件、「base で英字のままだった語が崩れる」形が 0 件
+- [ ] 査読: 判定ロジックの変更なので、査読員が境界例を自分で作って base と比べ、「base で全部かなだった入力が変わる」形が 0 件、「base で英字のままだった語が崩れる」形が 0 件、「base に `cい` が無いのに変わる」形が 0 件
 - [ ] 文書: `docs/KNOWN_LIMITS.md` に該当の記載なし (確認のみ)
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す。すべて未確認)
