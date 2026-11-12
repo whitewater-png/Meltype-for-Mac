@@ -238,7 +238,7 @@ public sealed class CompositionDetector
         {
             return [new CompositionSegment(true, "", stylized)];
         }
-        List<CompositionSegment> Spans(bool wordHeadCi)
+        List<CompositionSegment> Spans(HashSet<int>? wordHeadCi)
         {
             var found = FindSpans(units, pending, precedingEnglish, followingEnglish, level, englishSentence && precedingEnglish == true, kanaInput, final, startsWord: startsWord, precedingOpener: precedingOpener, afterNewline: afterNewline, wordHeadCi: wordHeadCi);
             if (kanaInput) return found;
@@ -249,7 +249,7 @@ public sealed class CompositionDetector
             }
             return found;
         }
-        var segments = Spans(wordHeadCi: false);
+        var segments = Spans(wordHeadCi: null);
         if (kanaInput) return segments;
         // 辞書にない英単語 (stackoverflow など) を最初から打っているなら全体を英語にする (カスタム表でしか読めない綴りは除く)。
         // 途中の区間 (… flow) だけを英語にすると「sたcこvえrflow」のようになってしまう。
@@ -263,7 +263,9 @@ public sealed class CompositionDetector
         // 語の頭の ci (CI が落ちた の ci。本家 #1734、要件 015): c はかなにできず i だけ い になって cい に崩れていた。
         // 上の「全体を英語にする」決まり (citrix・cilium + が) が当たらなかったときだけ、語の頭の ci を英字に残して分け直す
         // (先に FindSpans の中で ci を英語にすると、先頭が英語の区間になって上の決まりが効かなくなる)。
-        if (level != DetectionLevel.Manual && Enumerable.Range(0, units.Count).Any(k => IsWordHeadCi(units, k))) return Spans(wordHeadCi: true);
+        // 分け直すのは、今の分け方で c も i も日本語の区間に入っている (cい と出る) ci だけ。i から英単語が始まる c|int (cint) は触らない。
+        // 利用者が ci を日本語と決めて学習していれば、それを優先する。
+        if (level != DetectionLevel.Manual && Memory?.Get("ci") != false && WordHeadCiInJapanese(units, segments) is { } wordHeadCi) return Spans(wordHeadCi);
         return segments;
     }
 
@@ -326,8 +328,29 @@ public sealed class CompositionDetector
         return result;
     }
 
+    /// <summary>
+    /// 語の頭の ci (<see cref="IsWordHeadCi"/>) のうち、今の分け方で c と i がどちらも日本語の区間に入っているものの c の単位の位置 (要件 015)。無ければ null。
+    /// i から英語の区間が始まる形 (c|int の cint、c|it の cit) は入れない。
+    /// </summary>
+    private static HashSet<int>? WordHeadCiInJapanese(IReadOnlyList<CompositionUnit> units, List<CompositionSegment> segments)
+    {
+        HashSet<int>? result = null;
+        var unit = 0;
+        for (var s = 0; s < segments.Count; s++)
+        {
+            var first = unit;
+            for (var remaining = segments[s].Raw.Length; unit < units.Count && remaining > 0; unit++) remaining -= units[unit].Raw.Length;
+            if (segments[s].IsEnglish) continue;
+            for (var k = first; k + 1 < unit; k++)
+            {
+                if (IsWordHeadCi(units, k)) (result ??= []).Add(k);
+            }
+        }
+        return result;
+    }
+
     private List<CompositionSegment> FindSpans(IReadOnlyList<CompositionUnit> units, string pending, bool? precedingEnglish, bool? followingEnglish, DetectionLevel level, bool englishSentence, bool kanaInput, bool final,
-        HashSet<int>? japanesePunctuation = null, bool startsWord = true, string? precedingOpener = null, bool afterNewline = false, bool wordHeadCi = false)
+        HashSet<int>? japanesePunctuation = null, bool startsWord = true, string? precedingOpener = null, bool afterNewline = false, HashSet<int>? wordHeadCi = null)
     {
         var n = units.Count;
         var segments = new List<CompositionSegment>();
@@ -437,11 +460,11 @@ public sealed class CompositionDetector
                     }
                 }
             }
-            // 語の頭の ci (要件 015。Segment が、全体を英語にする決まりが当たらなかったときだけ wordHeadCi を立てて呼び直す)。
+            // 語の頭の ci (要件 015。Segment が、全体を英語にする決まりが当たらなかったときだけ、cい と出る ci の位置を wordHeadCi に入れて呼び直す)。
             // この位置から始まる英語の区間が上で見つからなかったときだけ、ci の 2 文字を英字のまま残す (city・cinema は上で先に英語の区間になる)。
             // 語の途中の ci (docira・ocitsuku) は chi の h 落ちで、打ち間違いの補正が直すので触らない
             // (english.txt に ci を足すと、その補正が止まる)。
-            if (wordHeadCi && found < 0 && !kanaInput && level != DetectionLevel.Manual && IsWordHeadCi(units, i)) found = i + 2;
+            if (found < 0 && wordHeadCi?.Contains(i) == true) found = i + 2;
             if (found < 0)
             {
                 i++;
