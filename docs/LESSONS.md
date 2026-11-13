@@ -14,3 +14,4 @@
 | 2026-10-24 | 判定ロジックの変更が「辞書の英単語 + 助詞」全般に効き、`sorenoerror` → `soreのerror` などが悪化した。正解表にその形が無く、eval-guard は通った。別モデルの査読員が境界例を自分で作って見つけた | 決まり | `CLAUDE.md` §4 に「判定ロジックを変えたら、査読員が境界例を自分で作って base と比べる」を足した |
 | 2026-10-24 | 2 つのエージェントが同じブランチを `git worktree add` で取ろうとして衝突した | 決まり | `CLAUDE.md` §3 の worktree コマンドと `.claude/agents/eval-guard.md`・`reviewer.md` を `--detach` にした |
 | 2026-11-01 | 声の収集で、既にある設定「↓ で予測候補を選ぶ」(`DownSelectsPrediction`) を見落とし、「予測候補を矢印キーで選べるようにする」を要件の候補に出した (`docs/USAGE.md` の Tab の行だけを見た) | 決まり | 声の収集の候補は、出す前に `src/Meltype.Core/Config/Settings.cs` の設定の一覧と `docs/USAGE.md` を語句で探し、既にあるものは候補にしない (`docs/voice/2026-11-01.md` の「人の判断」に記録) |
+| 2026-11-13 | 要件 016 の「非目標」「受け入れる変化」で、打ちかけの形 (`obsidia`・`obsi`) の表示が変わるか変わらないかを、base で打たずに書いて 2 回間違えた (査読の 1・2 周目が見つけた) | 決まり | 要件に「今のまま」「新しく生まれる」と書く形は、base と作業ツリーの両方で `--repro` を打ち、表示と確定を 2 列の表で並べる (`docs/requirements/016-obsidian-english.md` の「受け入れる変化」の形) |
