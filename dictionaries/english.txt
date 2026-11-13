@@ -249,3 +249,5 @@ env into instal
 # C/C++ のプリプロセッサの指令名 (本家 #1625。define は でふぃね と全部読めるため辞書では直らず、ここには入れない)
 # 入れない: undef・ifndef (jibundeftotemo → じぶんでとても・shifndefure → しふぉんでふれ のような 1 打鍵の打ち間違いの補正が効かなくなる。undef は 〜んで の 179 語・18,136 形、ifndef は 1 語・24 形。独立査読 2026-11-11)
 endif elifndef pragma
+# --- 本家 #1763 (obsidian が おbしぢあn になる。o が読めて b が残り、確定では おんしぢあん になる) ---
+obsidian
