@@ -32,10 +32,18 @@ scope: dictionary
 2. `o` + `b` で始まる日本語 (`obake`・`obon`・`oboeru`・`obi`・`obentou`) は今のまま。`Obsidian`・`obsolete`・`absorb` も今のまま。
 
 ## 非目標 (今回はやらない)
-- 「表示は英字・確定はかな」のずれ全般を直すこと (`obs` → 表示 `おbs`・確定 `おば`、`obsidia` → 表示 `obsidia`・確定 `おんしぢあ` は今のまま)。別の要件にするかは人が決める。
+- 「表示は英字・確定はかな」のずれ全般を直すこと (`obs` → 表示 `おbs`・確定 `おば` は今のまま)。別の要件にするかは人が決める。
 - obsidian 自体の打ち間違い (`obsidiann`・`obsidians` など) を直すこと (base と同じく崩れる)。
 - 判定ロジックの変更。辞書 (`english.txt`) に 1 語足すだけ (見出し `本家 #1763` の行を新しく作る)。
 - 候補 2 (`bugga`)・候補 3 (前後に半角スペースの記録) は別の要件。
+
+## 受け入れる変化 (査読 1 周目の指摘で追記。受け入れてよいかは人が判断する)
+- obsidian を打ちかけて途中で Enter した形は、表示が英字に変わるが、確定は今までどおりかなになる (表示と確定のずれが新しく生まれる。`kaggl` → 表示 `kaggl`・確定 `かっgl` と同じ、辞書の語の接頭辞に前からある型)。Core の `--repro` (2026-11-13):
+  - `obsi` → 表示 `obsi`・確定 `おんし`、`obsidi` → 表示 `obsidi`・確定 `おんしぢ`、`obsidia` → 表示 `obsidia`・確定 `おんしぢあ` (base の表示は `おbしぢあ`。確定は base と同じ)
+  - `obsid` → 表示 `obsid`・確定 `おbしd` (base は表示・確定とも `おbしd`)
+  - `kyouhaobsidia` → 表示 `きょうはobsidia`・確定 `きょうはおbしぢあ`
+- 大文字始まりの `Obsidian` + 日本語が空白なしで分かれるようになる (良くなる方向): `Obsidiantomari` → 確定 `Obsidianとまり` (base は `Obsidiantomari` のまま。表示は `Obsidianとmari` で確定とずれる)。
+- obsidian の前後に余計な 1 文字が付いた意味のない並び (`dobsidian`・`obsidiana` など) は崩れ方が変わるだけ (どちらも正しい語ではない)。
 
 ## 完成条件 (先に決める。機械で判定できる形)
 - [ ] 正解表: `eval/cases/short-words-in-english.tsv` に次の行を足し、実装前は外れ、実装後は当たる
