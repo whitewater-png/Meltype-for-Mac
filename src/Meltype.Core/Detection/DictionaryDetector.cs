@@ -39,8 +39,11 @@ public sealed class DictionaryDetector
         }
     }
 
-    internal static readonly string[] Particles = ["no", "ga", "wo", "ni", "de", "to", "ha", "mo", "wa", "he"];
+    private static readonly string[] ParticleList = ["no", "ga", "wo", "ni", "de", "to", "ha", "mo", "wa", "he"];
 
     /// <summary>助詞 (の が を に で と は も わ へ) で始まっていれば、その助詞。</summary>
-    public static string? StartsWithParticle(string letters) => Particles.FirstOrDefault(letters.StartsWith);
+    public static string? StartsWithParticle(string letters) => ParticleList.FirstOrDefault(letters.StartsWith);
+
+    /// <summary>助詞のローマ字 (no ga wo ni de to ha mo wa he)。</summary>
+    internal static IReadOnlyList<string> Particles => ParticleList;
 }

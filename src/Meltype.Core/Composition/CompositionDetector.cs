@@ -362,7 +362,7 @@ public sealed class CompositionDetector
             // 1 文字の大文字 + 助詞で始まる語 (O|gawa) に分けない。英語の文脈の続きなので、そのまま英語の区間として見る。
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual && !(KeepEnglishNameAfterEnglish() && table.StartsWithUpper(i) && PrecededByEnglish(i) == true))
                 found = CapitalizedWordEnd(units, i, pending, final);
-            if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = HyphenatedWordEnd(units, i, pending);
+            if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = HyphenatedWordEnd(units, i, pending, afterEnglish: precedingEnglish == true);
             // 英語の語 + 数字のすぐ後ろの英単語 (part1026|beta、win11|pro) は、ローマ字として読めても英語 (ベタ にしない)。
             // 助詞で始まるなら日本語 (PS5|wokaitai)。
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual && AlphanumericSuffixEnd(units, i, pending, segments, japaneseStart) is var suffix and > 0) found = suffix;
@@ -1058,15 +1058,15 @@ public sealed class CompositionDetector
     public static bool IsHyphenPrefix(string lower) => HyphenPrefixes.Contains(lower);
 
     /// <summary>- の入った英単語か (e-mail、co-op、re-do、x-ray)。</summary>
-    /// <param name="typedLower">打った字が全部小文字か。大文字を含めて打った形 (Re-toga) は、長音の入った日本語の語 + 助詞として読み直さない。</param>
-    public bool IsHyphenatedEnglishWord(string lower, bool typedLower = true)
+    /// <param name="kanaWordFirst">長音の入った日本語の語 + 助詞 (re-to|ga = れーとが) として読めるときは英語にしないか。入力の先頭 (直前に確定した文字が英語のときを除く) で、全部小文字で打った形だけ true にする。</param>
+    public bool IsHyphenatedEnglishWord(string lower, bool kanaWordFirst)
     {
         if (HyphenatedWords.Contains(lower)) return true;
         var dash = lower.IndexOf('-');
         if (dash <= 0 || lower.IndexOf('-', dash + 1) >= 0) return false;
         var rest = lower[(dash + 1)..];
         return HyphenPrefixes.Contains(lower[..dash]) && rest.Length >= 3 && rest.All(char.IsAsciiLetterLower) && IsKnownEnglishWord(rest)
-            && !(typedLower && IsLongVowelWordThenParticle(lower[..dash], rest));
+            && !(kanaWordFirst && IsLongVowelWordThenParticle(lower[..dash], rest));
     }
 
     /// <summary>
@@ -1486,7 +1486,7 @@ public sealed class CompositionDetector
     /// start から始まる - の入った英単語 (e-mail、co-op) の終わり。無ければ -1。
     /// 後ろに日本語が続いてもよい (e-mail|de) ので、- の後ろは長い方から英単語になる所を探す。
     /// </summary>
-    private int HyphenatedWordEnd(IReadOnlyList<CompositionUnit> units, int start, string pending)
+    private int HyphenatedWordEnd(IReadOnlyList<CompositionUnit> units, int start, string pending, bool afterEnglish)
     {
         var n = units.Count;
         // 日本語を打っている最中のローマ字列では、明示した英数字表記だけを英語として切り出す。
@@ -1500,7 +1500,7 @@ public sealed class CompositionDetector
         {
             var typed = Raw(units, start, end) + (end == n ? pending : "");
             var word = typed.ToLowerInvariant();
-            if (afterJapaneseRomaji ? NumericHyphenatedWords.Contains(word) : IsHyphenatedEnglishWord(word, typed == word)) return end;
+            if (afterJapaneseRomaji ? NumericHyphenatedWords.Contains(word) : IsHyphenatedEnglishWord(word, kanaWordFirst: start == 0 && !afterEnglish && typed == word)) return end;
         }
         return -1;
     }
