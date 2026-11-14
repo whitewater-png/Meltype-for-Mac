@@ -1322,6 +1322,8 @@ internal static class RomajiTypoTests
                 ("co-op", "co-op"), ("e-mail", "e-mail"), ("e-book", "e-book"), ("re-saga", "re-saga"), ("Re-toga", "Re-toga"),
                 // 英語を確定した直後と、同じ変換中の文字列の途中は変えない
                 ("hello re-toga", "hello re-toga"), ("git re-rude", "git re-rude"), ("(re-toga", "(re-toga"), ("kyouha,re-toga", "きょうは、re-toga"),
+                // co は こ とも読めるが対象にしない (co-doha は表示 こーdoha と確定 こーどは がずれる)
+                ("co-toga", "co-toga"), ("co-doha", "co-doha"), ("co-rude", "co-rude"),
             })
             {
                 var k = new CompositionTests.Keyboard();

@@ -362,6 +362,7 @@ public sealed class CompositionDetector
             // 1 文字の大文字 + 助詞で始まる語 (O|gawa) に分けない。英語の文脈の続きなので、そのまま英語の区間として見る。
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual && !(KeepEnglishNameAfterEnglish() && table.StartsWithUpper(i) && PrecededByEnglish(i) == true))
                 found = CapitalizedWordEnd(units, i, pending, final);
+            // 直前に確定した文字が英語なら、改行をはさんでいても今までどおり英語 (re-toga を れーとが と読み直さない)。
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = HyphenatedWordEnd(units, i, pending, afterEnglish: precedingEnglish == true);
             // 英語の語 + 数字のすぐ後ろの英単語 (part1026|beta、win11|pro) は、ローマ字として読めても英語 (ベタ にしない)。
             // 助詞で始まるなら日本語 (PS5|wokaitai)。
@@ -1070,13 +1071,14 @@ public sealed class CompositionDetector
     }
 
     /// <summary>
-    /// 接頭辞 + ー + 続きの頭が、よく使う日本語の語 (readings.txt) の読みと丸ごと同じで、残りが助詞 1 つか (re-to|ga = れーと + が、e-su|mo = えーす + も)。
+    /// 接頭辞 + ー + 続きの頭が、よく使う日本語の語・ブランド名 (readings.txt・brands.txt) の読みと丸ごと同じで、残りが助詞 1 つか (re-to|ga = れーと + が、e-su|mo = えーす + も)。
     /// 続き (toga・sumo・rude) がたまたま英単語でも、長音の入った日本語の語 + 助詞として読む (本家 #1841)。
     /// 語の頭ではなく丸ごとの一致だけを見るので、re-made (れーま は語でない)・re-enter・e-mail は英語のまま。
+    /// co は こ とも読めるが、こー は ko- と打つのが普通で、co-doha は表示 (こーdoha) と確定 (こーどは) がずれるので対象にしない。
     /// </summary>
     private bool IsLongVowelWordThenParticle(string prefix, string rest)
     {
-        if (ReadingOf(prefix) is not { } head) return false;
+        if (prefix.Contains('c') || ReadingOf(prefix) is not { } head) return false;
         foreach (var particle in Detection.DictionaryDetector.Particles)
         {
             if (rest.Length <= particle.Length || !rest.EndsWith(particle, StringComparison.Ordinal)) continue;
