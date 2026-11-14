@@ -1305,6 +1305,32 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req017_LongVowelWordThenParticle_IsKana_AndHyphenEnglishStays()
+    {
+        // 本家 #1841: re-toga (レートが) が英字のまま残る。re + - + 英単語 (toga) の規則に当たっていた。
+        // 接頭辞の読み + ー + 続きの頭が readings.txt の語と丸ごと同じで、残りが助詞 1 つなら英語にしない。
+        // - の入った英語 (re-enter・e-mail)、大文字を含めて打った形 (Re-toga) は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("re-toga", "れーとが"), ("re-sumo", "れーすも"), ("re-rude", "れーるで"), ("e-sumo", "えーすも"), ("re-togatakai", "れーとがたかい"),
+                ("re-to", "れーと"), ("re-towo", "れーとを"), ("re-suga", "れーすが"), ("ko-toga", "こーとが"), ("kawasere-toga", "かわせれーとが"),
+                ("re-enter", "re-enter"), ("re-run", "re-run"), ("re-make", "re-make"), ("re-made", "re-made"), ("re-do", "re-do"),
+                ("co-op", "co-op"), ("e-mail", "e-mail"), ("e-book", "e-book"), ("re-saga", "re-saga"), ("Re-toga", "Re-toga"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
     public static void Req014_Pixiv_StaysEnglish_AndPiSpellingsDoNot()
     {
         // 本家 #1696: pixiv が ぴぃv になる (pi + xi が読めて v が残る)。pixivnitoukou は丸ごと英字のまま残っていた。
