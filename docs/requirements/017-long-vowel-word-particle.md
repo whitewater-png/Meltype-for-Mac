@@ -23,19 +23,22 @@ scope: core
 - 本家の扱い: 未確認。
 
 ## minimum の要件 (これだけは満たす)
-1. 全部小文字で打った「接頭辞 + `-` + 続き」で、続きが「語の残り + 助詞 1 つ」に分かれ、接頭辞の読み + `ー` + 語の残りの読みが `readings.txt`・`brands.txt` の語と丸ごと同じなら、続きが英単語でも英語にしない (`re-toga` → `れーとが`、`re-sumo` → `れーすも`、`re-rude` → `れーるで`、`e-sumo` → `えーすも`)。
+1. 入力の先頭 (変換中の文字列の頭。直前に確定した文字が英語のときを除く) に全部小文字で打った「接頭辞 + `-` + 続き」で、続きが「語の残り + 助詞 1 つ」に分かれ、接頭辞の読み + `ー` + 語の残りの読みが `readings.txt`・`brands.txt` の語と丸ごと同じなら、続きが英単語でも英語にしない (`re-toga` → `れーとが`、`re-sumo` → `れーすも`、`re-rude` → `れーるで`、`e-sumo` → `えーすも`)。
 2. `re-enter`・`re-run`・`re-make`・`re-made`・`re-do`・`co-op`・`e-mail`・`e-book` は英字のまま。`re-to`・`re-towo`・`ko-toga`・`kawasere-toga` は今までどおりかな。
 3. 大文字を含めて打った形 (`Re-toga`) は今までどおり英字のまま。
+4. 英語を確定した直後 (`hello re-toga`・`git re-toga`)、同じ変換中の文字列の途中 (`kyouha,re-toga`・`(re-toga`) は base と同じ結果のまま。
 
 ## 非目標 (今回はやらない)
 - 語の頭の一致 (`re-sa` = レーサー の頭) や、助詞が 2 つ以上・助詞以外が続く形 (`re-todesu`) の扱い。丸ごとの語 + 助詞 1 つだけ。
 - `re-saga` (base でも英字のまま。`れーさ` は語でない)。
-- 英数状態から打ち始めた形 (`CompositionController.DecideHeld` の経路) の測定。同じ `IsHyphenatedEnglishWord` を通るので同じ向きに変わる見込みだが、Core の `--repro` では測っていない。
+- 英数状態から打ち始めた形 (`CompositionController.DecideHeld` の経路) は変えない (`kanaWordFirst: false` で呼ぶ)。査読員が `Keyboard(direct: true)` で base を測り、`re-toga` + Enter・Space は英数のまま (続きの `toga` を英語と見るため) だった。この経路の `re-toga` は直らないまま残る。
+- 空白のあとでも、直前が英語なら変えない。直前が日本語・数字で空白のあと (`watashiha re-toga` → base `わたしはre-toga`、変更後 `わたしはれーとが`。`1 re-toga` → `1れーとが`) は、空白で前が確定して入力の先頭になるので変わる (下の「受け入れる変化」)。
 - 候補 2 (`propernouns.txt` の形で確定)・候補 3 (表示と確定のずれ) は別の要件。
 
 ## 受け入れる変化 (リョウさんの判断をお願いします)
 - 同梱の一覧で変わる続きは `toga`・`sumo`・`rude`・`doha`・`chide`・`tide` の 6 語、接頭辞は `re`・`e`・`co` (`co` は `こ` と読める) で、12 形: `re-toga`・`re-sumo`・`re-rude`・`e-toga` (えーとが)・`e-sumo`・`e-rude`・`co-toga` (こーとが)・`co-sumo` (こーすも)・`co-rude` (こーるで)・`co-doha` (こーどは)・`co-chide`/`co-tide` (こーちで)。どれも英語の複合語としては使わない並び。
-- かなになるので、後ろの空白は変換のキーになる (`re-toga takai` → base `re-toga たかい`、変更後 `れーとがたかい`)。
+- 空白で前が確定したあとの入力の先頭でも同じように変わる (直前が英語のときを除く): `watashiha re-toga` → `わたしはれーとが` (base `わたしはre-toga`)、`1 re-toga` → `1れーとが` (base `1re-toga`)、`re-toga re-rude` → `れーとがれーるで`。
+- かなになるので、後ろの空白は変換のキーになり、後ろの句読点は全角になる (`re-toga.` → `れーとが。`)。空白の例: (`re-toga takai` → base `re-toga たかい`、変更後 `れーとがたかい`)。
 - 実機の `NSSpellChecker` が英単語と答える続き (`toto`・`tomo` など。未確認) も、同じ条件ならかなになる。
 
 ## 完成条件 (先に決める。機械で判定できる形)
@@ -47,7 +50,7 @@ scope: core
   e-sumo	えーすも	full
   re-togatakai	れーとがたかい	full
   ```
-  守る行 (今も当たる): `re-to` → `れーと`、`re-towo` → `れーとを`、`re-suga` → `れーすが`、`ko-toga` → `こーとが`、`kawasere-toga` → `かわせれーとが`、`re-enter`・`re-run`・`re-make`・`re-made`・`re-do`・`co-op`・`e-mail`・`e-book`・`Re-toga` → 打ったまま
+  守る行 (今も当たる): `re-to` → `れーと`、`re-towo` → `れーとを`、`re-suga` → `れーすが`、`ko-toga` → `こーとが`、`kawasere-toga` → `かわせれーとが`、`re-enter`・`re-run`・`re-make`・`re-made`・`re-do`・`co-op`・`e-mail`・`e-book`・`Re-toga`・`hello re-toga`・`(re-toga` → 打ったまま
 - [ ] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req017_LongVowelWordThenParticle_IsKana_AndHyphenEnglishStays` を足す (要点: 上の行を `BuiltInWordChecker` で打って Enter の確定を比べる)。実装前は赤。
 - [ ] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過
 - [ ] 判定ロジックの変更なので、査読員が「接頭辞 + `-` + 英単語」の境界例を自分で作って base と比べる (CLAUDE.md §4)
@@ -62,7 +65,8 @@ scope: core
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
 - 査読の境界例で、実際に使う英語の複合語 (`re-enter`・`e-mail` の型) がかなに崩れる形が見つかったとき。
-- 入力の先頭以外 (日本語・英語に続く形) で base と結果が変わるとき。
+- 英語を確定した直後、または同じ変換中の文字列の途中 (日本語・英語・記号に空白なしで続く形) で base と結果が変わるとき。
+  - 書き直しの記録: 最初は「入力の先頭以外 (日本語・英語に続く形) で base と結果が変わるとき」と書いていた。査読 1 周目で、空白のあと (`hello re-toga`・`watashiha re-toga`) も変わると指摘された。英語の直後は変えないよう実装を絞り、日本語・数字 + 空白のあとは Core では「入力の先頭」と同じ (本家 #1841 の「最新の為替」の直後と同じ形) なので、条件の文をこの形に直した。条件を後から直したので、受け入れるかはリョウさんの判断をお願いします。
 
 ## 記録 (ループが書く)
 - (実装後に記入)

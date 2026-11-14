@@ -1309,7 +1309,7 @@ internal static class RomajiTypoTests
     {
         // 本家 #1841: re-toga (レートが) が英字のまま残る。re + - + 英単語 (toga) の規則に当たっていた。
         // 接頭辞の読み + ー + 続きの頭が readings.txt の語と丸ごと同じで、残りが助詞 1 つなら英語にしない。
-        // - の入った英語 (re-enter・e-mail)、大文字を含めて打った形 (Re-toga) は変わらない。
+        // 入力の先頭 (直前が英語のときを除く) だけ。- の入った英語 (re-enter・e-mail)、大文字を含めて打った形 (Re-toga) は変わらない。
         var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
@@ -1320,6 +1320,8 @@ internal static class RomajiTypoTests
                 ("re-to", "れーと"), ("re-towo", "れーとを"), ("re-suga", "れーすが"), ("ko-toga", "こーとが"), ("kawasere-toga", "かわせれーとが"),
                 ("re-enter", "re-enter"), ("re-run", "re-run"), ("re-make", "re-make"), ("re-made", "re-made"), ("re-do", "re-do"),
                 ("co-op", "co-op"), ("e-mail", "e-mail"), ("e-book", "e-book"), ("re-saga", "re-saga"), ("Re-toga", "Re-toga"),
+                // 英語を確定した直後と、同じ変換中の文字列の途中は変えない
+                ("hello re-toga", "hello re-toga"), ("git re-rude", "git re-rude"), ("(re-toga", "(re-toga"), ("kyouha,re-toga", "きょうは、re-toga"),
             })
             {
                 var k = new CompositionTests.Keyboard();
