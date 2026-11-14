@@ -1058,13 +1058,31 @@ public sealed class CompositionDetector
     public static bool IsHyphenPrefix(string lower) => HyphenPrefixes.Contains(lower);
 
     /// <summary>- の入った英単語か (e-mail、co-op、re-do、x-ray)。</summary>
-    public bool IsHyphenatedEnglishWord(string lower)
+    /// <param name="typedLower">打った字が全部小文字か。大文字を含めて打った形 (Re-toga) は、長音の入った日本語の語 + 助詞として読み直さない。</param>
+    public bool IsHyphenatedEnglishWord(string lower, bool typedLower = true)
     {
         if (HyphenatedWords.Contains(lower)) return true;
         var dash = lower.IndexOf('-');
         if (dash <= 0 || lower.IndexOf('-', dash + 1) >= 0) return false;
         var rest = lower[(dash + 1)..];
-        return HyphenPrefixes.Contains(lower[..dash]) && rest.Length >= 3 && rest.All(char.IsAsciiLetterLower) && IsKnownEnglishWord(rest);
+        return HyphenPrefixes.Contains(lower[..dash]) && rest.Length >= 3 && rest.All(char.IsAsciiLetterLower) && IsKnownEnglishWord(rest)
+            && !(typedLower && IsLongVowelWordThenParticle(lower[..dash], rest));
+    }
+
+    /// <summary>
+    /// 接頭辞 + ー + 続きの頭が、よく使う日本語の語 (readings.txt) の読みと丸ごと同じで、残りが助詞 1 つか (re-to|ga = れーと + が、e-su|mo = えーす + も)。
+    /// 続き (toga・sumo・rude) がたまたま英単語でも、長音の入った日本語の語 + 助詞として読む (本家 #1841)。
+    /// 語の頭ではなく丸ごとの一致だけを見るので、re-made (れーま は語でない)・re-enter・e-mail は英語のまま。
+    /// </summary>
+    private bool IsLongVowelWordThenParticle(string prefix, string rest)
+    {
+        if (ReadingOf(prefix) is not { } head) return false;
+        foreach (var particle in Detection.DictionaryDetector.Particles)
+        {
+            if (rest.Length <= particle.Length || !rest.EndsWith(particle, StringComparison.Ordinal)) continue;
+            if (ReadingOf(rest[..^particle.Length]) is { } stem && Array.BinarySearch(JapaneseReadings.Value, head + "ー" + stem, StringComparer.Ordinal) >= 0) return true;
+        }
+        return false;
     }
 
     /// <summary>語の頭になる開きの記号 (`「『(（"'[) と、対応する閉じの記号。</summary>
@@ -1480,8 +1498,9 @@ public sealed class CompositionDetector
         if (dash == start || dash >= n || units[dash].Raw != "-") return -1;
         for (var end = n; end > dash + 1; end--)
         {
-            var word = (Raw(units, start, end) + (end == n ? pending : "")).ToLowerInvariant();
-            if (afterJapaneseRomaji ? NumericHyphenatedWords.Contains(word) : IsHyphenatedEnglishWord(word)) return end;
+            var typed = Raw(units, start, end) + (end == n ? pending : "");
+            var word = typed.ToLowerInvariant();
+            if (afterJapaneseRomaji ? NumericHyphenatedWords.Contains(word) : IsHyphenatedEnglishWord(word, typed == word)) return end;
         }
         return -1;
     }
