@@ -1308,7 +1308,7 @@ internal static class RomajiTypoTests
     public static void Req017_LongVowelWordThenParticle_IsKana_AndHyphenEnglishStays()
     {
         // 本家 #1841: re-toga (レートが) が英字のまま残る。re + - + 英単語 (toga) の規則に当たっていた。
-        // 接頭辞の読み + ー + 続きの頭が readings.txt の語と丸ごと同じで、残りが助詞 1 つなら英語にしない。
+        // 接頭辞の読み + ー + 続きの頭が readings.txt・brands.txt の語と丸ごと同じで、残りが助詞 1 つなら英語にしない。
         // 入力の先頭 (直前が英語のときを除く) だけ。- の入った英語 (re-enter・e-mail)、大文字を含めて打った形 (Re-toga) は変わらない。
         var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;

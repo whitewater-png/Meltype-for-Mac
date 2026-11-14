@@ -1078,7 +1078,7 @@ public sealed class CompositionDetector
     /// </summary>
     private bool IsLongVowelWordThenParticle(string prefix, string rest)
     {
-        if (prefix.Contains('c') || ReadingOf(prefix) is not { } head) return false;
+        if (prefix == "co" || ReadingOf(prefix) is not { } head) return false;
         foreach (var particle in Detection.DictionaryDetector.Particles)
         {
             if (rest.Length <= particle.Length || !rest.EndsWith(particle, StringComparison.Ordinal)) continue;
