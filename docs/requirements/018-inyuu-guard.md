@@ -32,7 +32,7 @@ scope: core
 
 ## 完成条件 (先に決める。機械で判定できる形)
 守りの行なので、今の main で最初から当たる。「先に赤」の代わりに、**わざと崩した木 (作業ツリーで一時的に変えて戻す) で、足した行とテストが外れること**を一度確かめる。
-- [ ] 正解表: `eval/cases/short-words-in-english.tsv` に次の行を足し、今の main でも当たる
+- [x] 正解表: `eval/cases/short-words-in-english.tsv` に次の行を足し、今の main でも当たる
   ```
   dainyuu	だいにゅう	full	本家 #1946
   kinyuu	きにゅう	full
@@ -41,11 +41,13 @@ scope: core
   hensuunidainyuu	へんすうにだいにゅう	full
   dainyuusuru	だいにゅうする	full
   kinyuusuru	きにゅうする	full
+  shinyuu	しにゅう	full	(査読の例: 前に英単語 shin)
+  ginyuu	ぎにゅう	full	(査読の例: 前に英単語 gin)
   ```
-- [ ] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req018_Inyuu_DoesNotSplitEnglishIn` を足す (要点: 上の行を打って Enter の確定を比べる。既定の判定器と `BuiltInWordChecker` の両方)。
-- [ ] わざと崩した木で、足した行の少なくとも 1 つとテストが外れる (崩し方と結果を記録欄に書く)。
-- [ ] 回帰なし: `tools/eval-compare.sh` の broken 0 (足した行は added として ok)、Core のテスト全件通過。
-- [ ] 文書: `docs/KNOWN_LIMITS.md` に該当の記載なし (確認のみ)。
+- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req018_Inyuu_DoesNotSplitEnglishIn` を足す (要点: 上の行を打って Enter の確定を比べる。テスト用の判定器 (`BuiltInWordChecker`) とスペルチェッカー無しの両方)。
+- [x] わざと崩した木で、足した行の少なくとも 1 つとテストが外れる (崩し方と結果を記録欄に書く)。
+- [x] 回帰なし: `tools/eval-compare.sh` の broken 0 (両方の木を同じ表で回すので、足した行は base でも当たり added・fixed は 0)、Core のテスト全件通過。
+- [x] 文書: `docs/KNOWN_LIMITS.md` に該当の記載なし (確認のみ)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] TextEdit: `dainyuu` + Enter → `だいにゅう` (Space で `代入` が候補に出るか)
@@ -56,4 +58,7 @@ scope: core
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
 
 ## 記録 (ループが書く)
-- (未記入)
+- 周回数: 実装 1 周 + 査読の指摘への対応 1 回、査読 2 周。
+- わざと崩した木: `src/Meltype.Core/Detection/RomajiDetector.cs` の `("にゅ", ["nyu"])` を一時的に `nyuq` にした (にゅ の綴りを外す崩し方。`in` を英語として拾う経路そのものに絞った崩し方ではない)。結果は `dainyuu` → `だinゆう` (本家 #1946 と同じ形)、`kinyuu` → `kinゆう`、`kanyuu` → `かnゆう`、`yunyuu` → `ゆじゅう`、`hensuunidainyuu` → `へんすうにだinゆう`、`dainyuusuru` → `だinゆうする`、`kinyuusuru` → `kinゆうする`、`shinyuu` → `shinゆう`、`ginyuu` → `ginゆう` で、足した 9 行はすべて外れ、テストは赤 (`dainyuu 期待値: だいにゅう / 実際: だinゆう`)。戻した後に緑。査読員も同じ崩し方で再現した。
+- 数字: Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 0 / added 0。辞書は変えていない。
+- 査読 1 周目: [止める] なし。[直す] テストの 2 回目のループが 1 回目と同じ判定器だった → スペルチェッカー無しに変えた / 記録欄と AGENT_STATE → 記入。[任意] 「added として ok」の記述 → 直した、崩し方の範囲 → 上に明記、`shinyuu`・`ginyuu` (前に英単語が来る形) → 足した。`sounyuu`・`kounyuu`・`ninyuu`・`chuunyuu` などは今も当たるが、同じ型なので足していない。
