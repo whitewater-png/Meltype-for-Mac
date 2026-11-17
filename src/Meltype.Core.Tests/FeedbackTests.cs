@@ -1308,11 +1308,12 @@ internal static class RomajiTypoTests
     public static void Req018_Inyuu_DoesNotSplitEnglishIn()
     {
         // 本家 #1946: dainyuu が だinゆう になる (英単語 in を拾う)。この fork では起きないが、正解表に -inyuu の形が無かったので守る。
-        // 既定の判定器と BuiltInWordChecker の両方で、Enter の確定を比べる。
+        // shinyuu・ginyuu は前に英単語 (shin・gin) が来る形。テスト用の判定器 (BuiltInWordChecker) とスペルチェッカー無しの両方で、Enter の確定を比べる。
         var cases = new[]
         {
             ("dainyuu", "だいにゅう"), ("kinyuu", "きにゅう"), ("kanyuu", "かにゅう"), ("yunyuu", "ゆにゅう"),
             ("hensuunidainyuu", "へんすうにだいにゅう"), ("dainyuusuru", "だいにゅうする"), ("kinyuusuru", "きにゅうする"),
+            ("shinyuu", "しにゅう"), ("ginyuu", "ぎにゅう"),
         };
         foreach (var (typed, expected) in cases)
         {
@@ -1320,18 +1321,15 @@ internal static class RomajiTypoTests
             k.Type(typed + "\n");
             Assert.Equal(expected, k.Host.Document, typed);
         }
-        var savedChecker = CompositionTests.Detector.SpellChecker;
-        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
-        try
+        using (CompositionTests.WithoutSpellChecker())
         {
             foreach (var (typed, expected) in cases)
             {
                 var k = new CompositionTests.Keyboard();
                 k.Type(typed + "\n");
-                Assert.Equal(expected, k.Host.Document, typed + " (BuiltInWordChecker)");
+                Assert.Equal(expected, k.Host.Document, typed + " (スペルチェッカー無し)");
             }
         }
-        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
     }
 
     [Test]
