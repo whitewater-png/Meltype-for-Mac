@@ -41,8 +41,8 @@ scope: core
   hensuunidainyuu	へんすうにだいにゅう	full
   dainyuusuru	だいにゅうする	full
   kinyuusuru	きにゅうする	full
-  shinyuu	しにゅう	full	(査読の例: 前に英単語 shin)
-  ginyuu	ぎにゅう	full	(査読の例: 前に英単語 gin)
+  shinyuu	しにゅう	full	要件 018 (査読の例: 前に英単語 shin が来る形)
+  ginyuu	ぎにゅう	full	要件 018 (査読の例: 前に英単語 gin が来る形)
   ```
 - [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req018_Inyuu_DoesNotSplitEnglishIn` を足す (要点: 上の行を打って Enter の確定を比べる。テスト用の判定器 (`BuiltInWordChecker`) とスペルチェッカー無しの両方)。
 - [x] わざと崩した木で、足した行の少なくとも 1 つとテストが外れる (崩し方と結果を記録欄に書く)。
@@ -61,4 +61,5 @@ scope: core
 - 周回数: 実装 1 周 + 査読の指摘への対応 1 回、査読 2 周。
 - わざと崩した木: `src/Meltype.Core/Detection/RomajiDetector.cs` の `("にゅ", ["nyu"])` を一時的に `nyuq` にした (にゅ の綴りを外す崩し方。`in` を英語として拾う経路そのものに絞った崩し方ではない)。結果は `dainyuu` → `だinゆう` (本家 #1946 と同じ形)、`kinyuu` → `kinゆう`、`kanyuu` → `かnゆう`、`yunyuu` → `ゆじゅう`、`hensuunidainyuu` → `へんすうにだinゆう`、`dainyuusuru` → `だinゆうする`、`kinyuusuru` → `kinゆうする`、`shinyuu` → `shinゆう`、`ginyuu` → `ginゆう` で、足した 9 行はすべて外れ、テストは赤 (`dainyuu 期待値: だいにゅう / 実際: だinゆう`)。戻した後に緑。査読員も同じ崩し方で再現した。
 - 数字: Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 0 / added 0。辞書は変えていない。
-- 査読 1 周目: [止める] なし。[直す] テストの 2 回目のループが 1 回目と同じ判定器だった → スペルチェッカー無しに変えた / 記録欄と AGENT_STATE → 記入。[任意] 「added として ok」の記述 → 直した、崩し方の範囲 → 上に明記、`shinyuu`・`ginyuu` (前に英単語が来る形) → 足した。`sounyuu`・`kounyuu`・`ninyuu`・`chuunyuu` などは今も当たるが、同じ型なので足していない。
+- 査読 2 周目: [止める] なし。[直す] 記録欄の AGENT_STATE の記述 → 直した。[任意] 完成条件の出典の書き方を tsv とそろえた。
+- 査読 1 周目: [止める] なし。[直す] テストの 2 回目のループが 1 回目と同じ判定器だった → スペルチェッカー無しに変えた / 記録欄 → 記入 (AGENT_STATE は PR 作成後に PR 番号付きで更新)。[任意] 「added として ok」の記述 → 直した、崩し方の範囲 → 上に明記、`shinyuu`・`ginyuu` (前に英単語が来る形) → 足した。`sounyuu`・`kounyuu`・`ninyuu`・`chuunyuu` などは今も当たるが、同じ型なので足していない。
