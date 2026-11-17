@@ -63,3 +63,4 @@ scope: core
 - 数字: Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 0 / added 0。辞書は変えていない。
 - 査読 2 周目: [止める] なし。[直す] 記録欄の AGENT_STATE の記述 → 直した。[任意] 完成条件の出典の書き方を tsv とそろえた。
 - 査読 1 周目: [止める] なし。[直す] テストの 2 回目のループが 1 回目と同じ判定器だった → スペルチェッカー無しに変えた / 記録欄 → 記入 (AGENT_STATE は PR 作成後に PR 番号付きで更新)。[任意] 「added として ok」の記述 → 直した、崩し方の範囲 → 上に明記、`shinyuu`・`ginyuu` (前に英単語が来る形) → 足した。`sounyuu`・`kounyuu`・`ninyuu`・`chuunyuu` などは今も当たるが、同じ型なので足していない。
+- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/23
