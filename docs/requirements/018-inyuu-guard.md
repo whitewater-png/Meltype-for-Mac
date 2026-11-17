@@ -58,7 +58,7 @@ scope: core
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
 
 ## 記録 (ループが書く)
-- 周回数: 実装 1 周 + 査読の指摘への対応 1 回、査読 2 周。
+- 周回数: 実装 1 周 + 査読の指摘への対応 2 回、査読 3 周 (3 周目は指摘なし)。
 - わざと崩した木: `src/Meltype.Core/Detection/RomajiDetector.cs` の `("にゅ", ["nyu"])` を一時的に `nyuq` にした (にゅ の綴りを外す崩し方。`in` を英語として拾う経路そのものに絞った崩し方ではない)。結果は `dainyuu` → `だinゆう` (本家 #1946 と同じ形)、`kinyuu` → `kinゆう`、`kanyuu` → `かnゆう`、`yunyuu` → `ゆじゅう`、`hensuunidainyuu` → `へんすうにだinゆう`、`dainyuusuru` → `だinゆうする`、`kinyuusuru` → `kinゆうする`、`shinyuu` → `shinゆう`、`ginyuu` → `ginゆう` で、足した 9 行はすべて外れ、テストは赤 (`dainyuu 期待値: だいにゅう / 実際: だinゆう`)。戻した後に緑。査読員も同じ崩し方で再現した。
 - 数字: Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 0 / added 0。辞書は変えていない。
 - 査読 2 周目: [止める] なし。[直す] 記録欄の AGENT_STATE の記述 → 直した。[任意] 完成条件の出典の書き方を tsv とそろえた。
