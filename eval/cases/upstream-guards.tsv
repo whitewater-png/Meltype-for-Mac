@@ -1,0 +1,12 @@
+# 本家 (yksr-melt/Meltype) に報告された誤判定のうち、この fork では起きないものを守る行。期待は今の Mac 版 Core の出力 (今も当たる行)。
+# 後の変更 (辞書への語の追加・判定ロジックの変更・本家への追従) で本家と同じ崩れ方をしたら、回帰ゲートで気付けるようにする。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打った結果を測る。実機の記録ではない。漢字の形は測れない。
+# カテゴリ: 要件 019 (本家 2026-11-17 の報告。docs/requirements/019-upstream-1117-guard.md。本家での崩れ方は出典の欄)
+baguhoukoku	ばぐほうこく	full	本家 #1984 (本家では bag ウ報告。docs/voice/2026-11-17.md 候補 2)
+tunagarumademattekara	つながるまでまってから	full	本家 #1985 (本家では つながるまでmatteから。docs/voice/2026-11-17.md 候補 2)
+tsunagarumademattekara	つながるまでまってから	full	要件 019 (作者の作例: tsu の綴り)
+CLAUDE.mdwohiraku	CLAUDE.mdをひらく	full	本家 #1987 (本家では CLAUDE.mdwo開く。docs/voice/2026-11-17.md 候補 2)
+AGENTS.mdwohiraku	AGENTS.mdをひらく	full	要件 019 (作者の作例: 大文字だけの別のファイル名)
+,nisuruwo	、にするを	full	本家 #1990 (本家では 、nisl を。docs/voice/2026-11-17.md 候補 2)
+reibunn:pregnant_man:	れいぶん:pregnant_man:	full	本家 #1991 (本家では reibun:pregnant_man:。docs/voice/2026-11-17.md 候補 2)
+reibun:smile:desu	れいぶん:smile:です	full	要件 019 (作者の作例: 記法の後ろに日本語)
