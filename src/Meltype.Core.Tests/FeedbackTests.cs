@@ -1328,6 +1328,25 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req019_Upstream1117Shapes_StayAsTheyAre()
+    {
+        // 本家 #1984・#1985・#1987・#1990・#1991 (2026-11-17): baguhoukoku が bag ウ報告、tunagarumademattekara が つながるまでmatteから、
+        // CLAUDE.mdwohiraku が CLAUDE.mdwo開く、,nisuruwo が 、nisl を、reibunn:pregnant_man: が reibun:pregnant_man: になる。
+        // この fork では起きないが、正解表に同じ形が無かったので守る (判定ロジック・辞書は変えていない)。正解表: eval/cases/upstream-guards.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("baguhoukoku", "ばぐほうこく"), ("tunagarumademattekara", "つながるまでまってから"), ("tsunagarumademattekara", "つながるまでまってから"),
+            ("CLAUDE.mdwohiraku", "CLAUDE.mdをひらく"), ("AGENTS.mdwohiraku", "AGENTS.mdをひらく"), (",nisuruwo", "、にするを"),
+            ("reibunn:pregnant_man:", "れいぶん:pregnant_man:"), ("reibun:smile:desu", "れいぶん:smile:です"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req012_PreprocessorDirectives_StayEnglish_AndKanaWordsDoNot()
     {
         // 本家 #1625: endif が えんぢf、elifndef が elifんdef になる。dictionaries/english.txt に endif・elifndef・pragma を足した。
