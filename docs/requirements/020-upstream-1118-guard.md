@@ -84,3 +84,4 @@ scope: core
   - どの崩し方でもテストは赤 (例: `uchidome 期待値: うちどめ / 実際: うちdome`)、戻した後は緑。
   - 崩し方は「その行が実際に比べられていること」を確かめるためのもので、本家の原因 (未確認) を再現したものではない。
 - 見つけた今の main の外れ (この要件では直さない。守る行にもしない。別の要件の候補): 小文字の `fluorite` → `fluおりて` (`EN:flu | JA:orite`)、`Fluoritewotukau` → 丸ごと英字のまま (どちらも実装者が `--repro` で確かめた)。
+- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/25
