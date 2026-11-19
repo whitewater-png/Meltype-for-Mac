@@ -66,12 +66,18 @@ scope: core
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
 
 ## 記録 (ループが書く)
-- 周回数: 実装 1 周。査読は下に書く。
+- 周回数: 実装 1 周、査読 1 周目は [止める] なし。
+- 数字: Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 0 / added 0 (630/736。新しい表は 8/8。両方の木を同じ表で回すので base でも当たる)。`check-terms.mjs` エラー 0。辞書・判定ロジックは変えていない (`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行)。
+- 査読 1 周目 (別エージェント。Core 1260/1260、eval-compare broken 0 / fixed 0 / added 0 を査読員が再実行。8 行と「今の main の外れ」2 形を `--repro`・`--segments` で照合。崩した木は ど・大文字始まり・ぱ の 3 つを再現。開いている PR #20・#23・#24 と `git merge-tree` で合わせて衝突なし):
+  - [直す・対応] `docs/AGENT_STATE.md` が未更新 → PR を作った後に 1 行足した。
+  - [任意・対応] ぱ を崩した木の「本家とは違う崩れ方」の書き方 → 表示は本家と同じ `ろんpa` になると書き直した (実装者も `--repro` で確かめた)。
+  - [任意・見送り] `docs/requirements/README.md` の一覧に 020 の行が無い (開いている PR #20・#23 が同じ末尾に行を足していて衝突するため。019 と同じ扱い)。
+  - [任意・見送り] テストも正解表も確定だけを比べるので、表示だけが崩れる回帰は見えない (018・019 と同じ作り)。
 - わざと崩した木 (作業ツリーで 1 つずつ変えて、テスト `Req020` と正解表を回し、`git checkout` で戻した。2026-11-19):
   | 崩し方 | 外れた行 → 出力 |
   |---|---|
   | `RomajiDetector.cs` の `("びゅ", ["byu"])` を `byuq` に (びゅ の綴りを外す) | `itotekinagobyuu` → `いとてきなgobゆう` (本家 #2015 のかなの形と同じ) |
-  | `RomajiDetector.cs` の `("ぱ", ["pa"])` を `paq` に (ぱ の綴りを外す) | `ronpa` → `ろのあ`、`onpa` → `おんぺあ`、`ronpasuru` → `ろのあする` (本家の `ろんpa` とは違う崩れ方) |
+  | `RomajiDetector.cs` の `("ぱ", ["pa"])` を `paq` に (ぱ の綴りを外す) | 確定は `ronpa` → `ろのあ`、`onpa` → `おんぺあ`、`ronpasuru` → `ろのあする`。確定の前の表示は `ろんpa`・`おんpa`・`ろんpあする` (表示は本家 #2016 の `ろんpa` と同じ形。テストと正解表が比べるのは確定だけ) |
   | `RomajiDetector.cs` の `("ど", ["do"])` を `doq` に (ど の綴りを外す) | `uchidome`・`utidome` → `うちdome` (本家 #2024 と同じ形) |
   | `RomajiDetector.cs` の `("うぃ", ["wi", "whi"])` の `wi` を `wiq` に | `fanntatowirukinnsonn` → `ふぁんたとwいるきんそん` (本家 #2029 のかなの形と同じ) |
   | `CompositionDetector.cs` の「大文字で始まる語は固有名詞や英文」の行 (`if (char.IsAsciiLetterUpper(span[0]) && (exact \|\| prefix \|\| atEnd \|\| …)) return true;`) を効かなくする | `Fluorite` → `Fluおりて` (本家 #2017 と同じ形) |
