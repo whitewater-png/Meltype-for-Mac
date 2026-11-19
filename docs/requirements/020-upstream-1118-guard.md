@@ -66,7 +66,7 @@ scope: core
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
 
 ## 記録 (ループが書く)
-- 周回数: 実装 1 周、査読 1 周目は [止める] なし。
+- 周回数: 実装 1 周、査読 2 周 (1 周目は [止める] なし・[直す] 1 件。2 周目は [止める]・[直す] なし)。
 - 数字: Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 0 / added 0 (630/736。新しい表は 8/8。両方の木を同じ表で回すので base でも当たる)。`check-terms.mjs` エラー 0。辞書・判定ロジックは変えていない (`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行)。
 - 査読 1 周目 (別エージェント。Core 1260/1260、eval-compare broken 0 / fixed 0 / added 0 を査読員が再実行。8 行と「今の main の外れ」2 形を `--repro`・`--segments` で照合。崩した木は ど・大文字始まり・ぱ の 3 つを再現。開いている PR #20・#23・#24 と `git merge-tree` で合わせて衝突なし):
   - [直す・対応] `docs/AGENT_STATE.md` が未更新 → PR を作った後に 1 行足した。
@@ -84,4 +84,5 @@ scope: core
   - どの崩し方でもテストは赤 (例: `uchidome 期待値: うちどめ / 実際: うちdome`)、戻した後は緑。
   - 崩し方は「その行が実際に比べられていること」を確かめるためのもので、本家の原因 (未確認) を再現したものではない。
 - 見つけた今の main の外れ (この要件では直さない。守る行にもしない。別の要件の候補): 小文字の `fluorite` → `fluおりて` (`EN:flu | JA:orite`)、`Fluoritewotukau` → 丸ごと英字のまま (どちらも実装者が `--repro` で確かめた)。
+- 査読 2 周目 (1 周目とは別のエージェント。PR を作った後の文書の更新を確認。`fluorite`・`Fluoritewotukau`・`ronpa` などを `--repro` で照合し、ぱ を崩した木の表示と確定を再現。開いている PR #20・#23・#24 と衝突なし): [止める]・[直す] なし。[任意・対応] AGENT_STATE の「今の外れ」に `Fluoritewotukau` を足した / 周回数の記述を今の状態に合わせた。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/25
