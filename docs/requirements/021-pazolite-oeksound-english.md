@@ -36,10 +36,26 @@ scope: dictionary
 - 2 語自体の打ち間違い (`pazolit`・`oeksoun` など) を直すこと。
 
 ## 受け入れる変化 (受け入れてよいかはリョウさんの判断)
-- 2 語を打ちかけて途中で Enter した形は、表示が英字に変わるが、確定は今までどおりかな (表示と確定のずれ。`kaggl`・PR #20 の `obsidia` と同じ、辞書の語の接頭辞に前からある型)。作業ツリーで見た例: `pazolit` → 表示 `pazolit`・確定 `ぱぞlit`、`oeksoun` → 表示 `oeksoun`・確定 `おえkそうん`、`oeksou` → 表示 `oeksou`・確定 `おえkそう`、`oeks` → 表示 `oeks`・確定 `おえか`。`pazoli` は `ぱぞぃ` のまま。base の表示・確定との差は査読で確かめて記録に書く。
+査読員が base (`origin/main` 20736db) と比べた結果 (Core、Enter で確定。実機は未確認)。
+1. 2 語を打ちかけて途中で Enter した形は、表示だけが英字に変わり、確定は base と同じ (表示と確定のずれ。`kaggl`・PR #20 の `obsidia` と同じ、辞書の語の接頭辞に前からある型)。
+
+   | 打鍵 | base の表示 / 確定 | この要件の後の表示 / 確定 |
+   |---|---|---|
+   | `pazol` | ぱぞl / ぱぞ | pazol / ぱぞ |
+   | `pazolit` | ぱぞlit / ぱぞlit | pazolit / ぱぞlit |
+   | `oeksou` | おえkそう / おえkそう | oeksou / おえkそう |
+   | `oeksoun` | おえksoun / おえkそうん | oeksoun / おえkそうん |
+   | `kyouhapazol` | きょうはぱぞl / きょうはぱぞ | きょうはpazol / きょうはぱぞ |
+   | `kyouhaoeks` | きょうはおえks / きょうはおえか | きょうはoeks / きょうはおえか |
+
+   `paz`・`pazo`・`pazoli`・`oek`・`oeks`・`oekso` は表示も確定も base と同じ (`oeks` は base でも 表示 `oeks`・確定 `おえか`。`pazol` の確定で `l` が消えるのも base から)。
+2. **`pazolite` 自体の 1 打鍵の打ち間違いが、確定で `pazolite` に寄る** (打ち間違いの補正が新しい語にも効く)。2 語の打ち間違い 19,673 入力のうち、綴りをそのまま含まない 227 件 + `pazolitde` の 1 件。base の確定はどれも意味のないかな・混ざった形で、日本語の語が壊れた例は無い。`oeksound` の打ち間違いでは 0 件。
+   - 良くなる方向の例: `pazolitd` ぱぞlite → pazolite、`pazklite` ぱぞlite → pazolite、`paqzolitewo` ぱぞぃてを → pazoliteを、`kyouhapazlolitenokyoku` きょうはぱぞぃてのきょく → きょうはpazoliteのきょく
+   - どちらも望ましくない例: `pazolitxeno` ぱぞぃてんお → pazoliteんお、`kyouhapapzoliteno` きょうはっぱぞぃての → きょうはっpazoliteの、`pazolitde` ぱぞlite → pazolite (で は base でも消えている)
+3. `oeksoundesu` (で + す の d が 1 つ) は おけそうんです → おえkそうんです。どちらも望ましい形 (`oeksoundです`) ではない。
 
 ## 完成条件 (先に決める。機械で判定できる形)
-- [ ] 正解表: `eval/cases/short-words-in-english.tsv` に次の行を足し、実装前は外れ、実装後は当たる
+- [x] 正解表: `eval/cases/short-words-in-english.tsv` に次の行を足し、実装前は外れ、実装後は当たる
   ```
   pazolite	pazolite	full
   oeksound	oeksound	full
@@ -53,10 +69,11 @@ scope: dictionary
   pazolite no kyoku	pazolite のきょく	full
   ```
   守る行 (今も当たる): `pazo` → `ぱぞ`、`kyouhapazo` → `きょうはぱぞ`、`pazuru` → `ぱずる`、`oekaki` → `おえかき`、`oeru` → `おえる`、`oeta` → `おえた`、`lite` → `lite`、`sound` → `sound`
-- [ ] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req021_PazoliteOeksound_StayEnglish_AndKanaSpellingsDoNot` を足す (要点: 上の行を `BuiltInWordChecker` で打って Enter の確定を完全一致で比べる)。実装前は赤。
-- [ ] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過、`node tools/check-dictionaries.mjs`・`node tools/check-terms.mjs` がエラー 0
+- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req021_PazoliteOeksound_StayEnglish_AndKanaSpellingsDoNot` を足す (要点: 上の行を `BuiltInWordChecker` で打って Enter の確定を完全一致で比べる)。実装前は赤。
+- [x] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過、`node tools/check-dictionaries.mjs`・`node tools/check-terms.mjs` がエラー 0
 - [ ] 査読: 別エージェントが、日本語の語の正しい打ち方と 1 打鍵の打ち間違いを base と比べ、2 語を含まない入力の確定の変化が 0 件 (要件 007・012 の教訓)
-- [ ] 文書: `docs/KNOWN_LIMITS.md` に該当の記載があれば直す
+  - **文字どおりには未達 (人の判断待ち)。** 日本語の語から作った 915,400 入力は確定・表示とも変化 0 件で、007・012 の型の回帰は無い。ただし `pazolite` 自体の打ち間違い 228 件 (綴りをそのまま含まない入力) の確定が変わった (「受け入れる変化」の 2)。条件を書いた時に「2 語の打ち間違い」を除くと書かなかったので、条件は書き換えずに未達のまま残し、受け入れるかをリョウさんに聞く。
+- [x] 文書: `docs/KNOWN_LIMITS.md` に該当の記載なし (確認のみ。K06 は一般的な書き方で 2 語を名指ししていない)
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す。すべて未確認)
 - [ ] TextEdit: `pazolite` + Enter → `pazolite`
@@ -70,4 +87,9 @@ scope: dictionary
 - 査読の境界例で、正しく打った日本語、または 1 打鍵の打ち間違いの補正が効かなくなる形が見つかったとき (要件 007 の教訓)。その語は外す。
 
 ## 記録 (ループが書く)
-- (未記入)
+- 周回数: 実装 1 周 (辞書に 2 語。判定ロジックは未変更)。査読は別エージェントで 1 周目に [止める] 1 件 (完成条件の「2 語を含まない入力の確定の変化が 0 件」に対し、`pazolite` 自体の打ち間違い 228 件が変わった。辞書・コードは直さず、「受け入れる変化」と完成条件に事実を書いて人の判断に回した)、[直す] 1 件 (この記録と AGENT_STATE)、[任意] 2 件 (接頭辞の表の `oeks`・`pazol` の誤り、`oeksoundesu` → どちらも反映)。
+- 先に赤: 2 つ目のコミットの木で `Req021_...` は 0/1 (`pazolite` 期待 pazolite / 実際 ぱぞlite)。正解表の 10 行は base で外れる。
+- 数字 (2026-11-20、クラウド Linux): Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 10 / added 0 (630→640/746)、品質テスト (`--eval`) は base と同じ 1295/1296、`check-dictionaries.mjs`・`check-terms.mjs` エラー 0。
+- 査読の境界例 (Core、Enter で確定、同梱の英単語の一覧): `readings.txt` の約 2 万語 (ヘボン式 1 通り) + `japanese.txt` 930 語から、正しい打ち方 20,441、+ 助詞 11 種 224,808、1 打鍵の打ち間違いのうち 2 語の断片 (`paz`・`pazol`・`oek`・`oeks`・`eks`・`kso`・`zol` など) を含むもの全件 16,874、それ以外の打ち間違い約 841 万件の 4 % の標本 332,414、語の境目に断片が出る複合語とその打ち間違い 326,829。重複を除いて 915,400 入力で、確定・表示とも変化 0 件。
+- 測れていないこと: 断片を含まない打ち間違いの残り 96 %、`si`・`tu`・`n'` など別の綴り、Space で変換する形、実機の `NSSpellChecker`、azooKey の漢字変換、実機の入力欄。本家の直し方 (クラウドから届かない)。
+- PR: (作成後に記す)
