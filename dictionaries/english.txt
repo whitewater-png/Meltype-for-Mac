@@ -215,6 +215,8 @@ riverside seaside teenage teenager woah mod mods hardcore tacz nsfw sfw fbc mine
 online
 # --- 本家 #1696 (pixiv が ぴぃv になる。pi + xi が読めて v が残る) ---
 pixiv
+# --- 本家 #2037 (pazolite が ぱぞlite、oeksound が おえksound になる。前がかなに読めて、後ろの lite・sound が英単語として残る) ---
+pazolite oeksound
 # --- 英単語 + する (pushして) の site と同じ綴りで終わる語 (web + site で分けない) ---
 website websites campsite worksite onsite offsite
 # --- 本家 #538 / PR #609 (infobesity = 情報過多。ty が残って いんふぉべしty になっていた) ---
