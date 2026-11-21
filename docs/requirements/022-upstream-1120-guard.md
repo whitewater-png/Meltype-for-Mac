@@ -82,3 +82,9 @@ scope: core
   | `("め", ["me"])` を `meq` に | `2nitime` → `2にtime`、`2nichime` → `2にちme`、`10nitime` → `10にtime` |
   - どの崩し方でもテストは赤 (例: `2nitime 期待値: 2にちめ / 実際: 2にtime`)、戻した後は緑。12 行とも少なくとも 1 つの崩し方で外れた。
   - 崩し方は「その行が実際に比べられていること」を確かめるためのもので、本家の原因 (未確認。中心は漢字の選び方) を再現したものではない。
+- 周回数: 実装 1 周。査読は別エージェントで 1 周目 [止める] なし・[直す] 2 件 (どちらも手続き: AGENT_STATE の更新、PR の作成)。
+- 数字: Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 0 / added 0 (634/740。新しい表は 12/12。両方の木を同じ表で回すので base でも当たる)。`check-terms.mjs`・`check-dictionaries.mjs` エラー 0。辞書・判定ロジックは変えていない (`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行)。
+- 査読 1 周目 (別エージェント。Core 1260/1260、eval-compare broken 0 / fixed 0 / added 0 を査読員が再実行。12 行を `--repro`・`--segments` で照合。崩した木は ま・め・ら の 3 つを再現し、出力は上の表と一致。た・ぱ は査読員は再現していない。開いている PR #20・#23・#24・#25・#26 のブランチと `git merge-tree` で合わせて衝突なし):
+  - [直す・対応] `docs/AGENT_STATE.md` が未更新 → PR を作った後に 1 行足す。
+  - [任意・見送り] テストは最初に外れた 1 形しか報告しない (019・020 と同じ書き方。外れた形の全体は正解表で見える)。
+  - 査読員が作った境界例 38 形 (`1nitime`・`2nitimedesu`・`2kaime`・`sitaikedo`・`amattara`・`chomattekudasai`・`yappari`・`era-desu`・`kakikomiera-ga` など) は今の main でどれもかなのまま確定し、外れは見つからなかった。`2time` → `2ちめ` (数字 + 英単語の time とも読める。K79 の `time`→ちめ と同じ傾向) は外れと断定していない。
