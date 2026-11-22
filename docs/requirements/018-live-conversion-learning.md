@@ -40,15 +40,18 @@ scope: core
 - R1e の表示と確定の食い違いを直すこと (別の要件)。
 
 ## 完成条件 (先に決める。機械で判定できる形)
-- [ ] テスト: R1a の形 (学習済みの語をライブ表示のまま Enter) で、予測用の回数と登録提案の回数が増える。実装前は赤 (増えない)。
-- [ ] テスト: 暗黙の確定・Shift+Enter・英語で終わる Space (R1e) では増えない。azooKey の学習 (偽の変換エンジンへの学習の呼び出し) は 0 回のまま。
-- [ ] 回帰なし: Core のテストが全件通る。`tools/eval-compare.sh` の broken 0。
-- [ ] 文書: README の学習の説明が、選んだ案と合っている。
+- [x] テスト: R1a の形 (学習済みの語をライブ表示のまま Enter) で、予測用の回数と登録提案の回数が増える。実装前は赤 (増えない)。
+- [x] テスト: 暗黙の確定・Shift+Enter・英語で終わる Space (R1e) では増えない。azooKey の学習 (偽の変換エンジンへの学習の呼び出し) は 0 回のまま。
+- [x] 回帰なし: Core のテストが全件通る。`tools/eval-compare.sh` の broken 0。
+- [x] 文書: README の学習の説明が、選んだ案と合っている。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] TextEdit・ライブ変換 ON: 同じ語 (例: 講演を) をライブ表示のまま Enter で 3 回確定すると、辞書への登録の提案が出る (P12 の 3 回)
 - [ ] 同じ語の予測が、前より上に出る (P13)
 - [ ] フォーカスを移して確定した (暗黙の確定) ときは、回数が増えない
+- [ ] `kouen` Enter のように語末の n で確定の形が変わる場合も、講演を 3 回確定すると提案が出る
+- [ ] 設定「変換後も続けて入力」ON: Space で変換したあと、学習済みの語を続けて打って Enter を 3 回で、続けて打った語の提案が出る
+- [ ] ATOK スタイル (TokMode) の Shift+↓ のあとの Enter、英字で確定したあと F6 → BackSpace → Enter、設定「Enter は見えているとおりに確定」ON で `kantan` + Enter では、回数が増えない
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
 - 学習データ (選び直しの記録・回数) のファイル形式を変える必要が出たとき。
@@ -59,4 +62,14 @@ scope: core
 2. README の学習の説明をどう直すか (案 A なら、azooKey の学習は Space で変換して確定したときだけ、と書き足す)。→ **決定**: 推奨どおり。予測の並びと登録の提案の回数は、ライブ変換の表示のまま Enter で確定したときも数えること、azooKey の学習は Space で変換して確定したときだけであることを、README の学習の説明に短く書く。
 
 ## 記録 (ループが書く)
-- 周回数 / モデル / 所要時間 / 手戻りの原因 / PR の URL
+- PR: #29 (https://github.com/whitewater-png/Meltype-for-Mac/pull/29。015〜017 と同じブランチに積んだ)。status は approved のまま。
+- 所要時間: 約 55 分 (開始 2026-11-22T09:04:11Z、終了 09:58:47Z)。人の介入なし。
+- 周回数 (implementer): 2。1 周目 (sonnet) で機械で測れる完成条件を達成。1 周目の査読 (opus) の直す 2 件と任意 7 件を、2 周目 (opus に昇格。`Composition/` に触れるため) で直す 1 件と任意 5 件に整理して入れた。2 周目の査読 (sonnet) は指摘なし。
+- モデルと起動回数: researcher 1 回 (sonnet) / implementer 2 回 (sonnet・opus) / reviewer 2 回 (opus・sonnet) / eval-guard 2 回 (sonnet) / doc-keeper 1 回。
+- 変更の中身: Core だけ (`CompositionController.cs`、`LiveEnterLearningTests.cs` 17 本、README 48 行に 1 文、`docs/KNOWN_LIMITS.md` の K95 の理由)。ライブ表示のまま Enter で確定したとき (変換後も続けて入力の残りの部分も)、確定した文節のうち学習済みの語について、`history.Touch` と `RecordSuggestions` を数える。azooKey の学習 (`LearnConversion`) と選び直しの記録 (`history.Remember`) はしない。学習データのファイル形式は変えていない。
+- 数字: Core のテスト 1290/1290 (base d210044 は 1273)。品質テスト 1295/1296 (外れは `my name is taro` だけ)。正解表 635/741 で base と同じ。eval-compare broken 0 / fixed 0 / added 0 / removed 0。境界例の一括比較 light 35,862 入力で違い 0。
+- 手戻りの原因: (1) 語末の n をかなのまま確定したら数えない、のテストが守りを外しても通った (偽の変換エンジンでは学習済みの語が入らない入力だった)。入力を替えて、守りを外すと落ちることを確かめた。(2) fixedOnly を「二重に数えないため」数えないとした 1 周目の判断が誤りと査読で分かり、2 周目で数えるようにした。(3) PR 本文と AGENT_STATE が古かった。
+- オーケストレーターが決めた解釈 (「見えたとおり」の読み方): 表示と確定の形が違う Enter (`kouen` Enter: 表示「こうえn」・確定 講演、打ち間違いの直し `onegaishimsu` → お願いします) でも、確定した語のうち学習済みのものは数える。数えるのは学習済みの語だけなので、見ずに通した誤変換を強める害は無い。設定「Shift+Enter で改行」が OFF のときの Shift+Enter は Enter と同じなので数える。数えない: 暗黙の確定・「Shift+Enter で改行」ON の Shift+Enter・英語で終わる Space・1 音確定・F6〜F10 の変換ボックス・ローマ字の再変換・EnterCommitsAsShown で語末の n をかなのまま確定した場合。
+- 測れていないこと (未確認): 実際の azooKey の文節の区切りと、履歴の読みと文節の読みが一致して Touch が当たるか (Mac 実機)。実機の入力欄。`_liveCache` に文節を持たせたことでのメモリーの増え (上限 256 件のまま。査読員の見込みは 1〜4 MB で、推測)。学習済みの語をライブ表示の Enter で確定するたびに suggest.json の書き込みが 1 回増える (Space → Enter と同じ量。未計測)。PreferEnglishAtSentenceEnd の守りはテストで届かない (かなが最大 1 文字で、ライブ変換の 4 文字に届かない)。ローマ字の再変換の Esc の経路は偽の変換エンジンで作れず、テストなし。Mac 実機チェックリストは未確認。
+- 範囲外で見つけたこと (別の要件の候補。018 より前から): 設定「変換後も続けて入力」ON で、ローマ字の再変換 → Space → 続けて打つ → Enter とすると、`Commit` の fixedOnly の分岐が `!_reconvertRomaji` を見ずに `Learn()` を呼び、azooKey と履歴に「きょうはいいてんきですね → kyouha iitenki desu ne」のような誤学習が入る (偽の変換エンジンで再現。base のコードでも同じ)。
+- 手順: PR #29 を開いたまま同じブランチに 017・018 を積んだので、止めのフックに従い、査読の前のコミットも PR のブランチに push された (`docs/LESSONS.md` に記録)。
