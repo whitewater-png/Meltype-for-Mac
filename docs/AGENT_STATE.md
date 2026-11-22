@@ -3,15 +3,20 @@
 > 1 枚だけの「今どこか」。ループの終わりと、文脈が圧縮される前に更新する。履歴は git に任せ、ここには最新だけを書く。
 > 話題ごとの詳しい引き継ぎは `docs/HANDOFF-*.md`、本家 PR の状態は `docs/UPSTREAM_PR_TRACKER.md`、設計と数字は `docs/IMPROVEMENT_PLAN.md`。
 
-## 基準の数字 (2026-10-24、クラウド Linux、ブランチ feat/001-api-no-error)
+## 基準の数字 (2026-11-22、クラウド Linux 4 コア、ブランチ ccr-0fc8aeab-sra4z7、HEAD 4a93b82)
 | 項目 | 値 | コマンド |
 |---|---|---|
-| Core のテスト | 940 / 940 (スキップ件数は未確認) | `dotnet run -c Release --project src/Meltype.Core.Tests` |
-| 品質テスト | 1270 / 1271 (99.9 %)。混在 39/39、英語 38/39。外れ: `my name is taro` のみ | `-- --eval` |
-| 正解表 (4 表) | 289 / 320 (90.3 %)。mac-device 40/41、mac-protected-spans 45/46、mac-terminal 26/30、upstream-quality 178/203。eval-compare は broken 0 / fixed 3 | `tools/eval-compare.sh` |
-| 規模 | 1 キー 0.086 ms (`[規模]`) | |
+| Core のテスト | 1259 / 1259 (スキップ件数は未確認) | `dotnet run -c Release --project src/Meltype.Core.Tests` |
+| 品質テスト | 1295 / 1296 (99.9 %)。外れ: `my name is taro` のみ | `-- --eval` |
+| 正解表 (6 表) | 622 / 728。mac-device 40/41、mac-protected-spans 52/53、mac-terminal 33/37、paren-space 10/12、short-words-in-english 301/382、upstream-quality 186/203。eval-compare (base 3a9c3b7) は broken 0 / fixed 0 | `tools/eval-compare.sh` |
+| 境界例の一括比較 | full (既定) 684,102 入力 (j1 203,350 / j2 270,110 / j3 196,735 / e 13,907)、1 本の木あたり約 16 分。light 35,862 入力、約 50〜70 秒。ローマ字にできず除いた読み 0。検算 1 (english.txt に undef を足した写し) は full で日本語の損失 289・英語の損失 0・その他 14・終了コード 1、light で日本語の損失 17・その他 1・終了コード 1。検算 2 (同じ木) は full・light とも違い 0・終了コード 0 | `tools/boundary-sweep.sh` (使い方は `docs/DEVELOPMENT.md`) |
+| 規模 | 1 キー 0.086 ms (`[規模]`)。2026-10-24 の値。今回は測っていない | |
 
 ## 進行中の要件
+- 015 判定の悪化を大量の境界例で測る道具 (`tools/boundary_sweep.py`・`boundary_compare.py`・`boundary-sweep.sh`。ブランチ ccr-0fc8aeab-sra4z7、PR は作成後に番号を記す)。docs/ACCURACY_PLAN_2026-11.md の 0-3、リョウさんの指示「おすすめで進めてください」(2026-11-22) で着手。status は approved のまま (done は人がマージした後)。Core 1259/1259、eval-compare broken 0 / fixed 0。単体テスト 21 件。別エージェントの査読 1 周 (止める・直す指摘なし。任意 1 件: `--expect-all` の無い木を base にする経路は動かしていない)。未確認: Mac で回せるか (`bash --noprofile --norc`)、かな → ローマ字の表 (Jht.cs の手写し) と Jht の出力の機械比較 (代表例のテストのみ)。判定ロジック・辞書は変えていない。
+- 016 (approved、次に着手)。
+- 017・018 (draft、人の判断待ち)。017 は案 A で進めてよいか・区切りの規則・Mac での測り方、018 は案 A・B・C の選択。
+- 精度の計画 `docs/ACCURACY_PLAN_2026-11.md` が今の方向 (§7 の 6 件はリョウさんの指示で決定済み)。
 - 002 ost が おst に崩れる (`dictionaries/english.txt` に 1 語。ブランチ req/002-short-english-words、PR #7 で main に統合済み)。定期タスクが docs/voice/2026-10-26.md の候補 1 から自動承認で着手。Core 1146/1146、eval-compare broken 0 / fixed 2。Mac 実機チェックリストはリョウさんが確認済み (2026-10-28。項目ごとの記録なし)。`gooddane` (本家 #1192) は判定ロジックの変更が要るため別の要件に残す。
 - 003 (長いローマ字文が全部かなになることを Core で守るテスト): PR #8 で main に統合済み・Mac 実機チェックリストは未確認。守りのテストで判定ロジックは未変更。外れは出なかった (400 文字超でも全部かな)。
 - 004 母音の無い英字 + ハイフンを長音にしない (ブランチ req/004-hyphen-english、PR 作成後に番号を記す)。docs/voice/2026-10-30.md 候補 2 から自動承認で着手。Core 1228/1228、eval-compare broken 0 / fixed 6。別エージェントの査読 1 周 (止める指摘なし)。Mac 実機チェックリストは未確認。日本語の直後の `git-log` (候補 1) は別の要件に残す。
@@ -29,10 +34,14 @@
 - 実装した範囲: 英字 1 文字ずつ読む略語 (`loanwords.txt` の大文字語) + の + 英字の残る英単語。新しく英字になるのは `api`・`ide`・`uri`・`gui`・`who` の 5 語。
 
 ## 次の一手
+- 人: Mac の Claude デスクトップアプリで、このリポジトリと本家の clone のフォルダーを共有する (本家追従 0-1 のため。2026-11-22 時点でクラウドから使える Mac のフォルダーは 0 件)。
+- 人: 要件 017・018 の判断 (017: 案 A で進めてよいか・区切りの規則・Mac での測り方 / 018: 案 A・B・C の選択)。
+- 人: 015 の PR の確認とマージの判断。
+- AI: 要件 016 を回す。
 - 人: `uri` (売り・瓜と読める) を英字にしてよいか判断する。
-- 人: PR を作り、Mac 実機チェックリスト (TextEdit・ターミナル) を確かめて、マージ・要件の `done` を判断する。
+- 人: 001 の Mac 実機チェックリスト (TextEdit・ターミナル) を確かめて、マージ・要件の `done` を判断する。
 - 別の要件にする候補: `my name is taro` (品質テストの最後の外れ)。
-- 辞書の英単語 + 助詞 全般 (`sorenoerror` など) は今回の範囲外。広げるときは境界例を別モデルの査読員に作らせる (`docs/LESSONS.md`)。
+- 辞書の英単語 + 助詞 全般 (`sorenoerror` など) は今回の範囲外。広げるときは境界例を別モデルの査読員に作らせる (`docs/LESSONS.md`)。道具は `tools/boundary-sweep.sh`。
 
 ## 1 件目の記録 (ループの実測。目標値は置かない)
 | 項目 | 値 |
@@ -42,3 +51,12 @@
 | 周回数 (implementer) | 2 |
 | 役割ごとのモデルと起動回数 | researcher 1 回 (sonnet、3.0 分) / implementer 2 回 (1 周目 sonnet 5.9 分、2 周目 opus 9.1 分。昇格理由: `Composition/` に触れる + 査読の「止める」指摘) / reviewer 2 回 (opus、6.6 分・4.9 分) / eval-guard 2 回 (sonnet、1.5 分・1.3 分) / doc-keeper 1 回。サブエージェント合計 8 回 |
 | 手戻りの原因 | (1) 要件の背景を `--explain` だけで書いて「全体が英語」と誤認し、完成条件に既に通る行 (`urlnoerror`) を入れた。(2) 1 周目の実装が「辞書の英単語 + 助詞」全般に効き、`sorenoerror` → `soreのerror` などの回帰が出た。正解表にその形が無く eval-guard は通り、reviewer が境界例を自分で作って発見。2 周目で `loanwords.txt` の大文字略語に絞って解消。(3) 2 つのエージェントが同じブランチを worktree に取って衝突 (`--detach` で回避) |
+
+## 015 の記録 (ループの実測。目標値は置かない)
+| 項目 | 値 |
+|---|---|
+| 要件 | 015 判定の悪化を大量の境界例で測る道具 (境界例の一括比較) |
+| 所要時間 | 約 53 分 (2026-11-22T04:28:27Z〜05:21:40Z)。人の介入なし (要件の承認はループの前) |
+| 周回数 (implementer) | 1 |
+| 役割ごとのモデルと起動回数 | researcher 1 回 (sonnet、約 3.5 分) / implementer 1 回 (sonnet、約 42.9 分。full の検算 2 本を含む) / reviewer 1 回 (sonnet、約 3.8 分。定義は opus だが、利用者の指定で sonnet にし、オーケストレーター (opus) が要所を読み直した) / eval-guard 1 回 (sonnet、約 1.9 分) / doc-keeper 1 回。サブエージェント合計 5 回 |
+| 手戻りの原因 | なし。設計の調整が 1 つ: J3 (語の連結) を最初は約 267 万入力で作ったが、1 入力 約 2.8 ms で 1 本の木 23 分超の見込みになり (止める条件は 30 分)、ん で終わる語 + で に右の語 6 語、ほかの語は 25 語に 1 語などに絞った (196,735 入力) |
