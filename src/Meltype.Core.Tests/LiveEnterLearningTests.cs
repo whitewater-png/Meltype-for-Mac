@@ -261,6 +261,45 @@ internal static class LiveEnterLearningTests
     }
 
     [Test]
+    public static void FirstSoundCommit_ThenLiveEnter_DoesNotCount()
+    {
+        // 1 音確定 (ATOK スタイルの Shift+↓) のあとの残りは語の途中から始まるので、数えない (Space → Enter でも学習しない。R46 任意 1)
+        var s = new Setup();
+        s.Keyboard.TokMode = true;
+        s.Keyboard.Type("atanniwotoru");
+        s.Keyboard.Key(VirtualKeys.LShift);
+        s.Keyboard.Press(VirtualKeys.Down);
+        s.Keyboard.Key(VirtualKeys.LShift, up: true);
+        Assert.Equal("あ", s.Keyboard.Host.Document, "前提: 先頭の 1 音だけ確定");
+        Assert.True(s.Keyboard.Host.View is { Converting: false, Text: "単位を取る" }, "前提: 残りはライブ表示: " + s.Keyboard.Showing);
+        s.Keyboard.Type("\n");
+        Assert.Equal("あ単位を取る", s.Keyboard.Host.Document, "確定はする");
+        Assert.Equal(1, s.Count("単位を"), "単位を の回数は変わらない");
+        Assert.Equal(0, s.Suggested("単位を"), "登録提案に数えない");
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
+    }
+
+    [Test]
+    public static void ToggleBox_LiveEnter_DoesNotCount()
+    {
+        // 確定後の F6 で開いた変換ボックス (英字で確定した語を、かなの読みにして開き直したもの) は、
+        // 変換をやめてライブ表示のまま Enter で確定しても数えない (Enter で日本語として覚えるのは打った英字のほう)
+        var s = new Setup();
+        s.Keyboard.Type("tanniwotoru");
+        s.Keyboard.Press(VirtualKeys.F10);
+        s.Keyboard.Type("\n");
+        Assert.Equal("tanniwotoru", s.Keyboard.Host.Document, "前提: 英字で確定");
+        Assert.True(s.Keyboard.Controller.TryToggleLastWord(toEnglish: false, s.Keyboard.Host.Document), "前提: 確定後の F6 で変換ボックスが開く");
+        s.Keyboard.Press(VirtualKeys.Back);
+        Assert.True(s.Keyboard.Host.View is { Converting: false, Text: "単位を取る" }, "前提: 変換をやめて、ライブ表示に戻る: " + s.Keyboard.Showing);
+        s.Keyboard.Type("\n");
+        Assert.Equal("単位を取る", s.Keyboard.Host.Document, "確定はする");
+        Assert.Equal(1, s.Count("単位を"), "単位を の回数は変わらない");
+        Assert.Equal(0, s.Suggested("単位を"), "登録提案に数えない");
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
+    }
+
+    [Test]
     public static void LiveOff_KanaEnter_DoesNotCount()
     {
         var s = new Setup(live: false);
