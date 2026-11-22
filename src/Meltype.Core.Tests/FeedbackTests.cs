@@ -1328,6 +1328,31 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req016_Obsidian_StaysEnglish_AndOSpellingsDoNot()
+    {
+        // 本家 #1763: obsidian が おbしぢあn になり、確定では おんしぢあん になる (o が読めて b が残る)。obsidianwo は表示が obsidianを なのに確定が おんしぢあんを だった。
+        // dictionaries/english.txt に足した。o + b で始まる日本語 (obake・obon・oboeru・obi・obentou) と Obsidian・obsolete・absorb は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("obsidian", "obsidian"), ("obsidianwo", "obsidianを"), ("obsidiande", "obsidianで"), ("obsidianga", "obsidianが"), ("obsidianni", "obsidianに"),
+                ("obsidian wo tsukau", "obsidian をつかう"), ("kyouhaobsidianwotukau", "きょうはobsidianをつかう"),
+                ("obake", "おばけ"), ("obon", "おぼん"), ("oboeru", "おぼえる"), ("obi", "おび"), ("obentou", "おべんとう"),
+                ("Obsidian", "Obsidian"), ("obsolete", "obsolete"), ("absorb", "absorb"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
     public static void Req012_PreprocessorDirectives_StayEnglish_AndKanaWordsDoNot()
     {
         // 本家 #1625: endif が えんぢf、elifndef が elifんdef になる。dictionaries/english.txt に endif・elifndef・pragma を足した。
