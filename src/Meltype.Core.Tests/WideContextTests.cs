@@ -93,6 +93,35 @@ internal static class WideContextTests
         Assert.Equal("この本は。", ContextAfterTyping("この本は。", true), "区切りが同じなら文脈つきで変換する");
     }
 
+    /// <summary>読みをカタカナにして返し、呼ばれた読みと文脈をすべて記録する変換エンジン。</summary>
+    private sealed class RecordingConverter : IKanjiConverter
+    {
+        public List<(string Reading, string? Context)> Calls { get; } = [];
+
+        public string? Convert(string hiragana) => CompositionText.ToKatakana(hiragana);
+
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null)
+        {
+            Calls.Add((hiragana, context));
+            return [new(hiragana, CompositionText.ToKatakana(hiragana))];
+        }
+    }
+
+    [Test]
+    public static void LongReading_ChunkContextComesBeforeWideContext()
+    {
+        // 50 文字を超える読みは区切って変換し、2 つ目以降の区切りには前の区切りの変換結果を文脈にする (_chunkContext)。
+        // 広い文脈 (前の文) は最初の区切りにだけ渡す。2 つ目以降で、前の区切りの変換結果より先に効かせない
+        var converter = new RecordingConverter();
+        var k = new CompositionTests.Keyboard(converter: converter) { WideContext = true };
+        k.Host.PrecedingText = "大学の先生の話を聞いた。";
+        k.Type(new string('a', CompositionController.ConvertChunkLength + 10) + " ");
+        var first = new string('あ', CompositionController.ConvertChunkLength);
+        Assert.True(converter.Calls.Contains((first, "大学の先生の話を聞いた。")), "最初の区切りには広い文脈を渡す (広い文脈が効いている場面)");
+        var contexts = converter.Calls.Where(c => c.Reading == new string('あ', 10) && c.Context is not null).Select(c => c.Context).Distinct();
+        Assert.Equal("アアアアアアアアアア", string.Join(" / ", contexts), "2 つ目の区切りには、前の区切りの変換結果 (の末尾 10 文字) を渡す。広い文脈ではない");
+    }
+
     [Test]
     public static void NiStart_UsesRealContextInsteadOfKore()
     {
