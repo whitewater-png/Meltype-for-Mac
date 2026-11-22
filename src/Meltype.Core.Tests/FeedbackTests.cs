@@ -1267,6 +1267,25 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req020_Upstream1118Shapes_StayAsTheyAre()
+    {
+        // 本家 #2015・#2016・#2017・#2024・#2029 (2026-11-18): itotekinagobyuu が 意図的なgobゆう、ronpa が ろんpa (onpa も)、
+        // Fluorite が Fluおりて、uchidome が うちdome、fanntatowirukinnsonn が ファンタとwイルキンソン になる。
+        // この fork では起きないが、正解表に同じ形が無かったので守る (判定ロジック・辞書は変えていない)。正解表: eval/cases/upstream-guards-1118.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("itotekinagobyuu", "いとてきなごびゅう"), ("ronpa", "ろんぱ"), ("onpa", "おんぱ"), ("ronpasuru", "ろんぱする"),
+            ("Fluorite", "Fluorite"), ("uchidome", "うちどめ"), ("utidome", "うちどめ"),
+            ("fanntatowirukinnsonn", "ふぁんたとうぃるきんそん"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req010_Karento_BecomesKana_AndKarenAndOthersDoNotChange()
     {
         // 本家 #1596: karento が karenと になる (固有名詞 karen + 助詞 to)。続きと合わせて日本語の語 (japanese.txt の karento) になるなら、固有名詞にしない。
@@ -1305,6 +1324,34 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req018_Inyuu_DoesNotSplitEnglishIn()
+    {
+        // 本家 #1946: dainyuu が だinゆう になる (英単語 in を拾う)。この fork では起きないが、正解表に -inyuu の形が無かったので守る。
+        // shinyuu・ginyuu は前に英単語 (shin・gin) が来る形。テスト用の判定器 (BuiltInWordChecker) とスペルチェッカー無しの両方で、Enter の確定を比べる。
+        var cases = new[]
+        {
+            ("dainyuu", "だいにゅう"), ("kinyuu", "きにゅう"), ("kanyuu", "かにゅう"), ("yunyuu", "ゆにゅう"),
+            ("hensuunidainyuu", "へんすうにだいにゅう"), ("dainyuusuru", "だいにゅうする"), ("kinyuusuru", "きにゅうする"),
+            ("shinyuu", "しにゅう"), ("ginyuu", "ぎにゅう"),
+        };
+        foreach (var (typed, expected) in cases)
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        using (CompositionTests.WithoutSpellChecker())
+        {
+            foreach (var (typed, expected) in cases)
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed + " (スペルチェッカー無し)");
+            }
+        }
+    }
+
+    [Test]
     public static void Req014_Pixiv_StaysEnglish_AndPiSpellingsDoNot()
     {
         // 本家 #1696: pixiv が ぴぃv になる (pi + xi が読めて v が残る)。pixivnitoukou は丸ごと英字のまま残っていた。
@@ -1317,6 +1364,31 @@ internal static class RomajiTypoTests
             {
                 ("pixiv", "pixiv"), ("pixivnitoukou", "pixivにとうこう"), ("pixivde", "pixivで"), ("pixivga", "pixivが"), ("pixiv wo miru", "pixiv をみる"),
                 ("pixi", "ぴぃ"), ("pixel", "pixel"), ("booth", "booth"), ("fanbox", "fanbox"), ("pinku", "ぴんく"), ("piza", "ぴざ"), ("pittari", "ぴったり"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
+    public static void Req016_Obsidian_StaysEnglish_AndOSpellingsDoNot()
+    {
+        // 本家 #1763: obsidian が おbしぢあn になり、確定では おんしぢあん になる (o が読めて b が残る)。obsidianwo は表示が obsidianを なのに確定が おんしぢあんを だった。
+        // dictionaries/english.txt に足した。o + b で始まる日本語 (obake・obon・oboeru・obi・obentou) と Obsidian・obsolete・absorb は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("obsidian", "obsidian"), ("obsidianwo", "obsidianを"), ("obsidiande", "obsidianで"), ("obsidianga", "obsidianが"), ("obsidianni", "obsidianに"),
+                ("obsidian wo tsukau", "obsidian をつかう"), ("kyouhaobsidianwotukau", "きょうはobsidianをつかう"),
+                ("obake", "おばけ"), ("obon", "おぼん"), ("oboeru", "おぼえる"), ("obi", "おび"), ("obentou", "おべんとう"),
+                ("Obsidian", "Obsidian"), ("obsolete", "obsolete"), ("absorb", "absorb"),
             })
             {
                 var k = new CompositionTests.Keyboard();
