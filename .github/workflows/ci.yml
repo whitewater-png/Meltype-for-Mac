@@ -73,3 +73,4 @@ jobs:
         run: |
           python3 tools/test_update_cask.py
           python3 tools/test_upstream_watch.py
+          python3 tools/test_boundary_sweep.py
