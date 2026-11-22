@@ -237,6 +237,7 @@ internal static class CompositionTests
 
         /// <summary>クリップボードの文字を候補に出すか (CompositionOptions.ClipboardCandidates)。既定は OFF。</summary>
         public bool ClipboardCandidates { get; set; }
+        public bool WideContext { get; set; }
 
         /// <summary>予測の Delete で呼ばれる、エンジンの予測を消す関数 (CompositionOptions.ForgetPrediction)。</summary>
         public Action<string>? ForgetPrediction { get; set; }
@@ -310,6 +311,7 @@ internal static class CompositionTests
                 ContextualLearning = () => ContextualLearning,
                 LaughterAfterKana = () => LaughterAfterKana,
                 ClipboardCandidates = () => ClipboardCandidates,
+                WideConversionContext = () => WideContext,
                 ForgetPrediction = text => ForgetPrediction?.Invoke(text),
                 RomajiTypos = Typos,
                 CorrectTypos = () => CorrectTypos,

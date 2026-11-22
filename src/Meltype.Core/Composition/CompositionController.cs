@@ -209,6 +209,12 @@ public sealed class CompositionOptions
     /// <summary>1 文字のかなの後ろの w を笑いにするか (設定。本家 #799)。</summary>
     public Func<bool> LaughterAfterKana { get; init; } = () => false;
 
+    /// <summary>
+    /// 変換エンジンに、文をまたいだ前の日本語 (最大 20 文字・最後の改行まで) を文脈として渡すか (要件 017)。
+    /// Zenzai (ニューラル変換) が使えるときだけ ON にする。OFF は今までどおり、同じ文の最大 10 文字。
+    /// </summary>
+    public Func<bool> WideConversionContext { get; init; } = () => false;
+
     /// <summary>クリップボードの文字を変換候補に出すか (設定。本家 #807)。</summary>
     public Func<bool> ClipboardCandidates { get; init; } = () => false;
 
@@ -2496,7 +2502,27 @@ public sealed class CompositionController
     }
 
     /// <summary>変換エンジンに渡す文脈: キャレットの前の確定済みの文字のうち、同じ文の日本語の部分 (最大 10 文字)。</summary>
-    private string? ConversionContext() => _chunkContext.Active ? _chunkContext.Text : ContextOf(PrecedingForConversion);
+    private string? ConversionContext() =>
+        _chunkContext.Active ? _chunkContext.Text : _options.WideConversionContext() ? WideContextOf(PrecedingForConversion) : ContextOf(PrecedingForConversion);
+
+    /// <summary>
+    /// 広い文脈 (要件 017): 最後が日本語のとき、最後の改行より後ろの末尾 20 文字。「。！？」では切らない (前の文も手がかりにする)。
+    /// 20 は Swift が入力欄から読む範囲 (UTF-16 の 20 単位) と同じ。改行より前は別の段落・別の発言なので混ぜない。
+    /// </summary>
+    private static string? WideContextOf(string? text)
+    {
+        if (string.IsNullOrEmpty(text) || LanguageOf(text) != false) return null;
+        text = text[(text.LastIndexOfAny(NewLines) + 1)..].Trim();
+        if (text.Length > WideContextLength)
+        {
+            text = text[^WideContextLength..];
+            if (char.IsLowSurrogate(text[0])) text = text[1..]; // サロゲートペアの途中から始めない
+        }
+        return text.Length == 0 ? null : text;
+    }
+
+    private const int WideContextLength = 20;
+    private static readonly char[] NewLines = ['\n', '\r'];
 
     private string? ContextOf(string? text)
     {
