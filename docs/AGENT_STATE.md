@@ -33,6 +33,7 @@
 - 019 本家 11-17 の誤判定 5 形 (`baguhoukoku`・`tunagarumademattekara`・`CLAUDE.mdwohiraku`・`,nisuruwo`・`reibunn:pregnant_man:`。fork では起きない) を守る (新しい正解表 `eval/cases/upstream-guards.tsv` に 8 行 + テスト `Req019_...`。判定ロジック・辞書は未変更。ブランチ req/019-upstream-1117-guard、PR #24)。docs/voice/2026-11-17.md 候補 2 から自動承認で着手。Core 1260/1260、eval-compare broken 0 / fixed 0 / added 0 (630/736)。わざと崩した木で 5 形とも外れることを確認。別エージェントの査読 3 周 (3 周目は止める・直す指摘なし)。査読で見つかった今の外れ `reibunn:+1:` → `れいぶん:＋1:` は別の要件の候補。Mac 実機チェックリストは未確認。候補 1 (数字の後の `,`) と候補 3 (ターミナルの Claude Code、Swift) は別の要件に残す。
 - (無し)。001 は PR #5 として base ブランチ `ccr-27ad1b0c-qzazzd` にマージ済み (2026-10-24、人の判断)。main へは PR #4 に含めて出す。Mac 実機チェックリスト (PR #5 本文) は未確認。
 - 実装した範囲: 英字 1 文字ずつ読む略語 (`loanwords.txt` の大文字語) + の + 英字の残る英単語。新しく英字になるのは `api`・`ide`・`uri`・`gui`・`who` の 5 語。
+- 023 本家 11-21 の誤判定 6 形 (`atude`・`tasinamu`・`haatu`・`getu`・`subewomotanai`・`Yukishiro`) を守る行と作例 6 形 (ブランチ req/023-upstream-1121-guard、PR #28)。docs/voice/2026-11-21.md 候補 2 から自動承認で着手。fork では今どれも起きないので、判定ロジック・辞書は変えず `eval/cases/upstream-guards-1121.tsv` (12 行) とテスト `Req023` だけ。わざと崩した木で 12 行とも外れることを確かめた。Core 1260/1260、eval-compare broken 0 / fixed 0 / added 0 (634/740)。別エージェントの査読 1 周 (止める指摘なし、直す 1 件は この行の追加、任意 2 件は 1 件 (テスト名) を対応・1 件 (`getup`・`at` の今の挙動) は範囲外として残す)。Mac 実機チェックリストは未確認。候補 1 (`verdeha` の `r` が確定で消える。原因は打ち間違いの直し) と候補 3 (括弧の幅) は人の判断が要るので別に残す。
 
 ## 次の一手
 - 人: `uri` (売り・瓜と読める) を英字にしてよいか判断する。

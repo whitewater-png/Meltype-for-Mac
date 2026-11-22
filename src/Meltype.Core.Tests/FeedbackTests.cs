@@ -1487,6 +1487,27 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req023_Upstream1121Shapes_StayKanaOrName()
+    {
+        // 本家 #2174・#2157・#2147・#2143・#2141・#2168 (2026-11-21): atude が at腕、tasinamu が 足しなmu、haatu が はatう、getu が getう、
+        // subewomotanai が すbeを持たない、Yukishiro が Yukiしろ になる、という報告。途中や頭の英字として読める並び (at・mu・get・be・Yuki) が残った形。
+        // この fork では今も起きない (判定ロジック・辞書は変えていない)。かなのまま (名前の Yukishiro は英字のまま) 確定することを守る。
+        // 漢字の形 (厚手・嗜む など) は測れない。正解表: eval/cases/upstream-guards-1121.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("atude", "あつで"), ("atsude", "あつで"), ("atudenoko-to", "あつでのこーと"),
+            ("tasinamu", "たしなむ"), ("tashinamu", "たしなむ"), ("haatu", "はあつ"), ("haatudesu", "はあつです"),
+            ("getu", "げつ"), ("getuyoubi", "げつようび"), ("subewomotanai", "すべをもたない"),
+            ("Yukishiro", "Yukishiro"), ("yukishiro", "ゆきしろ"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
