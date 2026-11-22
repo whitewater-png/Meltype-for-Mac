@@ -2516,11 +2516,9 @@ public sealed class CompositionController
     {
         if (string.IsNullOrEmpty(text) || LanguageOf(text) != false) return null;
         text = text[(text.LastIndexOfAny(NewLines) + 1)..].Trim();
-        if (text.Length > WideContextLength)
-        {
-            text = text[^WideContextLength..];
-            if (char.IsLowSurrogate(text[0])) text = text[1..]; // サロゲートペアの途中から始めない
-        }
+        if (text.Length > WideContextLength) text = text[^WideContextLength..];
+        // サロゲートペアの途中から始めない。ここで切ったときだけでなく、自分の確定の記録 (_lastCommitText) もサロゲートを見ずに 20 単位で切ってある
+        if (text.Length > 0 && char.IsLowSurrogate(text[0])) text = text[1..];
         return text.Length == 0 ? null : text;
     }
 

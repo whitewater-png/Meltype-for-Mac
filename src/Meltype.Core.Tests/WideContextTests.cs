@@ -39,6 +39,33 @@ internal static class WideContextTests
         Assert.Equal(new string('い', 19), context, "先頭の下位サロゲート単独は落とす");
     }
 
+    /// <summary>よしの を 𠮷野 (𠮷 はサロゲートペア) に、ほかの読みはかなのまま変換し、渡された文脈を覚える変換エンジン。</summary>
+    private sealed class YoshinoConverter : IKanjiConverter
+    {
+        public string? LastContext { get; private set; }
+
+        public string? Convert(string hiragana) => hiragana == "よしの" ? "\U00020BB7野" : null;
+
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null)
+        {
+            if (context is not null) LastContext = context;
+            return [new(hiragana, hiragana == "よしの" ? "\U00020BB7野" : hiragana)];
+        }
+    }
+
+    [Test]
+    public static void Context_DropsLeadingLowSurrogate_EvenWhenNotCut()
+    {
+        // 自分の確定の記録 (_lastCommitText) は、サロゲートを見ずに末尾 20 単位で切る。確定の直後 (1.5 秒以内) はその記録がキャレットの前の文字になるので、
+        // ちょうど 20 単位で下位サロゲートから始まることがある。広い文脈で切ったかどうかに関係なく落とす
+        Assert.Equal(new string('い', 19), ContextAfterTyping("\uDFB7" + new string('い', 19), true), "20 単位ちょうどでも、先頭の下位サロゲート単独は落とす");
+        var converter = new YoshinoConverter();
+        var k = new CompositionTests.Keyboard(converter: converter) { WideContext = true };
+        k.Type("yoshino \n" + new string('i', 18) + "\n"); // 𠮷野 (3 単位) + い 18 文字を確定する。記録は 21 単位の末尾 20 単位
+        k.Type("atsui ");
+        Assert.Equal("野" + new string('い', 18), converter.LastContext, "確定の直後も、記録の先頭の下位サロゲート単独は落とす");
+    }
+
     [Test]
     public static void Context_StopsAtNewline_NotAtSentenceEnd()
     {
