@@ -1348,7 +1348,7 @@ internal static class RomajiTypoTests
     }
 
     [Test]
-    public static void Req023_Upstream1121Shapes_StayAsTyped()
+    public static void Req023_Upstream1121Shapes_StayKanaOrName()
     {
         // 本家 #2174・#2157・#2147・#2143・#2141・#2168 (2026-11-21): atude が at腕、tasinamu が 足しなmu、haatu が はatう、getu が getう、
         // subewomotanai が すbeを持たない、Yukishiro が Yukiしろ になる、という報告。途中や頭の英字として読める並び (at・mu・get・be・Yuki) が残った形。

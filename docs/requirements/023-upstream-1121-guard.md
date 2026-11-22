@@ -56,7 +56,7 @@ scope: core
   Yukishiro	Yukishiro	full	本家 #2168
   yukishiro	ゆきしろ	full	要件 023 (作者の作例: 小文字で打った形)
   ```
-- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req023_Upstream1121Shapes_StayAsTyped` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
+- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req023_Upstream1121Shapes_StayKanaOrName` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
 - [x] わざと崩した木で、足した 12 行がどれも少なくとも 1 回は外れ、テストが赤になる (崩し方と結果を記録欄に書く)。
 - [x] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過。
 - [x] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。`eval/README.md` と `docs/requirements/README.md` の一覧には足さない (開いている PR が同じ場所に行を足していて衝突するため。019・020・022 と同じ扱い)。
