@@ -300,6 +300,43 @@ internal static class LiveEnterLearningTests
     }
 
     [Test]
+    public static void ContinueAfterConversion_CountsFixedClausesAndLiveRestOnceEach()
+    {
+        // 設定「変換後も続けて入力」: Space で変換した文節を固定し、続けて打った分 (ライブ表示) と一緒に Enter で確定する。
+        // 固定した文節は今までどおり Learn で数え、続けて打った分の学習済みの語も、ライブ表示の Enter と同じく数える (それぞれ 1 回。二重に数えない)
+        var s = new Setup();
+        s.History.Remember("かんたん", "簡単");
+        s.Keyboard.Continue = true;
+        s.Keyboard.Type("tanniwotoru ");
+        s.Keyboard.Type("kantann");
+        Assert.True(s.Keyboard.Host.View is { Converting: false, Text: "単位を取る簡単" }, "前提: 固定した文節 + 続けて打った分のライブ表示: " + s.Keyboard.Showing);
+        s.Keyboard.Type("\n");
+        Assert.Equal("単位を取る簡単", s.Keyboard.Host.Document, "確定");
+        Assert.Equal(2, s.Count("単位を"), "固定した文節の 単位を は 1 → 2 (1 回だけ)");
+        Assert.Equal(2, s.Count("簡単"), "続けて打った分の 簡単 も 1 → 2 (1 回だけ)");
+        Assert.Equal(1, s.Suggested("単位を"), "単位を の登録提案は 1 回");
+        Assert.Equal(1, s.Suggested("簡単"), "簡単 の登録提案は 1 回");
+        Assert.Equal("単位を|取る", s.Taught(), "azooKey の学習は固定した文節だけ (続けて打った分は学習しない)");
+    }
+
+    [Test]
+    public static void RomajiReconversion_ContinuedLiveEnter_DoesNotCount()
+    {
+        // ローマ字の再変換 (選んだローマ字の文を日本語にする) は打ち直した文ではないので学習しない。
+        // 設定「変換後も続けて入力」で続けて打った分 (ライブ表示) も、同じ確定の中なので数えない
+        var s = new Setup();
+        s.Keyboard.Continue = true;
+        Assert.True(s.Keyboard.Controller.ReconvertRomaji("kyouha iitenki desu ne"), "前提: ローマ字の再変換が始まる");
+        s.Keyboard.Type("tanniwotoru");
+        Assert.True(s.Keyboard.Host.View is { Converting: false } view && view.Text.EndsWith("単位を取る", StringComparison.Ordinal), "前提: 続けて打った分はライブ表示: " + s.Keyboard.Showing);
+        s.Keyboard.Type("\n");
+        Assert.True(s.Keyboard.Host.Document.EndsWith("単位を取る", StringComparison.Ordinal), "確定はする: " + s.Keyboard.Host.Document);
+        Assert.Equal(1, s.Count("単位を"), "単位を の回数は変わらない");
+        Assert.Equal(0, s.Suggested("単位を"), "登録提案に数えない");
+        Assert.True(!s.Taught().Contains("単位を", StringComparison.Ordinal), "続けて打った分を azooKey に学習させない");
+    }
+
+    [Test]
     public static void LiveOff_KanaEnter_DoesNotCount()
     {
         var s = new Setup(live: false);

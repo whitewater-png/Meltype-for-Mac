@@ -3006,16 +3006,18 @@ public sealed class CompositionController
         // 変換後も続けて入力: 固定した文節 + 未変換の文節 (変換していなければ、表示のまま)。
         var fixedOnly = !converting && _headCount > 0;
         if (fixedOnly) TrimToFixedClauses();
-        // 変換せずに確定するとき (変換中でも固定した文節でもない) だけ、確定する文字列の元になったライブ変換の文節を集める (回数の記録用)
+        // 変換中でなければ、確定する文字列の元になったライブ変換の文節を集める (回数の記録用)。
+        // 固定した文節があるときは、その後ろの未変換の文節 (CurrentDisplay) の分だけ (固定した文節は下の Learn で数えるので、二重に数えない)
         List<Clause>? liveClauses = null;
         string text;
         if (converting) text = string.Concat(_clauses.Select(c => c.Text)) + SuffixText;
-        else if (fixedOnly) text = FixedText + CurrentDisplay(final: true) + SuffixText;
         else
         {
             _liveClauseSink = [];
-            try { text = CurrentDisplay(final: true); }
+            string shown;
+            try { shown = CurrentDisplay(final: true); }
             finally { liveClauses = _liveClauseSink; _liveClauseSink = null; }
+            text = fixedOnly ? FixedText + shown + SuffixText : shown;
         }
         // 確定するのが、集めた文節 (ライブ変換の結果) のままか (語末の n をかなのまま確定する・文の終わりの to を英語にするときは違う)
         var liveResult = true;
@@ -3073,6 +3075,7 @@ public sealed class CompositionController
         // ライブ変換の表示のまま (Space で変換せずに) Enter で確定したときは、確定した文節のうち学習済みの語を、予測用の回数と登録提案の回数に数える
         // (Space → Enter と同じ)。語末の n が ん になってライブ変換される (表示 こうえn → 確定 講演) 場合や、Enter の打ち間違いの直しで
         // 確定の形が表示と変わる場合も、確定した語を数える (数えるのは学習済みの語だけなので、見ずに通した誤変換を強めない)。
+        // 設定「変換後も続けて入力」で固定した文節の後ろに続けて打った分も同じ (固定した文節は上の Learn で数えた)。
         // azooKey の学習と選び直しの記録はしない (見ずに通した誤変換を 1 回で強めないため)。
         // 暗黙の確定・Shift+Enter・英語で終わる Space・ライブ変換の結果を確定しない場合 (かなのまま・英語)・ローマ字の再変換・1 音確定の残り・F6 の変換ボックスでは数えない。
         if (liveResult && liveClauses is { Count: > 0 } && _committingByEnter && !implicitly && !_reconvertRomaji && !_firstSoundCommitted && toggle is null && suffix.Length == 0 && !fixEnglish)
