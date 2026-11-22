@@ -13,7 +13,7 @@ namespace Meltype.Tests;
 /// </summary>
 internal static class LiveEnterLearningTests
 {
-    /// <summary>変換エンジンに渡った学習を数える偽の変換エンジン。</summary>
+    /// <summary>変換エンジンに渡った学習を、1 回分ごとに文節の語を | でつないで覚える偽の変換エンジン。</summary>
     private sealed class Probe : IKanjiConverter, ILearningConverter
     {
         private readonly CompositionTests.FakeConverter _inner = new();
@@ -22,7 +22,7 @@ internal static class LiveEnterLearningTests
         public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null) => _inner.ConvertClauses(hiragana, context);
         public void Learn(string? context, IReadOnlyList<ConversionClause> clauses)
         {
-            lock (Learned) Learned.AddRange(clauses.Select(c => c.Text));
+            lock (Learned) Learned.Add(string.Join("|", clauses.Select(c => c.Text)));
         }
     }
 
@@ -42,12 +42,29 @@ internal static class LiveEnterLearningTests
 
         public double Used => History.Usage().GetValueOrDefault("単位を");
         public int Pending => Suggestions.Pending(1).Count;
-        public int LearnCalls
+
+        /// <summary>
+        /// 変換エンジンに渡った学習 (1 回分ごとに文節の語を | でつなぎ、/ で区切ったもの。無ければ空)。
+        /// 学習は裏のスレッドで後から届くので、最後に対照 (hiruka を Space → Enter。必ず「昼|か」を渡す) を確定し、
+        /// 対照が届くまで 10 ms ずつ最大 1 秒待つ。それより前に渡した学習は、裏のスレッドの列で対照より先に並ぶので、ふつうは先に届く
+        /// (固定の時間だけ待つより、遅い環境でも「届いていない」と「渡していない」を取り違えにくい)。返すのは対照を除いた分。
+        /// 対照の確定で入力欄も変わるので、ほかを確かめた後で最後に呼ぶ。
+        /// </summary>
+        public string Taught()
         {
-            get
+            const string control = "昼|か";
+            Keyboard.Type("hiruka ");
+            Keyboard.Press(VirtualKeys.Return);
+            var arrived = false;
+            for (var i = 0; i < 100 && !arrived; i++)
             {
-                Thread.Sleep(100); // 学習は裏のスレッド
-                lock (Probe.Learned) return Probe.Learned.Count;
+                lock (Probe.Learned) arrived = Probe.Learned.Contains(control);
+                if (!arrived) Thread.Sleep(10);
+            }
+            lock (Probe.Learned)
+            {
+                Assert.True(arrived, "対照の学習が届く (裏のスレッドの学習が動いている): " + string.Join(" / ", Probe.Learned));
+                return string.Join(" / ", Probe.Learned.Where(l => l != control));
             }
         }
     }
@@ -71,7 +88,7 @@ internal static class LiveEnterLearningTests
         Assert.Equal("単位を取る", s.Keyboard.Host.Document, "確定");
         Assert.True(s.Used > before, $"予測用の回数が増える: {before} → {s.Used}");
         Assert.Equal(1, s.Pending, "登録提案に数える");
-        Assert.Equal(0, s.LearnCalls, "azooKey の学習はしない");
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
     }
 
     [Test]
@@ -85,7 +102,7 @@ internal static class LiveEnterLearningTests
         Assert.Equal("単位を取る", s.Keyboard.Host.Document);
         Assert.True(s.Used > before, "回数が増える");
         Assert.Equal(1, s.Pending, "登録提案に数える");
-        Assert.True(s.LearnCalls > 0, "azooKey の学習をする (単位を・取る の 2 文節)");
+        Assert.Equal("単位を|取る", s.Taught(), "azooKey の学習をする (単位を・取る の 2 文節)");
     }
 
     [Test]
@@ -97,7 +114,7 @@ internal static class LiveEnterLearningTests
         Assert.Equal("単位を取る", s.Keyboard.Host.Document);
         Assert.Equal(0, s.History.Count, "履歴に覚えない");
         Assert.Equal(0, s.Pending, "登録提案に数えない");
-        Assert.Equal(0, s.LearnCalls, "学習しない");
+        Assert.Equal("", s.Taught(), "学習しない");
     }
 
     [Test]
@@ -121,7 +138,7 @@ internal static class LiveEnterLearningTests
         Assert.Equal("単位を取る", s.Keyboard.Host.Document, "確定はする");
         Assert.Equal(before, s.Used, "Shift+Enter は数えない");
         Assert.Equal(0, s.Pending);
-        Assert.Equal(0, s.LearnCalls);
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
     }
 
     [Test]
@@ -135,7 +152,7 @@ internal static class LiveEnterLearningTests
         Assert.Equal("単位を取る", s.Keyboard.Host.Document, "確定はする");
         Assert.Equal(before, s.Used, "暗黙の確定は数えない");
         Assert.Equal(0, s.Pending);
-        Assert.Equal(0, s.LearnCalls);
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
     }
 
     [Test]
@@ -148,7 +165,7 @@ internal static class LiveEnterLearningTests
         Assert.True(s.Keyboard.Host.Document.Contains("github"), "前提: 英語で終わって確定した: " + s.Keyboard.Host.Document);
         Assert.Equal(before, s.Used, "数えない");
         Assert.Equal(0, s.Pending);
-        Assert.Equal(0, s.LearnCalls);
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
     }
 
     [Test]
@@ -180,7 +197,7 @@ internal static class LiveEnterLearningTests
         Assert.Equal("かんたん", s.Keyboard.Host.Document, "確定はかなのまま");
         Assert.Equal(before, s.History.Usage().GetValueOrDefault("簡単"), "簡単 の回数は変わらない");
         Assert.Equal(0, s.Pending, "登録提案に数えない");
-        Assert.Equal(0, s.LearnCalls);
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
     }
 
     [Test]
@@ -194,7 +211,7 @@ internal static class LiveEnterLearningTests
         Assert.Equal("単位を取る", s.Keyboard.Host.Document);
         Assert.True(s.Used > before, "数える");
         Assert.Equal(1, s.Pending);
-        Assert.Equal(0, s.LearnCalls);
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
     }
 
     [Test]
