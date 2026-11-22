@@ -13,7 +13,7 @@
 | 規模 | 1 キー 0.086 ms (`[規模]`)。2026-10-24 の値。今回は測っていない | |
 
 ## 進行中の要件
-- 015 判定の悪化を大量の境界例で測る道具 (`tools/boundary_sweep.py`・`boundary_compare.py`・`boundary-sweep.sh`。ブランチ ccr-0fc8aeab-sra4z7、PR は作成後に番号を記す)。docs/ACCURACY_PLAN_2026-11.md の 0-3、リョウさんの指示「おすすめで進めてください」(2026-11-22) で着手。status は approved のまま (done は人がマージした後)。Core 1259/1259、eval-compare broken 0 / fixed 0。単体テスト 21 件。別エージェントの査読 1 周 (止める・直す指摘なし。任意 1 件: `--expect-all` の無い木を base にする経路は動かしていない)。未確認: Mac で回せるか (`bash --noprofile --norc`)、かな → ローマ字の表 (Jht.cs の手写し) と Jht の出力の機械比較 (代表例のテストのみ)。判定ロジック・辞書は変えていない。
+- 015 判定の悪化を大量の境界例で測る道具 (`tools/boundary_sweep.py`・`boundary_compare.py`・`boundary-sweep.sh`。ブランチ ccr-0fc8aeab-sra4z7、PR #29)。docs/ACCURACY_PLAN_2026-11.md の 0-3、リョウさんの指示「おすすめで進めてください」(2026-11-22) で着手。status は approved のまま (done は人がマージした後)。Core 1259/1259、eval-compare broken 0 / fixed 0。単体テスト 21 件。別エージェントの査読 1 周 (止める・直す指摘なし。任意 1 件: `--expect-all` の無い木を base にする経路は動かしていない)。未確認: Mac で回せるか (`bash --noprofile --norc`)、かな → ローマ字の表 (Jht.cs の手写し) と Jht の出力の機械比較 (代表例のテストのみ)。判定ロジック・辞書は変えていない。
 - 016 (approved、次に着手)。
 - 017・018 (draft、人の判断待ち)。017 は案 A で進めてよいか・区切りの規則・Mac での測り方、018 は案 A・B・C の選択。
 - 精度の計画 `docs/ACCURACY_PLAN_2026-11.md` が今の方向 (§7 の 6 件はリョウさんの指示で決定済み)。
