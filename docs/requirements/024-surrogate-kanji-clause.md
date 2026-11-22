@@ -76,7 +76,7 @@ private sealed class MapConverter(Dictionary<string, string> map) : IKanjiConver
 // A1: new CompositionTests.Keyboard(converter: new MapConverter(new() { ["よし"] = "𠮷" })) に "yoshi" → " " → "\n"
 // D1: new MeltypeSession(CompositionTests.Detector, converter, new CompositionOptions(), () => new Settings()) に HandleKey で 1 キーずつ (入力欄の文字は渡さない)
 ```
-A〜D は「直したあとの期待」で書いたテストで、FAIL は今の不具合を示す。B・E は今のまま正しい動き。
+A〜D は「直したあとの期待」で書いたテストで、FAIL は今の不具合を示す。B・E は今のまま正しい動き。候補は全部ではなく、出力の先頭 6 つまで (E1 は 4 つ、E2 は 3 つ)。
 
 | 記号 | 変換エンジンの答え | 打鍵 | Space の文節と候補 | Enter の確定 | 判定 |
 |---|---|---|---|---|---|
@@ -165,7 +165,7 @@ $ dotnet run -c Release --no-build --project src/Meltype.Core.Tests -- Scratch02
 同じ写しの木で、使い捨てのテストを外して Core のテストを全件流すと `1266/1266 passed` (root で動くクラウドのため、権限で失敗させるテストはスキップと表示される)。
 
 ### 再現 3: PR #29 の木 (ブランチ `ccr-0fc8aeab-sra4z7`、`d5bbd0f`、2026-11-22)
-同じやり方で、広い文脈 (`WideContext` = Core での Zenzai のときの文脈) の ON・OFF を比べた。使い捨てのテストは終わったら消した。
+同じやり方で、広い文脈 (`WideContext` = Core での Zenzai のときの文脈) の ON・OFF を比べた。使い捨てのテストは終わったら消した。候補は先頭 3 つまで出した。
 ```
 $ dotnet run -c Release --no-build --project src/Meltype.Core.Tests -- Scratch024Ccr
   WideContext=False: yoshi + Space 候補 [よし,𠮷,ヨシ] / + Enter: [よし]
@@ -187,7 +187,7 @@ $ dotnet run -c Release --no-build --project src/Meltype.Core.Tests -- Scratch02
 - 3 段目: Mac の経路で 𠮷野家 (4 単位) + あいうえおかきくけこさしすせそたち (17 単位) を確定した直後 (記録は 21 単位の末尾 20 単位で、先頭は下位サロゲート単独)。ON は記録の先頭まで使い、下位サロゲート単独を落としている (`野家…`、19 単位)。
 
 ### 再現 4: 査読 1 周目の後に足した打鍵と、試しの直し (2026-11-22)
-査読の指摘を確かめるため、写しの木 (`deb0ff4`。コードは main `5544133` と同じ) で使い捨てのテスト `Scratch024dTests` を流した。同じテストを、**写しの木だけで試しに直した版** (人の判断 1 の案 A の形。コミットしていない) でも流した。試しの直しは 2 か所: `IsSymbolOnly` を `text.EnumerateRunes().Any(Rune.IsLetterOrDigit)` で判定し、`ContextOf` の戻り値の先頭の下位サロゲート単独を (切ったかどうかに関係なく) 落とす。出力の `<U+DFB7>` は単独の下位サロゲート (ペアはそのまま表示)。G2 のために、写しの木のテストの csproj に `AllowUnsafeBlocks` を足した。
+査読の指摘を確かめるため、写しの木 (`deb0ff4`。コードは main `5544133` と同じ) で使い捨てのテスト `Scratch024dTests` を流した。同じテストを、**写しの木だけで試しに直した版** (人の判断 1 の案 A の形。コミットしていない) でも流した。試しの直しは 2 か所: `IsSymbolOnly` を `text.EnumerateRunes().Any(Rune.IsLetterOrDigit)` で判定し、`ContextOf` の戻り値の先頭の下位サロゲート単独を (切ったかどうかに関係なく) 落とす。出力の `<U+DFB7>` は単独の下位サロゲート (ペアはそのまま表示)。候補は全部ではなく、先頭 6 つまで。G2 のために、写しの木のテストの csproj に `AllowUnsafeBlocks` を足した。
 
 今の版 (`deb0ff4`):
 ```
@@ -246,6 +246,7 @@ $ dotnet run -c Release --no-build --project src/Meltype.Core.Tests -- Scratch02
 - 試しの直しで、使い捨てのテストを外して Core のテストを全件流すと `1266/1266 passed`。
 - `IsSymbolOnly` を一時的に「いつも true」にした写しの木 (今の版) では `1156/1266 passed` (既存のテストが 110 件落ちる)。「いつも false」では `1266/1266 passed` (上の「原因の場所」)。
 - 試しの直しを一時的なコミット (どこからも参照しない) にして PR #29 (`d5bbd0f`) と `git merge-tree --write-tree` で合わせると、`CompositionController.cs` は自動で合わさった (合わせた結果では `WideContextOf` と `ContextOf` の両方が先頭の下位サロゲート単独を落とす)。衝突するのは、前から main と PR #29 の間で衝突している `docs/LESSONS.md`・`docs/requirements/README.md` だけ。
+- PR #29 (`d5bbd0f`) の写しの木に同じ試しの直しを当てると、Core のテストは `1290/1290 passed` (PR #29 そのままも `1290/1290 passed`)。
 
 ## minimum の要件 (これだけは満たす)
 1. 変換エンジンが返した文節ごとに、文字列に BMP の外の文字・数字 (𠮷・𩸽 など。分類が Letter か DecimalDigitNumber のコードポイント) が 1 つでもあれば、その文節を「記号だけ」とみなさない。文字の分類は UTF-16 の 1 単位ではなく、コードポイントで見る (例: `text.EnumerateRunes().Any(Rune.IsLetterOrDigit)`。単独のサロゲートは U+FFFD = 記号として数えられ、例外にならない: 再現 2 の G)。
@@ -254,7 +255,7 @@ $ dotnet run -c Release --no-build --project src/Meltype.Core.Tests -- Scratch02
 
 ## 非目標 (今回はやらない)
 - Swift (`mac/`) の変更。Swift が入力欄から読むキャレットの前の 20 単位 (`mac/Sources/MeltypeIME/InputController.swift` 999〜1006 行の `surroundingText(of:)`。`NSRange` で UTF-16 の 20 単位) もペアの途中から始まりうるが、Swift の入力経路の変更は止める条件 (CLAUDE.md §5)。そのとき Core には U+FFFD が届く見込み (推定。Swift の文字列が単独のサロゲートを置き換えるため。未確認)。これは Core の直しでは消えない。
-- 案 A のときの、記録 `_lastCommitText` を切る 5 か所の変更 (記録の先頭を読むのは `ContextOf` と PR #29 の `WideContextOf` だけで、どちらも受け取る側で落とすため。5 か所の複写は `docs/CODE_REVIEW_2026-10.md` の R2 で別に扱う)。
+- 案 A のときの、記録 `_lastCommitText` を切る 5 か所の変更。記録の先頭の単独の下位サロゲートが文脈の結果に効くのは `ContextOf` と PR #29 の `WideContextOf` だけで、どちらも受け取る側で落とす。ほかに記録を使う所 (`IsEnglishSentence` の 1393 行・周りの文字の 2149・2346 行) は、案 A では記録を変えないので今と同じ。5 か所の複写は `docs/CODE_REVIEW_2026-10.md` の R2 で別に扱う。
 - PR #29 の `WideContextOf` の切り方 (既に先頭の下位サロゲート単独を落としている。変えない)。
 - 「記号だけの変換結果はひらがなの後ろ」の規則そのもの (～・絵文字の並び) を変えること。
 - ほかの UTF-16 単位の扱い: `LanguageOf`・`Classify` (サロゲートの単位を日本語の文字として数える)、`LengthForLiveConversion` (読みはかなだけなので影響なし)、`docs/CODE_REVIEW_2026-10.md` の L1a-5 (`ReconvertRomaji`)・L1b-6 (`Resize`)・L7-4 (Swift の `character`)。
@@ -298,6 +299,8 @@ azooKey の候補は Core では測れないので、まず並びを記録する
 - 実機の入力欄 (TextEdit・Safari・ターミナル・LibreOffice) での見え方。
 
 ## 受け入れる変化 (再現 4 の試しの直しで見えた変化。実装の後に base と新しい木の両方で打ち直して確かめる: docs/LESSONS.md 2026-11-13)
+候補の並びは先頭 6 つまで (再現 4 の出力と同じ)。
+
 | 形 | 今 (main) | 試しの直し (案 A の形) |
 |---|---|---|
 | A1〜A3 (よし → 𠮷・ほっけ → 𩸽・よしよし → 𠮷𠮷) | Space の先頭・Enter とも、ひらがな | 変換エンジンの答え (直したいこと) |
@@ -322,12 +325,13 @@ azooKey の候補は Core では測れないので、まず並びを記録する
 1. 範囲と直し方 (どれか 1 つ):
    - **案 A (推奨)**: `IsSymbolOnly` をコードポイントで見る + `ContextOf` が返す文脈の先頭の下位サロゲート単独を、切ったかどうかに関係なく落とす (PR #29 の `WideContextOf` と同じ形)。記録を切る 5 か所は変えない。再現 4 の試しでは、2 か所・6 行で、完成条件のテスト 1〜6 の形になり、Core のテストは 1266/1266。
    - 案 B: `IsSymbolOnly` だけ直し、文脈の切り目は直さない (別の要件にする)。minimum 3 とテスト 5・6 を外す。
-   - 案 C: `IsSymbolOnly` + 記録を切る 5 か所 + `ContextOf` を「切ったときだけ落とす」形 (`DictionaryManagement.Tail` と同じ形) にする。記録そのものもペアの途中から始まらなくなるが、変更が 6 か所に散る。
+   - 案 C: `IsSymbolOnly` + 記録を切る 5 か所 + `ContextOf` を「切ったときだけ落とす」形 (`DictionaryManagement.Tail` と同じ形) にする。記録そのものもペアの途中から始まらなくなるが、変更が `IsSymbolOnly` を含めて 7 か所に散る (案 A は `IsSymbolOnly` を含めて 2 か所)。
    - 判断の材料 (文脈の直しが Mac で効く範囲。上の「同じ系統の 2 か所」のコードを読んだ見立て): 今の main では、Zenzai ON の左文脈 (`ContextOf`) に効く。記録の先頭が入る D1 の形は、最後の確定から 1.5 秒以内に空白 10 個と次の入力を済ませたときか、入力欄の文字を返さないアプリだけ。PR #29 が入った後は、Zenzai ON の文脈が `WideContextOf` (既に落とす) になるので、`ContextOf` の直しが Mac で効くのは長い読み (50 字超) の 2 つ目以降の区切りの文脈だけ、記録の切り目は Mac では効かなくなる。
-   - どの案でも、切り目がペアの途中なら下位サロゲートを落とす (ペアごと含めて 11・21 単位にする案は、最大の長さが変わるので採らない)。
-2. 着手の時期: **PR #29 を待たなくてよい (推奨)**。案 A の試しの直しは PR #29 と自動で合わさった (再現 4)。`tools/boundary-sweep.sh` は、PR #29 の写しの道具を使えば今でも測れる (完成条件の「回帰なし」)。
+   - 案 A・C では、切り目がペアの途中なら下位サロゲートを落とす (ペアごと含めて 11・21 単位にする案は、最大の長さが変わるので採らない)。
+2. 着手の時期: **PR #29 を待たなくてよい (推奨)**。案 A の試しの直しは PR #29 と自動で合わさり、PR #29 に当てた木でも Core のテストは 1290/1290 だった (再現 4)。`tools/boundary-sweep.sh` は、PR #29 の写しの道具を使えば今でも測れる (完成条件の「回帰なし」)。
 3. 承認の前に、実機で `yoshi`・`hokke`・`yoshisan` + Space の並びを見るか (推奨: 見る)。𠮷 を 1 回選べば Core の学習 (2349 行) が先に効くので、この不具合が実機で目に見えるのは、azooKey (と Zenzai) が BMP の外の漢字だけの文節を最初に返すときだけ (推定)。返さないなら、作るのを後回しにしてよい。
 
 ## 記録 (ループが書く)
 - 下書き: 2026-11-22。再現だけ行い、実装はしていない。再現に使った写しの木と使い捨てのテストは消した。
 - 査読 1 周目 (2026-11-22、別のエージェント): 止める 0・直す 4・任意 9。直す 4 件 (PR #29 の後の効き目と着手の時期・落とし方の 2 つの形とテスト 6・複数の文節の形・実機の 2 項目) と、任意 8 件 (1〜7・9) を反映した。任意 8 (読みやすさ) は冒頭に要約を足し、出力は依頼 (再現のコマンドと出力を写す) のため畳まずに残した。査読員の報告にあった出力・数字は、文書に写す前に写しの木で打ち直した (再現 4。docs/LESSONS.md 2026-11-18)。報告のうち「分岐点 `20736db` から main までで `dictionaries/` は変わっていない」は誤りだった (main は `english.txt` に 3 語を足している) ので、確かめた事実で書いた。試しの直しは写しの木だけで行い、コミットしていない。
+- 査読 2 周目 (2026-11-22、同じエージェント): 止める 0・直す 0・任意 7。任意 1〜6 (「どの案でも」の言い過ぎ・か所の数え方・候補が先頭 6 つまでの注・記録を使う所の言い過ぎ・LESSONS の原因の当て方・PR #29 に当てた木のテストの数) と、7 の後半 (査読員の読み違いを LESSONS に 1 行) を反映した。7 の前半 (今回の決まりを `docs/requirements/TEMPLATE.md` にも書く) は依頼の範囲の外なので、人の判断に残す。
