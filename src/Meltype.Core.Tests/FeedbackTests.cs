@@ -1419,6 +1419,33 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req021_PazoliteOeksound_StayEnglish_AndKanaSpellingsDoNot()
+    {
+        // 本家 #2037: pazolite が ぱぞlite (pa + zo が読めて lite が残る)、oeksound が おえksound (o + e が読めて ksound が残る) になる。
+        // dictionaries/english.txt に足した。同じ綴りで始まる日本語 (pazo・pazuru・oekaki・oeru) と lite・sound は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("pazolite", "pazolite"), ("oeksound", "oeksound"),
+                ("pazolitenokyoku", "pazoliteのきょく"), ("pazolitewo", "pazoliteを"), ("kyouhapazolitewokiku", "きょうはpazoliteをきく"),
+                ("oeksoundwo", "oeksoundを"), ("oeksoundde", "oeksoundで"), ("oeksoundnoplugin", "oeksoundのplugin"),
+                ("kyouhaoeksoundwotukau", "きょうはoeksoundをつかう"), ("pazolite no kyoku", "pazolite のきょく"),
+                ("pazo", "ぱぞ"), ("kyouhapazo", "きょうはぱぞ"), ("pazuru", "ぱずる"), ("oekaki", "おえかき"), ("oeru", "おえる"), ("oeta", "おえた"),
+                ("lite", "lite"), ("sound", "sound"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
     public static void Req012_PreprocessorDirectives_StayEnglish_AndKanaWordsDoNot()
     {
         // 本家 #1625: endif が えんぢf、elifndef が elifんdef になる。dictionaries/english.txt に endif・elifndef・pragma を足した。
