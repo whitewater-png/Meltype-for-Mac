@@ -65,6 +65,12 @@ class KeyTests(unittest.TestCase):
         base = [row("a", True), row("a", False)]
         new = [row("a", True), row("a", True)]
         self.assertEqual(counts(base, new), (0, 1, 0, 0))
+        # 何回目かの番号が鍵に入っていること: 同じ鍵が 3 回と 2 回なら、3 回目は removed / added になる
+        # (番号が無いと、同じ鍵が 1 つにまとまって removed・added が 0 になる)
+        three = [row("a", True), row("a", True), row("a", True)]
+        two = [row("a", True), row("a", True)]
+        self.assertEqual(counts(three, two), (0, 0, 0, 1))
+        self.assertEqual(counts(two, three), (0, 0, 1, 0))
 
     def test_files_are_separate(self):
         self.assertEqual(counts([row("a", True, file="x.tsv")], [row("a", False, file="y.tsv")]), (0, 0, 1, 1))
