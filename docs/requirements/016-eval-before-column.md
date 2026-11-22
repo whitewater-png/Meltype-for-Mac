@@ -33,12 +33,12 @@ scope: core
 - 品質テスト (`QualityTests.cs`) の変更、判定の変更。
 
 ## 完成条件 (先に決める。機械で判定できる形)
-- [ ] テスト: `EvalFormatTests.cs` に、5 列の行の読み込み (前の文字が入る・4 列の行は変わらない・6 列以上や 3 列以下は今までどおり例外) と、前の文字を入れて打った結果 (前の文字 `I like ` + `sushi` → `sushi`、前の文字 `今日は` + `sushi` → `すし`) のテストを足す。実装前は赤を確かめる。
-- [ ] 正解表: `upstream-quality.tsv` の 13 件が 5 列の行として判定され、`--expect-all` の結果で 13 件とも ok。
-- [ ] 互換: `tools/eval-compare.sh <この変更より前の木> . eval/cases <出力>` が終了コード 0 で終わる (13 件は added、broken 0)。
-- [ ] 互換 2: `tools/eval_legacy_base.py` も 5 列目のある行を飛ばして動く (Python の単体テストで確かめる。本家の木はクラウドに無い)。
-- [ ] 回帰なし: Core のテストが全件通る。
-- [ ] 文書: `eval/README.md` の形式・比べ方の節と、`upstream-quality.tsv` の行の説明。
+- [x] テスト: `EvalFormatTests.cs` に、5 列の行の読み込み (前の文字が入る・4 列の行は変わらない・6 列以上や 3 列以下は今までどおり例外) と、前の文字を入れて打った結果 (前の文字 `I like ` + `sushi` → `sushi`、前の文字 `今日は` + `sushi` → `すし`) のテストを足す。実装前は赤を確かめる。
+- [x] 正解表: `upstream-quality.tsv` の 13 件が 5 列の行として判定され、`--expect-all` の結果で 13 件とも ok。
+- [x] 互換: `tools/eval-compare.sh <この変更より前の木> . eval/cases <出力>` が終了コード 0 で終わる (13 件は added、broken 0)。
+- [x] 互換 2: `tools/eval_legacy_base.py` も 5 列目のある行を飛ばして動く (Python の単体テストで確かめる。本家の木はクラウドに無い)。
+- [x] 回帰なし: Core のテストが全件通る。
+- [x] 文書: `eval/README.md` の形式・比べ方の節と、`upstream-quality.tsv` の行の説明。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - なし (開発用の評価の形式で、IME の動きを変えない)。
@@ -47,4 +47,10 @@ scope: core
 - 前の文字を入れて打つために、`src/Meltype.Core/` (判定・入力の本体) を変える必要が出たとき。
 
 ## 記録 (ループが書く)
-- 周回数 / モデル / 所要時間 / 手戻りの原因 / PR の URL
+- 周回数: implementer 2 周 (1 周目で完成条件をすべて達成、2 周目は査読の任意指摘)。3 周目はオーケストレーターがテスト 4 行を直した
+- モデル: researcher 1 回 (sonnet)・implementer 2 回 (sonnet)・reviewer 3 回 (sonnet。定義は opus だが利用者の指定。オーケストレーターの opus が要所を読み直した)・eval-guard 2 回 (sonnet)・doc-keeper 1 回
+- 所要時間: 約 24 分 (2026-11-22T05:23:39Z〜05:47Z ごろ)。人の介入なし
+- 手戻りの原因: 止める・直すの指摘による手戻りはなし。任意の指摘 2 件 (eval_compare.py の鍵の単体テストと README の 1 文 / 同じ鍵の何回目かの番号を固定できていなかったテストの強化。後者は docs/LESSONS.md)
+- 数字: Core 1263/1263 (base は 1259)、正解表 635/741、eval-compare broken 0 / fixed 0 / added 13 / removed 0
+- 測れていないこと: 本家の木 (`tools/eval_legacy_base.py` の実際の経路) では回していない (単体テストのみ)。前の文字そのものが `"…"` の形は今の形式では書けない (`eval/README.md` に記載)
+- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/29 (要件 015 と同じ PR。同じブランチに積んだ)
