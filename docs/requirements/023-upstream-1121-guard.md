@@ -41,7 +41,7 @@ scope: core
 
 ## 完成条件 (先に決める。機械で判定できる形)
 守りの行なので、今の main で最初から当たる。「先に赤」の代わりに、**わざと崩した木 (作業ツリーで一時的に変えて戻す) で、足した行とテストが外れること**を一度確かめる。
-- [ ] 正解表: 新しい表 `eval/cases/upstream-guards-1121.tsv` に次の行を足し、今の main でも当たる (新しい表にするのは、開いている PR #24・#25・#27 が別の名前の守りの表を新しく作っていて、同じファイルを作ると衝突するため。どれも main に入ったら 1 つにまとめてよい)
+- [x] 正解表: 新しい表 `eval/cases/upstream-guards-1121.tsv` に次の行を足し、今の main でも当たる (新しい表にするのは、開いている PR #24・#25・#27 が別の名前の守りの表を新しく作っていて、同じファイルを作ると衝突するため。どれも main に入ったら 1 つにまとめてよい)
   ```
   atude	あつで	full	本家 #2174
   atsude	あつで	full	要件 023 (作者の作例: tsu の綴り)
@@ -56,10 +56,10 @@ scope: core
   Yukishiro	Yukishiro	full	本家 #2168
   yukishiro	ゆきしろ	full	要件 023 (作者の作例: 小文字で打った形)
   ```
-- [ ] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req023_Upstream1121Shapes_StayAsTyped` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
-- [ ] わざと崩した木で、足した 12 行がどれも少なくとも 1 回は外れ、テストが赤になる (崩し方と結果を記録欄に書く)。
-- [ ] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過。
-- [ ] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。`eval/README.md` と `docs/requirements/README.md` の一覧には足さない (開いている PR が同じ場所に行を足していて衝突するため。019・020・022 と同じ扱い)。
+- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req023_Upstream1121Shapes_StayAsTyped` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
+- [x] わざと崩した木で、足した 12 行がどれも少なくとも 1 回は外れ、テストが赤になる (崩し方と結果を記録欄に書く)。
+- [x] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過。
+- [x] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。`eval/README.md` と `docs/requirements/README.md` の一覧には足さない (開いている PR が同じ場所に行を足していて衝突するため。019・020・022 と同じ扱い)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] TextEdit: `atude` + Enter → `あつで` (Space の候補に `厚手` が出るか)
@@ -71,4 +71,16 @@ scope: core
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
 
 ## 記録 (ループが書く)
-- (未記入)
+- わざと崩した木 (作業ツリーで一時的に変え、テスト `Req023` と 12 形の `--repro` を回し、`git checkout` で戻した。2026-11-22):
+  | 崩し方 | 外れた行 → 確定 |
+  |---|---|
+  | `src/Meltype.Core/Detection/RomajiDetector.cs` の `("つ", ["tsu", "tu"])` を `tsuq`・`tuq` に | `atude` → `atうで`、`atsude` → `atすで`、`atudenoko-to` → `atうでのこーと`、`haatu` → `はあtu`、`haatudesu` → `はatうです`、`getu` → `げtu`、`getuyoubi` → `getうようび` |
+  | `("な", ["na"])` を `naq` に | `tasinamu` → `たsinあむ`、`tashinamu` → `たshinあむ`、`subewomotanai` → `すべをもtanあい` |
+  | `("ろ", ["ro"])` を `roq` に | `yukishiro` → `ゆきしro` |
+  | `("べ", ["be"])` を `beq` に | `subewomotanai` → `subえをもたない` |
+  | `("で", ["de"])` を `deq` に | `atude` → `あつde`、`atudenoko-to` → `あつdenoこーと`、`haatudesu` → `はあつdえす` |
+  | `dictionaries/english.txt` の末尾に `yuki` を足す | `Yukishiro` → `Yukiしろ` (本家 #2168 の形と同じ) |
+  - どの崩し方でもテストは赤 (例: `atude 期待値: あつで / 実際: atうで`)、戻した後は緑。12 行とも少なくとも 1 つの崩し方で外れた。
+  - 崩し方は「その行が実際に比べられていること」を確かめるためのもので、本家の原因 (未確認) を再現したものではない。
+- 数字: Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 0 / added 0 (634/740。新しい表は 12/12。両方の木を同じ表で回すので base でも当たる)。`check-dictionaries.mjs`・`check-terms.mjs` エラー 0 (警告は main と同じ)。辞書・判定ロジックは変えていない (`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行)。
+- 開いている PR #20・#23〜#27 のブランチと `git merge-tree` で合わせて衝突なし (最初はテストを PR #27 と同じ場所に入れて衝突したので、`Req004` の前に移した)。
