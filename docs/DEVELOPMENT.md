@@ -145,6 +145,43 @@ tools/eval-compare.sh /tmp/meltype-upstream . eval/cases /tmp/eval-out
 
 この比較は Core のテスト用キーボードの結果で、**実機の確認の代わりにはなりません**。Windows・Linux は対象外です。
 
+### 境界例の一括比較 (`tools/boundary-sweep.sh`)
+
+正解表に無い形の悪化 (辞書の英単語 + 助詞、語の連結など) を、辞書から作った大量の入力で base と new を比べて見つけます。判定ロジックや辞書を変えたら、査読員はこれを回します (要件 015)。
+
+```bash
+git worktree add --detach /tmp/meltype-base HEAD~1
+tools/boundary-sweep.sh /tmp/meltype-base . /tmp/sweep-out light   # 手元の確認 (約 1 分)
+tools/boundary-sweep.sh /tmp/meltype-base . /tmp/sweep-out2        # 全件 (約 16 分)
+```
+
+`tools/boundary-sweep.sh <base-tree> <new-tree> <out-dir> [full|light]`。`out-dir` は無いか空のフォルダーで、`inputs/` (入力の一覧と `manifest.json`)・`base/` `new/` (結果の JSON)・`compare.md` (組ごとの件数と、種類ごとの先頭 20 件)・`diff.tsv` (違いの全件) ができます。**終了コードは、日本語の損失か英語の損失が 1 件でもあれば 1**、無ければ 0 (その他の変化だけなら 0)、dotnet や入力の失敗は 2 です。
+
+- 入力の一覧 (`tools/boundary_sweep.py`。辞書は、このスクリプトのあるリポジトリの `dictionaries/` から、乱数なしで決まった手順で作るので、同じ辞書なら何度作っても同じ) は 1 回だけ作り、base と new に同じものを打ちます (正解表の `--expect-all` と同じ打ち方。`--expect-all` が無い木は `tools/eval_legacy_base.py` が回します)。20 万行ごとの chunk に分けて回すので、結果の JSON は 1 回あたり数十 MB で済みます。
+- 組 (`file` 列の接頭辞):
+  - `j1` 日本語の語: `readings.txt` の読みと `japanese.txt` の語を、ヘボン式のローマ字にしたものの単独と、助詞・語尾 (を が に で の と は も です) を付けた形。助詞はかなの段階でつなぎます (ん の後の母音・や行・な行は nn)。
+  - `j2` 打ち間違い: j1 の単独の形 (2 語に 1 語) の、1 文字落とし・隣どうしの入れ替え・1 文字の重ね打ち・隣のキーの 1 文字足し (位置ごとに CRC32 で決めた 1 キー)。
+  - `j3` 語の連結: ん で終わる語 + で + 右の語 6 語 (固定の 24 語の輪から語ごとに決めた位置) と、そのつなぎ目に隣のキーを 1 つ足した形 (`jibundeftotemo` の型)。ん・う・ぶ・む・ぬ で終わるそれ以外の語と、ほかの語の 25 語に 1 語は、助詞 1 つ・右の語 1 つで、つなぎ目の両方に足した形。
+  - `e` 英単語: `english.txt` の語の単独と、助詞 (wo ga no desu) を付けた形。
+  ローマ字にできない読みは除いて数を `manifest.json` と `compare.md` に出します (今は 0 件)。`light` は辞書の語を 20 語に 1 語だけ取ります。
+- 違いの分け方: **日本語の損失** = j の入力で、base の結果は英字を含まず、new の結果は英字を含む。**英語の損失** = e の入力で、base の結果は日本語を含まず、new の結果は日本語を含む。**その他の変化** = 上のどちらでもない違い (人が見て決める)。
+- 件数と所要時間 (クラウドの Linux・4 コア・2026-11-22 に実測。1 本の木あたり。base と new は別のコアで同時に回すので、全体も同じ時間です。同じ木を 2 つ渡すと順に回すので 2 倍):
+
+  | 規模 | j1 | j2 | j3 | e | 合計 | 1 本の木 |
+  |---|---:|---:|---:|---:|---:|---|
+  | full (既定) | 203,350 | 270,110 | 196,735 | 13,907 | 684,102 | 約 16 分 |
+  | light | 10,560 | 14,598 | 10,004 | 700 | 35,862 | 約 50 秒 |
+
+  1 入力あたりの時間は j1 約 0.4 ms・j2 約 1 ms・j3 約 2.8 ms (長い入力ほど遅い)。
+- **検算 (道具が効いているかの確かめ)**: 同じ木を渡すと違い 0 で終了コード 0 (`tools/boundary-sweep.sh . . /tmp/o` を実行して 684,102 件とも同じ)。`dictionaries/english.txt` に `undef` を足した使い捨ての写しを new にすると、終了コード 1 で、日本語の損失に `kibundeftotemo` (きぶんでとても → きぶんでfとても) のような 〜んで + 余計な f + 続く語の形が出ます。
+  ```bash
+  git worktree add --detach /tmp/sweep-w HEAD && echo undef >> /tmp/sweep-w/dictionaries/english.txt
+  tools/boundary-sweep.sh . /tmp/sweep-w /tmp/sweep-check light   # 終了コード 1。light で 17 件、full で 289 件 (日本語の損失)
+  git worktree remove --force /tmp/sweep-w
+  ```
+- 自己テスト: `python3 tools/test_boundary_sweep.py` (dotnet は使いません。CI で回ります)。
+- **測れないこと**: テスト用の偽の変換エンジンでの結果で、漢字の変換は測りません。実機の入力欄の挙動の代わりにはなりません。Windows・Linux は対象外です。Mac で回せるか (`bash --noprofile --norc -c '...'`) は未確認です。
+
 ### 本家追従 (`tools/upstream_watch.py`)
 
 本家 Meltype の新しいコミットを PR 単位で拾い、Mac 版に取り込み済みか・そのまま当たるか・新しい正解ケースがあるかを [docs/UPSTREAM_WATCH.md](UPSTREAM_WATCH.md) の候補表にまとめます。
