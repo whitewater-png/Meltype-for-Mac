@@ -1228,6 +1228,27 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req022_Upstream1120Shapes_StayKana()
+    {
+        // 本家 #2077・#2085・#2091 (#1988)・#2072・#2094 (2026-11-20): sitaidesu が 死体です、amatte が 余って、chomatte が 苧麻って、
+        // 数字 + にちめ が 2２time のような形になる、などの報告。本家の中心は漢字の選び方で、ここでは測れない。
+        // どれも途中に英字として読める並び (sit・mat・era・time など) を含むので、かなのまま確定することだけを守る
+        // (この fork では今も起きない。判定ロジック・辞書は変えていない)。正解表: eval/cases/upstream-guards-1120.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("sitaidesu", "したいです"), ("shitaidesu", "したいです"), ("amatte", "あまって"), ("amattekara", "あまってから"),
+            ("chomatte", "ちょまって"), ("tyomatte", "ちょまって"), ("yappane", "やっぱね"),
+            ("kakikomiera-", "かきこみえらー"), ("kakikomiera-desu", "かきこみえらーです"),
+            ("2nitime", "2にちめ"), ("2nichime", "2にちめ"), ("10nitime", "10にちめ"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req011_Colab_Collab_Kaggle_StayEnglish_AndJapaneseSpellingsDoNot()
     {
         // 本家 #1607・#1609: colab が こlab、kaggle が かっがぇ になる (頭が読めて、残りが英字)。dictionaries/english.txt の技術用語に足した。
