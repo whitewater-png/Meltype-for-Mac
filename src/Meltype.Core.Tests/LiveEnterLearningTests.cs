@@ -7,8 +7,9 @@ using Meltype.Input;
 namespace Meltype.Tests;
 
 /// <summary>
-/// 要件 018: ライブ変換の表示を、見えたとおりに Enter で確定したとき、予測用の回数 (history.Touch) と登録提案の回数を、
-/// Space → Enter と同じく数える。azooKey の学習 (変換エンジンへの学習) と選び直しの記録はしない。
+/// 要件 018: ライブ変換の表示のまま (Space で変換せずに) Enter で確定したとき、確定した文節のうち学習済みの語を、
+/// 予測用の回数 (history.Touch) と登録提案の回数に、Space → Enter と同じく数える。語末の n や Enter の打ち間違いの直しで
+/// 確定の形が表示と変わる場合も、確定した語を数える。azooKey の学習 (変換エンジンへの学習) と選び直しの記録はしない。
 /// 暗黙の確定・Shift+Enter・英語で終わる Space・かなのまま確定した場合は数えない。
 /// </summary>
 internal static class LiveEnterLearningTests
@@ -28,8 +29,11 @@ internal static class LiveEnterLearningTests
 
     private sealed class Setup
     {
+        private static readonly DateTime Now = new(2026, 11, 22, 12, 0, 0, DateTimeKind.Utc);
+
         public Probe Probe { get; } = new();
-        public ConversionHistory History { get; } = new(null);
+        // 時計を止める (予測用のスコアは 回数 × 経過日数の減衰 なので、止めればスコアがそのまま回数になる)
+        public ConversionHistory History { get; } = new(null) { Clock = () => Now };
         public DictionarySuggestions Suggestions { get; } = new(null);
         public CompositionTests.Keyboard Keyboard { get; }
 
@@ -42,6 +46,17 @@ internal static class LiveEnterLearningTests
 
         public double Used => History.Usage().GetValueOrDefault("単位を");
         public int Pending => Suggestions.Pending(1).Count;
+
+        /// <summary>予測用の回数 (学習済みでない語は 0)。</summary>
+        public int Count(string word) => (int)History.Usage().GetValueOrDefault(word);
+
+        /// <summary>登録提案に数えた回数。</summary>
+        public int Suggested(string word)
+        {
+            var n = 0;
+            while (Suggestions.Pending(n + 1).Any(w => w.Word == word)) n++;
+            return n;
+        }
 
         /// <summary>
         /// 変換エンジンに渡った学習 (1 回分ごとに文節の語を | でつなぎ、/ で区切ったもの。無ければ空)。
@@ -126,6 +141,37 @@ internal static class LiveEnterLearningTests
         var once = s.Used;
         s.Keyboard.Type("tanniwotoru\n");
         Assert.True(once > before && s.Used > once, $"確定のたびに増える: {before} → {once} → {s.Used}");
+    }
+
+    [Test]
+    public static void LiveEnter_TrailingN_CountsTheCommittedWord()
+    {
+        // 設定が既定のとき、語末の n は Enter で ん になってライブ変換される (表示 こうえn → 確定 講演。今までの Enter の動き)。
+        // 表示と確定の形は違うが、確定した語のうち学習済みのものは数える (数えるのは学習済みの語だけなので、見ずに通した誤変換を強めない)
+        var s = new Setup(learned: false);
+        s.History.Remember("こうえん", "講演");
+        s.Keyboard.Type("kouen");
+        Assert.Equal("こうえn", s.Keyboard.Showing, "前提: 表示はかなと語末の n");
+        s.Keyboard.Type("\n");
+        Assert.Equal("講演", s.Keyboard.Host.Document, "確定はライブ変換の結果");
+        Assert.Equal(2, s.Count("講演"), "講演 の回数は 1 → 2");
+        Assert.Equal(1, s.Suggested("講演"), "登録提案に 1 回数える");
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
+    }
+
+    [Test]
+    public static void LiveEnter_FixedTypo_CountsTheCommittedWord()
+    {
+        // Enter の打ち間違いの直し (onegaishimsu → おねがいします) で確定の形が表示と変わる場合も、確定した学習済みの語を数える
+        var s = new Setup(learned: false);
+        s.History.Remember("おねがいします", "お願いします");
+        s.Keyboard.Type("onegaishimsu");
+        Assert.Equal("おねがいしmす", s.Keyboard.Showing, "前提: 表示は打ち間違いのまま");
+        s.Keyboard.Type("\n");
+        Assert.Equal("お願いします", s.Keyboard.Host.Document, "確定は直した読みのライブ変換");
+        Assert.Equal(2, s.Count("お願いします"), "お願いします の回数は 1 → 2");
+        Assert.Equal(1, s.Suggested("お願いします"), "登録提案に 1 回数える");
+        Assert.Equal("", s.Taught(), "azooKey の学習はしない");
     }
 
     [Test]

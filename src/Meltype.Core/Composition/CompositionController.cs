@@ -345,7 +345,7 @@ public sealed class CompositionController
     private readonly ICompositionHost _host;
     private readonly CompositionOptions _options;
     private readonly Dictionary<string, string> _conversionCache = new(StringComparer.Ordinal);
-    // ライブ変換の結果: 表示する文字列と、その元の文節 (Enter で見えたとおりに確定したときの回数の記録に使う)
+    // ライブ変換の結果: 表示する文字列と、その元の文節 (ライブ変換の表示のまま Enter で確定したときの回数の記録に使う)
     private readonly Dictionary<string, (string Text, List<Clause> Clauses)> _liveCache = new(StringComparer.Ordinal);
     // 確定の最中だけ、ライブ変換で作った文節をここに集める (null なら集めない)
     private List<Clause>? _liveClauseSink;
@@ -3006,7 +3006,7 @@ public sealed class CompositionController
         // 変換後も続けて入力: 固定した文節 + 未変換の文節 (変換していなければ、表示のまま)。
         var fixedOnly = !converting && _headCount > 0;
         if (fixedOnly) TrimToFixedClauses();
-        // ライブ変換の表示のまま確定するとき (変換中でも固定した文節でもない) だけ、表示の元になった文節を集める (回数の記録用)
+        // 変換せずに確定するとき (変換中でも固定した文節でもない) だけ、確定する文字列の元になったライブ変換の文節を集める (回数の記録用)
         List<Clause>? liveClauses = null;
         string text;
         if (converting) text = string.Concat(_clauses.Select(c => c.Text)) + SuffixText;
@@ -3017,13 +3017,14 @@ public sealed class CompositionController
             try { text = CurrentDisplay(final: true); }
             finally { liveClauses = _liveClauseSink; _liveClauseSink = null; }
         }
-        var shownAsLive = true;
+        // 確定するのが、集めた文節 (ライブ変換の結果) のままか (語末の n をかなのまま確定する・文の終わりの to を英語にするときは違う)
+        var liveResult = true;
         // 設定「Enter は見えているとおりに確定」: かな + 語末の n (かんたn) は、確定でライブ変換が漢字にせず、見えていたかなに n を ん にしただけで確定する (本家 #677)
         if (_committingByEnter && !converting && !fixedOnly && suffix.Length == 0 && !fixEnglish && _options.EnterCommitsAsShown() && _text.Mode == DisplayMode.Auto && _text.Pending == "n" &&
             CurrentDisplay(final: false) is { Length: > 1 } shownText && shownText[^1] == 'n' && shownText[^2] is >= '\u3041' and <= '\u3096')
         {
             text = shownText[..^1] + "ん";
-            shownAsLive = false;
+            liveResult = false;
         }
         if (fixEnglish && !converting && _text.Mode == DisplayMode.Auto) text = FixEnglishTypo(text);
         var english = converting ? _clauses.All(c => c.IsEnglish) : _text.IsAlphanumericAt(final: true);
@@ -3067,12 +3068,14 @@ public sealed class CompositionController
             hasEnglish = true;
             hasJapanese = false;
             raws = new SegmentRawSet([_text.Raw], [], JapaneseWord: false);
-            shownAsLive = false;
+            liveResult = false;
         }
-        // ライブ変換の表示を、見えたとおりに Enter で確定したときは、予測用の回数と登録提案の回数だけ数える (Space → Enter と同じ)。
+        // ライブ変換の表示のまま (Space で変換せずに) Enter で確定したときは、確定した文節のうち学習済みの語を、予測用の回数と登録提案の回数に数える
+        // (Space → Enter と同じ)。語末の n が ん になってライブ変換される (表示 こうえn → 確定 講演) 場合や、Enter の打ち間違いの直しで
+        // 確定の形が表示と変わる場合も、確定した語を数える (数えるのは学習済みの語だけなので、見ずに通した誤変換を強めない)。
         // azooKey の学習と選び直しの記録はしない (見ずに通した誤変換を 1 回で強めないため)。
-        // 暗黙の確定・Shift+Enter・Space・かなのまま確定した場合・ローマ字の再変換・F6 の変換ボックスでは数えない。
-        if (shownAsLive && liveClauses is { Count: > 0 } && _committingByEnter && !implicitly && !_reconvertRomaji && !_firstSoundCommitted && toggle is null && suffix.Length == 0 && !fixEnglish)
+        // 暗黙の確定・Shift+Enter・英語で終わる Space・ライブ変換の結果を確定しない場合 (かなのまま・英語)・ローマ字の再変換・1 音確定の残り・F6 の変換ボックスでは数えない。
+        if (liveResult && liveClauses is { Count: > 0 } && _committingByEnter && !implicitly && !_reconvertRomaji && !_firstSoundCommitted && toggle is null && suffix.Length == 0 && !fixEnglish)
         {
             RecordSuggestions(liveClauses);
             TouchUsed(liveClauses);
