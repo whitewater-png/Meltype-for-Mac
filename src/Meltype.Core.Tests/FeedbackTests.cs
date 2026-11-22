@@ -1324,6 +1324,34 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req018_Inyuu_DoesNotSplitEnglishIn()
+    {
+        // 本家 #1946: dainyuu が だinゆう になる (英単語 in を拾う)。この fork では起きないが、正解表に -inyuu の形が無かったので守る。
+        // shinyuu・ginyuu は前に英単語 (shin・gin) が来る形。テスト用の判定器 (BuiltInWordChecker) とスペルチェッカー無しの両方で、Enter の確定を比べる。
+        var cases = new[]
+        {
+            ("dainyuu", "だいにゅう"), ("kinyuu", "きにゅう"), ("kanyuu", "かにゅう"), ("yunyuu", "ゆにゅう"),
+            ("hensuunidainyuu", "へんすうにだいにゅう"), ("dainyuusuru", "だいにゅうする"), ("kinyuusuru", "きにゅうする"),
+            ("shinyuu", "しにゅう"), ("ginyuu", "ぎにゅう"),
+        };
+        foreach (var (typed, expected) in cases)
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        using (CompositionTests.WithoutSpellChecker())
+        {
+            foreach (var (typed, expected) in cases)
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed + " (スペルチェッカー無し)");
+            }
+        }
+    }
+
+    [Test]
     public static void Req014_Pixiv_StaysEnglish_AndPiSpellingsDoNot()
     {
         // 本家 #1696: pixiv が ぴぃv になる (pi + xi が読めて v が残る)。pixivnitoukou は丸ごと英字のまま残っていた。

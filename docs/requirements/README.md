@@ -35,3 +35,4 @@ Core のテストは偽の変換エンジンで動くので、漢字変換と実
 | 010 | karento が karenと になる (固有名詞 + 助詞 to の分け方) | approved (定期タスクによる自動承認。元: docs/voice/2026-11-06.md 候補 2) |
 | 014 | pixiv が ぴぃv に崩れ、pixiv + 助詞は丸ごと英字のまま残る | approved (定期タスクによる自動承認。元: docs/voice/2026-11-10.md 候補 2) |
 | 016 | obsidian がかなに崩れ、obsidian + 助詞は表示が英字なのに確定で おんしぢあんを になる | approved (定期タスクによる自動承認。元: docs/voice/2026-11-12.md 候補 1) |
+| 018 | dainyuu など -inyuu の形が英単語 in で崩れないことを正解表とテストで守る | approved (定期タスクによる自動承認。元: docs/voice/2026-11-16.md 候補 3) |
