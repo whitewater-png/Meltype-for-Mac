@@ -2501,7 +2501,10 @@ public sealed class CompositionController
         return withContext.Select(c => c.Reading).SequenceEqual(plain.Select(c => c.Reading)) ? withContext : plain;
     }
 
-    /// <summary>変換エンジンに渡す文脈: キャレットの前の確定済みの文字のうち、同じ文の日本語の部分 (最大 10 文字)。</summary>
+    /// <summary>
+    /// 変換エンジンに渡す文脈: キャレットの前の確定済みの文字のうち、同じ文の日本語の部分 (最大 10 文字)。
+    /// 広い文脈 (Zenzai のとき。<see cref="CompositionOptions.WideConversionContext"/>) が ON なら、文をまたいで最後の改行より後ろの日本語 (最大 20 単位)。
+    /// </summary>
     private string? ConversionContext() =>
         _chunkContext.Active ? _chunkContext.Text : _options.WideConversionContext() ? WideContextOf(PrecedingForConversion) : ContextOf(PrecedingForConversion);
 

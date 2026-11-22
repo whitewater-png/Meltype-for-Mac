@@ -237,6 +237,8 @@ internal static class CompositionTests
 
         /// <summary>クリップボードの文字を候補に出すか (CompositionOptions.ClipboardCandidates)。既定は OFF。</summary>
         public bool ClipboardCandidates { get; set; }
+
+        /// <summary>前の文 (最後の改行より後ろ・最大 20 単位) も変換エンジンに文脈として渡すか (CompositionOptions.WideConversionContext)。既定は OFF。</summary>
         public bool WideContext { get; set; }
 
         /// <summary>予測の Delete で呼ばれる、エンジンの予測を消す関数 (CompositionOptions.ForgetPrediction)。</summary>
