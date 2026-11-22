@@ -10,7 +10,7 @@ scope: core
 ## 背景 (誰が、何に困っているか)
 - 利用者の声からではなく、2026-11-22 に要件 025 の下書きの査読で見つけた。025 の人の判断 4 で、025 とは別の要件にした。
 - ローマ字のまま入った文を選んで再変換 (Mac: 選んで Shift+Space。README の「確定後の再変換」) し、確定すると、選んだ文の中の英単語 (README の例 `asita no meeting de review shimasu` の `meeting`・`review`) を、日英の学習に「日本語にする」と覚える。F6 で直したときと同じ「はっきりした選択」として覚えるので、1 回で効く。設定「変換後も続けて入力できる」に関係なく、既定の設定で起きる。
-- 覚えたあと、その語を打つと英字のままにならず崩れる (偽の変換エンジンでの表示): `meeting` → `めえちんg`、`review` → `れview`、`kyouhameetingdesu` → `きょうはめえtingです` (学習なしは `meeting`・`review`・`きょうはmeetingです`)。前に英語と覚えさせていた語も、再変換 1 回で日本語に反転する。
+- 覚えたあと、その語を打つと英字のままにならず崩れる (偽の変換エンジンでの表示): `meeting` → `めえちんg`、`review` → `れview`、`kyouhameetingdesu` → `きょうはめえtingです` (学習なしは `meeting`・`review`・`きょうはmeetingです`)。Enter の確定も崩れる (下の I1)。前に英語と覚えさせていた語も、再変換 1 回で日本語に反転する。
 - 再変換は「打ち直した文ではないので学習しない」決まり (`CompositionController.Commit` のコメント、`ReconvertRomajiTests.Reconvert_RomajiSentence_IsNotLearned`)。ただ、そのテストは変換エンジンと選び直しの記録だけを見ていて、日英の学習は見ていない。
 - 今の挙動: 下の「再現の結果」(Core の使い捨てのテスト。実機は未確認)。
 
@@ -18,7 +18,7 @@ scope: core
 
 ### 再現の結果 (2026-11-22、Core の使い捨てのテスト。コミットしていない)
 - やり方: 写しの木 (`git worktree add --detach`) に使い捨てのテストを足して流した。入口は `MeltypeSession.Reconvert` (Mac の Shift+Space が呼ぶ) と `HandleKey`・`CommitPending`。変換エンジンは偽物 (`CompositionTests.FakeConverter`)。日英の学習は `LanguageMemory.Entries()` で見た。覚えたあとの表示は、同じ `LanguageMemory` を判定 (`CompositionTests.Detector.Memory`) に付けて打った。
-- 流した木: 下の表の行は全部、main 5544133 と PR #29 の先頭 d5bbd0f で流し、結果は同じ (R1・R5・C2 と、I1 の `kyouhameetingdesu` は、要件 025 の測定 (L1〜L5) で d210044 でも同じ)。
+- 流した木: 下の表の行は全部、main 5544133 と PR #29 の先頭 d5bbd0f で流し、結果は同じ (R1・R5・C2 と、I1 の `kyouhameetingdesu` の表示は、要件 025 の測定 (L1〜L5) で d210044 でも同じ)。査読員も別に書いたテストで 3 つの木 (5544133・d5bbd0f・d210044) に流し、同じ結果だった (査読員の報告による)。
 - 選んだ文は `asita no meeting de review shimasu`。「ON / OFF」は設定「変換後も続けて入力できる」。
 
 | # | 手順 | 確定 | 日英の学習 |
@@ -29,6 +29,7 @@ scope: core
 | R4 | OFF。再変換 → `yo` (前を暗黙に確定して、新しい入力) → Enter | `あしたの meeting で review しますよ` | R1 と同じ |
 | R5 | ON。再変換 → Enter、または Space → Enter (続けて打たない。要件 025 の L2・L3) | R1・R2 と同じ | R1 と同じ |
 | R6 | 前に `meeting` を英語とはっきり覚えさせた状態で、OFF。再変換 → Enter | `あしたの meeting で review します` | `meeting` が日本語に反転 (回数 2)、`review` を日本語 |
+| R7 | OFF・ON とも。再変換 → Shift+Enter (設定「Shift+Enter で確定して改行」ON) | (見ていない) | R1 と同じ |
 | C1 | OFF。再変換 → Esc (やめて、選んだままに戻す) | `asita no meeting de review shimasu` | なし |
 | C2 | ON。再変換 → Space → `yo` → Enter (続けて打つ。要件 025 の L4) | `asita no meeting de review shimasuよ` | なし (選び直しの記録の漏れは要件 025) |
 
@@ -36,7 +37,7 @@ scope: core
 
 | # | 手順 | 結果 |
 |---|---|---|
-| I1 | R1 のあとの日英の学習で打つ | `meeting` → `めえちんg`、`review` → `れview`、`kyouhameetingdesu` → `きょうはめえtingです` (学習なしは `meeting`・`review`・`きょうはmeetingです`) |
+| I1 | R1 のあとの日英の学習で打つ | 表示: `meeting` → `めえちんg`、`review` → `れview`、`kyouhameetingdesu` → `きょうはめえtingです`。Enter の確定: `めえちんg`・`れview`・`きょうはめえちんがです` (最後は表示と形が違う)。Space の確定: `meeting` は `meeting ` のまま、`review` は `れview `。学習なしは、表示も確定も英字のまま (`きょうはmeetingです`) |
 
 変えてはいけない動き (利用者がはっきり直した。今も覚える):
 
@@ -47,7 +48,7 @@ scope: core
 | N3 | ON。再変換 → Space → `tanni` → F10 → Enter (続けて打った分を F10) | `tanni` を英語 (回数 1)。普通の変換のあとでも同じ |
 
 ### コード (行番号は main 5544133)
-- `CompositionController.Commit` (2965 行): `if (converting && !_reconvertRomaji) Learn(); else { if (fixedOnly) Learn(); if (toggle is null) LearnLanguage(); }` (2998〜3003 行)。ローマ字の再変換の確定は、`converting` でも `_reconvertRomaji` なので else 側に入り、`LearnLanguage()` (3002 行) が走る。暗黙の確定 (`Commit(implicitly: true)`) でも同じ。Shift+Enter (1147〜1153 行) も同じ `Commit` を通る (コードを読んだ。テストは流していない)。
+- `CompositionController.Commit` (2965 行): `if (converting && !_reconvertRomaji) Learn(); else { if (fixedOnly) Learn(); if (toggle is null) LearnLanguage(); }` (2998〜3003 行)。ローマ字の再変換の確定は、`converting` でも `_reconvertRomaji` なので else 側に入り、`LearnLanguage()` (3002 行) が走る。暗黙の確定 (`Commit(implicitly: true)`) でも同じ。Shift+Enter (1147〜1153 行) も同じ `Commit` を通る (R7)。
 - `ReconvertRomaji` (708 行) は、日本語にした文を `_text.AppendKana(c, c)` で 1 文字ずつ入れ、表示を `DisplayMode.Hiragana` にする (736・737 行)。
 - `LearnLanguage` (3160 行〜) の Hiragana の分岐 (3175・3176 行) は、表示が F6 などでかなにされたとみなし、区間分けで英語になった区間を `memory.Remember(word, english: false, explicitChoice: true)` (3168 行) で覚える。選んだ文の英単語は英語の区間になるので、日本語として覚える。
 - はっきりした選択 (`explicitChoice`) は 1 回で効き、前に英語と覚えていた語も 1 回で反転する (`LanguageMemory.cs` 413 行。R6)。
@@ -75,7 +76,7 @@ scope: core
 - 学習データのファイル形式の変更。
 
 ## 完成条件 (先に決める。機械で判定できる形)
-- [ ] テスト (赤 → 緑): `src/Meltype.Core.Tests/ReconvertRomajiTests.cs` に、英単語を含む文 (`asita no meeting de review shimasu`) の日英の学習を見るテストを足す (名前は仮: `Reconvert_RomajiSentence_DoesNotTeachLanguage`)。要点: `LanguageMemory` を付けた `MeltypeSession` で、R1〜R5 の各経路と Shift+Enter で、日英の学習が 0 件。R6 (前に `meeting` を英語と覚えさせた状態) で、`meeting` が英語のまま。**実装前は赤** (表のとおり覚える。Shift+Enter はコードを読んだ見込み)、実装後は緑。
+- [ ] テスト (赤 → 緑): `src/Meltype.Core.Tests/ReconvertRomajiTests.cs` に、英単語を含む文 (`asita no meeting de review shimasu`) の日英の学習を見るテストを足す (名前は仮: `Reconvert_RomajiSentence_DoesNotTeachLanguage`)。要点: `LanguageMemory` を付けた `MeltypeSession` で、R1〜R5 と R7 (Shift+Enter) の各経路で、日英の学習が 0 件。R6 (前に `meeting` を英語と覚えさせた状態) で、`meeting` が英語のまま。**実装前は赤** (表のとおり覚える)、実装後は緑。
 - [ ] 対照 (今も緑・直したあとも緑): Esc (C1) は 0 件のまま。ふつうに打った `meeting` + F6 (N1) は日本語と覚える。設定 ON で続けて打った分の F6・F10 (N2・N3) は今どおり覚える。
 - [ ] 守りが効いていること: 足した守りの条件を外すと、上のテストが落ちることを一度確かめて PR に書く。
 - [ ] 回帰なし: Core のテストが全件通る (base の数字: main 5544133 で 1266/1266。スキップ 6 件は、root の環境で権限を使うテスト 5 件と、ファイルシステムの作成時刻の条件のテスト 1 件)。`tools/eval-compare.sh` の broken 0。品質テストの基準 (全体 95 %・各カテゴリー 80 %) を満たしたまま。
