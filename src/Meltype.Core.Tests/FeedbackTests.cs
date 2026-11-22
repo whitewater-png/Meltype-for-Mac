@@ -1267,6 +1267,25 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req020_Upstream1118Shapes_StayAsTheyAre()
+    {
+        // 本家 #2015・#2016・#2017・#2024・#2029 (2026-11-18): itotekinagobyuu が 意図的なgobゆう、ronpa が ろんpa (onpa も)、
+        // Fluorite が Fluおりて、uchidome が うちdome、fanntatowirukinnsonn が ファンタとwイルキンソン になる。
+        // この fork では起きないが、正解表に同じ形が無かったので守る (判定ロジック・辞書は変えていない)。正解表: eval/cases/upstream-guards-1118.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("itotekinagobyuu", "いとてきなごびゅう"), ("ronpa", "ろんぱ"), ("onpa", "おんぱ"), ("ronpasuru", "ろんぱする"),
+            ("Fluorite", "Fluorite"), ("uchidome", "うちどめ"), ("utidome", "うちどめ"),
+            ("fanntatowirukinnsonn", "ふぁんたとうぃるきんそん"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req010_Karento_BecomesKana_AndKarenAndOthersDoNotChange()
     {
         // 本家 #1596: karento が karenと になる (固有名詞 karen + 助詞 to)。続きと合わせて日本語の語 (japanese.txt の karento) になるなら、固有名詞にしない。

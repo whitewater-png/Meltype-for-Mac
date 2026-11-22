@@ -1,0 +1,14 @@
+# 本家 (yksr-melt/Meltype) に 2026-11-18 に報告された誤判定のうち、この fork では起きないものを守る行。期待は今の Mac 版 Core の出力 (今も当たる行)。
+# 後の変更 (辞書への語の追加・判定ロジックの変更・本家への追従) で本家と同じ崩れ方をしたら、回帰ゲートで気付けるようにする。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打った結果を測る。実機の記録ではない。漢字の形は測れない。
+# 出典の docs/voice/<日付>.md は、ブランチ voice/<日付> にある (main には無い)。
+# 要件 019 (PR #24) の eval/cases/upstream-guards.tsv と同じ考えの表。PR #24 と同じファイルを作ると衝突するので別の表にしてある (両方が main に入ったら 1 つにまとめてよい)。
+# カテゴリ: 要件 020 (本家 2026-11-18 の報告。docs/requirements/020-upstream-1118-guard.md。本家での崩れ方は出典の欄)
+itotekinagobyuu	いとてきなごびゅう	full	本家 #2015 (本家では 意図的なgobゆう。docs/voice/2026-11-18.md 候補 2)
+ronpa	ろんぱ	full	本家 #2016 (本家では ろんpa。docs/voice/2026-11-18.md 候補 2)
+onpa	おんぱ	full	本家 #2016 (本家では onpa も崩れると報告。docs/voice/2026-11-18.md 候補 2)
+ronpasuru	ろんぱする	full	要件 020 (作者の作例: 後ろに日本語が続く形)
+Fluorite	Fluorite	full	本家 #2017 (本家では Fluおりて。docs/voice/2026-11-18.md 候補 2)
+uchidome	うちどめ	full	本家 #2024 (本家では うちdome。docs/voice/2026-11-18.md 候補 2)
+utidome	うちどめ	full	要件 020 (作者の作例: ti の綴り)
+fanntatowirukinnsonn	ふぁんたとうぃるきんそん	full	本家 #2029 (本家では ファンタとwイルキンソン。docs/voice/2026-11-18.md 候補 2)
