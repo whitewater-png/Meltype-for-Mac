@@ -161,4 +161,71 @@ internal static class EvalFormatTests
             Directory.Delete(dir, recursive: true);
         }
     }
+
+    // --- 5 列目「前の文字」(016) ---
+
+    [Test]
+    public static void Parse_FiveColumns_ReadsBefore()
+    {
+        var cases = Checks.ParseCases([
+            "sushi\tsushi\tfull\t出典\tI like ",
+            "sushi\tすし\tfull\t出典\t\"今日は\"",
+            "make\tmake\tfull\t出典\t\"Please \"",
+            "hello\thello\tfull\t出典",
+        ], "t.tsv");
+        Assert.Equal(4, cases.Count, "5 列の行も 4 列の行も読む");
+        Assert.Equal("I like ", cases[0].Before, "囲まない書き方でも、行末の空白は Trim しない");
+        Assert.Equal("今日は", cases[1].Before, "囲みの引用符は外す");
+        Assert.Equal("Please ", cases[2].Before, "囲んだ中の行末の空白が残る");
+        Assert.True(cases[3].Before is null, "4 列の行は前の文字が無い");
+        Assert.Equal("出典", cases[0].Source, "出典は今までどおり Trim する");
+    }
+
+    [Test]
+    public static void Parse_FiveColumnsOnly_IsNotLegacy()
+    {
+        var cases = Checks.ParseCases(["# 見出し", "sushi\tsushi\tfull\t出典\t\"I like \""], "t.tsv");
+        Assert.Equal(1, cases.Count, "5 列の行だけの表も 4 列の表として読む (古い 2 列の表と見なして 0 件にしない)");
+        Assert.Equal("I like ", cases[0].Before);
+    }
+
+    [Test]
+    public static void Parse_WrongColumnCount_StillThrows()
+    {
+        foreach (var bad in new[] { "a\tb\tfull\t出典\t前\t余り", "a\tb\tfull" })
+        {
+            var threw = false;
+            try { Checks.ParseCases(["hello\thello\tfull\t出典", bad], "t.tsv"); }
+            catch (FormatException) { threw = true; }
+            Assert.True(threw, $"4・5 列以外の行は例外にする: {bad}");
+        }
+    }
+
+    [Test]
+    public static void Evaluate_Before_ChangesTheResult()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"meltype-eval-before-{Environment.ProcessId}");
+        Directory.CreateDirectory(path);
+        try
+        {
+            File.WriteAllText(Path.Combine(path, "a.tsv"),
+                "sushi\tsushi\tfull\t出典\t\"I like \"\nsushi\tすし\tfull\t出典\t\"今日は\"\nsushi\tsushi\tfull\t出典\n");
+            var output = Path.Combine(path, "out.json");
+            Checks.ExpectAll(path, output);
+            using var json = JsonDocument.Parse(File.ReadAllText(output));
+            var items = json.RootElement.EnumerateArray().ToList();
+            Assert.Equal(3, items.Count);
+            Assert.Equal("sushi", items[0].GetProperty("actual").GetString(), "前が英文なら英字のまま");
+            Assert.True(items[0].GetProperty("ok").GetBoolean(), "I like + sushi → sushi");
+            Assert.Equal("すし", items[1].GetProperty("actual").GetString(), "前が日本語ならかな");
+            Assert.True(items[1].GetProperty("ok").GetBoolean(), "今日は + sushi → すし");
+            Assert.Equal("I like ", items[0].GetProperty("before").GetString(), "JSON に前の文字が入る (行末の空白つき)");
+            Assert.True(items[1].TryGetProperty("before", out _), "前の文字がある行には before がある");
+            Assert.True(!items[2].TryGetProperty("before", out _), "前の文字が無い行には before を出さない (4 列の表の JSON を変えない)");
+        }
+        finally
+        {
+            Directory.Delete(path, recursive: true);
+        }
+    }
 }
