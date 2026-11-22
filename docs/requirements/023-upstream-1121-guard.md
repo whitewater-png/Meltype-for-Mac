@@ -84,3 +84,8 @@ scope: core
   - 崩し方は「その行が実際に比べられていること」を確かめるためのもので、本家の原因 (未確認) を再現したものではない。
 - 数字: Core 1260/1260、eval-compare (origin/main 20736db と比較) broken 0 / fixed 0 / added 0 (634/740。新しい表は 12/12。両方の木を同じ表で回すので base でも当たる)。`check-dictionaries.mjs`・`check-terms.mjs` エラー 0 (警告は main と同じ)。辞書・判定ロジックは変えていない (`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行)。
 - 開いている PR #20・#23〜#27 のブランチと `git merge-tree` で合わせて衝突なし (最初はテストを PR #27 と同じ場所に入れて衝突したので、`Req004` の前に移した)。
+- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/28
+- 査読 1 周目 (実装を見ていない別のエージェント。Core 1260/1260・eval-compare broken 0 を再実行、崩した木は `つ` と `english.txt` の `yuki` の 2 通りを再現し記録と一致。境界例 `atudesu`・`getumatu`・`tasinamimasu`・`Yukishirosan`・`YUKISHIRO` などを自分で作って確認。開いている PR 6 本と衝突なし):
+  - [直す・対応] `docs/AGENT_STATE.md` が未更新 → PR を作った後に 1 行足した。
+  - [任意・対応] テスト名 `..._StayAsTyped` → `..._StayKanaOrName` に変えた。
+  - [任意・範囲外] `getup` → `げつp`、`at` の表示 `あt` と確定 `at` が違う (今の main の挙動。この要件では扱わない)。
