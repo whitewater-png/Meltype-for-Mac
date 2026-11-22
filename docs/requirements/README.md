@@ -36,5 +36,5 @@ Core のテストは偽の変換エンジンで動くので、漢字変換と実
 | 014 | pixiv が ぴぃv に崩れ、pixiv + 助詞は丸ごと英字のまま残る | approved (定期タスクによる自動承認。元: docs/voice/2026-11-10.md 候補 2) |
 | 015 | 判定の悪化を大量の境界例で測る道具 (境界例の一括比較) | approved (2026-11-22 リョウさんの指示。元: docs/ACCURACY_PLAN_2026-11.md 0-3) |
 | 016 | 正解表に「前の文字」の列を足す (本家の Before つきのケースを測る) | approved (2026-11-22 リョウさんの指示。元: docs/ACCURACY_PLAN_2026-11.md 0-2) |
-| 017 | 前の文を Zenzai に渡す (Q43) | draft (人の判断待ち。元: docs/ACCURACY_PLAN_2026-11.md 1-1) |
-| 018 | ライブ変換の表示のまま Enter で確定したときの学習 (Q41) | draft (人の判断待ち。元: docs/ACCURACY_PLAN_2026-11.md 1-2) |
+| 017 | 前の文を Zenzai に渡す (Q43) | approved (2026-11-22 リョウさんの指示。案 A。元: docs/ACCURACY_PLAN_2026-11.md 1-1) |
+| 018 | ライブ変換の表示のまま Enter で確定したときの学習 (Q41) | approved (2026-11-22 リョウさんの指示。案 A。元: docs/ACCURACY_PLAN_2026-11.md 1-2) |
