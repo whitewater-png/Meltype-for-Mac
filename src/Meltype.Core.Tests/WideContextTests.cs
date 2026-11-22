@@ -75,6 +75,19 @@ internal static class WideContextTests
     }
 
     [Test]
+    public static void Context_StopsAtUnicodeLineBreaks()
+    {
+        // Unicode の行区切り (U+2028)・段落区切り (U+2029)・垂直タブ (U+000B。Word の行区切り) も改行として扱う
+        foreach (var lineBreak in new[] { '\u2028', '\u2029', '\v' })
+        {
+            Assert.Equal("今日は雨。明日は", ContextAfterTyping($"昨日の話{lineBreak}今日は雨。明日は", true), $"U+{(int)lineBreak:X4} より後ろだけ");
+            Assert.True(ContextAfterTyping($"前の段落です。{lineBreak}", true) is null, $"U+{(int)lineBreak:X4} の後ろが空なら文脈なし");
+        }
+        // OFF の文脈 (同じ文の最大 10 文字) は今までどおり。この要件では変えない
+        Assert.Equal("昨日の話\u2028今日は", ContextAfterTyping("昨日の話\u2028今日は", false), "OFF は今までどおり");
+    }
+
+    [Test]
     public static void Context_IsNullAfterEnglish()
     {
         Assert.True(ContextAfterTyping("今日はGitHub", true) is null, "最後が英字なら文脈なし (今までどおり)");

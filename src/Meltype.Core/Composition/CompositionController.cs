@@ -2523,7 +2523,9 @@ public sealed class CompositionController
     }
 
     private const int WideContextLength = 20;
-    private static readonly char[] NewLines = ['\n', '\r'];
+
+    /// <summary>広い文脈で改行とみなす文字。LF・CR に加えて、Unicode の行区切り (U+2028)・段落区切り (U+2029)・垂直タブ (U+000B。Word の行区切り)。OFF の文脈 (<see cref="SentenceEnds"/>) は今までどおり。</summary>
+    private static readonly char[] NewLines = ['\n', '\r', '\u2028', '\u2029', '\v'];
 
     private string? ContextOf(string? text)
     {
