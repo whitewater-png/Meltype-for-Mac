@@ -14,7 +14,7 @@ key = file + typed ごとに次の 4 つに分ける。
 
 本家のゲートは broken + addedFailing (新しく増えて外れた例も止める)。こちらは broken だけで止める
 (同じフォルダーの表を両方で回すなら added は 0 になる)。
-key は (file, typed, 何回目か)。同じ打鍵の行を表の前の方に挿入すると、後ろの同じ打鍵の番号がずれて、別の行と比べてしまう。
+key は (file, typed, 前の文字, 何回目か)。前の文字 (5 列目。無ければ空) だけが違う行は別の行として扱う。同じ打鍵の行を表の前の方に挿入すると、後ろの同じ打鍵の番号がずれて、別の行と比べてしまう。
 """
 
 import argparse
@@ -39,13 +39,13 @@ def load(path):
 
 
 def keyed(results):
-    """key = (file, typed)。同じ打鍵が同じファイルに複数あれば、2 つ目以降に番号を付けて区別する。"""
+    """key = (file, typed, 前の文字)。同じ組が同じファイルに複数あれば、2 つ目以降に番号を付けて区別する。"""
     seen = Counter()
     out = OrderedDict()
     for r in results:
-        base = (r.get("file", ""), r["typed"])
+        base = (r.get("file", ""), r["typed"], r.get("before") or "")
         seen[base] += 1
-        out[(base[0], base[1], seen[base])] = r
+        out[base + (seen[base],)] = r
     return out
 
 
@@ -103,7 +103,8 @@ def render(b, n, broken, fixed, added, removed, base_label, new_label):
         lines.append("|---|---|---|---|" + ("---|" if show_base else "") + "---|")
         for k, nr, br in items[:MAX_LISTED]:
             r = nr or br
-            row = f"| {cell(k[0])} | {code(k[1])} | {cell(r['expected'])} | {cell(r.get('mode', ''))} | "
+            typed = code(k[1]) + (f" (前の文字: {code(chr(34) + k[2] + chr(34))})" if k[2] else "")
+            row = f"| {cell(k[0])} | {typed} | {cell(r['expected'])} | {cell(r.get('mode', ''))} | "
             if show_base:
                 row += f"{cell(br['actual']) if br else ''} | "
             row += f"{cell(nr['actual']) if nr else '(なし)'} |"
