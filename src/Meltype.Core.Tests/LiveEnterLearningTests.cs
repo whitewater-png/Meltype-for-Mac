@@ -167,14 +167,19 @@ internal static class LiveEnterLearningTests
     [Test]
     public static void EnterAsShown_KanaWithTrailingN_DoesNotCount()
     {
-        // 設定「Enter は見えているとおりに確定」で語末の n をんにして確定する形は、ライブ表示そのものではないので数えない
+        // 設定「Enter は見えているとおりに確定」で語末の n を ん にしてかなのまま確定する形 (かんたn → かんたん) は、
+        // ライブ変換の結果 (確定のときの読み かんたん → 簡単) を確定しないので数えない。
+        // 読みが学習済みの語でないと、守りを外しても数える語が無くて通ってしまうので、学習済みの 簡単 で確かめる
         var s = new Setup();
+        s.History.Remember("かんたん", "簡単");
         s.Keyboard.EnterCommitsAsShown = true;
-        var before = s.Used;
-        s.Keyboard.Type("tanniwotorun\n");
-        Assert.True(s.Keyboard.Host.Document.EndsWith("ん"), "前提: 語末の n を ん にして確定: " + s.Keyboard.Host.Document);
-        Assert.Equal(before, s.Used, "数えない");
-        Assert.Equal(0, s.Pending);
+        var before = s.History.Usage().GetValueOrDefault("簡単");
+        s.Keyboard.Type("kantan");
+        Assert.Equal("かんたn", s.Keyboard.Showing, "前提: 表示はかなと語末の n");
+        s.Keyboard.Type("\n");
+        Assert.Equal("かんたん", s.Keyboard.Host.Document, "確定はかなのまま");
+        Assert.Equal(before, s.History.Usage().GetValueOrDefault("簡単"), "簡単 の回数は変わらない");
+        Assert.Equal(0, s.Pending, "登録提案に数えない");
         Assert.Equal(0, s.LearnCalls);
     }
 
