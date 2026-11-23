@@ -3160,6 +3160,9 @@ public sealed class CompositionController
     private void LearnLanguage()
     {
         if (_firstSoundCommitted || _escReverted) return;
+        // ローマ字の再変換は、選んだ文をまるごと日本語にした (語を自分で直した) のではない。文の中の英単語を日本語と覚えない。
+        // 変換後も続けて入力で文節を固定したあと (_headCount > 0) は、_text は続けて打った分だけなので、その語の F6 / F10 は今までどおり覚える
+        if (_reconvertRomaji && _headCount == 0) return;
         if (_options.Languages is not { } memory) return;
         var raw = _text.Raw;
         var automatic = _text.Segments(final: true);
