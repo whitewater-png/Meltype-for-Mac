@@ -8,14 +8,14 @@
 |---|---|---|
 | Core のテスト | 1297 / 1297 (main の取り込み後。スキップ件数は未確認)。Python のテスト: test_eval_compare.py 8 件、test_eval_legacy_base.py 5 件、test_boundary_sweep.py 21 件、test_upstream_watch.py 37 件、test_update_cask.py OK | `dotnet run -c Release --project src/Meltype.Core.Tests` |
 | 品質テスト | 1295 / 1296 (99.9 %)。外れ: `my name is taro` のみ | `-- --eval` |
-| 正解表 (10 表) | 717 / 823。mac-device 40/41、mac-protected-spans 52/53、mac-terminal 33/37、paren-space 10/12、short-words-in-english 343/424、upstream-guards 8/8、upstream-guards-1118 8/8、upstream-guards-1120 12/12、upstream-guards-1121 12/12、upstream-quality 199/216。eval-compare (base origin/main 496c90e、704/810) は broken 0 / fixed 0 / added 13 / removed 0 (added は要件 025 (旧 016) の前の文字つきの 13 行で、すべて ok。PR #29 の CI も 8da7bac で成功) | `tools/eval-compare.sh` |
+| 正解表 (10 表) | 717 / 823。mac-device 40/41、mac-protected-spans 52/53、mac-terminal 33/37、paren-space 10/12、short-words-in-english 343/424、upstream-guards 8/8、upstream-guards-1118 8/8、upstream-guards-1120 12/12、upstream-guards-1121 12/12、upstream-quality 199/216。eval-compare (base origin/main 496c90e、704/810) は broken 0 / fixed 0 / added 13 / removed 0 (added は要件 029 (旧 016) の前の文字つきの 13 行で、すべて ok。PR #29 の CI も 8da7bac で成功) | `tools/eval-compare.sh` |
 | 境界例の一括比較 | full (既定) 684,102 入力 (j1 203,350 / j2 270,110 / j3 196,735 / e 13,907)、1 本の木あたり約 16 分。light 35,862 入力、約 50〜70 秒 (026 (旧 018) では light 35,862 入力で違い 0。main を取り込んだ後も、origin/main 496c90e と比べて light で違い 0)。ローマ字にできず除いた読み 0。検算 1 (english.txt に undef を足した写し) は full で日本語の損失 289・英語の損失 0・その他 14・終了コード 1、light で日本語の損失 17・その他 1・終了コード 1。検算 2 (同じ木) は full・light とも違い 0・終了コード 0 | `tools/boundary-sweep.sh` (使い方は `docs/DEVELOPMENT.md`) |
 | 規模 | 1 キー 0.086 ms (`[規模]`)。2026-10-24 の値。今回は測っていない | |
 
 ## 進行中の要件
 - 015 判定の悪化を大量の境界例で測る道具 (`tools/boundary_sweep.py`・`boundary_compare.py`・`boundary-sweep.sh`。ブランチ ccr-0fc8aeab-sra4z7、PR #29)。docs/ACCURACY_PLAN_2026-11.md の 0-3、リョウさんの指示「おすすめで進めてください」(2026-11-22) で着手。status は approved のまま (done は人がマージした後)。Core 1259/1259、eval-compare broken 0 / fixed 0。単体テスト 21 件。別エージェントの査読 1 周 (止める・直す指摘なし。任意 1 件: `--expect-all` の無い木を base にする経路は動かしていない)。未確認: Mac で回せるか (`bash --noprofile --norc`)、かな → ローマ字の表 (Jht.cs の手写し) と Jht の出力の機械比較 (代表例のテストのみ)。判定ロジック・辞書は変えていない。
-- 025 (旧 016) 正解表に「前の文字」の列を足す (本家の Before つきのケースを測る。PR #29 に積んだ。015 と同じ PR・同じブランチ)。status は approved のまま (done は人がマージした後)。docs/ACCURACY_PLAN_2026-11.md の 0-2 の下準備。Core 1263/1263、eval-compare broken 0 / fixed 0 / added 13。完成条件はすべて達成。別エージェントの査読 3 周 (止める・直す指摘なし。任意 2 件を入れた)。未確認: 本家の木 (`tools/eval_legacy_base.py` の実際の経路) では回していない (単体テストのみ)。前の文字そのものが `"…"` の形は今の形式では書けない (`eval/README.md` に記載)。Mac 実機は要件どおりなし。判定ロジック・辞書は変えていない。
-- 017 前の文を Zenzai に渡す (`CompositionOptions.WideConversionContext`、既定 OFF。Mac の経路で Zenzai ON かつ Mozc でないとき ON。PR #29 に積んだ。015・025 (旧 016) と同じ PR・同じブランチ)。2026-11-22 リョウさんの指示「OK、おすすめで対応して」(案 A・区切りの規則は残す・Mac は実機チェックリスト)。status は approved のまま (done は人がマージした後)。Core 1273/1273 (base 136d90c は 1263)、eval-compare broken 0 / fixed 0 / added 0 / removed 0、品質テスト 1295/1296 (base と同じ)、境界例の一括比較 light 35,862 入力で違い 0。機械で測れる完成条件は達成。別エージェントの査読 2 周 (1 周目 opus で直す 2 件と任意 7 件、2 周目 sonnet は指摘なし)。**Mac 実機チェックリストは未確認。** 測れていないこと: 実エンジン (azooKey・Zenzai) での効果 (正解表・一括比較は OFF の経路しか通らない。ON の経路は WideContextTests だけ)、規則を残した形での前の文で決まる 32 行の効果 (14 → 24 は規則なしの値)、ON での文頭の打鍵の変換エンジンの呼び出し回数 (OFF 8 回 → ON 16 回。1 回の変換あたりは最大 2 回のまま。Zenzai の推論は約 2 倍の見込み、推測)、Mac の入力欄が U+2028 などを渡すか。Swift・設定ファイルの形式・入力欄から読む範囲は変えていない。
+- 029 (旧 016) 正解表に「前の文字」の列を足す (本家の Before つきのケースを測る。PR #29 に積んだ。015 と同じ PR・同じブランチ)。status は approved のまま (done は人がマージした後)。docs/ACCURACY_PLAN_2026-11.md の 0-2 の下準備。Core 1263/1263、eval-compare broken 0 / fixed 0 / added 13。完成条件はすべて達成。別エージェントの査読 3 周 (止める・直す指摘なし。任意 2 件を入れた)。未確認: 本家の木 (`tools/eval_legacy_base.py` の実際の経路) では回していない (単体テストのみ)。前の文字そのものが `"…"` の形は今の形式では書けない (`eval/README.md` に記載)。Mac 実機は要件どおりなし。判定ロジック・辞書は変えていない。
+- 017 前の文を Zenzai に渡す (`CompositionOptions.WideConversionContext`、既定 OFF。Mac の経路で Zenzai ON かつ Mozc でないとき ON。PR #29 に積んだ。015・029 (旧 016) と同じ PR・同じブランチ)。2026-11-22 リョウさんの指示「OK、おすすめで対応して」(案 A・区切りの規則は残す・Mac は実機チェックリスト)。status は approved のまま (done は人がマージした後)。Core 1273/1273 (base 136d90c は 1263)、eval-compare broken 0 / fixed 0 / added 0 / removed 0、品質テスト 1295/1296 (base と同じ)、境界例の一括比較 light 35,862 入力で違い 0。機械で測れる完成条件は達成。別エージェントの査読 2 周 (1 周目 opus で直す 2 件と任意 7 件、2 周目 sonnet は指摘なし)。**Mac 実機チェックリストは未確認。** 測れていないこと: 実エンジン (azooKey・Zenzai) での効果 (正解表・一括比較は OFF の経路しか通らない。ON の経路は WideContextTests だけ)、規則を残した形での前の文で決まる 32 行の効果 (14 → 24 は規則なしの値)、ON での文頭の打鍵の変換エンジンの呼び出し回数 (OFF 8 回 → ON 16 回。1 回の変換あたりは最大 2 回のまま。Zenzai の推論は約 2 倍の見込み、推測)、Mac の入力欄が U+2028 などを渡すか。Swift・設定ファイルの形式・入力欄から読む範囲は変えていない。
 - 026 (旧 018) ライブ変換の表示のまま Enter で確定したときの学習 (案 A。予測用の回数 `history.Touch` と登録提案の回数 `RecordSuggestions` だけ数える。azooKey の学習はしない。PR #29 に積んだ。015〜017 と同じ PR・同じブランチ)。2026-11-22 リョウさんの指示「OK、おすすめで対応して」。status は approved のまま (done は人がマージした後)。Core 1290/1290 (base d210044 は 1273)、eval-compare broken 0 / fixed 0 / added 0 / removed 0、品質テスト 1295/1296 (base と同じ)、境界例 light 35,862 入力で違い 0。別エージェントの査読 2 周 (2 周目は指摘なし)。Mac 実機チェックリストは未確認。
 - 精度の計画 `docs/ACCURACY_PLAN_2026-11.md` が今の方向 (§7 の 6 件はリョウさんの指示で決定済み)。
 - 002 ost が おst に崩れる (`dictionaries/english.txt` に 1 語。ブランチ req/002-short-english-words、PR #7 で main に統合済み)。定期タスクが docs/voice/2026-10-26.md の候補 1 から自動承認で着手。Core 1146/1146、eval-compare broken 0 / fixed 2。Mac 実機チェックリストはリョウさんが確認済み (2026-10-28。項目ごとの記録なし)。`gooddane` (本家 #1192) は判定ロジックの変更が要るため別の要件に残す。
@@ -45,7 +45,7 @@
 ## 次の一手
 - 人: Mac の Claude デスクトップアプリで、このリポジトリと本家の clone のフォルダーを共有する (本家追従 0-1 のため。2026-11-22 時点でクラウドから使える Mac のフォルダーは 0 件)。
 - 人: 017・026 (旧 018) の Mac 実機チェックリスト (要件定義書の「Mac 実機チェックリスト」) を確かめる。
-- 人: PR #29 (計画・015・017・025 (旧 016)・026 (旧 018)) の確認とマージの判断。
+- 人: PR #29 (計画・015・017・029 (旧 016)・026 (旧 018)) の確認とマージの判断。
 - AI: Mac のフォルダーが共有されたら 0-1 (本家追従) を回す。
 - AI: Zenzai の初回の案内 (計画の 1-3 の (c)。Swift なので Mac で作る) の要件の下書き。
 - AI: 計画の 0-5 (Core を通す漢字の計測)。
@@ -74,10 +74,10 @@
 | 役割ごとのモデルと起動回数 | researcher 1 回 (sonnet、約 3.5 分) / implementer 1 回 (sonnet、約 42.9 分。full の検算 2 本を含む) / reviewer 1 回 (sonnet、約 3.8 分。定義は opus だが、利用者の指定で sonnet にし、オーケストレーター (opus) が要所を読み直した) / eval-guard 1 回 (sonnet、約 1.9 分) / doc-keeper 1 回。サブエージェント合計 5 回 |
 | 手戻りの原因 | なし。設計の調整が 1 つ: J3 (語の連結) を最初は約 267 万入力で作ったが、1 入力 約 2.8 ms で 1 本の木 23 分超の見込みになり (止める条件は 30 分)、ん で終わる語 + で に右の語 6 語、ほかの語は 25 語に 1 語などに絞った (196,735 入力) |
 
-## 025 (旧 016) の記録 (ループの実測。目標値は置かない)
+## 029 (旧 016) の記録 (ループの実測。目標値は置かない)
 | 項目 | 値 |
 |---|---|
-| 要件 | 025 (旧 016) 正解表に「前の文字」の列を足す |
+| 要件 | 029 (旧 016) 正解表に「前の文字」の列を足す |
 | 所要時間 | 約 12 分 (開始 2026-11-22T05:23:39Z、終了 05:36:05Z)。人の介入なし (要件の承認はループの前) |
 | 周回数 (implementer) | 2 (ほかに 3 周目をオーケストレーターが自分でテスト 4 行だけ直した) |
 | 役割ごとのモデルと起動回数 | researcher 1 回 (sonnet、約 1.6 分) / implementer 2 回 (sonnet、約 3.2 分・約 0.4 分) / reviewer 3 回 (sonnet、約 2.3 分・約 0.3 分・約 0.2 分。定義は opus だが、利用者の指定で sonnet にし、オーケストレーター (opus) が要所を読み直した) / eval-guard 2 回 (sonnet、約 2.5 分・約 1.4 分) / doc-keeper 1 回。サブエージェント合計 9 回 |

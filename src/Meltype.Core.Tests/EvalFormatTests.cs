@@ -162,7 +162,7 @@ internal static class EvalFormatTests
         }
     }
 
-    // --- 5 列目「前の文字」(要件 025、旧 016) ---
+    // --- 5 列目「前の文字」(要件 029、旧 016) ---
 
     [Test]
     public static void Parse_FiveColumns_ReadsBefore()
