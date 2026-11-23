@@ -3,13 +3,13 @@
 > 1 枚だけの「今どこか」。ループの終わりと、文脈が圧縮される前に更新する。履歴は git に任せ、ここには最新だけを書く。
 > 話題ごとの詳しい引き継ぎは `docs/HANDOFF-*.md`、本家 PR の状態は `docs/UPSTREAM_PR_TRACKER.md`、設計と数字は `docs/IMPROVEMENT_PLAN.md`。
 
-## 基準の数字 (2026-11-23、クラウド Linux 4 コア、ブランチ ccr-0fc8aeab-sra4z7、HEAD 8da7bac = origin/main 496c90e (PR #30 まで) を取り込んだ後)
+## 基準の数字 (2026-11-23、クラウド Linux 4 コア、ブランチ ccr-0fc8aeab-sra4z7、HEAD 34a2843。origin/main 496c90e (PR #30 まで) を取り込んだ後に 030 まで積んだ。数字は 9bc2b10 で測り、34a2843 は README の文言だけ)
 | 項目 | 値 | コマンド |
 |---|---|---|
-| Core のテスト | 1297 / 1297 (main の取り込み後。スキップ件数は未確認)。Python のテスト: test_eval_compare.py 8 件、test_eval_legacy_base.py 5 件、test_boundary_sweep.py 21 件、test_upstream_watch.py 37 件、test_update_cask.py OK | `dotnet run -c Release --project src/Meltype.Core.Tests` |
+| Core のテスト | 1301 / 1301 (030 の後。スキップ件数は未確認)。Python のテスト: test_eval_compare.py 8 件、test_eval_legacy_base.py 5 件、test_boundary_sweep.py 21 件、test_upstream_watch.py 37 件、test_update_cask.py OK | `dotnet run -c Release --project src/Meltype.Core.Tests` |
 | 品質テスト | 1295 / 1296 (99.9 %)。外れ: `my name is taro` のみ | `-- --eval` |
-| 正解表 (10 表) | 717 / 823。mac-device 40/41、mac-protected-spans 52/53、mac-terminal 33/37、paren-space 10/12、short-words-in-english 343/424、upstream-guards 8/8、upstream-guards-1118 8/8、upstream-guards-1120 12/12、upstream-guards-1121 12/12、upstream-quality 199/216。eval-compare (base origin/main 496c90e、704/810) は broken 0 / fixed 0 / added 13 / removed 0 (added は要件 029 (旧 016) の前の文字つきの 13 行で、すべて ok。PR #29 の CI も 8da7bac で成功) | `tools/eval-compare.sh` |
-| 境界例の一括比較 | full (既定) 684,102 入力 (j1 203,350 / j2 270,110 / j3 196,735 / e 13,907)、1 本の木あたり約 16 分。light 35,862 入力、約 50〜70 秒 (026 (旧 018) では light 35,862 入力で違い 0。main を取り込んだ後も、origin/main 496c90e と比べて light で違い 0)。ローマ字にできず除いた読み 0。検算 1 (english.txt に undef を足した写し) は full で日本語の損失 289・英語の損失 0・その他 14・終了コード 1、light で日本語の損失 17・その他 1・終了コード 1。検算 2 (同じ木) は full・light とも違い 0・終了コード 0 | `tools/boundary-sweep.sh` (使い方は `docs/DEVELOPMENT.md`) |
+| 正解表 (10 表) | 717 / 823。mac-device 40/41、mac-protected-spans 52/53、mac-terminal 33/37、paren-space 10/12、short-words-in-english 343/424、upstream-guards 8/8、upstream-guards-1118 8/8、upstream-guards-1120 12/12、upstream-guards-1121 12/12、upstream-quality 199/216。eval-compare (base origin/main 496c90e、704/818 → 727/831) は broken 0 / fixed 10 (030 の mac-terminal の 10 行。測り方の違いも含む) / added 13 / removed 0 (added は要件 029 (旧 016) の前の文字つきの 13 行で、すべて ok。base c1d78b9 では 717/831 → 727/831、broken 0 / fixed 10 / added 0)。PR #29 の CI は 030 の push 後は未確認 | `tools/eval-compare.sh` |
+| 境界例の一括比較 | full (既定) 684,102 入力 (j1 203,350 / j2 270,110 / j3 196,735 / e 13,907)、1 本の木あたり約 16 分。light 35,862 入力、約 50〜70 秒 (026 (旧 018)・030 では light 35,862 入力で違い 0。main を取り込んだ後も、origin/main 496c90e と比べて light で違い 0)。ローマ字にできず除いた読み 0。検算 1 (english.txt に undef を足した写し) は full で日本語の損失 289・英語の損失 0・その他 14・終了コード 1、light で日本語の損失 17・その他 1・終了コード 1。検算 2 (同じ木) は full・light とも違い 0・終了コード 0 | `tools/boundary-sweep.sh` (使い方は `docs/DEVELOPMENT.md`) |
 | 規模 | 1 キー 0.086 ms (`[規模]`)。2026-10-24 の値。今回は測っていない | |
 
 ## 進行中の要件
@@ -17,6 +17,7 @@
 - 029 (旧 016) 正解表に「前の文字」の列を足す (本家の Before つきのケースを測る。PR #29 に積んだ。015 と同じ PR・同じブランチ)。status は approved のまま (done は人がマージした後)。docs/ACCURACY_PLAN_2026-11.md の 0-2 の下準備。Core 1263/1263、eval-compare broken 0 / fixed 0 / added 13。完成条件はすべて達成。別エージェントの査読 3 周 (止める・直す指摘なし。任意 2 件を入れた)。未確認: 本家の木 (`tools/eval_legacy_base.py` の実際の経路) では回していない (単体テストのみ)。前の文字そのものが `"…"` の形は今の形式では書けない (`eval/README.md` に記載)。Mac 実機は要件どおりなし。判定ロジック・辞書は変えていない。
 - 017 前の文を Zenzai に渡す (`CompositionOptions.WideConversionContext`、既定 OFF。Mac の経路で Zenzai ON かつ Mozc でないとき ON。PR #29 に積んだ。015・029 (旧 016) と同じ PR・同じブランチ)。2026-11-22 リョウさんの指示「OK、おすすめで対応して」(案 A・区切りの規則は残す・Mac は実機チェックリスト)。status は approved のまま (done は人がマージした後)。Core 1273/1273 (base 136d90c は 1263)、eval-compare broken 0 / fixed 0 / added 0 / removed 0、品質テスト 1295/1296 (base と同じ)、境界例の一括比較 light 35,862 入力で違い 0。機械で測れる完成条件は達成。別エージェントの査読 2 周 (1 周目 (上位のモデル) で直す 2 件と任意 7 件、2 周目 (下位のモデル) は指摘なし)。**Mac 実機チェックリストは未確認。** 測れていないこと: 実エンジン (azooKey・Zenzai) での効果 (正解表・一括比較は OFF の経路しか通らない。ON の経路は WideContextTests だけ)、規則を残した形での前の文で決まる 32 行の効果 (14 → 24 は規則なしの値)、ON での文頭の打鍵の変換エンジンの呼び出し回数 (OFF 8 回 → ON 16 回。1 回の変換あたりは最大 2 回のまま。Zenzai の推論は約 2 倍の見込み、推測)、Mac の入力欄が U+2028 などを渡すか。Swift・設定ファイルの形式・入力欄から読む範囲は変えていない。
 - 026 (旧 018) ライブ変換の表示のまま Enter で確定したときの学習 (案 A。予測用の回数 `history.Touch` と登録提案の回数 `RecordSuggestions` だけ数える。azooKey の学習はしない。PR #29 に積んだ。015〜017 と同じ PR・同じブランチ)。2026-11-22 リョウさんの指示「OK、おすすめで対応して」。status は approved のまま (done は人がマージした後)。Core 1290/1290 (base d210044 は 1273)、eval-compare broken 0 / fixed 0 / added 0 / removed 0、品質テスト 1295/1296 (base と同じ)、境界例 light 35,862 入力で違い 0。別エージェントの査読 2 周 (2 周目は指摘なし)。Mac 実機チェックリストは未確認。
+- 030 ターミナルで、英単語 + 数字のコマンドの名前 (`python3`・`pip3`) の後の空白が消える + 正解表 mac-terminal をコード系アプリとして測る (`CommandNames` に 2 語・形式を「小文字の英字のあとに数字が 0 個以上」に広げる。正解表の表ごとの指定 `# app: code`。PR #29 に積んだ。015・017・026・029 と同じ PR・同じブランチ)。2026-11-23 リョウさんの指示「メルタイプの案件は一旦おすすめで進めてください」(docs/ACCURACY_PLAN_2026-11.md 2-3 の最初の型。人の判断 4 件は推奨どおり)。status は approved のまま (done は人がマージした後)。範囲はコード系アプリだけ。一般アプリは K79 の決まりで今までどおり。Core 1301/1301 (base c1d78b9 は 1297)、品質テスト 1295/1296 (base と同じ)、eval-compare broken 0 / fixed 10 / added 0 (base c1d78b9。base origin/main では added 13 は 029 の行)、mac-terminal 33/45 → 43/45、境界例 light 35,862 入力で違い 0。別エージェントの査読 2 周 (1 周目 (上位のモデル) で直す 1 件と任意 4 件、2 周目 (下位のモデル) は止める・直す指摘なし)。要件定義書の査読は 3 回。**Mac 実機チェックリストは未確認。** 測れていないこと: 本家の木や古い木では mac-terminal の 10 行が測り方の違いで fixed になる。指定の書き損じは黙って一般アプリになる (`eval/README.md`)。Swift・設定の形式は変えていない。
 - 精度の計画 `docs/ACCURACY_PLAN_2026-11.md` が今の方向 (§7 の 6 件はリョウさんの指示で決定済み)。
 - 002 ost が おst に崩れる (`dictionaries/english.txt` に 1 語。ブランチ req/002-short-english-words、PR #7 で main に統合済み)。定期タスクが docs/voice/2026-10-26.md の候補 1 から自動承認で着手。Core 1146/1146、eval-compare broken 0 / fixed 2。Mac 実機チェックリストはリョウさんが確認済み (2026-10-28。項目ごとの記録なし)。`gooddane` (本家 #1192) は判定ロジックの変更が要るため別の要件に残す。
 - 003 (長いローマ字文が全部かなになることを Core で守るテスト): PR #8 で main に統合済み・Mac 実機チェックリストは未確認。守りのテストで判定ロジックは未変更。外れは出なかった (400 文字超でも全部かな)。
@@ -45,10 +46,13 @@
 ## 次の一手
 - 人: Mac の Claude デスクトップアプリで、このリポジトリと本家の clone のフォルダーを共有する (本家追従 0-1 のため。2026-11-22 時点でクラウドから使える Mac のフォルダーは 0 件)。
 - 人: 017・026 (旧 018) の Mac 実機チェックリスト (要件定義書の「Mac 実機チェックリスト」) を確かめる。
-- 人: PR #29 (計画・015・017・029 (旧 016)・026 (旧 018)) の確認とマージの判断。
+- 人: 030 の Mac 実機チェックリスト (ターミナルの `python3 -m venv .venv`・`pip3 install requests` (Enter で実行しない)・`cd ~/Downloads`、`nihongo` + Space をターミナルと TextEdit で) を確かめる。
+- 人 (判断): 一般アプリでも、コマンドの名前の後の Space で空白を入れるか (030 の範囲外の案 A。K79 の「一般アプリでは今までどおり」を変える。変わるのは、ローマ字として読めない子音の並び + Space が空白つきの確定になることと、`iphone15 wo` の空白が残ること)。
+- 人: PR #29 (計画・015・017・029 (旧 016)・026 (旧 018)・030) の確認とマージの判断。
 - AI: Mac のフォルダーが共有されたら 0-1 (本家追従) を回す。
 - AI: Zenzai の初回の案内 (計画の 1-3 の (c)。Swift なので Mac で作る) の要件の下書き。
 - AI: 計画の 0-5 (Core を通す漢字の計測)。
+- AI: 030 の範囲外で見つけた別の要件の候補 (`npx create-next-app` → `npx create-next-あっp` の `-` でつないだ語の最後がかなになる件、コマンドの引数の短い語 `grep -n foo` → `grep -n ふぉお`・`mv a b` → `mv あb`、一般アプリの `node -v` → `のでーv`・`open ~/Desktop` → `おぺん～/Desktop`)。
 - 人: `uri` (売り・瓜と読める) を英字にしてよいか判断する。
 - 人: 001 の Mac 実機チェックリスト (TextEdit・ターミナル) を確かめて、マージ・要件の `done` を判断する。
 - 別の要件にする候補: `my name is taro` (品質テストの最後の外れ)。
@@ -100,3 +104,12 @@
 | 周回数 (implementer) | 2 |
 | 役割ごとのモデルと起動回数 | researcher 1 回 (下位のモデル、約 1.8 分) / implementer 2 回 (1 周目 (下位のモデル) 約 4.3 分、2 周目 (上位のモデル) 約 23.6 分。昇格理由: `Composition/` に触れる + 1 周目の査読の指摘) / reviewer 2 回 (1 周目 (上位のモデル) 約 18.0 分、2 周目 (下位のモデル) 約 2.3 分。1 周目は実装者と別のモデル) / eval-guard 2 回 (下位のモデル、約 2.3 分・約 2.4 分) / doc-keeper 1 回 |
 | 手戻りの原因 | (1) 1 周目の「語末の n をかなのまま確定したら数えない」テストが、偽の変換エンジンでは学習済みの語が入らない入力だったので、守り (`shownAsLive = false`) を外しても通った。査読員が守りを外して、見えてもいない語 (簡単) を数えてしまう例を見つけた。入力を「かんたん→簡単 を学習済み・EnterCommitsAsShown ON・kantan Enter」に替え、守りを外すと落ちることを確かめた。(2) 1 周目の実装者は fixedOnly (変換後も続けて入力) を「二重に数えないため」数えないとしたが、査読で二重にならないと分かり、2 周目で数えるようにした。(3) 任意の指摘のうち入れたもの: 表示と確定の形が違う Enter でも、確定した学習済みの語を数える動きをテストで固定、数えない条件のテスト (1 音確定・確定後の F6 の変換ボックス)、学習の待ち方を対照が届くまで待つ形に、K95 の理由の訂正。(4) PR 本文と AGENT_STATE が古かった (1 周目の査読) |
+
+## 030 の記録 (ループの実測。目標値は置かない)
+| 項目 | 値 |
+|---|---|
+| 要件 | 030 ターミナルで、英単語 + 数字のコマンドの名前 (python3・pip3) の後の空白が消える。正解表 mac-terminal をコード系アプリとして測る |
+| 所要時間 | 約 52 分 (開始 2026-11-23T06:55:25Z、終了 07:47Z)。人の介入なし (要件の承認はループの前) |
+| 周回数 (implementer) | 2 |
+| 役割ごとのモデルと起動回数 | researcher 1 回 (下位のモデル、約 8.6 分) / implementer 2 回 (1 周目 (下位のモデル) 約 6.8 分、2 周目 (上位のモデル) 約 5.8 分。昇格理由: `Composition/` (`CompositionDetector.cs`) に触れる) / reviewer 2 回 (1 周目 (上位のモデル) 約 21.5 分、2 周目 (下位のモデル) 約 2.1 分。1 周目は実装者と別のモデルで、境界例 29,808 件 + 設定の組 2,880 件を自分で作って base と比べた) / eval-guard 2 回 (下位のモデル、約 2.2 分・約 3.4 分) / doc-keeper 1 回 |
+| 手戻りの原因 | (1) 要件定義書の最初の下書きが、正解表の外れ (一般アプリとして測った値) を「ターミナルで崩れる」と書き、K79 がコード系アプリで直っていることを見落とした。下書きの査読 3 回で範囲を絞って書き直した (`docs/LESSONS.md` に記録)。(2) 1 周目の査読の直す 1 件 (K79 の症状の列に古い「既知の外れと同じ」が残っていた) と任意 3 件を 2 周目で直した。(3) 2 周目の eval-guard の最初の報告が中身なし (「placeholder」) で届き、出し直させた (`docs/LESSONS.md` に記録)。(4) 記録のモデル名の件で、CLAUDE.md に例外を足す案を出したが、AI がリポジトリにモデル名を書けないので取り消した (`docs/LESSONS.md` に記録) |
