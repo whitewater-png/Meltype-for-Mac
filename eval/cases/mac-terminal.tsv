@@ -45,3 +45,12 @@ rm-rf	rm-rf	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
 kyouhapt-query	きょうはpt-query	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
 kyouhals-files	きょうはls-files	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
 kyouhara-men	きょうはらーめん	full	docs/requirements/004-consonant-hyphen.md (長音を守る)
+# カテゴリ: コマンドの名前の後の空白 (要件 030。コード系アプリの K79 と、python3・pip3)
+python3 -m http.server	python3 -m http.server	full	要件 030
+python3 --version	python3 --version	full	要件 030
+pip3 install requests	pip3 install requests	full	要件 030
+cd ..	cd ..	full	要件 030 (K79 の守り)
+cd /tmp	cd /tmp	full	要件 030 (K79 の守り)
+ls -la	ls -la	full	要件 030 (K79 の守り)
+ls ~/Library	ls ~/Library	full	要件 030 (K79 の守り)
+rm -rf node_modules	rm -rf node_modules	full	要件 030 (K79 の守り)
