@@ -36,7 +36,7 @@ scope: core
 
 ## 完成条件 (先に決める。機械で判定できる形)
 守りの行なので、今の main で最初から当たる。「先に赤」の代わりに、**わざと崩した木 (作業ツリーで一時的に変えて戻す) で、足した行とテストが外れること**を一度確かめる。
-- [ ] 正解表: 新しい表 `eval/cases/upstream-guards-1122.tsv` に次の行を足し、今の main でも当たる (019〜023 と同じく、日付ごとの別の表にする)
+- [x] 正解表: 新しい表 `eval/cases/upstream-guards-1122.tsv` に次の行を足し、今の main でも当たる (019〜023 と同じく、日付ごとの別の表にする)
   ```
   setteisiteirundakedo	せっていしているんだけど	full	本家 #2206
   taiousiteirundakedo	たいおうしているんだけど	full	要件 025 (声の文書で打った同じ形)
@@ -47,10 +47,10 @@ scope: core
   @exampleabc-jh.ed.jpdesu	@exampleabc-jh.ed.jpdesu	full	本家 #2205
   abc@exampleabc-jh.ed.jpdesu	abc@exampleabc-jh.ed.jpdesu	full	要件 025 (作者の作例: 前に名前のある形)
   ```
-- [ ] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req025_Upstream1122Shapes_StayKanaOrEnglish` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
-- [ ] わざと崩した木で、足した 8 行がどれも少なくとも 1 回は外れ、テストが赤になる (崩し方と結果を記録欄に書く)。
-- [ ] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過。
-- [ ] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。`eval/README.md` と `docs/requirements/README.md` の一覧には足さない (019〜023 と同じ扱い。開いている PR #29 が同じ場所を変えている)。
+- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req025_Upstream1122Shapes_StayKanaOrEnglish` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
+- [x] わざと崩した木で、足した 8 行がどれも少なくとも 1 回は外れ、テストが赤になる (崩し方と結果を記録欄に書く)。
+- [x] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過。
+- [x] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。`eval/README.md` と `docs/requirements/README.md` の一覧には足さない (019〜023 と同じ扱い。開いている PR #29 が同じ場所を変えている)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] TextEdit: `setteisiteirundakedo` + Enter → `せっていしているんだけど` (Space の候補に `設定しているんだけど` が出るか)
@@ -62,4 +62,15 @@ scope: core
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
 
 ## 記録 (ループが書く)
-- (実装後に書く)
+- わざと崩した木 (作業ツリーで一時的に変え、テスト `Req025` と 8 形の `--repro` を回し、`git checkout` で戻した。2026-11-23):
+  | 崩し方 | 外れた行 → 確定 |
+  |---|---|
+  | `src/Meltype.Core/Detection/RomajiDetector.cs` の `("る", ["ru"])` を `ruq` に | `setteisiteirundakedo` → `せっていしていrunだけど` (本家 #2206 と同じ形)、`taiousiteirundakedo` → `たいおうしていrunだけど`、`ryourisiteirundakedo` → `りょうりしていrunだけど` |
+  | `dictionaries/english-words.txt`・`english-readable.txt` から `main` の行を消す | `mainkannsuu`・`mainkansuu` → `まいんかんすう` (本家 #2208 と同じ形)、`mainnokannsuu` → `まいんおかんすう` |
+  | `("か", ["ka"])` を `kaq` に | `mainkannsuu`・`mainkansuu` → `mainkあんすう` |
+  | `src/Meltype.Core/Composition/CompositionDetector.cs` の `UserNameEnd` で `mention` を常に false に | `@exampleabc-jh.ed.jpdesu` → `@exampleあbc-jh。えd。jpです`、`abc@exampleabc-jh.ed.jpdesu` → `abc@exampleあbc-jh。えd。jpです` |
+  | 同じ関数のドメインの続き (`.` と `-`) を `.` だけに | `@exampleabc-jh.ed.jpdesu` → `@exampleabc-jh。えd。jpです`、`abc@…` も同じ |
+  - どの崩し方でもテストは赤 (例: `setteisiteirundakedo 期待値: せっていしているんだけど / 実際: せっていしていrunだけど`)、戻した後は緑。8 行とも少なくとも 1 つの崩し方で外れた。`english-words.txt` だけから `main` を消しても外れなかった (`english-readable.txt` にもある)。
+  - 崩し方は「その行が実際に比べられていること」を確かめるためのもので、本家の原因 (未確認) を再現したものではない。
+- 数字: Core 1267/1267、eval-compare (origin/main 496c90e と比較) broken 0 / fixed 0 / added 0 / removed 0 (712/818。新しい表は 8/8。両方の木を同じ表で回すので base でも当たる)。`check-dictionaries.mjs`・`check-terms.mjs` エラー 0 (警告は main と同じ。辞書は変えていない)。`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行。
+- 開いている PR #29 (ブランチ ccr-0fc8aeab-sra4z7) と `git merge-tree` で合わせると、この要件の 3 ファイルは衝突しない (`docs/LESSONS.md`・`docs/requirements/README.md` の衝突は origin/main と PR #29 の間に元からあるもの)。PR #29 の木で新しい表だけを `tools/eval-compare.sh` で回しても 8/8。
