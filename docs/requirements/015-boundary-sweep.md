@@ -66,7 +66,7 @@ scope: core
 
 ## 記録 (ループが書く)
 - 周回数: 1 (implementer)。
-- モデル: researcher 1 回 (sonnet) / implementer 1 回 (sonnet) / reviewer 1 回 (sonnet。定義は opus だが利用者の指定で sonnet にし、オーケストレーターが要所を読み直した) / eval-guard 1 回 (sonnet) / doc-keeper 1 回。
+- モデル: researcher 1 回 (下位のモデル) / implementer 1 回 (下位のモデル) / reviewer 1 回 (下位のモデル。定義は上位のモデルだが利用者の指定で下位のモデルにし、オーケストレーターが要所を読み直した) / eval-guard 1 回 (下位のモデル) / doc-keeper 1 回。
 - 所要時間: 約 53 分 (2026-11-22T04:28:27Z〜05:21:40Z)。人の介入なし。
 - 手戻りの原因: なし。設計の調整 1 つ: J3 (語の連結) を約 267 万入力で作ったが 1 入力 約 2.8 ms で 1 本の木 23 分超の見込みになり (止める条件は 30 分)、ん で終わる語 + で に右の語 6 語、ほかの語は 25 語に 1 語などに絞った (196,735 入力)。
 - 達成の根拠 (クラウド Linux 4 コア、HEAD 4a93b82): 単体テスト 21 件。検算 1 は full で日本語の損失 289・英語の損失 0・その他 14・終了コード 1 (例: kibundeftotemo)、light で日本語の損失 17・終了コード 1。`jibundeftotemo` そのものは一覧に入っていないが同じ型は入っている。検算 2 は full (実装者) ・light (査読員) とも違い 0・終了コード 0。full は 684,102 入力・1 本の木あたり約 16 分、light は 35,862 入力・約 50〜70 秒。Core 1259/1259、eval-compare broken 0 / fixed 0。

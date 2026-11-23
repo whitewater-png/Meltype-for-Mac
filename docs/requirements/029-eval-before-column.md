@@ -48,7 +48,7 @@ scope: core
 
 ## 記録 (ループが書く)
 - 周回数: implementer 2 周 (1 周目で完成条件をすべて達成、2 周目は査読の任意指摘)。3 周目はオーケストレーターがテスト 4 行を直した
-- モデル: researcher 1 回 (sonnet)・implementer 2 回 (sonnet)・reviewer 3 回 (sonnet。定義は opus だが利用者の指定。オーケストレーターの opus が要所を読み直した)・eval-guard 2 回 (sonnet)・doc-keeper 1 回
+- モデル: researcher 1 回 (下位のモデル)・implementer 2 回 (下位のモデル)・reviewer 3 回 (下位のモデル。定義は上位のモデルだが利用者の指定。オーケストレーター (上位のモデル) が要所を読み直した)・eval-guard 2 回 (下位のモデル)・doc-keeper 1 回
 - 所要時間: 約 12 分 (2026-11-22T05:23:39Z〜05:36:05Z)。人の介入なし
 - 手戻りの原因: 止める・直すの指摘による手戻りはなし。任意の指摘 2 件 (eval_compare.py の鍵の単体テストと README の 1 文 / 同じ鍵の何回目かの番号を固定できていなかったテストの強化。後者は docs/LESSONS.md)
 - 数字: Core 1263/1263 (base は 1259)、正解表 635/741、eval-compare broken 0 / fixed 0 / added 13 / removed 0

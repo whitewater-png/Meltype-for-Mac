@@ -64,8 +64,8 @@ scope: core
 ## 記録 (ループが書く)
 - PR: #29 (https://github.com/whitewater-png/Meltype-for-Mac/pull/29。015〜017 と同じブランチに積んだ)。status は approved のまま。
 - 所要時間: 約 55 分 (開始 2026-11-22T09:04:11Z、終了 09:58:47Z)。人の介入なし。
-- 周回数 (implementer): 2。1 周目 (sonnet) で機械で測れる完成条件を達成。1 周目の査読 (opus) の直す 2 件と任意 7 件を、2 周目 (opus に昇格。`Composition/` に触れるため) で直す 1 件と任意 5 件に整理して入れた。2 周目の査読 (sonnet) は指摘なし。
-- モデルと起動回数: researcher 1 回 (sonnet) / implementer 2 回 (sonnet・opus) / reviewer 2 回 (opus・sonnet) / eval-guard 2 回 (sonnet) / doc-keeper 1 回。
+- 周回数 (implementer): 2。1 周目 (下位のモデル) で機械で測れる完成条件を達成。1 周目の査読 (上位のモデル) の直す 2 件と任意 7 件を、2 周目 (上位のモデルに昇格。`Composition/` に触れるため) で直す 1 件と任意 5 件に整理して入れた。2 周目の査読 (下位のモデル) は指摘なし。
+- モデルと起動回数: researcher 1 回 (下位のモデル) / implementer 2 回 (下位のモデル・上位のモデル) / reviewer 2 回 (上位のモデル・下位のモデル) / eval-guard 2 回 (下位のモデル) / doc-keeper 1 回。
 - 変更の中身: Core だけ (`CompositionController.cs`、`LiveEnterLearningTests.cs` 17 本、README 48 行に 1 文、`docs/KNOWN_LIMITS.md` の K95 の理由)。ライブ表示のまま Enter で確定したとき (変換後も続けて入力の残りの部分も)、確定した文節のうち学習済みの語について、`history.Touch` と `RecordSuggestions` を数える。azooKey の学習 (`LearnConversion`) と選び直しの記録 (`history.Remember`) はしない。学習データのファイル形式は変えていない。
 - 数字: Core のテスト 1290/1290 (base d210044 は 1273)。品質テスト 1295/1296 (外れは `my name is taro` だけ)。正解表 635/741 で base と同じ。eval-compare broken 0 / fixed 0 / added 0 / removed 0。境界例の一括比較 light 35,862 入力で違い 0。
 - 手戻りの原因: (1) 語末の n をかなのまま確定したら数えない、のテストが守りを外しても通った (偽の変換エンジンでは学習済みの語が入らない入力だった)。入力を替えて、守りを外すと落ちることを確かめた。(2) fixedOnly を「二重に数えないため」数えないとした 1 周目の判断が誤りと査読で分かり、2 周目で数えるようにした。(3) PR 本文と AGENT_STATE が古かった。
