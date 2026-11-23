@@ -174,6 +174,7 @@ internal static class ReconvertRomajiTests
         try
         {
             // R1〜R5・R7: 確定のしかたごとに、日英の学習が 0 件
+            // R8 (査読で足した経路): 再変換のあと F6 / F7 で表示を変えると、変換中でなくなってから確定する (SetMode が変換を終える)。変換中かどうかで守ると、ここが漏れる
             var routes = new (string Name, bool Continue, bool ShiftEnter, Action<MeltypeSession> Run)[]
             {
                 ("R1 OFF Enter", false, false, s => Press(s, VirtualKeys.Return)),
@@ -184,6 +185,8 @@ internal static class ReconvertRomajiTests
                 ("R5 ON Space→Enter", true, false, s => { Press(s, VirtualKeys.Space); Press(s, VirtualKeys.Return); }),
                 ("R7 OFF Shift+Enter", false, true, s => s.HandleKey(VirtualKeys.Return, null, true, false, false, false)),
                 ("R7 ON Shift+Enter", true, true, s => s.HandleKey(VirtualKeys.Return, null, true, false, false, false)),
+                ("R8 OFF F6→Enter", false, false, s => { Press(s, VirtualKeys.F6); Press(s, VirtualKeys.Return); }),
+                ("R8 OFF F7→Enter", false, false, s => { Press(s, VirtualKeys.F7); Press(s, VirtualKeys.Return); }),
             };
             var leaked = new List<string>();
             foreach (var (name, cont, shiftEnter, run) in routes)
@@ -201,7 +204,7 @@ internal static class ReconvertRomajiTests
                 var langs = new LanguageMemory(null);
                 langs.Remember("meeting", english: true, explicitChoice: true);
                 var session = Create(new CompositionOptions { Languages = langs });
-                session.Reconvert(selected);
+                Assert.True(session.Reconvert(selected).Consumed, "R6: 再変換が始まっている");
                 Press(session, VirtualKeys.Return);
                 Assert.Equal(1, langs.Entries().Count, $"R6: 件数 (入ったもの: {Dump(langs)})");
                 var entry = langs.Entries().Single(e => e.Word == "meeting");
@@ -228,7 +231,7 @@ internal static class ReconvertRomajiTests
             {
                 var langs = new LanguageMemory(null);
                 var session = Create(new CompositionOptions { Languages = langs });
-                session.Reconvert(selected);
+                Assert.True(session.Reconvert(selected).Consumed, "C1 Esc: 再変換が始まっている");
                 Press(session, VirtualKeys.Escape);
                 Assert.Equal(0, langs.Entries().Count, $"C1 Esc: 覚えない ({Dump(langs)})");
             }
@@ -246,13 +249,15 @@ internal static class ReconvertRomajiTests
             {
                 var langs = new LanguageMemory(null);
                 var session = Create(new CompositionOptions { Languages = langs, ContinueAfterConversion = () => true });
-                session.Reconvert(selected);
+                Assert.True(session.Reconvert(selected).Consumed, $"N2/N3 {word}: 再変換が始まっている");
                 Press(session, VirtualKeys.Space);
                 Type(session, word);
                 Press(session, key);
                 Press(session, VirtualKeys.Return);
                 Assert.True(langs.Entries().Any(e => e.Word == word && e.English == english),
                     $"N2/N3 {word}: {(english ? "英語" : "日本語")}と覚える ({Dump(langs)})");
+                // 覚えるのは続けて打った語だけ (再変換の文の meeting・review は入らない)
+                Assert.Equal(1, langs.Entries().Count, $"N2/N3 {word}: 件数 (入ったもの: {Dump(langs)})");
             }
         }
         finally
