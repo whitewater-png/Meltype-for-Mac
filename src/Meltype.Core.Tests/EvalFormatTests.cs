@@ -228,4 +228,43 @@ internal static class EvalFormatTests
             Directory.Delete(path, recursive: true);
         }
     }
+
+    [Test]
+    public static void ExpectAll_AppCodeComment_TypesTheTableAsCodeApp()
+    {
+        // 表ごとの指定 (要件 030): `# app: code` のある表はコード系アプリとして打つ。指定の無い表は一般アプリのまま
+        var path = Path.Combine(Path.GetTempPath(), $"meltype-eval-app-{Environment.ProcessId}");
+        Directory.CreateDirectory(path);
+        try
+        {
+            File.WriteAllText(Path.Combine(path, "code.tsv"), "# メモ\n# app: code\ncd ..\tcd ..\tfull\t出典\nls -la\tls -la\tfull\t出典\n");
+            File.WriteAllText(Path.Combine(path, "general.tsv"), "cd ..\tcd ..\tfull\t出典\n");
+            var output = Path.Combine(path, "out.json");
+            Checks.ExpectAll(path, output);
+            using var json = JsonDocument.Parse(File.ReadAllText(output));
+            var items = json.RootElement.EnumerateArray().ToList();
+            Assert.Equal(3, items.Count);
+            var code = items.Where(i => i.GetProperty("file").GetString() == "code.tsv").ToList();
+            var general = items.Single(i => i.GetProperty("file").GetString() == "general.tsv");
+            Assert.True(code.All(i => i.GetProperty("ok").GetBoolean()), "指定のある表は、コマンド名の後の空白が残る (K79)");
+            Assert.True(!general.GetProperty("ok").GetBoolean(), "指定の無い表は一般アプリ (K79 の決まりで今までどおり、cd の後の空白が消える)");
+        }
+        finally
+        {
+            Directory.Delete(path, recursive: true);
+        }
+    }
+
+    [Test]
+    public static void UsesCodeApp_OnlyTheCommentLine()
+    {
+        Assert.True(Checks.UsesCodeApp(["# メモ", "# app: code", "a\ta\tfull\t出典"]), "# app: code");
+        Assert.True(Checks.UsesCodeApp(["  #app:code  "]), "空白の揺れは許す");
+        Assert.True(!Checks.UsesCodeApp(["a\ta\tfull\t出典"]), "指定が無ければ一般アプリ");
+        Assert.True(!Checks.UsesCodeApp(["# app: general"]), "code 以外は一般アプリ");
+        Assert.True(!Checks.UsesCodeApp(["# このアプリは app: code ではない"]), "行の途中の文字列は指定ではない");
+        Assert.True(!Checks.UsesCodeApp(["app: code\tapp: code\tfull\t出典"]), "# で始まらない行は指定ではない");
+        // 指定の行は、4 列の表として読むとき、ほかのコメント行と同じく読み飛ばされる (件数が変わらない)
+        Assert.Equal(1, Checks.ParseCases(["# app: code", "cd\tcd\tfull\t出典"], "t.tsv").Count);
+    }
 }

@@ -162,7 +162,8 @@ internal static class Checks
     {
         CompositionTests.Detector.SpellChecker ??= Detection.BuiltInWordChecker.Shared;
         var candidates = Composition.CandidateDictionary.Load(null);
-        var results = Evaluate(ParseCases(File.ReadAllLines(input), Path.GetFileName(input)), null, candidates);
+        var lines = File.ReadAllLines(input);
+        var results = Evaluate(ParseCases(lines, Path.GetFileName(input)), null, candidates, UsesCodeApp(lines));
         File.WriteAllText(output, JsonSerializer.Serialize(results, ResultJson));
     }
 
@@ -175,12 +176,21 @@ internal static class Checks
         foreach (var path in Directory.GetFiles(directory, "*.tsv").OrderBy(p => p, StringComparer.Ordinal))
         {
             var name = Path.GetFileName(path);
-            results.AddRange(Evaluate(ParseCases(File.ReadAllLines(path), name, fourColumns: true), name, candidates));
+            var lines = File.ReadAllLines(path);
+            results.AddRange(Evaluate(ParseCases(lines, name, fourColumns: true), name, candidates, UsesCodeApp(lines)));
         }
         File.WriteAllText(output, JsonSerializer.Serialize(results, ResultJson));
     }
 
-    private static List<EvalResult> Evaluate(List<EvalCase> cases, string? file, Composition.CandidateDictionary candidates)
+    /// <summary>
+    /// 表ごとの指定 (要件 030): `# app: code` というコメント行が 1 つでもあれば、その表の行をコード系アプリ (ターミナルなど) として打つ。
+    /// 指定の無い表は一般アプリ。# の行なので、この指定を知らない古い木は黙って読み飛ばし、今までどおりに動く。
+    /// </summary>
+    public static bool UsesCodeApp(IEnumerable<string> lines) =>
+        lines.Any(l => System.Text.RegularExpressions.Regex.IsMatch(l, @"^\s*#\s*app:\s*code\s*$"));
+
+    /// <summary>codeApp のとき、各行をコード系アプリとして打つ (<see cref="UsesCodeApp"/>)。</summary>
+    internal static List<EvalResult> Evaluate(List<EvalCase> cases, string? file, Composition.CandidateDictionary candidates, bool codeApp = false)
     {
         var results = new List<EvalResult>();
         foreach (var c in cases)
@@ -194,7 +204,7 @@ internal static class Checks
                 results.Add(new EvalResult(file, typed, expected, mode, source, string.Join(" ", list.Take(12)), list.Contains(expected), "候補", c.Before));
                 continue;
             }
-            var k = new CompositionTests.Keyboard();
+            var k = new CompositionTests.Keyboard { CodeApp = codeApp };
             k.Host.PrecedingText = c.Before; // 前の文字 (無ければ null)。品質テストと同じ入れ方
             k.Type(new string(typed.Where(ch => ch is >= ' ' and <= '~').Take(300).ToArray()) + "\n");
             var actual = k.Host.Document;
