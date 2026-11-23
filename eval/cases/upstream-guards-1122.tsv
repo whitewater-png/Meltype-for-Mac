@@ -1,0 +1,15 @@
+# 本家 (yksr-melt/Meltype) に 2026-11-22 に報告された誤判定の形のうち、この fork では起きないもの (かなのまま・英字のまま確定する) を守る行。期待は今の Mac 版 Core の出力 (今も当たる行)。
+# 本家では、かなの途中の run が英字で残る・英単語の main がかなになる・メールアドレスの途中から日本語になる、という形だった。漢字の形 (設定・関数) はここでは測れない。
+# 後の変更 (辞書への語の追加・判定ロジックの変更・本家への追従) で崩れたら、回帰ゲートで気付けるようにする。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打った結果を測る。実機の記録ではない。
+# 出典の docs/voice/<日付>.md は、ブランチ voice/<日付> にある (main には無い)。
+# 要件 019〜023 の守りの表と同じ考えの表 (日付ごとの別の表。まとめてよい)。
+# カテゴリ: 要件 025 (本家 2026-11-22 の報告。docs/requirements/025-upstream-1122-guard.md。本家での形は出典の欄)
+setteisiteirundakedo	せっていしているんだけど	full	本家 #2206 (本家では 設定していrunだけど。docs/voice/2026-11-22.md 候補 3)
+taiousiteirundakedo	たいおうしているんだけど	full	要件 025 (声の文書で打った同じ形)
+ryourisiteirundakedo	りょうりしているんだけど	full	要件 025 (声の文書で打った同じ形)
+mainkannsuu	mainかんすう	full	本家 #2208 (本家では マイン関数。docs/voice/2026-11-22.md 候補 3)
+mainkansuu	mainかんすう	full	要件 025 (作者の作例: n 1 つの綴り)
+mainnokannsuu	mainのかんすう	full	要件 025 (作者の作例: 助詞の の を挟む形)
+@exampleabc-jh.ed.jpdesu	@exampleabc-jh.ed.jpdesu	full	本家 #2205 (本家では途中から日本語。docs/voice/2026-11-22.md 候補 3)
+abc@exampleabc-jh.ed.jpdesu	abc@exampleabc-jh.ed.jpdesu	full	要件 025 (作者の作例: 前に名前のある形)
