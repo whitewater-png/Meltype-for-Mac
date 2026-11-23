@@ -1104,7 +1104,7 @@ public sealed class CompositionDetector
     }
 
     /// <summary>
-    /// コード系アプリの語の頭で、打ち終わりに英字のままにするコマンド名 (K79。小文字・完全一致)。今の判定で、Space で変換が始まる・確定で日本語になるものだけを入れる。
+    /// コード系アプリの語の頭で、打ち終わりに英字のままにするコマンド名 (K79。小文字の英字のあとに数字が 0 個以上・完全一致)。今の判定で、Space で変換が始まる・確定で日本語になるものだけを入れる。
     /// </summary>
     public static readonly HashSet<string> CommandNames = new(StringComparer.Ordinal)
     {
@@ -1115,6 +1115,8 @@ public sealed class CompositionDetector
         "bg", "fg", "tr", "bc", "dd", "nc", "uname", "nohup", "time", "date", "tee",
         // 指示書で崩れると挙げられた。同梱の英単語の一覧では崩れない。原因は未確認 (echo → えちょ、code → こで)
         "echo", "code",
+        // 英単語 + 数字の名前 (python3 → python + 3 で最後の区間が日本語になり、Space で変換が始まって空白が消える。pip3 も同じ。要件 030)
+        "python3", "pip3",
     };
 
     /// <summary>キャレットの前の文字が開きの記号 (`「『(（"'[) ならその記号。無ければ null (保護区間の範囲を閉じの記号までにするため)。</summary>

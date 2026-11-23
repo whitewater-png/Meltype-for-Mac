@@ -110,11 +110,54 @@ internal static class CommandNameTests
         Assert.Equal("まけ", document, "判定の強さ「手動」では効かせない");
     }
 
+    /// <summary>一覧の語の形: 小文字の英字が 1 文字以上、そのあとに数字が 0 個以上 (python3・pip3)。</summary>
+    private static bool IsCommandNameShape(string name)
+    {
+        var letters = name.TakeWhile(char.IsAsciiLetterLower).Count();
+        return letters > 0 && name.Skip(letters).All(char.IsAsciiDigit);
+    }
+
     [Test]
-    public static void CommandNames_AreLowerCaseWordsOnly()
+    public static void CommandNames_AreLowerCaseWordsWithOptionalTrailingDigits()
     {
         foreach (var name in CompositionDetector.CommandNames)
-            Assert.True(name.Length > 0 && name.All(char.IsAsciiLetterLower), $"一覧の語は小文字の英字だけ: {name}");
+            Assert.True(IsCommandNameShape(name), $"一覧の語は小文字の英字のあとに数字が 0 個以上: {name}");
+        // 形の判定そのものの確かめ: 英字の無い語・数字で始まる語・数字のあとに英字が続く語・大文字・記号は落ちる
+        foreach (var ok in new[] { "cd", "python3", "pip3", "x264", "sha256" })
+            Assert.True(IsCommandNameShape(ok), $"形に合う: {ok}");
+        foreach (var bad in new[] { "", "3", "3ji", "py3thon", "Python3", "pip-3", "a.b" })
+            Assert.True(!IsCommandNameShape(bad), $"形に合わない: {bad}");
+    }
+
+    [Test]
+    public static void CodeApp_CommandWithDigits_KeepsTheSpaceInFullLine()
+    {
+        // 要件 030: python3・pip3 (英単語 + 数字) も、コマンド名として Space・Enter で英字のまま (後ろの引数は打ったとおり)
+        Assert.Equal("python3 -m venv .venv", Type("python3 -m venv .venv\n", codeApp: true).Document, "python3 -m venv .venv");
+        Assert.Equal("pip3 install requests", Type("pip3 install requests\n", codeApp: true).Document, "pip3 install requests");
+        Assert.Equal("python3 --version", Type("python3 --version\n", codeApp: true).Document, "python3 --version");
+    }
+
+    [Test]
+    public static void CommandWithDigits_Guards_AreUnchanged()
+    {
+        // 一般アプリの python3 + Space は今までどおり (変換が始まり、空白は入らない)
+        var (general, generalComposing) = Type("python3 ", codeApp: false);
+        Assert.True(!general.EndsWith("python3 ", StringComparison.Ordinal) && !string.IsNullOrEmpty(generalComposing),
+            $"一般アプリの python3 + Space は今までどおり変換が始まる (実際: {general} / {generalComposing})");
+        // コード系アプリでも、日本語の直後 (語の頭でない) は今までどおり
+        var (afterJapanese, afterComposing) = Type("python3 ", codeApp: true, k => k.Host.PrecedingText = "今日は");
+        Assert.True(!afterJapanese.EndsWith("python3 ", StringComparison.Ordinal) && !string.IsNullOrEmpty(afterComposing),
+            $"日本語の直後の python3 + Space は今までどおり変換が始まる (実際: {afterJapanese} / {afterComposing})");
+        // 一覧に無い語・ローマ字として読める語は、コード系アプリでも今までどおり (Space で変換が始まる)
+        foreach (var word in new[] { "iphone15", "3ji", "nihongo" })
+        {
+            var general2 = Type(word + " ", codeApp: false);
+            var code2 = Type(word + " ", codeApp: true);
+            Assert.Equal(general2.Document, code2.Document, $"{word} + Space: コード系アプリでも一般アプリと同じ (文書)");
+            Assert.Equal(general2.Composing, code2.Composing, $"{word} + Space: コード系アプリでも一般アプリと同じ (変換中)");
+            Assert.True(!code2.Document.EndsWith(word + " ", StringComparison.Ordinal), $"{word} + Space は英字 + 空白で確定しない (実際: {code2.Document})");
+        }
     }
 
     [Test]

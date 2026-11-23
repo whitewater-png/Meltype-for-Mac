@@ -1508,6 +1508,27 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req025_Upstream1122Shapes_StayKanaOrEnglish()
+    {
+        // 本家 #2206・#2208・#2205 (2026-11-22): setteisiteirundakedo が 設定していrunだけど、mainkannsuu が マイン関数 になり、
+        // @exampleabc-jh.ed.jpdesu は途中から日本語になる、という報告。この fork では今も起きない (判定ロジック・辞書は変えていない)。
+        // かなの途中の run はかなのまま、英単語の main とメールアドレスは英字のまま確定することを守る。
+        // 漢字の形 (設定・関数) と、実機の確定済みの前の文字の長さ (#2205) は測れない。正解表: eval/cases/upstream-guards-1122.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("setteisiteirundakedo", "せっていしているんだけど"), ("taiousiteirundakedo", "たいおうしているんだけど"),
+            ("ryourisiteirundakedo", "りょうりしているんだけど"),
+            ("mainkannsuu", "mainかんすう"), ("mainkansuu", "mainかんすう"), ("mainnokannsuu", "mainのかんすう"),
+            ("@exampleabc-jh.ed.jpdesu", "@exampleabc-jh.ed.jpdesu"), ("abc@exampleabc-jh.ed.jpdesu", "abc@exampleabc-jh.ed.jpdesu"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。

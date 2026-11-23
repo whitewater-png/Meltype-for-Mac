@@ -66,11 +66,12 @@ def judge(mode, expected, actual):
     return hiragana(actual) == hiragana(expected)
 
 
-def parse_cases(path):
-    """Repro.cs の ParseCases と同じ読み方。# で始まらない空でない行に 4 列の行が 1 つも無ければ変更前と同じ読み方 (# も読み、2 列でない行は捨てる)。"""
+def parse_cases(path, skipped=None):
+    """Repro.cs の ParseCases と同じ読み方。# で始まらない空でない行に 4 列か 5 列の行が 1 つも無ければ変更前と同じ読み方 (# も読み、2 列でない行は捨てる)。
+    5 列目 (前の文字) のある行は、本家の木の --expect が前の文字を入れられないので飛ばし、skipped (リスト) に行番号を足す。"""
     with open(path, encoding="utf-8-sig") as f:
         lines = [l.rstrip("\r") for l in f.read().split("\n")]
-    legacy = not any(l.strip() and not l.lstrip().startswith("#") and len(l.split("\t")) == 4 for l in lines)
+    legacy = not any(l.strip() and not l.lstrip().startswith("#") and len(l.split("\t")) in (4, 5) for l in lines)
     cases = []
     for number, line in enumerate(lines, 1):
         if legacy:
@@ -84,10 +85,14 @@ def parse_cases(path):
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         parts = line.split("\t")
-        if len(parts) != 4:
-            raise SystemExit(f"{path}:{number} 列が {len(parts)} 個です (打鍵・期待・比べ方・出典の 4 列)")
+        if len(parts) not in (4, 5):
+            raise SystemExit(f"{path}:{number} 列が {len(parts)} 個です (打鍵・期待・比べ方・出典の 4 列、任意で 5 列目に前の文字)")
         typed, expected = parts[0].strip(), parts[1].strip()
         if not typed or not expected:
+            continue
+        if len(parts) == 5:
+            if skipped is not None:
+                skipped.append(number)
             continue
         mode, source = parts[2].strip(), parts[3].strip()
         if mode not in ("",) + MODES:
@@ -107,7 +112,10 @@ def run_legacy(tree, cases_dir, out):
     results = []
     with tempfile.TemporaryDirectory(prefix="meltype-eval-legacy-") as tmp:
         for name in sorted(n for n in os.listdir(cases_dir) if n.endswith(".tsv")):
-            cases = parse_cases(os.path.join(cases_dir, name))
+            skipped = []
+            cases = parse_cases(os.path.join(cases_dir, name), skipped)
+            if skipped:
+                print(f"{name}: 前の文字つきの {len(skipped)} 行を飛ばしました (この木の --expect は前の文字を入れられません)", file=sys.stderr)
             table = os.path.join(tmp, "in.txt")
             result = os.path.join(tmp, "out.json")
             with open(table, "w", encoding="utf-8", newline="\n") as f:
