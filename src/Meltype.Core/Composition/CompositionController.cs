@@ -209,6 +209,12 @@ public sealed class CompositionOptions
     /// <summary>1 文字のかなの後ろの w を笑いにするか (設定。本家 #799)。</summary>
     public Func<bool> LaughterAfterKana { get; init; } = () => false;
 
+    /// <summary>
+    /// 変換エンジンに、文をまたいだ前の日本語 (最大 20 文字・最後の改行まで) を文脈として渡すか (要件 017)。
+    /// Zenzai (ニューラル変換) が使えるときだけ ON にする。OFF は今までどおり、同じ文の最大 10 文字。
+    /// </summary>
+    public Func<bool> WideConversionContext { get; init; } = () => false;
+
     /// <summary>クリップボードの文字を変換候補に出すか (設定。本家 #807)。</summary>
     public Func<bool> ClipboardCandidates { get; init; } = () => false;
 
@@ -339,7 +345,10 @@ public sealed class CompositionController
     private readonly ICompositionHost _host;
     private readonly CompositionOptions _options;
     private readonly Dictionary<string, string> _conversionCache = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _liveCache = new(StringComparer.Ordinal);
+    // ライブ変換の結果: 表示する文字列と、その元の文節 (ライブ変換の表示のまま Enter で確定したときの回数の記録に使う)
+    private readonly Dictionary<string, (string Text, List<Clause> Clauses)> _liveCache = new(StringComparer.Ordinal);
+    // 確定の最中だけ、ライブ変換で作った文節をここに集める (null なら集めない)
+    private List<Clause>? _liveClauseSink;
     // 変換エンジンの学習が終わるたびに進む (学習は裏のスレッドで走るので、終わったあとに変換結果のキャッシュを捨てるための目印)
     private int _learnGeneration;
     private int _cacheGeneration;
@@ -2495,8 +2504,31 @@ public sealed class CompositionController
         return withContext.Select(c => c.Reading).SequenceEqual(plain.Select(c => c.Reading)) ? withContext : plain;
     }
 
-    /// <summary>変換エンジンに渡す文脈: キャレットの前の確定済みの文字のうち、同じ文の日本語の部分 (最大 10 文字)。</summary>
-    private string? ConversionContext() => _chunkContext.Active ? _chunkContext.Text : ContextOf(PrecedingForConversion);
+    /// <summary>
+    /// 変換エンジンに渡す文脈: キャレットの前の確定済みの文字のうち、同じ文の日本語の部分 (最大 10 文字)。
+    /// 広い文脈 (Zenzai のとき。<see cref="CompositionOptions.WideConversionContext"/>) が ON なら、文をまたいで最後の改行より後ろの日本語 (最大 20 単位)。
+    /// </summary>
+    private string? ConversionContext() =>
+        _chunkContext.Active ? _chunkContext.Text : _options.WideConversionContext() ? WideContextOf(PrecedingForConversion) : ContextOf(PrecedingForConversion);
+
+    /// <summary>
+    /// 広い文脈 (要件 017): 最後が日本語のとき、最後の改行より後ろの末尾 20 文字。「。！？」では切らない (前の文も手がかりにする)。
+    /// 20 は Swift が入力欄から読む範囲 (UTF-16 の 20 単位) と同じ。改行より前は別の段落・別の発言なので混ぜない。
+    /// </summary>
+    private static string? WideContextOf(string? text)
+    {
+        if (string.IsNullOrEmpty(text) || LanguageOf(text) != false) return null;
+        text = text[(text.LastIndexOfAny(NewLines) + 1)..].Trim();
+        if (text.Length > WideContextLength) text = text[^WideContextLength..];
+        // サロゲートペアの途中から始めない。ここで切ったときだけでなく、自分の確定の記録 (_lastCommitText) もサロゲートを見ずに 20 単位で切ってある
+        if (text.Length > 0 && char.IsLowSurrogate(text[0])) text = text[1..];
+        return text.Length == 0 ? null : text;
+    }
+
+    private const int WideContextLength = 20;
+
+    /// <summary>広い文脈で改行とみなす文字。LF・CR に加えて、Unicode の行区切り (U+2028)・段落区切り (U+2029)・垂直タブ (U+000B。Word の行区切り)。OFF の文脈 (<see cref="SentenceEnds"/>) は今までどおり。</summary>
+    private static readonly char[] NewLines = ['\n', '\r', '\u2028', '\u2029', '\v'];
 
     private string? ContextOf(string? text)
     {
@@ -2939,10 +2971,16 @@ public sealed class CompositionController
         if (LengthForLiveConversion(kana) < LiveConversionMinLength) return kana;
         DropCachesIfLearned();
         var key = string.Join("\u0001", kana, PrecedingForConversion, _followingText, _options.History?.Version, _options.UserDictionary?.Version);
-        if (_liveCache.TryGetValue(key, out var cached)) return cached;
-        var converted = string.Concat(ConvertJapanese(kana).Select(c => c.Text));
+        if (_liveCache.TryGetValue(key, out var cached))
+        {
+            _liveClauseSink?.AddRange(cached.Clauses);
+            return cached.Text;
+        }
+        var clauses = ConvertJapanese(kana);
+        var converted = string.Concat(clauses.Select(c => c.Text));
         if (_liveCache.Count > 256) _liveCache.Clear();
-        _liveCache[key] = converted;
+        _liveCache[key] = (converted, clauses);
+        _liveClauseSink?.AddRange(clauses);
         return converted;
     }
 
@@ -2968,12 +3006,27 @@ public sealed class CompositionController
         // 変換後も続けて入力: 固定した文節 + 未変換の文節 (変換していなければ、表示のまま)。
         var fixedOnly = !converting && _headCount > 0;
         if (fixedOnly) TrimToFixedClauses();
-        var text = converting ? string.Concat(_clauses.Select(c => c.Text)) + SuffixText : fixedOnly ? FixedText + CurrentDisplay(final: true) + SuffixText : CurrentDisplay(final: true);
+        // 変換中でなければ、確定する文字列の元になったライブ変換の文節を集める (回数の記録用)。
+        // 固定した文節があるときは、その後ろの未変換の文節 (CurrentDisplay) の分だけ (固定した文節は下の Learn で数えるので、二重に数えない)
+        List<Clause>? liveClauses = null;
+        string text;
+        if (converting) text = string.Concat(_clauses.Select(c => c.Text)) + SuffixText;
+        else
+        {
+            _liveClauseSink = [];
+            string shown;
+            try { shown = CurrentDisplay(final: true); }
+            finally { liveClauses = _liveClauseSink; _liveClauseSink = null; }
+            text = fixedOnly ? FixedText + shown + SuffixText : shown;
+        }
+        // 確定するのが、集めた文節 (ライブ変換の結果) のままか (語末の n をかなのまま確定する・文の終わりの to を英語にするときは違う)
+        var liveResult = true;
         // 設定「Enter は見えているとおりに確定」: かな + 語末の n (かんたn) は、確定でライブ変換が漢字にせず、見えていたかなに n を ん にしただけで確定する (本家 #677)
         if (_committingByEnter && !converting && !fixedOnly && suffix.Length == 0 && !fixEnglish && _options.EnterCommitsAsShown() && _text.Mode == DisplayMode.Auto && _text.Pending == "n" &&
             CurrentDisplay(final: false) is { Length: > 1 } shownText && shownText[^1] == 'n' && shownText[^2] is >= '\u3041' and <= '\u3096')
         {
             text = shownText[..^1] + "ん";
+            liveResult = false;
         }
         if (fixEnglish && !converting && _text.Mode == DisplayMode.Auto) text = FixEnglishTypo(text);
         var english = converting ? _clauses.All(c => c.IsEnglish) : _text.IsAlphanumericAt(final: true);
@@ -3017,6 +3070,18 @@ public sealed class CompositionController
             hasEnglish = true;
             hasJapanese = false;
             raws = new SegmentRawSet([_text.Raw], [], JapaneseWord: false);
+            liveResult = false;
+        }
+        // ライブ変換の表示のまま (Space で変換せずに) Enter で確定したときは、確定した文節のうち学習済みの語を、予測用の回数と登録提案の回数に数える
+        // (Space → Enter と同じ)。語末の n が ん になってライブ変換される (表示 こうえn → 確定 講演) 場合や、Enter の打ち間違いの直しで
+        // 確定の形が表示と変わる場合も、確定した語を数える (数えるのは学習済みの語だけなので、見ずに通した誤変換を強めない)。
+        // 設定「変換後も続けて入力」で固定した文節の後ろに続けて打った分も同じ (固定した文節は上の Learn で数えた)。
+        // azooKey の学習と選び直しの記録はしない (見ずに通した誤変換を 1 回で強めないため)。
+        // 暗黙の確定・Shift+Enter・英語で終わる Space・ライブ変換の結果を確定しない場合 (かなのまま・英語)・ローマ字の再変換・1 音確定の残り・F6 の変換ボックスでは数えない。
+        if (liveResult && liveClauses is { Count: > 0 } && _committingByEnter && !implicitly && !_reconvertRomaji && !_firstSoundCommitted && toggle is null && suffix.Length == 0 && !fixEnglish)
+        {
+            RecordSuggestions(liveClauses);
+            TouchUsed(liveClauses);
         }
         CommitText(text + (suffix.Length > 0 ? suffix : toggle?.Tail ?? ""), english, toggle?.Raw ?? _text.Raw, chosen, hasEnglish, hasJapanese, toggle is null ? raws : ToggleRaws(toggle));
     }
@@ -3821,13 +3886,9 @@ public sealed class CompositionController
             _options.TranslationHistory?.Remember(clause.Reading, clause.Text);
         }
         LearnConversion();
-        RecordSuggestions();
+        RecordSuggestions(_clauses);
+        TouchUsed(_clauses);
         if (_options.History is not { } history) return;
-        // 学習済みの語をそのまま確定したときも、回数と新しさを更新する (予測を使用頻度で並べるため。並びは変わらない)。
-        foreach (var clause in _clauses.Where(c => !IsClipboardChoice(c) && !c.IsEnglish && !c.Changed && c.Reading.Length >= 2))
-        {
-            history.Touch(clause.Reading, clause.Text);
-        }
         // 1 文字の読み (き → 記) を覚えると、関係ない変換 (き + ごうとう) まで巻き込むので 2 文字以上だけ。
         // ただし数字・記号の 1 文字 (1 → ①、( → （) は、かなの途中に巻き込まれないので覚える (本家 #801)。
         foreach (var clause in _clauses.Where(c => !IsClipboardChoice(c) && !c.IsEnglish && c.Changed &&
@@ -3845,18 +3906,28 @@ public sealed class CompositionController
         }
     }
 
+    /// <summary>学習済みの語をそのまま確定したときも、回数と新しさを更新する (予測を使用頻度で並べるため。並びは変わらない)。</summary>
+    private void TouchUsed(IEnumerable<Clause> clauses)
+    {
+        if (_options.History is not { } history) return;
+        foreach (var clause in clauses.Where(c => !IsClipboardChoice(c) && !c.IsEnglish && !c.Changed && c.Reading.Length >= 2))
+        {
+            history.Touch(clause.Reading, clause.Text);
+        }
+    }
+
     /// <summary>
     /// 選び直して確定した「読み → 語」を、ユーザー辞書への登録提案として数える。
     /// 数えるのは、候補を選び直した文節と、前に選び直して学習した語をそのまま確定した文節だけ
     /// (エンジンや文脈辞書が最初から出した語は、辞書に無くても困っていないので数えない)。
     /// 読みがかな以外の文節・英語の文節・ひらがなだけの語・登録済みの語などは Suggestions 側で除く。
     /// </summary>
-    private void RecordSuggestions()
+    private void RecordSuggestions(IEnumerable<Clause> clauses)
     {
         if (_options.Suggestions is not { } suggestions || !_options.DictionarySuggest()) return;
         var threshold = _options.DictionarySuggestThreshold();
         // 日付・時刻 (きょう → 金曜日) も数えない (学習しないのと同じ理由。登録すると、次から古い日付が出る)
-        foreach (var clause in _clauses.Where(c => !IsClipboardChoice(c) && !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c) && !IsNumberChoice(c) && !IsUnitChoice(c) && !IsSeasonalChoice(c)))
+        foreach (var clause in clauses.Where(c => !IsClipboardChoice(c) && !c.IsEnglish && c.Text != c.Raw && !IsDateTimeChoice(c) && !IsNumberChoice(c) && !IsUnitChoice(c) && !IsSeasonalChoice(c)))
         {
             // 学習済みの語を最初の候補としてそのまま確定した場合 (History はこの後の Remember で更新されるので、ここで先に見る)。
             if (clause.Changed || _options.History?.Get(clause.Reading) == clause.Text)

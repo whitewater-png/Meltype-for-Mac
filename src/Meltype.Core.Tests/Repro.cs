@@ -69,24 +69,28 @@ internal static class Checks
     /// 正解表 (eval/cases/*.tsv) の 1 件。1 行 = 打鍵・期待・比べ方・出典の 4 列 (Tab 区切り)。
     /// Mode は full / ascii / nojp。古い 2 列だけの表 (Pull Request のチェックが使う) は Mode が空で、
     /// 変更前の Expect と同じに比べる (期待に漢字があれば英字の語の並び、なければ完全一致。カタカナ・大小の正規化なし)。
+    /// 任意の 5 列目 Before は「前の文字」(キャレットの前にある文字)。品質テストの Before と同じく、入れてから打つ。無ければ null。
     /// </summary>
-    public sealed record EvalCase(string Typed, string Expected, string Mode, string Source);
+    public sealed record EvalCase(string Typed, string Expected, string Mode, string Source, string? Before = null);
 
     /// <summary>1 件の結果。File は --expect-all のときだけ入る。</summary>
     public sealed record EvalResult(
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? File,
-        string Typed, string Expected, string Mode, string Source, string Actual, bool Ok, string Kind);
+        string Typed, string Expected, string Mode, string Source, string Actual, bool Ok, string Kind,
+        // 前の文字がある行だけ JSON に出す (4 列の表の JSON を変えない)
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Before = null);
 
     /// <summary>
     /// 正解表の行を読む。
-    /// # で始まらない空でない行に 4 列 (Tab 3 つ) の行が 1 つも無ければ、古い 2 列の表 (Pull Request のチェック) として、変更前と同じ読み方 (# の行も読み、2 列でない行は黙って捨てる)。
-    /// 1 つでもあれば 4 列の表として、# で始まる行と空行を無視し、列の数・比べ方の誤りは例外にする。
+    /// # で始まらない空でない行に 4 列 (Tab 3 つ) か 5 列の行が 1 つも無ければ、古い 2 列の表 (Pull Request のチェック) として、変更前と同じ読み方 (# の行も読み、2 列でない行は黙って捨てる)。
+    /// 1 つでもあれば 4 列の表として、# で始まる行と空行を無視し、列の数 (4 か 5)・比べ方の誤りは例外にする。
+    /// 5 列目 (前の文字) は Trim しない (行末の空白に意味がある)。"I like " のように二重引用符で囲んで書けて、囲みの引用符は外す。
     /// fourColumns のときは、判定せず常に 4 列の表として読む (--expect-all)。
     /// </summary>
     public static List<EvalCase> ParseCases(IEnumerable<string> lines, string name = "", bool fourColumns = false)
     {
         var all = lines.ToList();
-        var legacy = !fourColumns && !all.Any(l => !string.IsNullOrWhiteSpace(l) && !l.TrimStart().StartsWith('#') && l.Split('\t').Length == 4);
+        var legacy = !fourColumns && !all.Any(l => !string.IsNullOrWhiteSpace(l) && !l.TrimStart().StartsWith('#') && l.Split('\t').Length is 4 or 5);
         var cases = new List<EvalCase>();
         var number = 0;
         foreach (var line in all)
@@ -103,8 +107,8 @@ internal static class Checks
             }
             if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#')) continue;
             var parts = line.Split('\t');
-            if (parts.Length != 4)
-                throw new FormatException($"{name}:{number} 列が {parts.Length} 個です (打鍵・期待・比べ方・出典の 4 列)");
+            if (parts.Length is not (4 or 5))
+                throw new FormatException($"{name}:{number} 列が {parts.Length} 個です (打鍵・期待・比べ方・出典の 4 列、任意で 5 列目に前の文字)");
             var (typed, expected) = (parts[0].Trim(), parts[1].Trim());
             if (typed.Length == 0 || expected.Length == 0) continue;
             var mode = parts[2].Trim();
@@ -115,7 +119,14 @@ internal static class Checks
                 throw new FormatException($"{name}:{number} かなで打つ行 (候補を見る行) に比べ方 '{mode}' は使えません (比べ方は空にする): {typed}");
             if (mode == "ascii" && AsciiWords(expected).Length == 0)
                 throw new FormatException($"{name}:{number} ascii の期待に比べる英字・記号の語がありません: {expected}");
-            cases.Add(new EvalCase(typed, expected, mode, source));
+            string? before = null;
+            if (parts.Length == 5)
+            {
+                before = parts[4];
+                if (before.Length >= 2 && before[0] == '"' && before[^1] == '"') before = before[1..^1];
+                if (before.Length == 0) before = null;
+            }
+            cases.Add(new EvalCase(typed, expected, mode, source, before));
         }
         return cases;
     }
@@ -151,7 +162,8 @@ internal static class Checks
     {
         CompositionTests.Detector.SpellChecker ??= Detection.BuiltInWordChecker.Shared;
         var candidates = Composition.CandidateDictionary.Load(null);
-        var results = Evaluate(ParseCases(File.ReadAllLines(input), Path.GetFileName(input)), null, candidates);
+        var lines = File.ReadAllLines(input);
+        var results = Evaluate(ParseCases(lines, Path.GetFileName(input)), null, candidates, UsesCodeApp(lines));
         File.WriteAllText(output, JsonSerializer.Serialize(results, ResultJson));
     }
 
@@ -164,12 +176,21 @@ internal static class Checks
         foreach (var path in Directory.GetFiles(directory, "*.tsv").OrderBy(p => p, StringComparer.Ordinal))
         {
             var name = Path.GetFileName(path);
-            results.AddRange(Evaluate(ParseCases(File.ReadAllLines(path), name, fourColumns: true), name, candidates));
+            var lines = File.ReadAllLines(path);
+            results.AddRange(Evaluate(ParseCases(lines, name, fourColumns: true), name, candidates, UsesCodeApp(lines)));
         }
         File.WriteAllText(output, JsonSerializer.Serialize(results, ResultJson));
     }
 
-    private static List<EvalResult> Evaluate(List<EvalCase> cases, string? file, Composition.CandidateDictionary candidates)
+    /// <summary>
+    /// 表ごとの指定 (要件 030): `# app: code` というコメント行が 1 つでもあれば、その表の行をコード系アプリ (ターミナルなど) として打つ。
+    /// 指定の無い表は一般アプリ。# の行なので、この指定を知らない古い木は黙って読み飛ばし、今までどおりに動く。
+    /// </summary>
+    public static bool UsesCodeApp(IEnumerable<string> lines) =>
+        lines.Any(l => System.Text.RegularExpressions.Regex.IsMatch(l, @"^\s*#\s*app:\s*code\s*$"));
+
+    /// <summary>codeApp のとき、各行をコード系アプリとして打つ (<see cref="UsesCodeApp"/>)。</summary>
+    private static List<EvalResult> Evaluate(List<EvalCase> cases, string? file, Composition.CandidateDictionary candidates, bool codeApp = false)
     {
         var results = new List<EvalResult>();
         foreach (var c in cases)
@@ -180,10 +201,11 @@ internal static class Checks
             {
                 var reading = new string(typed.Select(ch => ch is >= 'ァ' and <= 'ヶ' ? (char)(ch - 0x60) : ch).ToArray());
                 var list = candidates.Lookup(reading);
-                results.Add(new EvalResult(file, typed, expected, mode, source, string.Join(" ", list.Take(12)), list.Contains(expected), "候補"));
+                results.Add(new EvalResult(file, typed, expected, mode, source, string.Join(" ", list.Take(12)), list.Contains(expected), "候補", c.Before));
                 continue;
             }
-            var k = new CompositionTests.Keyboard();
+            var k = new CompositionTests.Keyboard { CodeApp = codeApp };
+            k.Host.PrecedingText = c.Before; // 前の文字 (無ければ null)。品質テストと同じ入れ方
             k.Type(new string(typed.Where(ch => ch is >= ' ' and <= '~').Take(300).ToArray()) + "\n");
             var actual = k.Host.Document;
             var kind = mode switch
@@ -193,7 +215,7 @@ internal static class Checks
                 "" => expected.Any(ch => ch is >= '㐀' and <= '鿿') ? "判定 (英字の部分だけ比べる)" : "入力",
                 _ => "入力",
             };
-            results.Add(new EvalResult(file, typed, expected, mode, source, actual, Judge(mode, expected, actual), kind));
+            results.Add(new EvalResult(file, typed, expected, mode, source, actual, Judge(mode, expected, actual), kind, c.Before));
         }
         return results;
     }

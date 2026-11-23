@@ -1,7 +1,7 @@
 # 本家 Meltype の品質テスト (src/Meltype.Core.Tests/QualityTests.cs の Typing 配列、コミット a4b6f1a) の写し。
-# 出典: https://github.com/yksr-melt/Meltype (GPL-3.0)。1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。
+# 出典: https://github.com/yksr-melt/Meltype (GPL-3.0)。1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典 (前の文字つきの行だけ、末尾に<Tab>前の文字の 5 列目)。
 # 本家の採点 (Score) は actual == Expected の完全一致。ここの full はカタカナ→ひらがなと英字の大小だけ吸収する (eval/README.md)。
-# 本家の表には「直前の文字 (Before)」を入れた 13 件がある。この形式には直前の文字の列が無いので、下に # で写すだけにして判定しない。
+# 本家の表には「直前の文字 (Before)」を入れた 13 件がある。5 列目に前の文字を書いた行にして判定する (キャレットの前にその文字がある状態で打つ。eval/README.md)。
 
 # --- 日本語の文 (テスト用の変換エンジンはかなのまま返す) ---
 # カテゴリ: 日本語
@@ -241,17 +241,17 @@ i18n	i18n	full	本家 QualityTests 2026-10-13 a4b6f1a
 l10n	l10n	full	本家 QualityTests 2026-10-13 a4b6f1a
 h2o	h2o	full	本家 QualityTests 2026-10-13 a4b6f1a
 
-# --- 直前の文字 (Before) つきの 13 件 (この形式では判定できないので写すだけ) ---
-# 前="I like " 打鍵=sushi 期待=sushi (曖昧な語)
-# 前="今日は" 打鍵=sushi 期待=すし (曖昧な語)
-# 前="Please " 打鍵=make 期待=make (曖昧な語)
-# 前="GitHub" 打鍵=no 期待=の (短い語)
-# 前="Chrome" 打鍵=de 期待=で (短い語)
-# 前="今日は GitHub " 打鍵=ni 期待=に (短い語)
-# 前="Python" 打鍵=ga 期待=が (短い語)
-# 前="GitHub" 打鍵=ya 期待=や (短い語)
-# 前="I want " 打鍵=to 期待=to (短い語)
-# 前="this " 打鍵=is 期待=is (短い語)
-# 前="look " 打鍵=at 期待=at (短い語)
-# 前="this is " 打鍵=a 期待=a (短い語)
-# 前="Hello" 打鍵=! 期待=! (記号・数字)
+# --- 直前の文字 (Before) つきの 13 件 (5 列目に前の文字。二重引用符で囲み、行末の空白を守る) ---
+sushi	sushi	full	本家 QualityTests 2026-10-13 a4b6f1a	"I like "
+sushi	すし	full	本家 QualityTests 2026-10-13 a4b6f1a	"今日は"
+make	make	full	本家 QualityTests 2026-10-13 a4b6f1a	"Please "
+no	の	full	本家 QualityTests 2026-10-13 a4b6f1a	"GitHub"
+de	で	full	本家 QualityTests 2026-10-13 a4b6f1a	"Chrome"
+ni	に	full	本家 QualityTests 2026-10-13 a4b6f1a	"今日は GitHub "
+ga	が	full	本家 QualityTests 2026-10-13 a4b6f1a	"Python"
+ya	や	full	本家 QualityTests 2026-10-13 a4b6f1a	"GitHub"
+to	to	full	本家 QualityTests 2026-10-13 a4b6f1a	"I want "
+is	is	full	本家 QualityTests 2026-10-13 a4b6f1a	"this "
+at	at	full	本家 QualityTests 2026-10-13 a4b6f1a	"look "
+a	a	full	本家 QualityTests 2026-10-13 a4b6f1a	"this is "
+!	!	full	本家 QualityTests 2026-10-13 a4b6f1a	"Hello"

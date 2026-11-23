@@ -161,4 +161,110 @@ internal static class EvalFormatTests
             Directory.Delete(dir, recursive: true);
         }
     }
+
+    // --- 5 列目「前の文字」(要件 029、旧 016) ---
+
+    [Test]
+    public static void Parse_FiveColumns_ReadsBefore()
+    {
+        var cases = Checks.ParseCases([
+            "sushi\tsushi\tfull\t出典\tI like ",
+            "sushi\tすし\tfull\t出典\t\"今日は\"",
+            "make\tmake\tfull\t出典\t\"Please \"",
+            "hello\thello\tfull\t出典",
+        ], "t.tsv");
+        Assert.Equal(4, cases.Count, "5 列の行も 4 列の行も読む");
+        Assert.Equal("I like ", cases[0].Before, "囲まない書き方でも、行末の空白は Trim しない");
+        Assert.Equal("今日は", cases[1].Before, "囲みの引用符は外す");
+        Assert.Equal("Please ", cases[2].Before, "囲んだ中の行末の空白が残る");
+        Assert.True(cases[3].Before is null, "4 列の行は前の文字が無い");
+        Assert.Equal("出典", cases[0].Source, "出典は今までどおり Trim する");
+    }
+
+    [Test]
+    public static void Parse_FiveColumnsOnly_IsNotLegacy()
+    {
+        var cases = Checks.ParseCases(["# 見出し", "sushi\tsushi\tfull\t出典\t\"I like \""], "t.tsv");
+        Assert.Equal(1, cases.Count, "5 列の行だけの表も 4 列の表として読む (古い 2 列の表と見なして 0 件にしない)");
+        Assert.Equal("I like ", cases[0].Before);
+    }
+
+    [Test]
+    public static void Parse_WrongColumnCount_StillThrows()
+    {
+        foreach (var bad in new[] { "a\tb\tfull\t出典\t前\t余り", "a\tb\tfull" })
+        {
+            var threw = false;
+            try { Checks.ParseCases(["hello\thello\tfull\t出典", bad], "t.tsv"); }
+            catch (FormatException) { threw = true; }
+            Assert.True(threw, $"4・5 列以外の行は例外にする: {bad}");
+        }
+    }
+
+    [Test]
+    public static void Evaluate_Before_ChangesTheResult()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"meltype-eval-before-{Environment.ProcessId}");
+        Directory.CreateDirectory(path);
+        try
+        {
+            File.WriteAllText(Path.Combine(path, "a.tsv"),
+                "sushi\tsushi\tfull\t出典\t\"I like \"\nsushi\tすし\tfull\t出典\t\"今日は\"\nsushi\tsushi\tfull\t出典\n");
+            var output = Path.Combine(path, "out.json");
+            Checks.ExpectAll(path, output);
+            using var json = JsonDocument.Parse(File.ReadAllText(output));
+            var items = json.RootElement.EnumerateArray().ToList();
+            Assert.Equal(3, items.Count);
+            Assert.Equal("sushi", items[0].GetProperty("actual").GetString(), "前が英文なら英字のまま");
+            Assert.True(items[0].GetProperty("ok").GetBoolean(), "I like + sushi → sushi");
+            Assert.Equal("すし", items[1].GetProperty("actual").GetString(), "前が日本語ならかな");
+            Assert.True(items[1].GetProperty("ok").GetBoolean(), "今日は + sushi → すし");
+            Assert.Equal("I like ", items[0].GetProperty("before").GetString(), "JSON に前の文字が入る (行末の空白つき)");
+            Assert.True(items[1].TryGetProperty("before", out _), "前の文字がある行には before がある");
+            Assert.True(!items[2].TryGetProperty("before", out _), "前の文字が無い行には before を出さない (4 列の表の JSON を変えない)");
+        }
+        finally
+        {
+            Directory.Delete(path, recursive: true);
+        }
+    }
+
+    [Test]
+    public static void ExpectAll_AppCodeComment_TypesTheTableAsCodeApp()
+    {
+        // 表ごとの指定 (要件 030): `# app: code` のある表はコード系アプリとして打つ。指定の無い表は一般アプリのまま
+        var path = Path.Combine(Path.GetTempPath(), $"meltype-eval-app-{Environment.ProcessId}");
+        Directory.CreateDirectory(path);
+        try
+        {
+            File.WriteAllText(Path.Combine(path, "code.tsv"), "# メモ\n# app: code\ncd ..\tcd ..\tfull\t出典\nls -la\tls -la\tfull\t出典\n");
+            File.WriteAllText(Path.Combine(path, "general.tsv"), "cd ..\tcd ..\tfull\t出典\n");
+            var output = Path.Combine(path, "out.json");
+            Checks.ExpectAll(path, output);
+            using var json = JsonDocument.Parse(File.ReadAllText(output));
+            var items = json.RootElement.EnumerateArray().ToList();
+            Assert.Equal(3, items.Count);
+            var code = items.Where(i => i.GetProperty("file").GetString() == "code.tsv").ToList();
+            var general = items.Single(i => i.GetProperty("file").GetString() == "general.tsv");
+            Assert.True(code.All(i => i.GetProperty("ok").GetBoolean()), "指定のある表は、コマンド名の後の空白が残る (K79)");
+            Assert.True(!general.GetProperty("ok").GetBoolean(), "指定の無い表は一般アプリ (K79 の決まりで今までどおり、cd の後の空白が消える)");
+        }
+        finally
+        {
+            Directory.Delete(path, recursive: true);
+        }
+    }
+
+    [Test]
+    public static void UsesCodeApp_OnlyTheCommentLine()
+    {
+        Assert.True(Checks.UsesCodeApp(["# メモ", "# app: code", "a\ta\tfull\t出典"]), "# app: code");
+        Assert.True(Checks.UsesCodeApp(["  #app:code  "]), "空白の揺れは許す");
+        Assert.True(!Checks.UsesCodeApp(["a\ta\tfull\t出典"]), "指定が無ければ一般アプリ");
+        Assert.True(!Checks.UsesCodeApp(["# app: general"]), "code 以外は一般アプリ");
+        Assert.True(!Checks.UsesCodeApp(["# このアプリは app: code ではない"]), "行の途中の文字列は指定ではない");
+        Assert.True(!Checks.UsesCodeApp(["app: code\tapp: code\tfull\t出典"]), "# で始まらない行は指定ではない");
+        // 指定の行は、4 列の表として読むとき、ほかのコメント行と同じく読み飛ばされる (件数が変わらない)
+        Assert.Equal(1, Checks.ParseCases(["# app: code", "cd\tcd\tfull\t出典"], "t.tsv").Count);
+    }
 }

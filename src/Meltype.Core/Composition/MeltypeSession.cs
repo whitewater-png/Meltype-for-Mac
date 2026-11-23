@@ -154,6 +154,10 @@ public sealed class MeltypeSession
         _controller = new CompositionController(_gate, detector, converter, _host, options);
     }
 
+    /// <summary>広い文脈 (<see cref="CompositionOptions.WideConversionContext"/>) を使うか。Zenzai の設定が ON で、変換エンジンが Mozc でないとき。設定は毎回読む。</summary>
+    internal static Func<bool> WideContextProvider(IKanjiConverter converter, Func<bool> zenzai) =>
+        converter is MozcConverter ? () => false : zenzai;
+
     /// <summary>カスタムローマ字表の取得。設定が OFF のときは load を呼ばない (ファイルに触れない)。</summary>
     internal static Func<RomajiTable?> CustomTableProvider(Func<bool> enabled, Func<string, RomajiTable?> load, string path) =>
         () => enabled() ? load(path) : null;
@@ -230,6 +234,8 @@ public sealed class MeltypeSession
             ContextualLearning = () => shared.Current.ContextualLearning,
             LaughterAfterKana = () => shared.Current.LaughterAfterKana,
             ClipboardCandidates = () => shared.Current.ClipboardCandidates,
+            // Zenzai が ON のとき、前の文 (最大 20 文字) も変換エンジンに渡す (要件 017)。Mozc・Windows は今までどおり。
+            WideConversionContext = WideContextProvider(converter, () => shared.Current.Zenzai),
             ForgetPrediction = forgetPrediction,
             Meanings = MeaningDictionary.Load(),
             CandidateMeanings = () => shared.Current.ShowCandidateMeanings,

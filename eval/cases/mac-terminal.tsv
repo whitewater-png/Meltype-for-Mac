@@ -1,6 +1,8 @@
 # ターミナル・AI ツールの名前が出る入力 (docs/STRATEGY_2026-10.md の施策 1-4)。
 # 期待は、今の Mac 版 Core の「望ましい」出力。今は外れると分かっているものも入れてある (出典に「既知の外れ」と書いた)。
 # 実機の結果ではなく、Core のテスト用キーボードで打った結果を測る。漢字の変換は測らない (ascii は印字可能 ASCII の連続 (空白で区切った並び) を比べる)。
+# 表ごとの指定: 次の行があるので、この表の行はコード系アプリ (ターミナル) として打つ (eval/README.md。要件 030)。古い木では # の行として読み飛ばされる。
+# app: code
 # 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。
 # カテゴリ: AI ツール名 + 日本語
 Claude Code de kaku	Claude Code でかく	ascii	計画書 1-4
@@ -43,3 +45,12 @@ rm-rf	rm-rf	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
 kyouhapt-query	きょうはpt-query	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
 kyouhals-files	きょうはls-files	full	docs/requirements/004-consonant-hyphen.md (本家 #1349)
 kyouhara-men	きょうはらーめん	full	docs/requirements/004-consonant-hyphen.md (長音を守る)
+# カテゴリ: コマンドの名前の後の空白 (要件 030。コード系アプリの K79 と、python3・pip3)
+python3 -m http.server	python3 -m http.server	full	要件 030
+python3 --version	python3 --version	full	要件 030
+pip3 install requests	pip3 install requests	full	要件 030
+cd ..	cd ..	full	要件 030 (K79 の守り)
+cd /tmp	cd /tmp	full	要件 030 (K79 の守り)
+ls -la	ls -la	full	要件 030 (K79 の守り)
+ls ~/Library	ls ~/Library	full	要件 030 (K79 の守り)
+rm -rf node_modules	rm -rf node_modules	full	要件 030 (K79 の守り)

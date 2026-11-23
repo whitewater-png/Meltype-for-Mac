@@ -24,7 +24,7 @@ argument-hint: <NNN>
 - 指摘なし + broken 0 + テスト全件通過 + 完成条件の全項目達成 → 3 へ。
 
 ## 3. 記録
-`doc-keeper` に、周回数・役割ごとのモデルと起動回数・所要時間・手戻りの原因・最新の数字を渡し、`docs/AGENT_STATE.md`・`docs/LESSONS.md`・要件定義書の記録欄を更新させる (`status` はまだ `approved` のまま。`done` にするのは人がマージしたあと)。
+`doc-keeper` に、周回数・役割ごとの起動回数と、上位・下位のどちらのモデルで動かしたか (モデルの名前は書かない。CLAUDE.md §1)・所要時間・手戻りの原因・最新の数字を渡し、`docs/AGENT_STATE.md`・`docs/LESSONS.md`・要件定義書の記録欄を更新させる (`status` はまだ `approved` のまま。`done` にするのは人がマージしたあと)。
 
 ## 4. 提出
 1. `git push -u origin <ブランチ>`。

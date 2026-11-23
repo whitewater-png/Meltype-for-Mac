@@ -34,10 +34,22 @@ mkdir -p "$4"
 out_dir="$(abs "$4")"
 
 run_tree() {
-  local tree="$1" out="$2"
+  local tree="$1" out="$2" cases="$cases_dir" tmp=""
   if grep -q -- '"--expect-all"' "$tree/src/Meltype.Core.Tests/Program.cs"; then
+    if ! grep -q -- 'PrecedingText = c.Before' "$tree/src/Meltype.Core.Tests/Repro.cs"; then
+      # 5 列目 (前の文字) を読めない木は、5 列の行で FormatException になる。5 列の行を除いた写しを渡す (比較では added になる)
+      echo "(5 列目 (前の文字) を読めない作業ツリー: ${tree} 。5 列の行を除いた正解表で回します)" >&2
+      tmp="$(mktemp -d)"
+      for f in "$cases_dir"/*.tsv; do
+        awk -F'\t' '/^[[:space:]]*#/ || NF != 5' "$f" > "$tmp/$(basename "$f")"
+      done
+      cases="$tmp"
+    fi
     # global.json・nuget.config は実行したフォルダーから探されるので、作業ツリーの中で動かす
-    (cd "$tree" && dotnet run -c Release --project src/Meltype.Core.Tests -- --expect-all "$cases_dir" "$out" >/dev/null)
+    local rc=0
+    (cd "$tree" && dotnet run -c Release --project src/Meltype.Core.Tests -- --expect-all "$cases" "$out" >/dev/null) || rc=$?
+    [ -n "$tmp" ] && rm -rf "$tmp"
+    return "$rc"
   else
     echo "(--expect-all が無い作業ツリー: ${tree} 。--expect を表ごとに回して連結します)" >&2
     python3 "$script_dir/eval_legacy_base.py" "$tree" "$cases_dir" "$out"
