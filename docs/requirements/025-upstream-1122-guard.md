@@ -80,3 +80,4 @@ scope: core
   - [任意・範囲外] 近い形で今の main が崩れるもの (自分で `--repro` を打ち直して確認、2026-11-23): `mainnmenyuu` → `まいんめにゅう`、`mainnkinou` → `まいんきのう` (main の後に n が重なる形)、`nameisrun` → `なめisrun`。本家 #2208 そのものの形ではないので、この要件では扱わない (次の声の文書の候補にするかは人が決める)。
 - 査読 2 周目 (1 周目とは別のエージェント。Core 1267/1267・eval-compare broken 0 / fixed 0 / added 0 / removed 0 (712/818) を再実行、文書の出力例を `--repro` で打ち直して一致、崩した木は `kaq` を別の worktree で再現。PR #29 との衝突は増えていない): [止める]・[直す] なし。
   - [任意・対応] 崩し方の表の `kaq` の行にファイル名が無く、外れた行の `mainnokannsuu` が抜けていた → 直した (実装者の最初の試しの出力にも `まいんおかんすう` があった)。
+- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/31
