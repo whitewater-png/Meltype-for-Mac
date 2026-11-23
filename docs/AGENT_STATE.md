@@ -3,13 +3,13 @@
 > 1 枚だけの「今どこか」。ループの終わりと、文脈が圧縮される前に更新する。履歴は git に任せ、ここには最新だけを書く。
 > 話題ごとの詳しい引き継ぎは `docs/HANDOFF-*.md`、本家 PR の状態は `docs/UPSTREAM_PR_TRACKER.md`、設計と数字は `docs/IMPROVEMENT_PLAN.md`。
 
-## 基準の数字 (2026-11-22、クラウド Linux 4 コア、ブランチ ccr-0fc8aeab-sra4z7、HEAD 45a99f0)
+## 基準の数字 (2026-11-23、クラウド Linux 4 コア、ブランチ ccr-0fc8aeab-sra4z7、HEAD 8da7bac = origin/main 496c90e (PR #30 まで) を取り込んだ後)
 | 項目 | 値 | コマンド |
 |---|---|---|
-| Core のテスト | 1290 / 1290 (base d210044 は 1273 / 1273。+17 件。スキップ件数は未確認)。Python のテスト: test_eval_compare.py 8 件、test_eval_legacy_base.py 5 件、test_boundary_sweep.py 21 件、test_upstream_watch.py 37 件、test_update_cask.py OK | `dotnet run -c Release --project src/Meltype.Core.Tests` |
+| Core のテスト | 1297 / 1297 (main の取り込み後。スキップ件数は未確認)。Python のテスト: test_eval_compare.py 8 件、test_eval_legacy_base.py 5 件、test_boundary_sweep.py 21 件、test_upstream_watch.py 37 件、test_update_cask.py OK | `dotnet run -c Release --project src/Meltype.Core.Tests` |
 | 品質テスト | 1295 / 1296 (99.9 %)。外れ: `my name is taro` のみ | `-- --eval` |
-| 正解表 (6 表) | 635 / 741。mac-device 40/41、mac-protected-spans 52/53、mac-terminal 33/37、paren-space 10/12、short-words-in-english 301/382、upstream-quality 199/216。eval-compare (base d210044) は broken 0 / fixed 0 / added 0 / removed 0 (表ごとの数も base と同じ。026 (旧 018) は正解表に触れていない)。直前の 025 (旧 016) の変更 (base 9a38f39 との比較) では added 13 (upstream-quality の前の文字つきの行で、すべて ok) | `tools/eval-compare.sh` |
-| 境界例の一括比較 | full (既定) 684,102 入力 (j1 203,350 / j2 270,110 / j3 196,735 / e 13,907)、1 本の木あたり約 16 分。light 35,862 入力、約 50〜70 秒 (026 (旧 018) では light 35,862 入力で違い 0)。ローマ字にできず除いた読み 0。検算 1 (english.txt に undef を足した写し) は full で日本語の損失 289・英語の損失 0・その他 14・終了コード 1、light で日本語の損失 17・その他 1・終了コード 1。検算 2 (同じ木) は full・light とも違い 0・終了コード 0 | `tools/boundary-sweep.sh` (使い方は `docs/DEVELOPMENT.md`) |
+| 正解表 (10 表) | 717 / 823。mac-device 40/41、mac-protected-spans 52/53、mac-terminal 33/37、paren-space 10/12、short-words-in-english 343/424、upstream-guards 8/8、upstream-guards-1118 8/8、upstream-guards-1120 12/12、upstream-guards-1121 12/12、upstream-quality 199/216。eval-compare (base origin/main 496c90e、704/810) は broken 0 / fixed 0 / added 13 / removed 0 (added は要件 025 (旧 016) の前の文字つきの 13 行で、すべて ok。PR #29 の CI も 8da7bac で成功) | `tools/eval-compare.sh` |
+| 境界例の一括比較 | full (既定) 684,102 入力 (j1 203,350 / j2 270,110 / j3 196,735 / e 13,907)、1 本の木あたり約 16 分。light 35,862 入力、約 50〜70 秒 (026 (旧 018) では light 35,862 入力で違い 0。main を取り込んだ後も、origin/main 496c90e と比べて light で違い 0)。ローマ字にできず除いた読み 0。検算 1 (english.txt に undef を足した写し) は full で日本語の損失 289・英語の損失 0・その他 14・終了コード 1、light で日本語の損失 17・その他 1・終了コード 1。検算 2 (同じ木) は full・light とも違い 0・終了コード 0 | `tools/boundary-sweep.sh` (使い方は `docs/DEVELOPMENT.md`) |
 | 規模 | 1 キー 0.086 ms (`[規模]`)。2026-10-24 の値。今回は測っていない | |
 
 ## 進行中の要件
@@ -53,7 +53,7 @@
 - 人: 001 の Mac 実機チェックリスト (TextEdit・ターミナル) を確かめて、マージ・要件の `done` を判断する。
 - 別の要件にする候補: `my name is taro` (品質テストの最後の外れ)。
 - 別の要件にする候補 (026 (旧 018) の範囲外で見つけたこと。026 より前から): 設定「変換後も続けて入力」ON で、ローマ字の再変換 → Space → 続けて打つ → Enter とすると、`Commit` の fixedOnly の分岐が `!_reconvertRomaji` を見ずに `Learn()` を呼ぶので、azooKey と履歴に「きょうはいいてんきですね → kyouha iitenki desu ne」のような誤学習が入る (偽の変換エンジンで再現。base のコードでも同じと査読員が確認)。
-- 別の要件にする候補 (017 の査読の範囲外で見つけたこと): `IsSymbolOnly` が `char.IsLetterOrDigit` を UTF-16 の 1 単位ずつ見るので、サロゲートペアの漢字 (𠮷 など) だけの文節を「記号だけ」とみなし、ひらがなを先にする (偽の変換エンジンで `yoshi` + Space + Enter が よし になる。OFF・ON とも。実際の azooKey が 𠮷 1 字を返すかは未確認)。OFF の経路の `ContextOf` (`[^10..]`) と `_lastCommitText` (`[^20..]`) もサロゲートを見ずに切っている (017 では変えていない)。
+- (済) 017 の査読の範囲外で見つけた `IsSymbolOnly` のサロゲートペアの件は、要件 024 (PR #30 で main に統合) になった。
 - 辞書の英単語 + 助詞 全般 (`sorenoerror` など) は今回の範囲外。広げるときは境界例を別モデルの査読員に作らせる (`docs/LESSONS.md`)。道具は `tools/boundary-sweep.sh`。
 
 ## 1 件目の記録 (ループの実測。目標値は置かない)
