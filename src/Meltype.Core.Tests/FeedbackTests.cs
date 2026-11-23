@@ -1228,6 +1228,27 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req022_Upstream1120Shapes_StayKana()
+    {
+        // 本家 #2077・#2085・#2091 (#1988)・#2072・#2094 (2026-11-20): sitaidesu が 死体です、amatte が 余って、chomatte が 苧麻って、
+        // 数字 + にちめ が 2２time のような形になる、などの報告。本家の中心は漢字の選び方で、ここでは測れない。
+        // どれも途中に英字として読める並び (sit・mat・era・time など) を含むので、かなのまま確定することだけを守る
+        // (この fork では今も起きない。判定ロジック・辞書は変えていない)。正解表: eval/cases/upstream-guards-1120.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("sitaidesu", "したいです"), ("shitaidesu", "したいです"), ("amatte", "あまって"), ("amattekara", "あまってから"),
+            ("chomatte", "ちょまって"), ("tyomatte", "ちょまって"), ("yappane", "やっぱね"),
+            ("kakikomiera-", "かきこみえらー"), ("kakikomiera-desu", "かきこみえらーです"),
+            ("2nitime", "2にちめ"), ("2nichime", "2にちめ"), ("10nitime", "10にちめ"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req011_Colab_Collab_Kaggle_StayEnglish_AndJapaneseSpellingsDoNot()
     {
         // 本家 #1607・#1609: colab が こlab、kaggle が かっがぇ になる (頭が読めて、残りが英字)。dictionaries/english.txt の技術用語に足した。
@@ -1258,6 +1279,25 @@ internal static class RomajiTypoTests
         {
             ("iCloud", "iCloud"), ("iTunes", "iTunes"), ("iCloud wo", "iCloud を"), ("iCloudnoerror", "iCloudのerror"),
             ("iPhone", "iPhone"), ("ichi", "いち"), ("ikou", "いこう"), ("iCloudnihozon", "iCloudにほぞん"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Req020_Upstream1118Shapes_StayAsTheyAre()
+    {
+        // 本家 #2015・#2016・#2017・#2024・#2029 (2026-11-18): itotekinagobyuu が 意図的なgobゆう、ronpa が ろんpa (onpa も)、
+        // Fluorite が Fluおりて、uchidome が うちdome、fanntatowirukinnsonn が ファンタとwイルキンソン になる。
+        // この fork では起きないが、正解表に同じ形が無かったので守る (判定ロジック・辞書は変えていない)。正解表: eval/cases/upstream-guards-1118.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("itotekinagobyuu", "いとてきなごびゅう"), ("ronpa", "ろんぱ"), ("onpa", "おんぱ"), ("ronpasuru", "ろんぱする"),
+            ("Fluorite", "Fluorite"), ("uchidome", "うちどめ"), ("utidome", "うちどめ"),
+            ("fanntatowirukinnsonn", "ふぁんたとうぃるきんそん"),
         })
         {
             var k = new CompositionTests.Keyboard();
@@ -1305,6 +1345,34 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req018_Inyuu_DoesNotSplitEnglishIn()
+    {
+        // 本家 #1946: dainyuu が だinゆう になる (英単語 in を拾う)。この fork では起きないが、正解表に -inyuu の形が無かったので守る。
+        // shinyuu・ginyuu は前に英単語 (shin・gin) が来る形。テスト用の判定器 (BuiltInWordChecker) とスペルチェッカー無しの両方で、Enter の確定を比べる。
+        var cases = new[]
+        {
+            ("dainyuu", "だいにゅう"), ("kinyuu", "きにゅう"), ("kanyuu", "かにゅう"), ("yunyuu", "ゆにゅう"),
+            ("hensuunidainyuu", "へんすうにだいにゅう"), ("dainyuusuru", "だいにゅうする"), ("kinyuusuru", "きにゅうする"),
+            ("shinyuu", "しにゅう"), ("ginyuu", "ぎにゅう"),
+        };
+        foreach (var (typed, expected) in cases)
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        using (CompositionTests.WithoutSpellChecker())
+        {
+            foreach (var (typed, expected) in cases)
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed + " (スペルチェッカー無し)");
+            }
+        }
+    }
+
+    [Test]
     public static void Req014_Pixiv_StaysEnglish_AndPiSpellingsDoNot()
     {
         // 本家 #1696: pixiv が ぴぃv になる (pi + xi が読めて v が残る)。pixivnitoukou は丸ごと英字のまま残っていた。
@@ -1328,6 +1396,77 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req016_Obsidian_StaysEnglish_AndOSpellingsDoNot()
+    {
+        // 本家 #1763: obsidian が おbしぢあn になり、確定では おんしぢあん になる (o が読めて b が残る)。obsidianwo は表示が obsidianを なのに確定が おんしぢあんを だった。
+        // dictionaries/english.txt に足した。o + b で始まる日本語 (obake・obon・oboeru・obi・obentou) と Obsidian・obsolete・absorb は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("obsidian", "obsidian"), ("obsidianwo", "obsidianを"), ("obsidiande", "obsidianで"), ("obsidianga", "obsidianが"), ("obsidianni", "obsidianに"),
+                ("obsidian wo tsukau", "obsidian をつかう"), ("kyouhaobsidianwotukau", "きょうはobsidianをつかう"),
+                ("obake", "おばけ"), ("obon", "おぼん"), ("oboeru", "おぼえる"), ("obi", "おび"), ("obentou", "おべんとう"),
+                ("Obsidian", "Obsidian"), ("obsolete", "obsolete"), ("absorb", "absorb"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
+    public static void Req019_Upstream1117Shapes_StayAsTheyAre()
+    {
+        // 本家 #1984・#1985・#1987・#1990・#1991 (2026-11-17): baguhoukoku が bag ウ報告、tunagarumademattekara が つながるまでmatteから、
+        // CLAUDE.mdwohiraku が CLAUDE.mdwo開く、,nisuruwo が 、nisl を、reibunn:pregnant_man: が reibun:pregnant_man: になる。
+        // この fork では起きないが、正解表に同じ形が無かったので守る (判定ロジック・辞書は変えていない)。正解表: eval/cases/upstream-guards.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("baguhoukoku", "ばぐほうこく"), ("tunagarumademattekara", "つながるまでまってから"), ("tsunagarumademattekara", "つながるまでまってから"),
+            ("CLAUDE.mdwohiraku", "CLAUDE.mdをひらく"), ("AGENTS.mdwohiraku", "AGENTS.mdをひらく"), (",nisuruwo", "、にするを"),
+            ("reibunn:pregnant_man:", "れいぶん:pregnant_man:"), ("reibun:smile:desu", "れいぶん:smile:です"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Req021_PazoliteOeksound_StayEnglish_AndKanaSpellingsDoNot()
+    {
+        // 本家 #2037: pazolite が ぱぞlite (pa + zo が読めて lite が残る)、oeksound が おえksound (o + e が読めて ksound が残る) になる。
+        // dictionaries/english.txt に足した。同じ綴りで始まる日本語 (pazo・pazuru・oekaki・oeru) と lite・sound は変わらない。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("pazolite", "pazolite"), ("oeksound", "oeksound"),
+                ("pazolitenokyoku", "pazoliteのきょく"), ("pazolitewo", "pazoliteを"), ("kyouhapazolitewokiku", "きょうはpazoliteをきく"),
+                ("oeksoundwo", "oeksoundを"), ("oeksoundde", "oeksoundで"), ("oeksoundnoplugin", "oeksoundのplugin"),
+                ("kyouhaoeksoundwotukau", "きょうはoeksoundをつかう"), ("pazolite no kyoku", "pazolite のきょく"),
+                ("pazo", "ぱぞ"), ("kyouhapazo", "きょうはぱぞ"), ("pazuru", "ぱずる"), ("oekaki", "おえかき"), ("oeru", "おえる"), ("oeta", "おえた"),
+                ("lite", "lite"), ("sound", "sound"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed + "\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
     public static void Req012_PreprocessorDirectives_StayEnglish_AndKanaWordsDoNot()
     {
         // 本家 #1625: endif が えんぢf、elifndef が elifんdef になる。dictionaries/english.txt に endif・elifndef・pragma を足した。
@@ -1339,6 +1478,27 @@ internal static class RomajiTypoTests
             ("#endif", "#endif"), ("#pragma", "#pragma"),
             ("jibundeftotemo", "じぶんでとても"), ("yasundefgohan", "やすんでごはん"), ("shinbundefdasu", "しんぶんでだす"), ("shifndefure", "しふぉんでふれ"),
             ("ima", "いま"), ("unde", "うんで"), ("enda", "えんだ"), ("ifu", "いふ"), ("dekiru", "できる"), ("denwa", "でんわ"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
+    public static void Req023_Upstream1121Shapes_StayKanaOrName()
+    {
+        // 本家 #2174・#2157・#2147・#2143・#2141・#2168 (2026-11-21): atude が at腕、tasinamu が 足しなmu、haatu が はatう、getu が getう、
+        // subewomotanai が すbeを持たない、Yukishiro が Yukiしろ になる、という報告。途中や頭の英字として読める並び (at・mu・get・be・Yuki) が残った形。
+        // この fork では今も起きない (判定ロジック・辞書は変えていない)。かなのまま (名前の Yukishiro は英字のまま) 確定することを守る。
+        // 漢字の形 (厚手・嗜む など) は測れない。正解表: eval/cases/upstream-guards-1121.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("atude", "あつで"), ("atsude", "あつで"), ("atudenoko-to", "あつでのこーと"),
+            ("tasinamu", "たしなむ"), ("tashinamu", "たしなむ"), ("haatu", "はあつ"), ("haatudesu", "はあつです"),
+            ("getu", "げつ"), ("getuyoubi", "げつようび"), ("subewomotanai", "すべをもたない"),
+            ("Yukishiro", "Yukishiro"), ("yukishiro", "ゆきしろ"),
         })
         {
             var k = new CompositionTests.Keyboard();

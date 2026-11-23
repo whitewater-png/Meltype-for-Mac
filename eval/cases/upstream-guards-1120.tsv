@@ -1,0 +1,19 @@
+# 本家 (yksr-melt/Meltype) に 2026-11-20 に報告された形のうち、この fork では英字が混ざらず、かなのまま確定するものを守る行。期待は今の Mac 版 Core の出力 (今も当たる行)。
+# 本家の報告の中心は漢字の選び方 (死体です・余って・苧麻って など) で、ここでは測れない。どれも途中に英字として読める並び (sit・mat・era・time など) を含むので、かなと英字の分かれ方だけを守る。
+# 後の変更 (辞書への語の追加・判定ロジックの変更・本家への追従) で英字が混ざる形に崩れたら、回帰ゲートで気付けるようにする。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打った結果を測る。実機の記録ではない。漢字の形は測れない。
+# 出典の docs/voice/<日付>.md は、ブランチ voice/<日付> にある (main には無い)。
+# 要件 019 (PR #24) の eval/cases/upstream-guards.tsv・要件 020 (PR #25) の eval/cases/upstream-guards-1118.tsv と同じ考えの表。同じファイルを作ると衝突するので別の表にしてある (どれも main に入ったら 1 つにまとめてよい)。
+# カテゴリ: 要件 022 (本家 2026-11-20 の報告。docs/requirements/022-upstream-1120-guard.md。本家での形は出典の欄)
+sitaidesu	したいです	full	本家 #2077 (本家では 死体です。docs/voice/2026-11-20.md 候補 3)
+shitaidesu	したいです	full	要件 022 (作者の作例: shi の綴り)
+amatte	あまって	full	本家 #2085 (本家では 余って。docs/voice/2026-11-20.md 候補 3)
+amattekara	あまってから	full	要件 022 (作者の作例: 後ろに日本語が続く形)
+chomatte	ちょまって	full	本家 #2091・#1988 (本家では 苧麻って。docs/voice/2026-11-20.md 候補 3)
+tyomatte	ちょまって	full	要件 022 (作者の作例: tyo の綴り)
+yappane	やっぱね	full	本家 #2091 (話し言葉の語。docs/voice/2026-11-20.md 候補 3)
+kakikomiera-	かきこみえらー	full	本家 #2072 (本家では 書込エラー を選べない。docs/voice/2026-11-20.md 候補 3)
+kakikomiera-desu	かきこみえらーです	full	要件 022 (作者の作例: 後ろに日本語が続く形)
+2nitime	2にちめ	full	本家 #2094 (本家では 2２time のような形。docs/voice/2026-11-20.md 候補 3)
+2nichime	2にちめ	full	要件 022 (作者の作例: chi の綴り)
+10nitime	10にちめ	full	要件 022 (作者の作例: 数字が 2 桁)

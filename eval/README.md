@@ -36,6 +36,7 @@
 | `cases/mac-device.tsv` | Mac 実機で確かめた「打った → 結果」(`docs/IMPROVEMENT_PLAN.md` と `docs/HANDOFF-upstream-pr-next-session.md` の記録) と、計画書に期待だけが書いてある例です。出典に節の名前を書いています。打鍵が文書に書かれておらず期待から復元した行は、出典に「打鍵は復元」と書いています。 |
 | `cases/mac-protected-spans.tsv` | パス・オプション・変数の保護区間 (`./src/main.ts`・`--no-install`・`$HOME` が崩れないこと、拡張子の後ろの助詞が日本語になること)。`docs/IMPROVEMENT_PLAN.md` の「追加項目 1-4a」。 |
 | `cases/mac-terminal.tsv` | ターミナル・AI ツール名の形 (`Claude Code de kaku`・`git push origin main`・`ollama run gemma`・`gpt-oss wo tsukau` など) です。期待は今の Mac 版 Core の **望ましい** 出力で、今は外れると分かっているもの (`ollama run` が `るん`、`gemma4-27b` が `gemma4ー27b`、`gpt-oss` が `gpt-おっs`) も入れてあります。このうち `ollama run`→`るん` と `gemma4ー27b` は「実機で既知の外れ」で、Mac 版 Core のテスト用キーボードでは再現しません (`ollama run` は本家の Core でも再現せず、`gemma4ー27b` は本家の Core では再現します)。 |
+| `cases/upstream-guards.tsv` | 本家に報告された誤判定のうち、Mac 版の Core では起きないものを守る行です (要件 019 から)。期待は今の Mac 版 Core の出力で、全部当たるのが正常です。後の変更で本家と同じ崩れ方をしたら、回帰ゲートで気付けます。本家での崩れ方は出典の欄に書いています。 |
 
 実機の結果と、Core のテスト用キーボードの結果は別物です。この評価基盤は変換エンジン (azooKey) も Mac の入力欄も使わないので、「実機で確かめた」ことの代わりにはなりません。
 

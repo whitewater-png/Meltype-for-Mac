@@ -62,4 +62,4 @@ scope: core
 - 測れていないこと: 実エンジン (azooKey・Zenzai) での効果と Mac 実機 (上の実機チェックリストは未確認)。正解表・一括比較は OFF の経路しか通らない (ON の経路は WideContextTests だけ)。偽の変換エンジンは「きごうとう」以外では文脈で結果を変えない。前の文で決まる 32 行の 14 → 24 は区切りの規則を掛けずに測った値で、規則を残した形での効果は未計測 (LEARNING_CONTEXT_REVIEW §3 では「末尾 20 文字・規則あり」で 21 → 20)。ON のとき、文頭の打鍵で変換エンジンの呼び出しが OFF 8 回 → ON 16 回に増え、Swift のキャッシュの鍵が文脈で分かれるので、文頭の Zenzai の推論は約 2 倍の見込み (推測)。「に」で始まる読みは、ON で前の文があると仮の文脈「これ」の代わりに本物の文脈が渡り、区切りの規則が掛かる (害は小さい見込み、推測)。Mac の入力欄が U+2028 などを渡すかは未確認。
 - 範囲外で見つけたこと: `IsSymbolOnly` のサロゲートペアの扱い (`docs/AGENT_STATE.md` の「別の要件にする候補」)。
 - 変更: Core だけ (`CompositionController.cs`・`MeltypeSession.cs`・`CompositionTests.cs`・`WideContextTests.cs`)。Swift・Mac.Native・Windows・設定ファイルの形式・入力欄から読む範囲は変えていない。コミット 4069d8d・587d555・8bc34e4・3b8074e・e8202c2。
-- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/29 (015・016 と同じブランチに積んだ)
+- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/29 (015・025 (旧 016) と同じブランチに積んだ)
