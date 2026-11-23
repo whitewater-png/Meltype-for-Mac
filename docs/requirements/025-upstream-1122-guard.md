@@ -67,7 +67,7 @@ scope: core
   |---|---|
   | `src/Meltype.Core/Detection/RomajiDetector.cs` の `("る", ["ru"])` を `ruq` に | `setteisiteirundakedo` → `せっていしていrunだけど` (本家 #2206 と同じ形)、`taiousiteirundakedo` → `たいおうしていrunだけど`、`ryourisiteirundakedo` → `りょうりしていrunだけど` |
   | `dictionaries/english-words.txt` の `main` の行と `english-readable.txt` の `main domain` の行を消す | `mainkannsuu`・`mainkansuu` → `まいんかんすう` (本家 #2208 と同じ形)、`mainnokannsuu` → `まいんおかんすう` |
-  | `("か", ["ka"])` を `kaq` に | `mainkannsuu`・`mainkansuu` → `mainkあんすう` |
+  | `src/Meltype.Core/Detection/RomajiDetector.cs` の `("か", ["ka"])` を `kaq` に | `mainkannsuu`・`mainkansuu` → `mainkあんすう`、`mainnokannsuu` → `まいんおかんすう` |
   | `src/Meltype.Core/Composition/CompositionDetector.cs` の `UserNameEnd` で `mention` を常に false に | `@exampleabc-jh.ed.jpdesu` → `@exampleあbc-jh。えd。jpです`、`abc@exampleabc-jh.ed.jpdesu` → `abc@exampleあbc-jh。えd。jpです` |
   | 同じ関数のドメインの続き (`.` と `-`) を `.` だけに | `@exampleabc-jh.ed.jpdesu` → `@exampleabc-jh。えd。jpです`、`abc@…` も同じ |
   - どの崩し方でもテストは赤 (例: `setteisiteirundakedo 期待値: せっていしているんだけど / 実際: せっていしていrunだけど`)、戻した後は緑。8 行とも少なくとも 1 つの崩し方で外れた。`english-words.txt` だけから `main` を消しても外れなかった (`english-readable.txt` にもある)。
@@ -78,3 +78,5 @@ scope: core
   - [直す・対応] `docs/AGENT_STATE.md` が未更新 → 進行中の要件に 025 の行を足した。
   - [任意・対応] 崩し方の表の `english-readable.txt` の行は `main domain` の形 → 表の書き方を直した。
   - [任意・範囲外] 近い形で今の main が崩れるもの (自分で `--repro` を打ち直して確認、2026-11-23): `mainnmenyuu` → `まいんめにゅう`、`mainnkinou` → `まいんきのう` (main の後に n が重なる形)、`nameisrun` → `なめisrun`。本家 #2208 そのものの形ではないので、この要件では扱わない (次の声の文書の候補にするかは人が決める)。
+- 査読 2 周目 (1 周目とは別のエージェント。Core 1267/1267・eval-compare broken 0 / fixed 0 / added 0 / removed 0 (712/818) を再実行、文書の出力例を `--repro` で打ち直して一致、崩した木は `kaq` を別の worktree で再現。PR #29 との衝突は増えていない): [止める]・[直す] なし。
+  - [任意・対応] 崩し方の表の `kaq` の行にファイル名が無く、外れた行の `mainnokannsuu` が抜けていた → 直した (実装者の最初の試しの出力にも `まいんおかんすう` があった)。
