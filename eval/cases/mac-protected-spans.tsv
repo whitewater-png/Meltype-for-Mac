@@ -16,7 +16,7 @@ mac/build.sh --no-install wo jikkou	mac/build.sh --no-install をじっこう	fu
 ~/.config/nvim wo	~/.config/nvim を	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 7
 ./node_modules/.bin/tsc	./node_modules/.bin/tsc	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 7
 /etc/hosts ni	/etc/hosts に	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 7
-cd ~/Downloads	cd ~/Downloads	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 7 (既知の外れ: cd が英語と判定されず Space で変換が始まり cd~/Downloads になる。mac-terminal.tsv の cd ~/Documents/Meltype と同じ原因)
+cd ~/Downloads	cd ~/Downloads	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 7 (既知の外れ: cd が英語と判定されず Space で変換が始まり cd~/Downloads になる。一般アプリでは K79 の決まりで今までどおり、コード系アプリでは当たる。要件 030 の非目標)
 `./build.sh` wo	`./build.sh` を	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 3 (開きの記号の後)
 (~/Documents)wo	(~/Documents)を	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 3 (開きの記号の後)
 [~/Documents]wo	「~/Documents」を	full	計画書 1-4a (保護区間 P42) / 査読 R50 推奨 3 ([ ] は日本語の入力では 「」)
