@@ -190,7 +190,7 @@ internal static class Checks
         lines.Any(l => System.Text.RegularExpressions.Regex.IsMatch(l, @"^\s*#\s*app:\s*code\s*$"));
 
     /// <summary>codeApp のとき、各行をコード系アプリとして打つ (<see cref="UsesCodeApp"/>)。</summary>
-    internal static List<EvalResult> Evaluate(List<EvalCase> cases, string? file, Composition.CandidateDictionary candidates, bool codeApp = false)
+    private static List<EvalResult> Evaluate(List<EvalCase> cases, string? file, Composition.CandidateDictionary candidates, bool codeApp = false)
     {
         var results = new List<EvalResult>();
         foreach (var c in cases)
