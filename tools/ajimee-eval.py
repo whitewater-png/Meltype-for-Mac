@@ -201,7 +201,7 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
         "# AJIMEE-Bench での測定 (かな → 漢字変換)",
         "",
         f"- 対象: `{binary}`",
-        f"- 引擎: {summary['engine']}",
+        f"- エンジン: {summary['engine']}",
         f"- データ: {summary['dataset']}",
         "",
         "| 区分 | 第一候補の完全一致 (acc@1) | MinCER の平均 |",
@@ -210,7 +210,7 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
         f"| 左文脈あり ({summary['with_context']['n']} 件) | {line(summary['with_context'])} | {pct(summary['with_context'])} |",
         f"| 左文脈なし ({summary['without_context']['n']} 件) | {line(summary['without_context'])} | {pct(summary['without_context'])} |",
         "",
-        f"外れ {len(misses)} 件 (Cer の大きい順に 25 件。`許容解` は `|` 区切り):",
+        f"外れ {len(misses)} 件 (CER の大きい順に 25 件。`許容解` は `|` 区切り):",
         "",
         "| id | 読み | 第一候補 | 許容解 | CER | 左文脈 |",
         "|---|---|---|---|---|---|",
@@ -231,7 +231,7 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
 def compare(rows_a: str, rows_b: str, out_dir: str, labels=("A", "B")) -> int:
     """2 回の測定の結果 (`rows.tsv`) を行ごとに突き合わせ、片方だけ正解だった数を McNemar の検定で出す。
 
-    同一ビルドで ON/OFF を比べたときに使う (`--weights` の有无で 2 回走らせる)。
+    同一ビルドで ON/OFF を比べたときに使う (`--weights` の有無で 2 回走らせる)。
     """
     def load(path: str) -> dict:
         out = {}
