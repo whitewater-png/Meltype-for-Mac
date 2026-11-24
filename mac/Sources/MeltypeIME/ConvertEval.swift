@@ -16,6 +16,8 @@ import Foundation
 /// `--top <N>` を付けると 5 列目に、同じ読みの候補を上位 N 個 (重複なし、U+001F 区切り) 出す。第一候補しか見えないと、
 /// 外れが「正解が候補に並んでいるのに順位が低い」のか「そもそも候補に無い」のか分けられないため。
 /// 候補は `MeltypeConverter.rawMainResults` (製品が `clauses` で使う `results` と同じ azooKey の結果) から取り、時間は測らない。
+/// `--product-candidates` を付けると、`--top` の候補を `MeltypeConverter.candidates(for:)` (製品の候補ウィンドウに渡る一覧。
+/// 末尾が助詞のときの語幹の候補を足し、キャッシュと 30 個の上限を通る。左文脈は常に無し) から取る。画面と同じ経路の azooKey 側の候補を見るための口。
 /// 学習データは一時フォルダーを使い、利用者の `~/Library/Application Support/Meltype/azooKey` に触りません。
 ///
 /// `--weights <gguf>` を付けると Zenzai (ニューラル変換) を ON にして測ります。製品の `ZenzaiModel` と同じ検査
@@ -104,6 +106,7 @@ enum ConvertEval {
             print("正解表に行がありません: \(path)")
             return false
         }
+        let productCandidates = arguments.contains("--product-candidates")
         var topCount = 0
         if let topFlag = arguments.firstIndex(of: "--top"), arguments.indices.contains(topFlag + 1),
            let value = Int(arguments[topFlag + 1]), value > 0 {
@@ -150,12 +153,17 @@ enum ConvertEval {
                 // 時間を測ったあとで候補を取る (測定に入れない)。表の都合で、タブ・改行は空白にして U+001F で区切る
                 var seen = Set<String>()
                 var list: [String] = []
-                for candidate in converter.rawMainResults(for: row.reading, context: row.context.isEmpty ? nil : row.context)
-                where seen.insert(candidate.text).inserted {
-                    list.append(candidate.text.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " "))
+                let texts: [String]
+                if productCandidates {
+                    texts = converter.candidates(for: row.reading)   // 製品の候補ウィンドウの経路 (左文脈なし)
+                } else {
+                    texts = converter.rawMainResults(for: row.reading, context: row.context.isEmpty ? nil : row.context).map(\.text)
+                }
+                for text in texts where seen.insert(text).inserted {
+                    list.append(text.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " "))
                     if list.count >= topCount { break }
                 }
-                if list.first != top { firstMismatch += 1 }
+                if !productCandidates, list.first != top { firstMismatch += 1 }
                 line += "\t" + list.joined(separator: "\u{1F}")
             }
             print(line)
