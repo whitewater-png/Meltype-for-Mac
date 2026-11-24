@@ -84,3 +84,4 @@ scope: core
 - 査読 2 周目 (1 周目とは別のエージェント。Core 1305/1305・eval-compare broken 0 / fixed 0 / added 0 / removed 0 (745/849) を再実行、崩した木は `miq` + `isPath` と `english.txt` の 4 語を別の worktree で再現し記録と一致、範囲外の例 5 つを `--repro` で打ち直して一致): [止める]・[直す] なし。
   - [任意・対応] `docs/AGENT_STATE.md` の 031 の行に査読の周回数が無い → 2 周と書いた。
   - [任意・範囲外] `docs/AGENT_STATE.md` の基準の数字の Core 件数が 1301 (030 の後) のまま → 基準の数字は測った HEAD と組で書く表なので、この要件では変えない (次に基準を測り直すときに直す)。
+- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/33
