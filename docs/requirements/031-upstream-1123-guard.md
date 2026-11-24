@@ -81,3 +81,6 @@ scope: core
   - [任意・対応] 出典の「作者の作例」が本家の作者と紛らわしい → 「要件の書き手の作例」に直した (表も)。
   - [任意・対応] 実機チェックリストの `/usr/bin/php` はターミナルだが表は一般アプリ → 上の 1 行を記録に足した。
   - [任意・範囲外] 近い形で今の main が崩れるもの (main と同じ。一般アプリの `--repro`): 日本語と空白の後のパス `sore ha /usr/bin/php desu` → `それは/usr/びん/php です`、`sore ha /tmp/foo desu` → `それは/tmp/ふぉおです`、`kore ha ./build.sh desu` → `これは。/build.sh です`、`phpha/usr/bin/phpniaru` → `phpは/usr/びん/phpにある`、一般アプリの `cd /usr/bin/php` → `cd/usr/びん/php`。本家 #2254 の形 (先頭の `/` が `・`) ではないので、この要件では扱わない (次の声の文書の候補にするかは人が決める)。
+- 査読 2 周目 (1 周目とは別のエージェント。Core 1305/1305・eval-compare broken 0 / fixed 0 / added 0 / removed 0 (745/849) を再実行、崩した木は `miq` + `isPath` と `english.txt` の 4 語を別の worktree で再現し記録と一致、範囲外の例 5 つを `--repro` で打ち直して一致): [止める]・[直す] なし。
+  - [任意・対応] `docs/AGENT_STATE.md` の 031 の行に査読の周回数が無い → 2 周と書いた。
+  - [任意・範囲外] `docs/AGENT_STATE.md` の基準の数字の Core 件数が 1301 (030 の後) のまま → 基準の数字は測った HEAD と組で書く表なので、この要件では変えない (次に基準を測り直すときに直す)。
