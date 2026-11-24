@@ -6,7 +6,7 @@
 - **対象**: Mac 版のかな → 漢字変換。製品と同じ `MeltypeConverter.clauses(for:context:)` を呼ぶ (`mac/Sources/MeltypeIME/ConvertEval.swift` を新規、`main.swift` に 1 行)。日英判定 (`eval/cases` 839 件) は測らない — 軸が違うので `eval/cases` とは**並べて**使う。
 - **正解表**: AJIMEE-Bench (https://github.com/azooKey/AJIMEE-Bench) の `JWTD_v2/v1/evaluation_items.json` **200 件**。日本語 Wikipedia 入力誤りデータセット v2 のテストデータから `kanji-conversion_a` (かな漢字の変換の誤り) を含む項目を 200 件サンプリングし、100 件を左文脈付き・100 件を文脈なしに分けたもの (README の構築手順)。**許容解は複数列挙** (平均 2.1 個)。
 - **ライセンス**: 正解表のデータは CC-BY-SA 3.0 なので**リポジトリに同梱しない**。実行時に取って `~/.cache/meltype/ajimee/` に置く。評価の式は本家 `utils.py` が CC0 1.0 なので、同じ式 (acc@1 = 第一候補が許容解に含まれるか / MinCER = 許容解のうちの最小の CER) を `tools/ajimee-eval.py` に書き写した (Levenshtein は自前実装。標準ライブラリだけで動く)。
-- **計測機**: Apple M4 Max、macOS 27.2.1、36 GB。ビルドは `swift build -c release --package-path mac`。実測に使う木は `origin/main` の **`9f28603826e238de1f07f23623c963ec75593108`** に下の 3 ファイルを足したもの (コミット前) で、成果物の `MeltypeIME` (10,321,368 バイト) は MD5 **`5c4c164cf51a07d8e16a935cbfa4e03b`**。ON/OFF は**この 1 つのバイナリ**を 1 回ずつ走らせた。手元の作業 HEAD (`feature/ajimee-bench` の `20736db`) は `9f28603` の祖先なので、下の数字は `20736db` のビルドではない。Zenzai は CPU 版、重みは zenz-v3.1-small Q5_K_M (73,871,968 バイト、SHA-256 `4de930c06bef8c26…`)。`--weights` は製品の `ZenzaiModel` と同じ検査 (サイズ・SHA-256 をアプリに固定した値と比べる) を通したので、製品が使うのと同じ重みである。
+- **計測機**: Apple M4 Max、macOS 27.2.1、36 GB。ビルドは `swift build -c release --package-path mac`。実測に使う木は `origin/main` の **`9f28603826e238de1f07f23623c963ec75593108`** に下の 3 ファイルを足したもの (コードは `feature/ajimee-bench` の `aaea22f` にコミット済みだが、**実測の木は `9f28603` + この 3 ファイル**で、コミットの木は `20736db` + この 3 ファイルなので同一ではない) で、成果物の `MeltypeIME` (10,321,368 バイト) は MD5 **`5c4c164cf51a07d8e16a935cbfa4e03b`**。ON/OFF は**この 1 つのバイナリ**を 1 回ずつ走らせた。手元の作業 HEAD (`feature/ajimee-bench` の `20736db`) は `9f28603` の祖先なので、下の数字は `20736db` のビルドではない。Zenzai は CPU 版、重みは zenz-v3.1-small Q5_K_M (73,871,968 バイト、SHA-256 `4de930c06bef8c26…`)。`--weights` は製品の `ZenzaiModel` と同じ検査 (サイズ・SHA-256 をアプリに固定した値と比べる) を通したので、製品が使うのと同じ重みである。
 
 ## 判定式の修正 (2026-11-24、この日の午後にやり直した)
 採点側の `tools/ajimee-eval.py` に、AJIMEE の入力をカタカナからひらがなへ直す式 (`katakana_to_hiragana`) のバグがあった。カタカナは `-0x60` で寄せるが、**中音符 `・` (U+30FB) もカタカナの範囲 (U+30A1..U+30FF) に入っている**ので、`・` が U+309B の濁音記号 `゛` に化けていた (長音符 `ー` U+30FC は U+309C の半濁音記号 `゜` に化けるので、そちらは最初から除外していた)。期待値側の `・` と食い違い、**Zenzai ON で 7 件 / なしで 3 件**が「外れ」に落ちていた。`・` をそのまま通すように直して両方をやり直した。
@@ -82,7 +82,7 @@ python3 tools/ajimee-eval.py --compare <DIR_OFF>/rows.tsv <DIR_ON>/rows.tsv --ou
 
 Meltype-Flash の 40 件表で測るには、`rust/ai/data/ime-qa-accuracy.json` を上の形 (`index` / `input` / `expected_output` / `context_text`) に変換した JSON を `--items` に渡す (40 件の読み・正解・文脈は元のまま、変換は形だけ)。
 
-## 加えたコード (コミット前、ブランチ `feature/ajimee-bench`)
+## 加えたコード (ブランチ `feature/ajimee-bench` の `aaea22f` にコミット済み)
 - `mac/Sources/MeltypeIME/ConvertEval.swift` (新規 134 行): `MeltypeIME --convert-eval <tsv> [--limit N] [--weights <gguf>]`。行ごとに `endComposition()` してから `clauses(for:context:)` を呼ぶので、前の行の差分変換・学習が次の行に食い込まない。変換の本体 (`MeltypeConverter` / Core) は**変更していない**。
 - `mac/Sources/MeltypeIME/main.swift` (1 行): `--convert-eval` の受け口。
 - `tools/ajimee-eval.py` (新規 333 行): 正解表の取得・採点・`report.md` / `rows.tsv`、`--compare` で McNemar の両側正確検定。中黒の誤判定を修正した (上の節)。
