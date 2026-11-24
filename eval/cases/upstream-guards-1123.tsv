@@ -7,8 +7,8 @@
 # 要件 019〜025 の守りの表と同じ考えの表 (日付ごとの別の表。まとめてよい)。
 # カテゴリ: 要件 031 (本家 2026-11-23 の報告。docs/requirements/031-upstream-1123-guard.md。本家での形は出典の欄)
 nonbirimiroyo	のんびりみろよ	full	本家 #2261 (本家では のんびりmiroよ。docs/voice/2026-11-23.md 候補 1)
-kokowomiroyo	ここをみろよ	full	要件 031 (作者の作例: 同じ形)
-asitamiroyo	あしたみろよ	full	要件 031 (作者の作例: 同じ形)
+kokowomiroyo	ここをみろよ	full	要件 031 (要件の書き手の作例: 同じ形)
+asitamiroyo	あしたみろよ	full	要件 031 (要件の書き手の作例: 同じ形)
 nonbirimiro	のんびりみろ	full	要件 031 (声の文書で打った同じ形。語の終わりで止める)
 kokowomiro	ここをみろ	full	要件 031 (声の文書で打った同じ形)
 asitamiro	あしたみろ	full	要件 031 (声の文書で打った同じ形)

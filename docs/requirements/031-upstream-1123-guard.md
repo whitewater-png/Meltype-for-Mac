@@ -8,9 +8,9 @@ scope: core
 # 031 本家 11-23 の誤判定の 3 形 (fork ではかなのまま・英字のまま) を正解表とテストで守る
 
 ## 背景 (誰が、何に困っているか)
-- 本家 (1.7.x、Windows の報告) に 2026-11-23 に出た報告 (docs/voice/2026-11-23.md の要約。本文は WebFetch の要約を通したもので、細部は原文と違う可能性がある):
+- 本家 (1.7.x。#2261・#2258 は Windows、#2254 は OS 不明) に 2026-11-23 に出た報告 (docs/voice/2026-11-23.md の要約。本文は WebFetch の要約を通したもので、細部は原文と違う可能性がある):
   - #2261 `nonbirimiroyo` → `のんびりmiroよ` (期待 `のんびり見ろよ`。動詞の命令形 `miro` が英字で残る)
-  - #2258 `What are things made you happy?` → `What あれ things まで 用 happy?` (英文の途中が かな・漢字になる。Zenzai ON)
+  - #2258 `What are things made you happy?` → `What あれ things まで 用 happy?` (英文の途中が かな・漢字になる。Zenzai ON。本家の bot の main・1.7.1 では再現せず)
   - #2254 `/usr/bin/php` → 先頭の `/` が `・` になる
 - 今の挙動 (Core の `--repro`、最後のキーは Enter、2026-11-24、`origin/main` 9f28603): この fork では確定はどれも崩れない。
   - `nonbirimiroyo` → `のんびりみろよ`。同じ形の `kokowomiroyo` → `ここをみろよ`、`asitamiroyo` → `あしたみろよ`
@@ -38,8 +38,8 @@ scope: core
 - [x] 正解表: 新しい表 `eval/cases/upstream-guards-1123.tsv` に次の行を足し、今の main でも当たる (019〜025 と同じく、日付ごとの別の表にする)
   ```
   nonbirimiroyo	のんびりみろよ	full	本家 #2261
-  kokowomiroyo	ここをみろよ	full	要件 031 (作者の作例: 同じ形)
-  asitamiroyo	あしたみろよ	full	要件 031 (作者の作例: 同じ形)
+  kokowomiroyo	ここをみろよ	full	要件 031 (要件の書き手の作例: 同じ形)
+  asitamiroyo	あしたみろよ	full	要件 031 (要件の書き手の作例: 同じ形)
   nonbirimiro	のんびりみろ	full	要件 031 (声の文書で打った同じ形。語の終わりで止める)
   kokowomiro	ここをみろ	full	要件 031 (声の文書で打った同じ形)
   asitamiro	あしたみろ	full	要件 031 (声の文書で打った同じ形)
@@ -74,3 +74,10 @@ scope: core
   - 崩し方は「その行が実際に比べられていること」を確かめるためのもので、本家の原因 (未確認) を再現したものではない。
 - 数字: Core 1305/1305 (権限で失敗させるテストはスキップ)、eval-compare (origin/main 9f28603 と比較) broken 0 / fixed 0 / added 0 / removed 0 (745/849。新しい表は 10/10。両方の木を同じ表で回すので base でも当たる)。`check-dictionaries.mjs`・`check-terms.mjs` エラー 0 (警告は main と同じ。辞書は変えていない)。`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行。
 - `docs/KNOWN_LIMITS.md` に `miro`・`made you`・`/usr/bin/php` の記載なし (確認のみ)。
+- `/usr/bin/php` は表とテストでは一般アプリとして打つ。査読員が `# app: code` の表で確かめ、コード系アプリでも `/usr/bin/php`・`cd /usr/bin/php`・`ls /usr/local/bin/node`・`cd ~/bin` は当たった (表には足していない)。
+- 査読 1 周目 (実装を見ていない別のエージェント。Core 1305/1305・eval-compare broken 0 / fixed 0 / added 0 / removed 0 (745/849) を再実行、10 行の `--repro` を照合、崩した木は `miq`・`isPath`・`english.txt` の 4 語を別の worktree で再現し記録と一致。境界例 (`tabero`・`okiroyo`・`What made you happy?`・`/usr/local/bin/node` など) で要件の記述との矛盾なし): [止める] なし。
+  - [直す・対応] `docs/AGENT_STATE.md` が未更新 → 進行中の要件に 031 の行を足した。
+  - [直す・対応] 背景の「Windows の報告」が #2254 (OS 不明) にもかかっていた → 件ごとに書き分け、#2258 に「bot の main・1.7.1 では再現せず」を足した。
+  - [任意・対応] 出典の「作者の作例」が本家の作者と紛らわしい → 「要件の書き手の作例」に直した (表も)。
+  - [任意・対応] 実機チェックリストの `/usr/bin/php` はターミナルだが表は一般アプリ → 上の 1 行を記録に足した。
+  - [任意・範囲外] 近い形で今の main が崩れるもの (main と同じ。一般アプリの `--repro`): 日本語と空白の後のパス `sore ha /usr/bin/php desu` → `それは/usr/びん/php です`、`sore ha /tmp/foo desu` → `それは/tmp/ふぉおです`、`kore ha ./build.sh desu` → `これは。/build.sh です`、`phpha/usr/bin/phpniaru` → `phpは/usr/びん/phpにある`、一般アプリの `cd /usr/bin/php` → `cd/usr/びん/php`。本家 #2254 の形 (先頭の `/` が `・`) ではないので、この要件では扱わない (次の声の文書の候補にするかは人が決める)。
