@@ -1529,6 +1529,28 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req031_Upstream1123Shapes_StayKanaOrEnglish()
+    {
+        // 本家 #2261・#2258・#2254 (2026-11-23): nonbirimiroyo が のんびりmiroよ、What are things made you happy? の途中が
+        // かな・漢字になり、/usr/bin/php の先頭の / が ・ になる、という報告。この fork では確定は今も崩れない (判定ロジック・辞書は変えていない)。
+        // 動詞の命令形の miro はかなのまま、英文とパスは英字のまま確定することを守る。
+        // 漢字の形 (見ろ) と、打っている途中の表示 (のんびりmiro) は守らない。正解表: eval/cases/upstream-guards-1123.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("nonbirimiroyo", "のんびりみろよ"), ("kokowomiroyo", "ここをみろよ"), ("asitamiroyo", "あしたみろよ"),
+            ("nonbirimiro", "のんびりみろ"), ("kokowomiro", "ここをみろ"), ("asitamiro", "あしたみろ"),
+            ("What are things made you happy?", "What are things made you happy?"),
+            ("made you happy", "made you happy"), ("it made you happy", "it made you happy"),
+            ("/usr/bin/php", "/usr/bin/php"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
