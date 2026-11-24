@@ -174,7 +174,13 @@ enum ConvertEval {
         let p95 = times[(times.count * 95 + 99) / 100 - 1]
         print("# summary 行数 \(rows.count) 第一候補の完全一致 \(hits) 件 (\(String(format: "%.1f", Double(hits) * 100 / Double(rows.count)))%)")
         print("# summary 左文脈あり \(withContext.0)/\(withContext.1) 左文脈なし \(withoutContext.0)/\(withoutContext.1)")
-        if topCount > 0 { print("# summary --top \(topCount): 候補の先頭と第一候補の食い違い \(firstMismatch) 件") }
+        if topCount > 0 {
+            // --product-candidates のときは、文脈なしの候補 (candidates(for:)) と、文脈ありの第一候補 (clauses) は先頭が違ってよいので、数えない
+            print(productCandidates ? "# summary --top \(topCount) (--product-candidates): 先頭と第一候補の食い違いは数えない"
+                                    : "# summary --top \(topCount): 候補の先頭と第一候補の食い違い \(firstMismatch) 件")
+        } else if productCandidates {
+            print("# summary --product-candidates は --top <N> と一緒に付けたときだけ効く (候補は出していない)")
+        }
         print("# summary 1 行の変換 p50 \(String(format: "%.1f", p50)) ms / p95 \(String(format: "%.1f", p95)) ms")
         if let model = zenzai { try? FileManager.default.removeItem(at: model.modelsDirectory.deletingLastPathComponent()) }   // 一時フォルダーのモデルの片付け
         return true
