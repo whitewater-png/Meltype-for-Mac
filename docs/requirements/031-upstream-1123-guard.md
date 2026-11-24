@@ -35,7 +35,7 @@ scope: core
 
 ## 完成条件 (先に決める。機械で判定できる形)
 守りの行なので、今の main で最初から当たる。「先に赤」の代わりに、**わざと崩した木 (作業ツリーで一時的に変えて戻す) で、足した行とテストが外れること**を一度確かめる。
-- [ ] 正解表: 新しい表 `eval/cases/upstream-guards-1123.tsv` に次の行を足し、今の main でも当たる (019〜025 と同じく、日付ごとの別の表にする)
+- [x] 正解表: 新しい表 `eval/cases/upstream-guards-1123.tsv` に次の行を足し、今の main でも当たる (019〜025 と同じく、日付ごとの別の表にする)
   ```
   nonbirimiroyo	のんびりみろよ	full	本家 #2261
   kokowomiroyo	ここをみろよ	full	要件 031 (作者の作例: 同じ形)
@@ -48,10 +48,10 @@ scope: core
   it made you happy	it made you happy	full	要件 031 (声の文書で打った同じ形)
   /usr/bin/php	/usr/bin/php	full	本家 #2254
   ```
-- [ ] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req031_Upstream1123Shapes_StayKanaOrEnglish` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
-- [ ] わざと崩した木で、足した 10 行がどれも少なくとも 1 回は外れ、テストが赤になる (崩し方と結果を記録欄に書く)。
-- [ ] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過。
-- [ ] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。`eval/README.md` と `docs/requirements/README.md` の一覧には足さない (019〜025 と同じ扱い)。
+- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req031_Upstream1123Shapes_StayKanaOrEnglish` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
+- [x] わざと崩した木で、足した 10 行がどれも少なくとも 1 回は外れ、テストが赤になる (崩し方と結果を記録欄に書く)。
+- [x] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過。
+- [x] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。`eval/README.md` と `docs/requirements/README.md` の一覧には足さない (019〜025 と同じ扱い)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] TextEdit: `nonbirimiroyo` + Enter → `のんびりみろよ` (Space の候補に `のんびり見ろよ` が出るか)
@@ -63,3 +63,14 @@ scope: core
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
 
 ## 記録 (ループが書く)
+- わざと崩した木 (作業ツリーで一時的に変え、テスト `Req031` と新しい表だけを `--expect-all` で回し、`git checkout` で戻した。2026-11-24):
+  | 崩し方 | 外れた行 → 確定 |
+  |---|---|
+  | `src/Meltype.Core/Detection/RomajiDetector.cs` の `("み", ["mi"])` を `miq` に | `kokowomiroyo` → `ここをmiroよ`・`asitamiroyo` → `あしたmiroよ` (本家 #2261 と同じ形)、`nonbirimiroyo` → `のんびrimいろよ`、`kokowomiro` → `ここをmiro`、`asitamiro` → `あしたmiro`、`nonbirimiro` → `のんびrimいろ` |
+  | `dictionaries/english.txt` から `made`・`happy`・`are`・`what` を消す | `What are things made you happy?` → `What あれthings までようhappy?` (本家 #2258 に近い形)、`made you happy` → `までようはっpy`、`it made you happy` → `it までようはっpy` |
+  | `src/Meltype.Core/Composition/CompositionDetector.cs` の `ProtectedEnd` で `isPath` を常に false に | `/usr/bin/php` → `/usr/びん/php` |
+  - どの崩し方でもテストは赤 (例: `nonbirimiroyo 期待値: のんびりみろよ / 実際: のんびrimいろよ`)、戻した後は緑。10 行とも少なくとも 1 つの崩し方で外れた。
+  - 外れなかった崩し方 (行が守る範囲の注): `english-words.txt` に `miro` を足す・`english-words.txt` から `made`・`you` を消す・`english.txt` から `made`・`happy` だけを消す (このときは `What are things made you happy?` は英字のまま)・`CompositionText.cs` の先頭の `/` を中黒にする条件を「設定と前の文字に関係なく」にする (パスの保護区間が英字の区間にして `/` を打ったまま出すので、`/usr/bin/php` は崩れない)。本家 #2254 の `・` の形そのものは、この fork の崩し方では再現できていない。
+  - 崩し方は「その行が実際に比べられていること」を確かめるためのもので、本家の原因 (未確認) を再現したものではない。
+- 数字: Core 1305/1305 (権限で失敗させるテストはスキップ)、eval-compare (origin/main 9f28603 と比較) broken 0 / fixed 0 / added 0 / removed 0 (745/849。新しい表は 10/10。両方の木を同じ表で回すので base でも当たる)。`check-dictionaries.mjs`・`check-terms.mjs` エラー 0 (警告は main と同じ。辞書は変えていない)。`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行。
+- `docs/KNOWN_LIMITS.md` に `miro`・`made you`・`/usr/bin/php` の記載なし (確認のみ)。
