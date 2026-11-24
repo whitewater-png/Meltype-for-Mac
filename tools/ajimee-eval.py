@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """AJIMEE-Bench (外部の中立の正解表) で、Mac 版の **かな → 漢字変換** を測る。
 
-    python3 tools/ajimee-eval.py --binary <MeltypeIME のバイナリ> [--items <json>] [--out <dir>] [--limit N] [--weights <gguf>]
+    python3 tools/ajimee-eval.py --binary <MeltypeIME のバイナリ> [--items <json>] [--out <dir>] [--limit N] [--weights <gguf>] [--top N]
     python3 tools/ajimee-eval.py --compare <rows.tsv> <rows.tsv> --out <dir>   # 2 回の結果を行ごとに突き合わせる (McNemar)
 
 AJIMEE-Bench (Advanced Japanese IME Evaluation Benchmark / 味見ベンチ)
@@ -22,6 +22,7 @@ AJIMEE-Bench (Advanced Japanese IME Evaluation Benchmark / 味見ベンチ)
 """
 
 import argparse
+import collections
 import json
 import math
 import os
@@ -106,7 +107,7 @@ def build_table(items: list, tsv_path: str, limit: int) -> int:
     return len(rows)
 
 
-def run_engine(binary: str, tsv_path: str, limit: int, weights=None) -> list:
+def run_engine(binary: str, tsv_path: str, limit: int, weights=None, top: int = 0) -> list:
     """IME のバイナリを `--convert-eval` で走らせ、行ごとの `id hit top ms` を取り出す。"""
     if not os.path.exists(binary):
         raise SystemExit(f"バイナリがありません: {binary}")
@@ -117,6 +118,8 @@ def run_engine(binary: str, tsv_path: str, limit: int, weights=None) -> list:
     command = [binary, "--convert-eval", tsv_path]
     if limit:
         command += ["--limit", str(limit)]
+    if top:
+        command += ["--top", str(top)]
     if weights:
         if not os.path.exists(weights):
             raise SystemExit(f"Zenzai のモデルがありません: {weights}")
@@ -128,14 +131,16 @@ def run_engine(binary: str, tsv_path: str, limit: int, weights=None) -> list:
         print(done.stderr[-2000:], file=sys.stderr)
         raise SystemExit(f"IME が終了コード {done.returncode} で終わりました")
     results = []
-    for line in done.stdout.splitlines():
+    for line in done.stdout.split("\n"):   # splitlines() は U+001C〜U+001E や U+2028 でも切ってしまうので使わない
         if line.startswith("#"):
             print("  " + line, file=sys.stderr)
             continue
         columns = line.split("\t")
-        if len(columns) != 4:
+        if len(columns) not in (4, 5):
             continue
-        results.append({"id": columns[0], "hit": columns[1] == "1", "top": columns[2], "ms": float(columns[3])})
+        # 5 列目 (--top のとき) は、同じ読みの候補を U+001F 区切りで上位から並べたもの
+        candidates = columns[4].split("\x1f") if len(columns) == 5 and columns[4] else None
+        results.append({"id": columns[0], "hit": columns[1] == "1", "top": columns[2], "ms": float(columns[3]), "candidates": candidates})
     return results
 
 
@@ -157,6 +162,10 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
             "top": result["top"],
             "accepted": references,
             "hit": result["top"] in references,
+            "candidates": result.get("candidates"),
+            # 許容解のどれかが候補の何番目に出るか (1 始まり)。--top 無しなら None、上位 N に無ければ 0
+            "rank": (next((i for i, c in enumerate(result["candidates"], start=1) if c in references), 0)
+                     if result.get("candidates") is not None else None),
             "cer": min_cer(references, result["top"]),
             "ms": result["ms"],
         })
@@ -180,13 +189,20 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
         "without_context": block(without_context),
     }
     misses = [row for row in rows if not row["hit"]]
+    # --top のとき、外れを「候補に正解がある (順位の問題)」と「上位 N に無い (語彙・組み合わせの問題)」に分ける
+    ranked = [row for row in misses if row["rank"] is not None]
+    in_list = [row for row in ranked if row["rank"] > 0]
+    not_in_list = [row for row in ranked if row["rank"] == 0]
+    summary["miss_breakdown"] = ({"misses": len(misses), "in_candidates": len(in_list), "not_in_candidates": len(not_in_list),
+                                  "rank_of_in_candidates": sorted(row["rank"] for row in in_list)} if ranked else None)
 
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "rows.tsv"), "w", encoding="utf-8") as handle:
-        handle.write("id\thit\tcer\tms\thas_context\ttop\taccepted\treading\n")
+        handle.write("id\thit\tcer\tms\thas_context\ttop\taccepted\treading\trank\n")
         for row in rows:
             handle.write(f"{row['id']}\t{1 if row['hit'] else 0}\t{row['cer']:.3f}\t{row['ms']:.1f}\t"
-                         f"{1 if row['has_context'] else 0}\t{row['top']}\t{'|'.join(row['accepted'])}\t{row['reading']}\n")
+                         f"{1 if row['has_context'] else 0}\t{row['top']}\t{'|'.join(row['accepted'])}\t{row['reading']}\t"
+                         f"{'' if row['rank'] is None else row['rank']}\n")
     with open(os.path.join(out_dir, "results.json"), "w", encoding="utf-8") as handle:
         json.dump({"summary": summary, "rows": rows}, handle, ensure_ascii=False, indent=1)
 
@@ -212,11 +228,24 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
         "",
         f"外れ {len(misses)} 件 (CER の大きい順に 25 件。`許容解` は `|` 区切り):",
         "",
-        "| id | 読み | 第一候補 | 許容解 | CER | 左文脈 |",
-        "|---|---|---|---|---|---|",
+        "| id | 読み | 第一候補 | 許容解 | CER | 左文脈 | 許容解の順位 |",
+        "|---|---|---|---|---|---|---|",
     ]
+    if ranked:
+        breakdown = [
+            f"外れ {len(misses)} 件を、候補の一覧 (一覧の個数は最大 {max(len(r['candidates']) for r in ranked)} 個だった) で切り分けた:",
+            "",
+            f"- 候補に許容解が**ある** (順位の問題。1 番目に上げれば当たる): {len(in_list)} 件"
+            + (f" (順位の内訳 {dict(sorted(collections.Counter(row['rank'] for row in in_list).items()))})" if in_list else ""),
+            f"- 候補に許容解が**無い** (語彙・語の組み合わせが候補に出てこない): {len(not_in_list)} 件",
+            "- 注: 候補は入力の全体を使った変換結果だけ (長い読みでは、語は辞書にあっても全体の組み合わせが上位に出ないことがある)。"
+            "「無い」は語彙不足の証拠ではなく、語彙不足か、組み合わせが出ないかの区別まではつかない。",
+            "",
+        ]
+        at = next(i for i, m in enumerate(md) if m.startswith("外れ "))
+        md[at:at] = breakdown
     for row in sorted(misses, key=lambda r: -r["cer"])[:25]:
-        md.append(f"| {row['id']} | `{row['reading'][:28]}` | `{row['top'][:28]}` | `{row['accepted'][0][:28]}` | {row['cer'] * 100:.0f}% | {'あり' if row['has_context'] else 'なし'} |")
+        md.append(f"| {row['id']} | `{row['reading'][:28]}` | `{row['top'][:28]}` | `{row['accepted'][0][:28]}` | {row['cer'] * 100:.0f}% | {'あり' if row['has_context'] else 'なし'} | {'-' if row['rank'] is None else (row['rank'] or '圏外')} |")
     with open(os.path.join(out_dir, "report.md"), "w", encoding="utf-8") as handle:
         handle.write("\n".join(md) + "\n")
 
@@ -224,6 +253,9 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
           f"左文脈あり {line(summary['with_context'])} / 左文脈なし {line(summary['without_context'])}")
     print(f"MinCER の平均: 全体 {pct(summary['total'])} / "
           f"あり {pct(summary['with_context'])} / なし {pct(summary['without_context'])}")
+    if summary["miss_breakdown"]:
+        info = summary["miss_breakdown"]
+        print(f"外れ {info['misses']} 件の内訳: 候補に許容解あり {info['in_candidates']} 件 (順位の問題) / 候補に無し {info['not_in_candidates']} 件")
     print(f"外れ {len(misses)} 件。詳細: {os.path.join(out_dir, 'report.md')} / {os.path.join(out_dir, 'rows.tsv')}")
     return summary
 
@@ -262,7 +294,7 @@ def compare(rows_a: str, rows_b: str, out_dir: str, labels=("A", "B")) -> int:
 
     def q(values: list, ratio: float) -> float:
         values = sorted(values)
-        return values[min(len(values) - 1, int(len(values) * ratio))]
+        return values[max(0, math.ceil(round(len(values) * ratio, 9)) - 1)]   # nearest-rank (⌈q·n⌉ 番目)
 
     md = [
         f"# {labels[0]} と {labels[1]} の突き合わせ ({len(common)} 件共通)",
@@ -302,11 +334,14 @@ def main() -> int:
     parser.add_argument("--out", default=os.path.join(DEFAULT_CACHE, "run"), help="結果の出力フォルダー (リポジトリの外を推奨)")
     parser.add_argument("--limit", type=int, default=0, help="測る件数 (0 = 全件 200)")
     parser.add_argument("--weights", default=None, help="Zenzai の GGUF。指定すると Zenzai ON で測る (指定しない = 製品の既定と同じ OFF)。取得はせず、既にあるファイルを検査して使う")
+    parser.add_argument("--top", type=int, default=0, help="候補を上位 N 個まで出して、外れを「候補に正解あり (順位)」と「候補に無し」に切り分ける (0 = 出さない。最大 100)")
     parser.add_argument("--no-download", action="store_true", help="取得しない (正解表が既にあるときだけ)")
     parser.add_argument("--compare", nargs=2, default=None, metavar=("rows_a.tsv", "rows_b.tsv"),
                         help="2 回の測定の結果 (`rows.tsv`) を行ごとに突き合わせる (McNemar)。Zenzai ON/OFF の判定に使う")
     parser.add_argument("--labels", default="A,B", help="--compare のラベル 2 つ (例: --labels OFF,ON)")
     args = parser.parse_args()
+    if not 0 <= args.top <= 100:
+        raise SystemExit("--top は 0〜100 で指定してください (0 = 候補を出さない)")
 
     if args.compare:
         labels = tuple(args.labels.split(","))
@@ -322,7 +357,7 @@ def main() -> int:
     tsv_path = os.path.join(args.out, "table.tsv")
     count = build_table(items, tsv_path, args.limit)
     print(f"正解表 {count} 件を作りました: {tsv_path}", file=sys.stderr)
-    results = run_engine(args.binary, tsv_path, args.limit, args.weights)
+    results = run_engine(args.binary, tsv_path, args.limit, args.weights, args.top)
     if len(results) != count:
         print(f"警告: 返ってきた行が {len(results)} 件 / 正解表 {count} 件", file=sys.stderr)
     report(items, results, args.out, args.binary, "Zenzai ON (--weights)" if args.weights else "Zenzai なし (製品の既定)")

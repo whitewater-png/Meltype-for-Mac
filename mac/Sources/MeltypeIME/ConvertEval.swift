@@ -13,6 +13,9 @@ import Foundation
 /// - `left_context`: 左文脈 (無ければ空 → `context: nil`)
 ///
 /// 出力 (stdout): 1 行 1 件 `id<TAB>hit<TAB>top<TAB>ms` と、末尾に `# summary ...`。
+/// `--top <N>` を付けると 5 列目に、同じ読みの候補を上位 N 個 (重複なし、U+001F 区切り) 出す。第一候補しか見えないと、
+/// 外れが「正解が候補に並んでいるのに順位が低い」のか「そもそも候補に無い」のか分けられないため。
+/// 候補は `MeltypeConverter.rawMainResults` (製品が `clauses` で使う `results` と同じ azooKey の結果) から取り、時間は測らない。
 /// 学習データは一時フォルダーを使い、利用者の `~/Library/Application Support/Meltype/azooKey` に触りません。
 ///
 /// `--weights <gguf>` を付けると Zenzai (ニューラル変換) を ON にして測ります。製品の `ZenzaiModel` と同じ検査
@@ -47,6 +50,18 @@ enum ConvertEval {
     /// CLI は RunLoop を回さないので、検査の結果 (メインキューに戻るブロック) は自分で回して待ちます。
     private static func makeZenzai(weights: String) -> ZenzaiModel? {
         let source = ZenzaiModel.Source.production
+        // 通信しないための前検査: `ZenzaiModel.poll` は、置かれたファイルが検査に落ちると本物のモデルを取得し直してしまう。
+        // それを避けるため、コピーの前に、`ZenzaiModel` と同じ検査 (サイズ・SHA-256) を自分で行い、合わなければ何も置かずに止める。
+        let attributes = try? FileManager.default.attributesOfItem(atPath: weights)
+        let size = (attributes?[.size] as? NSNumber)?.int64Value
+        guard attributes?[.type] as? FileAttributeType == .typeRegular, size == source.size else {
+            print("--weights のファイルのサイズが、アプリに固定した値 (\(source.size) バイト) と合いません。通信して取り直すことはしないので、測らずに終わります: \(weights)")
+            return nil
+        }
+        guard Updater.sha256(of: URL(fileURLWithPath: weights)) == source.sha256 else {
+            print("--weights のファイルの SHA-256 が、アプリに固定した値と合いません。通信して取り直すことはしないので、測らずに終わります: \(weights)")
+            return nil
+        }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("meltype-convert-eval-zenzai-\(getpid())", isDirectory: true)
         let models = directory.appendingPathComponent("models", isDirectory: true)
         try? FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
@@ -54,6 +69,7 @@ enum ConvertEval {
         try? FileManager.default.removeItem(at: destination)
         do { try FileManager.default.copyItem(at: URL(fileURLWithPath: weights), to: destination) } catch {
             print("Zenzai のモデルをコピーできません: \(weights) (\(error.localizedDescription))")
+            try? FileManager.default.removeItem(at: directory)
             return nil
         }
         let model = ZenzaiModel(source: source, dataDirectory: { directory }, turnOffSetting: { false })
@@ -62,8 +78,11 @@ enum ConvertEval {
         while !model.isReady && Date() < deadline {
             RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.2))
         }
-        // モデルのファイルは、azooKey が変換のときに読むので、測り終わるまで残す (run() の末尾で消す)
-        return model.isUsable ? model : nil
+        // モデルのファイルは、azooKey が変換のときに読むので、測り終わるまで残す (run() の末尾で消す)。
+        // 検査が通らなかったときは、コピーしたモデル (約 74 MB) を残さない
+        if model.isUsable { return model }
+        try? FileManager.default.removeItem(at: directory)
+        return nil
     }
 
     static func run(_ arguments: [String]) -> Bool {
@@ -84,6 +103,11 @@ enum ConvertEval {
         if rows.isEmpty {
             print("正解表に行がありません: \(path)")
             return false
+        }
+        var topCount = 0
+        if let topFlag = arguments.firstIndex(of: "--top"), arguments.indices.contains(topFlag + 1),
+           let value = Int(arguments[topFlag + 1]), value > 0 {
+            topCount = min(value, 100)
         }
 
         // 利用者の学習データに触れない (Bench.swift と同じ作法)
@@ -110,6 +134,7 @@ enum ConvertEval {
         var withContext = (0, 0)
         var withoutContext = (0, 0)
         var times: [Double] = []
+        var firstMismatch = 0   // --top のとき、候補の先頭が第一候補 (clauses) と食い違った行数 (0 のはず)
         for row in rows {
             // 行ごとに組版を終えて、前の行の差分変換・学習が次の行に食い込まないようにする
             converter.endComposition()
@@ -120,13 +145,28 @@ enum ConvertEval {
             let hit = row.accepted.contains(top)
             if hit { hits += 1 }
             if row.context.isEmpty { withoutContext.1 += 1; if hit { withoutContext.0 += 1 } } else { withContext.1 += 1; if hit { withContext.0 += 1 } }
-            print("\(row.id)\t\(hit ? 1 : 0)\t\(top)\t\(String(format: "%.1f", ms))")
+            var line = "\(row.id)\t\(hit ? 1 : 0)\t\(top)\t\(String(format: "%.1f", ms))"
+            if topCount > 0 {
+                // 時間を測ったあとで候補を取る (測定に入れない)。表の都合で、タブ・改行は空白にして U+001F で区切る
+                var seen = Set<String>()
+                var list: [String] = []
+                for candidate in converter.rawMainResults(for: row.reading, context: row.context.isEmpty ? nil : row.context)
+                where seen.insert(candidate.text).inserted {
+                    list.append(candidate.text.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " "))
+                    if list.count >= topCount { break }
+                }
+                if list.first != top { firstMismatch += 1 }
+                line += "\t" + list.joined(separator: "\u{1F}")
+            }
+            print(line)
         }
         times.sort()
-        let p50 = times[times.count / 2]
-        let p95 = times[min(times.count - 1, Int(Double(times.count) * 0.95))]
+        // nearest-rank (昇順で ⌈q·n⌉ 番目)。整数だけで計算する (0.95 の浮動小数点の誤差を避ける)
+        let p50 = times[(times.count + 1) / 2 - 1]
+        let p95 = times[(times.count * 95 + 99) / 100 - 1]
         print("# summary 行数 \(rows.count) 第一候補の完全一致 \(hits) 件 (\(String(format: "%.1f", Double(hits) * 100 / Double(rows.count)))%)")
         print("# summary 左文脈あり \(withContext.0)/\(withContext.1) 左文脈なし \(withoutContext.0)/\(withoutContext.1)")
+        if topCount > 0 { print("# summary --top \(topCount): 候補の先頭と第一候補の食い違い \(firstMismatch) 件") }
         print("# summary 1 行の変換 p50 \(String(format: "%.1f", p50)) ms / p95 \(String(format: "%.1f", p95)) ms")
         if let model = zenzai { try? FileManager.default.removeItem(at: model.modelsDirectory.deletingLastPathComponent()) }   // 一時フォルダーのモデルの片付け
         return true
