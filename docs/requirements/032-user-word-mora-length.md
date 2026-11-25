@@ -1,6 +1,6 @@
 ---
 title: ユーザー辞書の語を「文節の途中からも使う」しきい値を、文字数でなく拍数で数える (しゅう → 秋 のような登録で 学習する が がく週する に割れる)
-status: draft   # draft | approved | done。approved にするのは人
+status: draft   # draft | approved | done。approved にするのは人 / 棚卸し 2026-11-25: リョウさんの指示で実装・取り込み済み (2026-11-25)。approved の記録が無い。実機未確認
 source: 実機の報告 (リョウさんの実機で「学習する」が「がく週する」になる。2026-11-25) / 本家 #374・PR #385 (Mac 版 P30・P30b) の続き
 scope: core
 ---

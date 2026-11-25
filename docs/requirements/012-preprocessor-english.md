@@ -1,6 +1,6 @@
 ---
 title: C/C++ のプリプロセッサの指令名 (endif・elifndef・pragma) がかなに崩れる
-status: approved   # 定期タスクによる自動承認 (リョウさんの設定)。元: docs/voice/2026-11-08.md 候補 3 (voice/2026-11-08 ブランチ)
+status: done   # 定期タスクによる自動承認 (リョウさんの設定)。元: docs/voice/2026-11-08.md 候補 3 (voice/2026-11-08 ブランチ) / 棚卸し 2026-11-25: リョウさん実機 2026-11-11 で主項目 (プリプロセッサ) 確認。ほかの項目は未確認
 source: docs/voice/2026-11-08.md 候補 3 / 本家 #1625
 scope: dictionary
 ---

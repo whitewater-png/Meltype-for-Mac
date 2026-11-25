@@ -1,6 +1,6 @@
 ---
 title: 「い + について」が英字に割れる (にほんいについて が にほんinitsuite になる)
-status: approved   # draft | approved | done。approved にするのは人
+status: done   # draft | approved | done。approved にするのは人 / 棚卸し 2026-11-25: リョウさん実機 2026-11-25 (setsumeinitsuite) 確認
 source: 要件 033 の掃引で見つかった別の形 (2026-11-25、レーン L7)
 scope: core
 ---

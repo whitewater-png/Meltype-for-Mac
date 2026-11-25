@@ -1,6 +1,6 @@
 ---
 title: iCloud・iTunes の頭の i がかなになる (いCloud)
-status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-11-04.md 候補 1 (voice/2026-11-04 ブランチ)
+status: done   # 定期タスクによる自動承認。元: docs/voice/2026-11-04.md 候補 1 (voice/2026-11-04 ブランチ) / 棚卸し 2026-11-25: リョウさん実機 2026-11-05 で主項目 (iCloud) 確認。ほかの項目は未確認
 source: docs/voice/2026-11-04.md 候補 1 / 本家 #1530
 scope: dictionary
 ---

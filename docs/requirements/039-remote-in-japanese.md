@@ -1,6 +1,6 @@
 ---
 title: 「それも + て…」のような日本語が、英単語 remote に取られて割れる (soremoteishutsu が そremoteいしゅつ になる)
-status: approved   # draft | approved | done。approved にするのは人
+status: done   # draft | approved | done。approved にするのは人 / 棚卸し 2026-11-25: リョウさん実機 2026-11-25 (soremoteishutsu) 確認
 source: 要件 033 の掃引 (2026-11-25) で見つかった別の形の割れ。`soremoteishutsu`・`soremotetsudau`・`soremotekisetsu` など (jp_tsu の 26 件)
 scope: core
 ---

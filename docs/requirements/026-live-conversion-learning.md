@@ -1,6 +1,6 @@
 ---
 title: ライブ変換の表示のまま Enter で確定したときの学習 (Q41)
-status: approved   # 2026-11-22 リョウさんの指示「OK、おすすめで対応して」(案 A。「人の判断」の節の決定)
+status: approved   # 2026-11-22 リョウさんの指示「OK、おすすめで対応して」(案 A。「人の判断」の節の決定) / 棚卸し 2026-11-25: 実機未確認
 source: docs/UPSTREAM_PR_TRACKER.md Q41 / docs/LEARNING_CONTEXT_REVIEW_2026-11-06.md §1 / docs/ACCURACY_PLAN_2026-11.md 1-2
 scope: core
 ---

@@ -1,6 +1,6 @@
 ---
 title: サロゲートペアの漢字 (𠮷・𩸽) だけの文節を「記号だけ」とみなし、変換・確定がひらがなになる
-status: approved   # 2026-11-22 の人の指示「案 A で approved にして、PR を作って」(「人の判断」の 1 の決定)
+status: approved   # 2026-11-22 の人の指示「案 A で approved にして、PR を作って」(「人の判断」の 1 の決定) / 棚卸し 2026-11-25: 実装は main に無い (要件定義書のみ。IsSymbolOnly は UTF-16 のまま・サロゲートのテスト無し)
 source: PR #29 の要件 017 (前の文を Zenzai に渡す。ブランチ ccr-0fc8aeab-sra4z7) の作業中に見つけた不具合 (2026-11-22)
 scope: core
 ---

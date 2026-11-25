@@ -1,6 +1,6 @@
 ---
 title: pixiv が ぴぃv に崩れ、pixiv + 助詞は丸ごと英字のまま残る
-status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-10.md 候補 2)
+status: done (定期タスクによる自動承認。元: docs/voice/2026-11-10.md 候補 2)   # 棚卸し 2026-11-25: リョウさん実機 2026-11-11 で主項目 (pixiv) 確認。Safari のフォームは未確認
 source: docs/voice/2026-11-10.md (ブランチ voice/2026-11-10) 候補 2 / 本家 #1696
 scope: dictionary
 ---

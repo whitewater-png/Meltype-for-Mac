@@ -1,6 +1,6 @@
 ---
 title: 正解表に「前の文字」の列を足す (本家の Before つきのケースを測る)
-status: approved   # 2026-11-22 リョウさんの指示「おすすめで進めてください」(docs/ACCURACY_PLAN_2026-11.md §8 の 1 週目、0-2 の下準備)
+status: approved   # 2026-11-22 リョウさんの指示「おすすめで進めてください」(docs/ACCURACY_PLAN_2026-11.md §8 の 1 週目、0-2 の下準備) / 棚卸し 2026-11-25: 実機の確認項目なし (道具)
 source: docs/ACCURACY_PLAN_2026-11.md 0-2
 scope: core
 ---

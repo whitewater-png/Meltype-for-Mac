@@ -1,6 +1,6 @@
 ---
 title: 本家 11-22 の誤判定の 3 形 (fork ではかなのまま・英字のまま) を正解表とテストで守る
-status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-22.md 候補 3)
+status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-22.md 候補 3)   # 棚卸し 2026-11-25: 実機未確認
 source: docs/voice/2026-11-22.md (ブランチ voice/2026-11-22) 候補 3 / 本家 #2206・#2208・#2205
 scope: core
 ---

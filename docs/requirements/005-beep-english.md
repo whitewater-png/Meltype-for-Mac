@@ -1,6 +1,6 @@
 ---
 title: beep が べえp に崩れる (be + e が読めて p が残る英語)
-status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-10-31.md 候補 1 (voice/2026-10-31 ブランチ)
+status: done   # 定期タスクによる自動承認。元: docs/voice/2026-10-31.md 候補 1 (voice/2026-10-31 ブランチ) / 棚卸し 2026-11-25: リョウさん実機 2026-11-05 で主項目 (beep) 確認。ほかの項目は未確認
 source: docs/voice/2026-10-31.md 候補 1 / 本家 #1377
 scope: dictionary
 ---

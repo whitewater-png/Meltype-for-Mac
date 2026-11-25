@@ -1,6 +1,6 @@
 ---
 title: Obsidian のウィキリンク [[…]] が「「…」」になる
-status: approved   # 定期タスクによる自動承認 (リョウさんの設定)。元: docs/voice/2026-11-09.md 候補 1 (voice/2026-11-09 ブランチ)
+status: done   # 定期タスクによる自動承認 (リョウさんの設定)。元: docs/voice/2026-11-09.md 候補 1 (voice/2026-11-09 ブランチ) / 棚卸し 2026-11-25: リョウさん実機 2026-11-11 で主項目 ([[link]]) 確認。Obsidian・途中の見え方は未確認
 source: docs/voice/2026-11-09.md 候補 1 / 本家 #1676
 scope: core
 ---

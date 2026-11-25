@@ -1,6 +1,6 @@
 ---
 title: colab・collab・kaggle が英字にならない (こlab・かっがぇ)
-status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-11-07.md 候補 1 と 2 (voice/2026-11-07 ブランチ)
+status: done   # 定期タスクによる自動承認。元: docs/voice/2026-11-07.md 候補 1 と 2 (voice/2026-11-07 ブランチ) / 棚卸し 2026-11-25: リョウさん実機 2026-11-11 で主項目 (colab・kaggle) 確認。kore は未確認
 source: docs/voice/2026-11-07.md 候補 1・2 / 本家 #1607・#1609
 scope: dictionary
 ---

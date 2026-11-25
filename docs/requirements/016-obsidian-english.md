@@ -1,6 +1,6 @@
 ---
 title: obsidian がかなに崩れ、obsidian + 助詞は表示が英字なのに確定で おんしぢあんを になる
-status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-12.md 候補 1)
+status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-12.md 候補 1)   # 棚卸し 2026-11-25: 実機未確認
 source: docs/voice/2026-11-12.md (ブランチ voice/2026-11-12) 候補 1 / 本家 #1763
 scope: dictionary
 ---

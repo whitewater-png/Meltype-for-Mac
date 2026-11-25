@@ -1,6 +1,6 @@
 ---
 title: 短い英単語の直後の「の」が英語に吸われる (apinoerror → apiのerror)
-status: done       # 2026-10-24 PR #5 を base ブランチにマージ (人の判断)。main へは PR #4 で
+status: done       # 2026-10-24 PR #5 を base ブランチにマージ (人の判断)。main へは PR #4 で / 棚卸し 2026-11-25: 実機未確認 (記録は「未確認」のまま)
 source: 品質テスト (src/Meltype.Core.Tests/QualityTests.cs:140、本家 QualityTests の写し) で外れている例
 scope: core
 ---

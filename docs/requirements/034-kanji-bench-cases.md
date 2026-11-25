@@ -1,6 +1,6 @@
 ---
 title: かな漢字の正解表に比較ベンチの 180 文を取り込み、Zenzai OFF/ON を変更ごとに測れるようにする
-status: approved   # draft | approved | done。approved にするのは人
+status: approved   # draft | approved | done。approved にするのは人 / 棚卸し 2026-11-25: 実機の確認項目なし (道具。表の 1 項目が未確認)
 source: 派生フォーク比較ベンチ (2026-11-22 計測の xlsx、649 件) の A 日英混在 60 文・B かな漢字 120 文と、その検証 (2026-11-25 の測り直し。REPORT §3・§5)
 scope: docs     # 表・測る道具・文書だけ。Core・Swift のコードは変えない
 ---

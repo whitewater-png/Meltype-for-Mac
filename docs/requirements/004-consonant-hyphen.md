@@ -1,6 +1,6 @@
 ---
 title: 母音の無い英字 + ハイフン (pt-query-digest・ls-files) が長音 ー になる
-status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-10-30.md 候補 2
+status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-10-30.md 候補 2 / 棚卸し 2026-11-25: 実機未確認
 source: docs/voice/2026-10-30.md 候補 2 / 本家 #1349
 scope: core
 ---
