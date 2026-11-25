@@ -2163,25 +2163,48 @@ public sealed class CompositionController
     }
 
     /// <summary>
-    /// この文字数より短い読みのユーザーの語は、変換エンジンの文節の途中から始まるときは使わない (<see cref="AlignUserWords"/>)。
-    /// この文字数以上の読みの語は、途中から始まっても使う。
+    /// この拍数より短い読みのユーザーの語は、変換エンジンの文節の途中から始まるときは使わない (<see cref="AlignUserWords"/>)。
+    /// この拍数以上の読みの語は、途中から始まっても使う。拍数は <see cref="UserWordMoraCount"/> で数える (文字数ではない)。
     /// 短い語 (しの → 紫乃) は、わたしのことがすき の途中の しの のように、ほかの語の一部に偶然現れやすい。
     /// 長い語 (めるたいぷ → Meltype) は偶然つながりにくく、変換エンジンは未知の語を助詞とくっつけて区切りがち
     /// (きょうは|めるたいぷを|つかう のように、助詞の後ろの語が文節の途中になる) なので、途中から始まっても使うほうが登録した意図に合う。
-    /// 実際の azooKey で登録語入りの約 140 文を比べた結果: 3 文字にすると、本家の問題例 (しの) が直り、変更前に使えていた登録語が落ちるのは 2 文字の語だけになる。
-    /// 4 文字以上にすると、3 文字の語 (さくら・ひなた・ゆうき などの名前) が助詞の後ろで落ちる。
+    /// 実際の azooKey で登録語入りの約 140 文を比べた結果: 3 にすると、本家の問題例 (しの) が直り、変更前に使えていた登録語が落ちるのは 2 文字の語だけになる。
+    /// 4 にすると、3 文字の語 (さくら・ひなた・ゆうき などの名前) が助詞の後ろで落ちる。
+    /// 値 (3) は文字数で決めたときのまま変えない。数え方だけを拍に直した (要件 032)。
     /// </summary>
     internal const int InsideClauseMinReadingLength = 3;
+
+    /// <summary>
+    /// ユーザーの語の読みの拍数。読みの文字数から、直前の文字といっしょに 1 拍と数える小さいかな (ゃゅょぁぃぅぇぉ。拗音と外来語の小さい母音) を引く。
+    /// っ・ん・長音 (ー) は 1 拍のまま。しゅう・じゅん・しょう は 3 文字だが 2 拍、ふぁいる・ちゃんと は 4 文字だが 3 拍、らーめん は 4 拍。
+    /// 数えるのはひらがなの読み。カタカナの読みは、登録のときにひらがなに直される (<see cref="ReadingNormalizer.ForUserDictionary"/>) 前提で、ここでは直さない。
+    /// 得: しゅう・じゅう・しょう のような音は、がくしゅうする・しゅうがく のようにどの語の途中にも現れやすい。文字数 3 の語として扱うと、
+    ///     いろいろな文の途中にユーザー辞書の語が割り込んで文節を壊す (実機で起きた「学習する」→「がく週する」)。2 拍の語として、短い語と同じ扱いにして防ぐ。
+    /// 損: 影響を受けるのは、小さいかな (拗音・外来語の小さい母音) を含み、拍数が 3 未満の語 (じゅん・しゅう・しょう・きょう など。3 文字以上のもの) だけ。
+    ///     それらは、変換エンジンの文節の途中から始まるときは使われなくなる (文節の頭から始まるときは今までどおり使う。
+    ///     使いたいときは文節の区切りを Shift+←→ で変えれば、候補から選べる)。小さいかなを含まない語、拍数が 3 以上の語は、今までと同じ。
+    /// </summary>
+    internal static int UserWordMoraCount(string reading)
+    {
+        var count = 0;
+        for (var i = 0; i < reading.Length; i++)
+        {
+            // 先頭の小さいかなは、直前の文字が無いので 1 拍として数える
+            if (i > 0 && reading[i] is 'ゃ' or 'ゅ' or 'ょ' or 'ぁ' or 'ぃ' or 'ぅ' or 'ぇ' or 'ぉ') continue;
+            count++;
+        }
+        return count;
+    }
 
     /// <summary>
     /// ユーザーが登録した語 (自作の専門用語集の語を含む) の読みが、変換エンジンの文節の途中から始まるなら、その語では区切らない (本家 #374・PR #385)。
     /// しの → 紫乃 を登録すると、わたしのことがすき の途中の しの で区切って 綿紫乃事が好き になっていた
     /// (変換エンジンは わたしの|ことが|すき と区切るので、しの は文節の途中から始まる)。文節の頭から始まる語 (しのがきた の しの) は今までどおり。
-    /// 対象は、読みが <see cref="InsideClauseMinReadingLength"/> 文字より短い語だけ。それ以上の長さの語は、途中から始まっても使う
+    /// 対象は、読みの拍数 (<see cref="UserWordMoraCount"/>) が <see cref="InsideClauseMinReadingLength"/> より短い語だけ。それ以上の長さの語は、途中から始まっても使う
     /// (実際の azooKey は きょうは|めるたいぷを|つかう のように助詞とくっつけて区切るので、文節の頭かどうかだけで決めると、助詞の後ろの登録語が落ちる)。
     /// 同梱の語句 (phrases.txt) と同梱の専門用語集の強制語は、変換エンジンが区切りを間違える語を補うものなので、そのまま使う。
     /// 使わなくなった語は、文節の区切りを Shift+←→ で変えれば、候補から選べる。
-    /// 変換エンジンを余分に呼ぶのは、読みの先頭以外から始まる、短い (しきい値より短い) ユーザーの語が入っているときだけ (先頭は必ず文節の頭)。
+    /// 変換エンジンを余分に呼ぶのは、読みの先頭以外から始まる、短い (拍数がしきい値より短い) ユーザーの語が入っているときだけ (先頭は必ず文節の頭)。
     /// 結果はキャッシュ付きの ConvertWithEngine と同じなので、同じ読みは打つたびにまた変換しない。
     /// 変換エンジンが文節に区切れなかったとき (ConvertClauses が null) は、文節の頭が分からないので、何も変えずに元の語の割り当てを返す。
     /// 使う語が 1 つも残らなければ、変換エンジンの結果 (wholeByEngine) をそのまま返す。
@@ -2194,7 +2217,7 @@ public sealed class CompositionController
         var inside = false;
         foreach (var (reading, word) in pieces)
         {
-            if (position > 0 && word is not null && reading.Length < InsideClauseMinReadingLength && dictionary.IsUserReading(reading)) inside = true;
+            if (position > 0 && word is not null && UserWordMoraCount(reading) < InsideClauseMinReadingLength && dictionary.IsUserReading(reading)) inside = true;
             position += reading.Length;
         }
         if (!inside) return pieces;
@@ -2207,7 +2230,7 @@ public sealed class CompositionController
         position = 0;
         foreach (var (reading, word) in pieces)
         {
-            var keep = word is not null && (reading.Length >= InsideClauseMinReadingLength || !dictionary.IsUserReading(reading) || starts.Contains(position));
+            var keep = word is not null && (UserWordMoraCount(reading) >= InsideClauseMinReadingLength || !dictionary.IsUserReading(reading) || starts.Contains(position));
             // 使わない語の読みは、前後の変換エンジンに渡す部分とつなげる
             if (!keep && aligned.Count > 0 && aligned[^1].Word is null) aligned[^1] = (aligned[^1].Reading + reading, null);
             else aligned.Add(keep ? (reading, word) : (reading, null));
