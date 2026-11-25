@@ -118,4 +118,4 @@ Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの�
   - 査読 3 周目: 止める・直す指摘なし。任意 2 件 (完成条件の印・この記録) を入れた。
 - 数字: Core のテスト・eval-compare・境界例の値は、`docs/AGENT_STATE.md` と PR 本文に書く。
 - 手戻りの原因: 境界例の一括比較は、1 文字の置き換えの打ち間違いを作らない。そのため、語の境目の `あ + おまえ` の打ち間違いを見落とした。査読員が手で作った境界例で見つかった。
-- PR: (作成後に追記)
+- PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/34
