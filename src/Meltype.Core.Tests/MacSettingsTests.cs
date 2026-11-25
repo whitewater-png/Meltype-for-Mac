@@ -198,12 +198,14 @@ internal static class MacSettingsTests
         Assert.True(!new Settings().Zenzai, "既定は OFF のまま");
         var summary = item.Summary!;
         Assert.True(summary.Contains("同音異義語") && summary.Contains("74 MB") && summary.Contains("遅く"), "要約に 得 と 損 (ダウンロード・遅さ) がある: " + summary);
+        // Windows と共通の Description (Settings.cs) は、Windows で測っていない Mac 固有の案内 (同音異義語・遅くなる) を含まない
+        Assert.True(!item.Description.Contains("同音異義語") && !item.Description.Contains("遅く") && !item.Description.Contains("M4"), "共通の説明に Mac 固有の案内がある: " + item.Description);
         foreach (var text in new[] { item.DisplayDescription, item.Description })
         {
-            Assert.True(text.Contains("同音異義語") && text.Contains("74 MB") && text.Contains("遅く"), "説明に 得 と 損 がある: " + text);
             Assert.True(!text.Contains("82.5") && !text.Contains("44.0") && !System.Text.RegularExpressions.Regex.IsMatch(text, @"\d+(\.\d+)?\s*%"), "選別した表の数字 (%) を画面に出さない: " + text);
         }
         var detail = item.DisplayDescription;
+        Assert.True(detail.Contains("同音異義語") && detail.Contains("74 MB") && detail.Contains("遅く"), "詳しくに 得 と 損 がある: " + detail);
         Assert.True(detail.Contains("M4 Max") && detail.Contains("未確認") && detail.Contains("送りません"), "詳しくに、測った機械・未確認・送らないことがある");
         Assert.True(item.Example is { } e && e.Contains("→") && e.Contains("石"), "例がある");
     }

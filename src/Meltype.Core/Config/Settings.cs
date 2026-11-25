@@ -198,7 +198,7 @@ public sealed class Settings
     public bool LiveConversion { get; set; } = true;
 
     [Category("1. 全般"), DisplayName("Zenzai (ニューラル変換、実験的)"),
-     Description("前後の文脈を見て漢字を選ぶので、同音異義語 (公園/講演、石/医師 など) が合いやすくなります。引き換えに、ON にすると変換モデル (約 74 MB) を 1 回だけダウンロードし、変換が少し遅くなります。ダウンロードが終わるまでは今までどおりの変換です。")]
+     Description("文脈に合う漢字が先頭に来やすくなります。ON にすると変換モデル (約 74 MB) を 1 回だけダウンロードします。ダウンロードが終わるまでは今までどおりの変換です。")]
     public bool Zenzai { get; set; }
 
     [Category("1. 全般"), DisplayName("変換後も続けて入力できる"),

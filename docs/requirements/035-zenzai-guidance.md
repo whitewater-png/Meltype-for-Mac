@@ -1,7 +1,7 @@
 ---
 title: Zenzai (ニューラル変換) を設定画面で勧める案内を強める (既定は OFF のまま)
 status: draft   # 文言の方針はリョウさんが承認 (2026-11-25)。この実装の確認と「実験的」の扱いは人の判断待ち
-source: docs/AJIMEE_BENCH_2026-11-24.md (「設定画面の案内を強めるかは別に決める」) / リョウさんの承認 (2026-11-25「既定は OFF のまま、設定画面で『オンにすると同音異義語に強くなる』と勧める」)
+source: docs/AJIMEE_BENCH_2026-11-24.md (「設定画面の案内を強めるかは別に決める」) / リョウさんの承認 (2026-11-25「既定は OFF のまま、設定画面で『オンにすると同音異義語など文脈で決まる語が合いやすくなる』と勧める」)
 scope: docs   # 文言 (Core の属性・カタログ) と README だけ。挙動・既定値は変えない
 ---
 
@@ -19,13 +19,14 @@ scope: docs   # 文言 (Core の属性・カタログ) と README だけ。挙�
 - 例の確認: 製品の変換経路 (`MeltypeIME --convert-eval`) で OFF / ON を比べた (M4 Max)。`きのうこうえんをきいた` は OFF 昨日**公演**を聞いた → ON 昨日**講演**を聞いた、`いしをひろった` は OFF **意志**を拾った → ON **石**を拾った、`このいしはおもい` は OFF この医師は思い → ON この**石は重い**。同じ入力でも OFF が当たる語もある (`こうえんでおはなしをきく` は両方 公園で…) ので、例は「ON で当たる」ことだけを言い、「OFF は必ず外れる」とは書かない (「OFF では 意志を拾った」は測った出力)。
 
 ## 変えたもの
-1. `Settings.cs` の Zenzai の Description (Windows と共通の文): 得 (同音異義語) と 損 (約 74 MB・少し遅くなる) を 1 文ずつ。
+1. `Settings.cs` の Zenzai の Description (Windows の設定画面にも反射で出る共通の文) は**変更前のまま**。Windows では Zenzai の速さを測っていないので、Mac 固有の案内は書かない (査読 R2 の指摘で戻した)。
 2. `MacSettingsCatalog.cs`: 要約 (1 行)、例 (`いしをひろった → 石を拾った (OFF では 意志を拾った)`)、「詳しく」(MacDescription: 得・損 3 点・Hugging Face から取得・送るのはモデルの要求だけ・M4 Max でしか測っていない・安全弁・OFF でいつでも戻る)。
 3. README (公開物) の特徴の行と `mac/README.md` の Zenzai の節を同じ内容に。README は「実験的、既定 OFF」を残し、数字は書かない。docs/USAGE.md には Zenzai の説明が無いので変更なし。
-4. テスト `MacSettingsTests.Zenzai_Guidance_SaysBothSides_NoCherryPickedNumbers` (1331 → 1332 のうち、前は 1331 で全件通過 / 今回 1332): 既定 OFF、要約・説明に 得と損、% の数字を出さない、「詳しく」に M4 Max・未確認・送りません。
+4. テスト `MacSettingsTests.Zenzai_Guidance_SaysBothSides_NoCherryPickedNumbers` (1331 → 1332 のうち、前は 1331 で全件通過 / 今回 1332): 既定 OFF、要約と「詳しく」に 得と損、共通の Description に Mac 固有の案内が無い、% の数字を出さない、「詳しく」に M4 Max・未確認・送りません。
 
 ## しなかったこと (意図)
-- 既定値は OFF のまま。設定の新設・移行なし。初回起動のポップアップなど新しい画面なし。`src/Meltype/` (Windows UI) は触っていない。
+- 既定値は OFF のまま。設定の新設・移行なし。初回起動のポップアップなど新しい画面なし。`src/Meltype/` (Windows UI) は触っていない。Windows の設定画面に出る文 (`Settings.cs` の Description) も変更前のまま。
+- 「同音異義語に強くなる」とは言い切らず「同音異義語など、文脈で決まる語が合いやすくなる」と書く (測ったのは全体の精度で、同音異義語だけの数字ではない。査読 R2)。
 - 画面に 82.5% などの数字は出さない (AJIMEE 200 件は選別した表で、利用者の文章の当たる率ではない)。
 
 ## 人の判断 (リョウさん)
