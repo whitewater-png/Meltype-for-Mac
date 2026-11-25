@@ -1626,6 +1626,7 @@ public sealed class CompositionController
                 return true;
             // Delete (Mac では fn+delete): 選んでいる文節の「読み → 今の候補」を学習から忘れて、その文節の候補を引き直す (要件 031)。
             // 英語の文節 (打った英字の候補)・ローマ字の再変換 (読みに戻れない)・Shift つき (Shift+Delete) は、今までどおり (確定して Delete をアプリに渡す)。
+            // Ctrl・Option・Command つきの Delete は、手前の修飾キーの処理 (確定して通す) で済み、ここには届かない (テストで確認)。
             // 押しっぱなしの自動繰り返しで続けて忘れないことは、Core がキーの繰り返しを知れないので Swift (InputController) が受け持つ。
             case 0x2E when !shift && !clause.IsEnglish && !_reconvertRomaji:
                 ForgetSelectedConversion(clause);

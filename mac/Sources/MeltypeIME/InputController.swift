@@ -222,9 +222,9 @@ final class MeltypeInputController: IMKInputController {
 
         // 変換中の Delete (fn+delete) は、選んでいる文節の学習を忘れる (要件 031)。押しっぱなしの自動繰り返し (isARepeat) では忘れない:
         // 1 回目で候補を引き直したあと、繰り返しで次々に忘れて、意図しない語まで学習から消えるのを避ける。繰り返しは飲み込んで何もしない。
-        // 変換中でなければ (1 回目が変換中の Delete でなかった・確定して Delete をアプリに渡したあと) 今までどおり通す。Shift つきは対象外 (Core が忘れずに通す)。
+        // 変換中でなければ (1 回目が変換中の Delete でなかった・確定して Delete をアプリに渡したあと) 今までどおり通す。修飾キー (Shift・Control・Option・Command) つきは対象外 (Shift+Delete は Core が忘れずに確定して通し、Control・Option・Command つきは Core の手前の修飾キーの処理で確定して通る。どちらも飲み込まない)。
         // 損: 押しっぱなしで続けて忘れることはできない (1 語ずつ押し直す)。
-        if event.isARepeat, Int(event.keyCode) == kVK_ForwardDelete, modifiers & 1 == 0, lastView?.converting == true {
+        if event.isARepeat, Int(event.keyCode) == kVK_ForwardDelete, modifiers == 0, lastView?.converting == true {
             Self.trace("変換中の Delete の自動繰り返し: 飲み込む")
             return true
         }
