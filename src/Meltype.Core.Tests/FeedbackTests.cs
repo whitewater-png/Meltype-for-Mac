@@ -1529,11 +1529,12 @@ internal static class RomajiTypoTests
     }
 
     [Test]
-    public static void Req032_VulnAlma_CommitAsShown()
+    public static void Req032_Vuln_CommitsAsShown_AndAlmaTypoStillCorrected()
     {
-        // 本家 #2312 (vuln)・#1487 (alma): 打っている間は vuln・alma と見えるのに、Enter で ゔおん・あおま が確定していた
-        // (確定直前の打ち間違いの補正が l を o と読み直す)。dictionaries/english.txt に足した。
-        // vulns・vulnerable・AlmaLinux・salmon・almond と、aruma・karuma・vu のかなは変わらない。正解表: eval/cases/short-words-in-english.tsv。
+        // 本家 #2312: 打っている間は vuln と見えるのに、Enter で ゔおん が確定していた (確定直前の打ち間違いの補正が l を o と読み直す)。
+        // dictionaries/english.txt に足した。vulns・vulnerable・AlmaLinux・salmon・almond と、aruma・karuma・vu のかなは変わらない。
+        // alma (本家 #1487) は入れない: 母音の後の あおま の o を l と打った形 (maalmae → まあおまえ) の補正が効かなくなる (査読 032 R1)。
+        // 正解表: eval/cases/short-words-in-english.tsv。
         var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try
@@ -1541,9 +1542,9 @@ internal static class RomajiTypoTests
             foreach (var (typed, expected) in new[]
             {
                 ("vuln", "vuln"), ("--script vuln", "--script vuln"), ("vulnwo", "vulnを"), ("vulnde", "vulnで"),
-                ("alma", "alma"), ("almaga", "almaが"), ("almade", "almaで"), ("alma linux", "alma linux"),
                 ("vulns", "vulns"), ("vulnerable", "vulnerable"), ("AlmaLinux", "AlmaLinux"), ("salmon", "salmon"), ("almond", "almond"),
                 ("vu", "ゔ"), ("aruma", "あるま"), ("arumade", "あるまで"), ("karuma", "かるま"),
+                ("maalmae", "まあおまえ"), ("kinoualmamewoyonda", "きのうあおまめをよんだ"),
             })
             {
                 var k = new CompositionTests.Keyboard();
@@ -1552,7 +1553,7 @@ internal static class RomajiTypoTests
                 k.Type("\n");
                 Assert.Equal(expected, k.Host.Document, typed);
                 // 打っている間に見えていたもの (確定済みの部分 + 変換中の部分) と、Enter で入るものが同じ
-                if (typed is "vuln" or "--script vuln" or "alma") Assert.Equal(shown, k.Host.Document, typed + " の表示");
+                if (typed is "vuln" or "--script vuln") Assert.Equal(shown, k.Host.Document, typed + " の表示");
             }
         }
         finally { CompositionTests.Detector.SpellChecker = savedChecker; }
