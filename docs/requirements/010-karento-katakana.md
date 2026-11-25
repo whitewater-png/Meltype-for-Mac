@@ -1,6 +1,6 @@
 ---
 title: karento が karenと になる (karen + to の分け方)
-status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-11-06.md 候補 2 (voice/2026-11-06 ブランチ)
+status: done   # 定期タスクによる自動承認。元: docs/voice/2026-11-06.md 候補 2 (voice/2026-11-06 ブランチ) / 棚卸し 2026-11-25: リョウさん実機 2026-11-11 で主項目 (Karento) 確認。karen 単独などは未確認
 source: docs/voice/2026-11-06.md 候補 2 / 本家 #1596
 scope: core
 ---

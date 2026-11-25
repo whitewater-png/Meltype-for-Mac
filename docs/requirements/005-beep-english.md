@@ -1,6 +1,6 @@
 ---
 title: beep が べえp に崩れる (be + e が読めて p が残る英語)
-status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-10-31.md 候補 1 (voice/2026-10-31 ブランチ)
+status: done   # 定期タスクによる自動承認。元: docs/voice/2026-10-31.md 候補 1 (voice/2026-10-31 ブランチ) / 棚卸し 2026-11-25: リョウさん実機 2026-11-05 で主項目 (beep) 確認。ほかの項目は未確認
 source: docs/voice/2026-10-31.md 候補 1 / 本家 #1377
 scope: dictionary
 ---
@@ -25,7 +25,7 @@ scope: dictionary
 - [x] テスト `FeedbackTests.cs` の `Req005_Beep_StaysEnglish_AndBeeWordsDoNot`。実装前は赤
 - [x] 回帰なし: eval-compare broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` エラー 0
 
-## Mac 実機チェックリスト (人が確かめる。すべて未確認)
+## Mac 実機チェックリスト (主項目のみ確認、2026-11-05 リョウさん)
 - [x] TextEdit: `beep` + Enter → `beep` … リョウさんの実機 (2026-11-05。「1～3＞OK」の一括報告で、項目ごとの記録は無い)
 - [ ] ターミナル (zsh): `beep sound` → `beep sound`
 - [ ] TextEdit: `beeru` → べえる (変わらない)

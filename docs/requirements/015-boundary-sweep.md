@@ -1,6 +1,6 @@
 ---
 title: 判定の悪化を大量の境界例で測る道具 (境界例の一括比較)
-status: approved   # 2026-11-22 リョウさんの指示「おすすめで進めてください」(docs/ACCURACY_PLAN_2026-11.md §8 の 1 週目)
+status: approved   # 2026-11-22 リョウさんの指示「おすすめで進めてください」(docs/ACCURACY_PLAN_2026-11.md §8 の 1 週目) / 棚卸し 2026-11-25: 実機の確認項目なし (道具)
 source: docs/ACCURACY_PLAN_2026-11.md 0-3 / docs/LESSONS.md 2026-10-24 の決まり / 要件 007・009・012 の独立査読
 scope: core
 ---

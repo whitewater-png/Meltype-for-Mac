@@ -1,6 +1,6 @@
 ---
 title: pazolite・oeksound がかなと英字の混ざった形に崩れる
-status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-19.md 候補 1)
+status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-19.md 候補 1)   # 棚卸し 2026-11-25: 実機未確認
 source: docs/voice/2026-11-19.md (ブランチ voice/2026-11-19) 候補 1 / 本家 #2037
 scope: dictionary
 ---

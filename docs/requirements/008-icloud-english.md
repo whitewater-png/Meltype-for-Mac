@@ -1,6 +1,6 @@
 ---
 title: iCloud・iTunes の頭の i がかなになる (いCloud)
-status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-11-04.md 候補 1 (voice/2026-11-04 ブランチ)
+status: done   # 定期タスクによる自動承認。元: docs/voice/2026-11-04.md 候補 1 (voice/2026-11-04 ブランチ) / 棚卸し 2026-11-25: リョウさん実機 2026-11-05 で主項目 (iCloud) 確認。ほかの項目は未確認
 source: docs/voice/2026-11-04.md 候補 1 / 本家 #1530
 scope: dictionary
 ---
@@ -30,7 +30,7 @@ scope: dictionary
 - [x] 回帰なし: eval-compare の broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` が通る
 - [x] 文書: `docs/KNOWN_LIMITS.md` に iCloud・iTunes の記載なし (grep で確認)。直すものなし
 
-## Mac 実機チェックリスト (人が確かめる。すべて未確認)
+## Mac 実機チェックリスト (主項目のみ確認、2026-11-05 リョウさん)
 - [x] TextEdit: `iCloud` + Enter → `iCloud` … リョウさんの実機 (2026-11-05。「1～3＞OK」の一括報告で、項目ごとの記録は無い)
 - [ ] ターミナル (zsh): `iTunes` + Enter → `iTunes`
 - [ ] TextEdit: `ichi` → いち (変わらない)

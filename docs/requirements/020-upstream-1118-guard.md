@@ -1,6 +1,6 @@
 ---
 title: 本家 11-18 の誤判定 6 形 (fork では起きない) を正解表とテストで守る
-status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-18.md 候補 2)
+status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-18.md 候補 2)   # 棚卸し 2026-11-25: 実機未確認
 source: docs/voice/2026-11-18.md (ブランチ voice/2026-11-18) 候補 2 / 本家 #2015・#2016・#2017・#2024・#2029
 scope: core
 ---

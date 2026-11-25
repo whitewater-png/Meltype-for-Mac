@@ -1,6 +1,6 @@
 ---
 title: dainyuu など -inyuu の形が英単語 in で崩れないことを正解表とテストで守る
-status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-16.md 候補 3)
+status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-16.md 候補 3)   # 棚卸し 2026-11-25: 実機未確認
 source: docs/voice/2026-11-16.md (ブランチ voice/2026-11-16) 候補 3 / 本家 #1946
 scope: core
 ---

@@ -1,6 +1,6 @@
 ---
 title: ターミナルで、英単語 + 数字のコマンドの名前 (python3・pip3) の後の空白が消える。正解表 mac-terminal をコード系アプリとして測る
-status: approved   # 2026-11-23 リョウさんの指示「メルタイプの案件は一旦おすすめで進めてください」(docs/ACCURACY_PLAN_2026-11.md 2-3 の最初の型「パス・コマンドの記号」。人の判断は推奨どおり)
+status: approved   # 2026-11-23 リョウさんの指示「メルタイプの案件は一旦おすすめで進めてください」(docs/ACCURACY_PLAN_2026-11.md 2-3 の最初の型「パス・コマンドの記号」。人の判断は推奨どおり) / 棚卸し 2026-11-25: 実機未確認 (チェックリスト未確認)
 source: docs/ACCURACY_PLAN_2026-11.md 2-3 / docs/KNOWN_LIMITS.md K79 / eval/cases/mac-terminal.tsv の既知の外れ
 scope: core
 ---

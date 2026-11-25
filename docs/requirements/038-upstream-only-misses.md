@@ -1,6 +1,6 @@
 ---
 title: 本家では直っていて Mac 版だけ崩れる入力の残りを、1 件ずつ悪化を測って、悪化 0 のものだけ直す
-status: approved   # draft | approved | done。approved にするのは人
+status: done   # draft | approved | done。approved にするのは人 / 棚卸し 2026-11-25: リョウさん実機 2026-11-25 (cachewokeshitemite・Tell me more) 確認
 source: 派生フォーク比較ベンチ (2026-11-22 計測の xlsx、649 件) の「本家では直っていて fork だけ外れる 14 件」のうち、要件 033 (totemoatsui) で直した 1 件を除く 13 行 / リョウさんの方針「悪化するのは良くない」
 scope: core
 ---

@@ -1,6 +1,6 @@
 ---
 title: ost が おst に崩れる (3 文字で o + 子音 2 つの英語)
-status: approved   # 定期タスクによる自動承認。元: docs/voice/2026-10-26.md 候補 1 (voice/2026-10-26 ブランチ)
+status: done   # 定期タスクによる自動承認。元: docs/voice/2026-10-26.md 候補 1 (voice/2026-10-26 ブランチ) / 棚卸し 2026-11-25: リョウさん 2026-10-28「確認済み」報告 (全項目。項目ごとの記録なし)
 source: docs/voice/2026-10-26.md 候補 1 / 本家 #1123
 scope: dictionary
 ---

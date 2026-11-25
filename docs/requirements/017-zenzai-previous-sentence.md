@@ -1,6 +1,6 @@
 ---
 title: 前の文を Zenzai に渡す (Q43)
-status: approved   # 2026-11-22 リョウさんの指示「OK、おすすめで対応して」(案 A。「人の判断」の節の決定)
+status: approved   # 2026-11-22 リョウさんの指示「OK、おすすめで対応して」(案 A。「人の判断」の節の決定) / 棚卸し 2026-11-25: 実機未確認
 source: docs/UPSTREAM_PR_TRACKER.md Q43 / docs/LEARNING_CONTEXT_REVIEW_2026-11-06.md §3 / docs/ACCURACY_PLAN_2026-11.md 1-1
 scope: core
 ---
