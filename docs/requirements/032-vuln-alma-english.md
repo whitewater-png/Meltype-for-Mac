@@ -75,7 +75,7 @@ Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの�
 - 査読 2 周目の自作の境界例: 19,703 入力 (日本語の綴りに隣のキーへの 1 文字の置き換え・前後に語) を base と比べた。変化 651 件は、すべて `vuln` を含む入力で `vuln` が英字で残る形。`vuln` を含まない入力の変化は 0 件。
 
 ## 完成条件 (先に決める。機械で判定できる形)
-- [ ] 正解表: `eval/cases/short-words-in-english.tsv` に次の行を足し、実装前は外れ、実装後は当たる
+- [x] 正解表: `eval/cases/short-words-in-english.tsv` に次の行を足し、実装前は外れ、実装後は当たる
   ```
   vuln	vuln	full	本家 #2312
   --script vuln	--script vuln	full	本家 #2312
@@ -84,15 +84,15 @@ Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの�
   ```
   - 守る行 (今も当たる): `vulns` → `vulns`、`vulnerable` → `vulnerable`、`AlmaLinux` → `AlmaLinux`、`salmon` → `salmon`、`almond` → `almond`、`vu` → `ゔ`、`vuittonn` → `ゔいっとん`、`aruma` → `あるま`、`arumade` → `あるまで`、`karuma` → `かるま`
   - 入れない理由の固定 (今も当たる。`alma` を辞書に入れると外れる): `maalmae` → `まあおまえ`、`kinoualmamewoyonda` → `きのうあおまめをよんだ`
-- [ ] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req032_Vuln_CommitsAsShown_AndAlmaTypoStillCorrected` を足す。
+- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req032_Vuln_CommitsAsShown_AndAlmaTypoStillCorrected` を足す。
   - 要点: 上の行を `BuiltInWordChecker` で打ち、Enter の確定を比べる。`vuln`・`--script vuln` は、Enter の直前の表示と確定が同じことも比べる。
   - 実装前は赤。`alma` を辞書に足しても赤になる (`maalmae`)。
-- [ ] 回帰なし: 次をすべて満たす。
+- [x] 回帰なし: 次をすべて満たす。
   - `tools/eval-compare.sh` の broken 0
   - Core のテスト全件通過
   - `node tools/check-dictionaries.mjs`・`node tools/check-terms.mjs` がエラー 0
-- [ ] 境界例: `tools/boundary-sweep.sh` (full) で、日本語の損失・英語の損失が 0 件
-- [ ] 文書: `docs/KNOWN_LIMITS.md` に該当の記載なし (確認のみ)
+- [x] 境界例: `tools/boundary-sweep.sh` (full) で、日本語の損失・英語の損失が 0 件
+- [x] 文書: `docs/KNOWN_LIMITS.md` に該当の記載なし (確認のみ)
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す。すべて未確認)
 - [ ] ターミナル (zsh): `--script vuln` + Enter → `--script vuln`
@@ -115,6 +115,7 @@ Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの�
   - 査読 2 周目: 止める指摘は無し。直す 1 件・任意 2 件。
     - 直す: 境界例の一括比較の記録が、`vuln` を打っていない 1 回目の値だった → 最終の形で回し直した値に差し替えた。
     - 任意: 前に日本語がつながった `avuln` のずれを非目標に足した。`vuittonn` を守る行に足した。
+  - 査読 3 周目: 止める・直す指摘なし。任意 2 件 (完成条件の印・この記録) を入れた。
 - 数字: Core のテスト・eval-compare・境界例の値は、`docs/AGENT_STATE.md` と PR 本文に書く。
 - 手戻りの原因: 境界例の一括比較は、1 文字の置き換えの打ち間違いを作らない。そのため、語の境目の `あ + おまえ` の打ち間違いを見落とした。査読員が手で作った境界例で見つかった。
 - PR: (作成後に追記)
