@@ -58,6 +58,15 @@ Meltype.app には、このファイルと各ライセンスの全文を `Conten
 上の Swift の部品のライセンスは、ビルド時に取得される `mac/.build/checkouts/<部品名>/LICENSE` (または `LICENSE.txt`) を読んで書いています。
 Meltype.app を配布するときは、これらのライセンス全文 (MIT / Apache License 2.0) と、Apache License 2.0 の部品の著作権表示を同梱してください。
 
+## 評価用の正解表 (`eval/kanji/bench-*.tsv`。配布物には入らない)
+
+かな漢字変換の精度を測るための正解表で、リポジトリの `eval/` にだけ置きます (Meltype.app・配布 zip には入りません)。出典の原文を並べ替え・分割し、期待の許容を足したものです (変えたことは各表の頭と [要件 034](docs/requirements/034-kanji-bench-cases.md) に書いています)。
+
+| 出典 | ライセンス | 使い方 |
+| --- | --- | --- |
+| [yksr-melt/Meltype](https://github.com/yksr-melt/Meltype) の `tools/mozc-compare-cases.tsv` (main 01672c87。Copyright (C) 2026 雪代 / Yukishiro。リポジトリの README の表記) | GPL-3.0-or-later (README と LICENSE) | `eval/kanji/bench-mixed.tsv` (日英混在 60 文の日本語の部分 73 行) |
+| [Serugu/Meltype-Zenzai-Vulkan](https://github.com/Serugu/Meltype-Zenzai-Vulkan) の `tools/zenzai-cases.txt`・`tools/zenzai-holdout.txt` (6973b307。追加者は Serugu。フォークの README の表記は本家のまま Copyright (C) 2026 雪代 / Yukishiro。ファイル自体に著作権の行は無い) | GPL-3.0 (LICENSE の全文。README は「GPL-3.0-or-later」と読める表記を引き継いでいる) | `eval/kanji/bench-homophones.tsv` (かな漢字 120 文) |
+
 ## 実行時に使う Windows の機能 (同梱しない)
 
 次は Windows に標準で入っているものを実行時に呼び出すだけで、Meltype には含まれません。

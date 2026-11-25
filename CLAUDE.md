@@ -42,6 +42,7 @@ node tools/check-dictionaries.mjs
 node tools/check-terms.mjs
 python3 tools/test_update_cask.py
 python3 tools/test_upstream_watch.py
+python3 tools/test_kanji_bench.py
 ```
 Mac 専用 (クラウドでは動かない): `mac/build.sh`、`tools/check-mac-aot-settings.py`、`tools/check-release.py`、`tools/check-install-stop-ime.py`。
 

@@ -74,6 +74,15 @@
 Zenzai (ニューラル変換) の計測用の、かな → 漢字の正解表です (212 文。列: category / reading / expected / left_context / note / accepted。accepted は `|` 区切りの別の正解)。上の `cases/` (日英判定用) とは別物で、日英判定の `--expect-all` には読ませません。
 計測は `exp/zenzai-1-1` ブランチの `ZenzaiEval` (結果は [docs/ZENZAI_EXPERIMENT_2026-10.md](../docs/ZENZAI_EXPERIMENT_2026-10.md))。製品の変換の経路での配線の確認は `MeltypeIME --zenzai-self-test --weights <gguf> --cases eval/kanji/kanji-cases.tsv` (`mac/README.md`)。
 
+## 比較ベンチの正解表 (`eval/kanji/bench-*.tsv`、要件 034)
+
+外部の比較ベンチ (xlsx) の 180 文を、出典 (本家 `yksr-melt/Meltype` と `Serugu/Meltype-Zenzai-Vulkan`。どちらも GPL-3.0) の原文と照合して入れた表です。`MeltypeIME --convert-eval` が読む 4 列 (id / 読み / 正解 (`|` 区切りで複数許容) / 左文脈) で、表の頭に出典・コミット・変えたことを書いてあります。
+
+- `bench-mixed.tsv`: 日英混在の 60 文を英単語の所で切った、日本語の部分 73 行 (左文脈 = その前の期待)。英単語は測らない。
+- `bench-homophones.tsv`: かな漢字 120 文。**Zenzai の評価用で、同音異義語に偏っている。この表に合わせて辞書を足すと過学習になる**ので、`kanji-cases.tsv`・AJIMEE-Bench など表の外の文でも確かめる。
+- `bench-baseline.json`: main 9ded846 の第一候補の記録 (OFF/ON、M4 Max)。
+- 測り方: `python3 tools/kanji-bench.py --binary mac/.build/release/MeltypeIME [--weights <gguf>] [--baseline eval/kanji/bench-baseline.json] [--save <記録.json>] [--fail-on-regression]`。OFF (必ず) と ON (`--weights` のとき) を流し、表ごとの件数 (行・文、厳密一致・許容あり) と、前回の記録との差 (当たり → 外れの行) を出します。自己テストは `python3 tools/test_kanji_bench.py`。基準値・許容を足した行と理由は [docs/requirements/034-kanji-bench-cases.md](../docs/requirements/034-kanji-bench-cases.md)。
+
 ## 前の文字つきの正解表 (`eval/context/`)
 
 実験 2-2 (キャレット前 20 文字の英日比率を判定に使うか) の表です (列: 前の文字 / 打鍵 / 期待 / 種類 / メモ)。`context-cases.tsv` (68 件) は作者が、`review-cases.tsv` (56 件) は査読者が書いた作例で、期待は人の判断です (実機の記録ではありません。件数の配分も実際の利用の頻度ではありません)。上の `cases/` とは別物で、日英判定の `--expect-all` には読ませません。
