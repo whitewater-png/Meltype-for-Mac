@@ -354,7 +354,7 @@ try/catch 列: ○ = 関数本体全体 (または `Run`/`Text`/`Reason` ラッ�
 | # | 関数 (Exports.cs 行) | 引数 | 返値の所有権 | try/catch |
 |---|---|---|---|---|
 | 1 | `meltype_set_reader` (43) | fnptr | void | × (代入のみ) |
-| 1a | `meltype_set_forget_conversion` (45) | fnptr | void | × (代入のみ。要件 031 で足した。番号は 2 以降を振り直さないよう 1a にした) |
+| 1a | `meltype_set_forget_conversion` (49) | fnptr | void | × (代入のみ。要件 031 で足した。行は `[UnmanagedCallersOnly]` の行で、この行だけ今の Exports.cs に合わせた。ほかの行の行番号は古いままで直していない。番号は 2 以降を振り直さないよう 1a にした) |
 | 2 | `meltype_abi_version` (56) | – | int | × (定数) |
 | 3 | `meltype_get_continue_after_conversion` (60) | – | int | × (内部 `ConfigFlag.IsOn` が lock+try) |
 | 4 | `meltype_set_continue_after_conversion` (64) | int | int | × (同上 `Set`) |
