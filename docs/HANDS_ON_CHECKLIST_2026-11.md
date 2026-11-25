@@ -4,7 +4,7 @@
 
 ## 使い方
 - 結果は **「打った > 結果」** の形で、番号つきで貼る (例: `12 pazolite > pazolite`)。期待と違うときだけ、見えたとおりを書けば足ります。
-- **必須** だけなら 15 分以内を見込んでいます (1 行 15〜20 秒)。**任意** は時間があるときに。
+- **必須** だけで約 25〜30 分 (1 行 15〜20 秒に、設定の切り替え・ダウンロード待ちを足した見込み)。打つのが長い 64・65 と、Zenzai を入れる C を除くと約 12〜15 分。**任意** は時間があるときに。
 - アプリは TextEdit・ターミナル・LibreOffice・Hermes だけです。文書にあった Safari のフォーム・Slack・Discord・ChatGPT・Obsidian・Word・Pages は使わないので、Hermes か TextEdit で代用するか載せていません (末尾の「載せなかった項目」)。
 - JIS 配列のキー: `-` は 0 の右、`^` はその右、`~` は Shift+^、`#` は Shift+3。
 - 1 行ごとに、Enter の前の見え方と Enter 後の結果の両方を見て、⌘A → Delete (ターミナルは Ctrl+U) で消してから次へ。
@@ -17,39 +17,39 @@
 | 番号 | 優先 | アプリ | 打つもの | 期待 | 要件 |
 |---|---|---|---|---|---|
 | 1 | 必須 | TextEdit | `apinoerror` Enter | `apiのerror` | 001 |
-| 2 | 任意 | TextEdit | `youtubenodouga` Space | 候補に `youtubeの動画`。Enter で確定する形は `youtubeのどうが` (要確認 R3) | 001 |
+| 2 | 任意 | TextEdit | `youtubenodouga` Space | 候補に `youtubeの動画`。Enter で確定する形は `youtubeのどうが` (要確認 R2) | 001 |
 | 3 | 必須 | TextEdit | `pt-query-digest` Enter | `pt-query-digest` | 004 |
 | 4 | 必須 | TextEdit | `ra-menwotaberu` Enter | `らーめんをたべる` | 004 |
 | 5 | 必須 | TextEdit | `karen` Enter | `karen` (英字のまま) | 010 |
 | 6 | 必須 | TextEdit | `obsidian` Enter | `obsidian` | 016 |
 | 7 | 必須 | TextEdit | `obsidianwo` Enter | `obsidianを` (変換ボックスの表示と確定が同じ) | 016 |
-| 8 | 必須 | TextEdit | `dainyuu` Space → Enter | Space の候補に `代入`。Enter 単独なら `だいにゅう` | 018 |
+| 8 | 必須 | TextEdit | (a) `dainyuu` Enter  (b) 別に `dainyuu` Space | (a) `だいにゅう`  (b) 候補に `代入` | 018 |
 | 9 | 任意 | TextEdit | `hensuunidainyuu` Enter | `へんすうにだいにゅう` | 018 |
 | 10 | 必須 | TextEdit | `pazolite` Enter | `pazolite` | 021 |
 | 11 | 必須 | TextEdit | `oeksound` Enter | `oeksound` | 021 |
-| 12 | 必須 | TextEdit | `pazolitenokyoku` Space → Enter | Space の候補に `pazoliteの曲`。Enter 単独なら `pazoliteのきょく` | 021 |
-| 13 | 必須 | TextEdit | `baguhoukoku` Space → Enter | Space の候補に `バグ報告`。Enter 単独なら `ばぐほうこく` | 019 |
+| 12 | 必須 | TextEdit | (a) `pazolitenokyoku` Enter  (b) 別に `pazolitenokyoku` Space | (a) `pazoliteのきょく`  (b) 候補に `pazoliteの曲` | 021 |
+| 13 | 必須 | TextEdit | (a) `baguhoukoku` Enter  (b) 別に `baguhoukoku` Space | (a) `ばぐほうこく`  (b) 候補に `バグ報告` | 019 |
 | 14 | 任意 | TextEdit | `tunagarumademattekara` Enter | `つながるまでまってから` | 019 |
 | 15 | 任意 | TextEdit | `CLAUDE.mdwohiraku` Enter | `CLAUDE.mdをひらく` | 019 |
 | 16 | 任意 | TextEdit | `,nisuruwo` Enter | `、にするを` | 019 |
 | 17 | 任意 | TextEdit | `reibunn:pregnant_man:` Enter | `れいぶん:pregnant_man:` (絵文字の補完の窓は Slack・Discord だけの話。ここでは文字だけ確かめる) | 019 |
-| 18 | 必須 | TextEdit | `itotekinagobyuu` Space → Enter | Space の候補に `意図的な誤謬`。Enter 単独なら `いとてきなごびゅう` | 020 |
+| 18 | 必須 | TextEdit | (a) `itotekinagobyuu` Enter  (b) 別に `itotekinagobyuu` Space | (a) `いとてきなごびゅう`  (b) 候補に `意図的な誤謬` | 020 |
 | 19 | 任意 | TextEdit | `ronpa` Enter | `ろんぱ` | 020 |
 | 20 | 任意 | TextEdit | `uchidome` Enter | `うちどめ` | 020 |
 | 21 | 任意 | TextEdit | `Fluorite` Enter | `Fluorite` | 020 |
-| 22 | 任意 | TextEdit | `fanntatowirukinnsonn` Space → Enter | Space の候補に `ファンタとウィルキンソン`。Enter 単独なら `ふぁんたとうぃるきんそん` | 020 |
-| 23 | 必須 | TextEdit | `sitaidesu` Space → Enter | Enter 単独なら `したいです`。Space の 1 番目の候補が `したいです` か `死体です` かを記録 | 022 |
+| 22 | 任意 | TextEdit | (a) `fanntatowirukinnsonn` Enter  (b) 別に `fanntatowirukinnsonn` Space | (a) `ふぁんたとうぃるきんそん`  (b) 候補に `ファンタとウィルキンソン` | 020 |
+| 23 | 必須 | TextEdit | (a) `sitaidesu` Enter  (b) 別に `sitaidesu` Space | (a) `したいです`  (b) 1 番目の候補が `したいです` か `死体です` かを記録 | 022 |
 | 24 | 任意 | TextEdit | `amatte` Enter | `あまって` | 022 |
 | 25 | 任意 | TextEdit | `chomatte` Enter | `ちょまって` | 022 |
-| 26 | 任意 | TextEdit | `kakikomiera-` Space → Enter | Space の候補に `書き込みエラー`。Enter 単独なら `かきこみえらー` | 022 |
+| 26 | 任意 | TextEdit | (a) `kakikomiera-` Enter  (b) 別に `kakikomiera-` Space | (a) `かきこみえらー`  (b) 候補に `書き込みエラー` | 022 |
 | 27 | 任意 | TextEdit | `2nitime` Space | 空白が入らず変換中のまま (候補に `2日目`) | 022 |
-| 28 | 必須 | TextEdit | `atude` Space → Enter | Enter 単独なら `あつで`。Space の候補に `厚手` が出るかを記録 | 023 |
+| 28 | 必須 | TextEdit | (a) `atude` Enter  (b) 別に `atude` Space | (a) `あつで`  (b) 候補に `厚手` が出るかを記録 | 023 |
 | 29 | 任意 | TextEdit | `tasinamu` Enter | `たしなむ` | 023 |
 | 30 | 任意 | TextEdit | `haatu` Enter | `はあつ` | 023 |
 | 31 | 任意 | TextEdit | `getu` Enter | `げつ` | 023 |
 | 32 | 任意 | TextEdit | `subewomotanai` Enter | `すべをもたない` | 023 |
-| 33 | 必須 | TextEdit | `setteisiteirundakedo` Space → Enter | Enter 単独なら `せっていしているんだけど`。Space の候補に `設定しているんだけど` | 025 |
-| 34 | 必須 | TextEdit | `mainkannsuu` Space → Enter | Enter 単独なら `mainかんすう`。Space の候補に `main関数` | 025 |
+| 33 | 必須 | TextEdit | (a) `setteisiteirundakedo` Enter  (b) 別に `setteisiteirundakedo` Space | (a) `せっていしているんだけど`  (b) 候補に `設定しているんだけど` | 025 |
+| 34 | 必須 | TextEdit | (a) `mainkannsuu` Enter  (b) 別に `mainkannsuu` Space | (a) `mainかんすう`  (b) 候補に `main関数` | 025 |
 | 35 | 任意 | TextEdit | `@exampleabc-jh.ed.jpdesu` Enter | `@exampleabc-jh.ed.jpdesu` (全部そのまま) | 025 |
 | 36 | 任意 | TextEdit | 先に `kyouhaiitenkidesune,kinoumoiitenkidesitane.` Enter で 21 文字以上を確定し、その直後に `@exampleabc-jh.ed.jpdesu` Enter | 直前の確定があっても、上の行と同じく途中から日本語にならない | 025 |
 | 37 | 任意 | TextEdit | `kore` Enter | `これ` (変わらない) | 011 |
@@ -69,7 +69,7 @@ Enter は IME の確定だけにする。確定のあとに 2 回目の Enter �
 | 番号 | 優先 | アプリ | 打つもの | 期待 | 要件 |
 |---|---|---|---|---|---|
 | 46 | 必須 | ターミナル | `apinoerror` Enter | `apiのerror` | 001 |
-| 47 | 必須 | ターミナル | `error` Enter | `error` (英字のまま。`api` 単体は要確認 R1) | 001 |
+| 47 | 必須 | ターミナル | `error` Enter / `api` Enter | `error` (英字のまま) / `あぴ` (単体はかなになる。単体で英字に残すのは 001 の範囲外) | 001 |
 | 48 | 必須 | ターミナル | `ls-files` Enter / `cd-rom` Enter | `ls-files` / `cd-rom` (英字のまま) | 004 |
 | 49 | 必須 | ターミナル | `beep sound` (間は Space) Enter | `beep sound` | 005 |
 | 50 | 必須 | ターミナル | `iTunes` Enter | `iTunes` | 008 |
@@ -115,7 +115,7 @@ LibreOffice は本家 #2015 の報告のアプリ。Hermes の入力欄は、要
 | 73 | 任意 | TextEdit | `maenobundesu.` Enter で確定したあと `ninatteshimau` Space | 先頭の候補を記録。Zenzai を OFF にして同じ手順の先頭も記録して比べる | 017 |
 | 74 | 任意 | TextEdit | 確定のあと Return で改行してから `kouenha` Space | Zenzai OFF の結果と同じ (前の段落は渡さない) | 017 |
 | 75 | 任意 | TextEdit | Zenzai ON で何文か打つ | 1 キーごとの遅さが気にならない (感想) | 017 |
-| | | | **D. 設定「変換後も続けて入力できる」を ON** (入力メニューにも項目がある) | | |
+| | | | **D. 設定「変換後も続けて入力できる」を ON** (設定タブの「変換後も続けて入力できる」。入力メニューには出ない) | | |
 | 76 | 任意 | TextEdit | Space で変換して確定し、続けて学習済みの語を打って Enter、を 3 回 | 3 回目で、続けて打った語の登録提案が出る | 026 |
 | | | | **E. 設定は変えずに、ライブ変換 ON (既定) のまま学習を見る** | | |
 | 77 | 必須 | TextEdit | `kouenwo` Enter を 3 回 (毎回、ライブ変換の表示が `講演を` になってから確定する。Space は押さない) | 3 回目で入力メニューに「『講演を』を辞書に登録」の提案が出る (別の学習済みの語でもよい) | 026 |
@@ -136,22 +136,36 @@ LibreOffice は本家 #2015 の報告のアプリ。Hermes の入力欄は、要
 
 | 番号 | アプリ | 打つもの | 期待と、Core の今 | 要件 |
 |---|---|---|---|---|
-| R1 | 実機 | `api` Enter (TextEdit・ターミナル) | 要件 001 の実機チェックは「`api` 単体は英字のまま」。**Core では今 `あぴ`** (ローマ字として読める 3 文字以上の語は、単独ではかなになる。`error` 単体は `error` のまま)。実機でも `あぴ` なら期待の書き間違い | 001 |
-| R2 | 実機 | `beepon` Enter (Hermes・TextEdit) | 要件 005 の実機チェックは `beep音` (本家 #1377 の期待)。**Core では今 `べえぽん`** (005 の記録欄に「`beep` を足した後も `べえぽん` のまま」と既にある。目標ではない)。期待を `べえぽん` に直すか | 005 |
-| R3 | 実機 | `youtubenodouga` Enter | 要件 001 の期待は `youtubeの動画`。Enter 単独の確定は漢字にならず、**Core では今 `youtubeのどうが`**。漢字は Space の候補。表では Space の行に直した | 001 |
+| R1 | 実機 | `beepon` Enter (Hermes・TextEdit) | 要件 005 の実機チェックは `beep音` (本家 #1377 の期待)。**Core では今 `べえぽん`** (005 の記録欄に「`beep` を足した後も `べえぽん` のまま」と既にある。目標ではない)。期待を `べえぽん` に直すか | 005 |
+| R2 | 実機 | `youtubenodouga` Enter | 要件 001 の期待は `youtubeの動画`。Enter 単独の確定は漢字にならず、**Core では今 `youtubeのどうが`**。漢字は Space の候補。表では Space の行に直した | 001 |
 
 ## 載せなかった項目 (理由)
 - Obsidian・Safari のフォーム・Slack・Discord・ChatGPT・Word・Pages の項目: 使うアプリでない。Safari のフォームは Hermes の入力欄で代用した (Safari 固有の挙動は未確認のまま)。
 - 要件 017 の「𠮷野家 を確定した直後」: 打つ手段がない (要件 024 の範囲)。
 - 要件 013 の `[[Hello World]]`・`[[nikki` Space → `]]`・Shift+↓ で候補を回す形: 「限界」として記録済みの動き。
-- 要件 005 の ChatGPT での `beepon`: 要確認の R2 に移した。
+- 要件 005 の ChatGPT での `beepon`: 要確認の R1 に移した。
 - 確認済みの項目 (`ost`・`beep`・`iCloud`・`pixiv`・`karento` など。各要件の `[x]`) は再掲しない。
 
 ## 集計
-- 番号つきの項目: 必須 36 / 任意 50 (計 86)
-- 要確認: 3 件 (R1〜R3)
+- 番号つきの項目: 必須 39 / 任意 57 (計 96。追加分を含む)
+- 要確認: 2 件 (R1・R2)
+- 直したこと: 要件 001 の `api` 単体の期待 (旧 R1。`あぴ` が正しい)
 
 ## 追加分
 
-(要件 024・028 の項目は、あとで親が足す)
+要件 028・024 の実機チェックリスト (それぞれのブランチの文書から写した)。番号は上の続き。
 
+| 番号 | 優先 | アプリ | 打つもの | 期待 | 要件 |
+|---|---|---|---|---|---|
+| | | | **要件 028 (再変換の文を学習しない)**。前提: 設定タブの「変換後も続けて入力できる」を ON。TextEdit で日本語入力 (「あ」) にして試す。**028 の修正が入った版で打つ** (入っていない版では誤学習が入り、消すには入力メニューの「辞書の登録提案の履歴を消去」か「学習データをすべて消去…」が要る)。1 文節で済む短い語で打つ。 | | |
+| 87 | 必須 | TextEdit | 英数入力で `arigatou` と打って選択 → 「あ」にして Shift+Space。候補を見る。次に Space で選んだままの `arigatou` にして、続けて `yo` → Enter | 候補が `ありがとう` (ひらがなだけ) と選んだままの `arigatou` の 2 つ (ならなければ別の語で記録)。確定は `arigatouよ` | 028 |
+| 88 | 必須 | TextEdit | 上のあと `ariga` まで打つ (予測を見る)。続けて `arigatou` を打ち、ライブ表示と Space の最初の候補を見る。見るだけ。Esc で取り消す (Space で変換したあとは Esc 2 回) | 予測に `arigatou` が出ない。ライブ表示も Space の最初の候補も `arigatou` (ローマ字) にならない | 028 |
+| 89 | 必須 | TextEdit | 同じ `arigatou` をもう一度選んで Shift+Space | 候補が 1 回目と同じ 2 つのまま (最初の候補が `arigatou` にならない) | 028 |
+| 90 | 任意 | TextEdit | 1 回目の最後を `hello` Space・`kyouhagoogle` Space・Shift+Enter・Tab・別の欄をクリック (暗黙の確定) に替える | いずれも 88・89 と同じ (ローマ字が予測・候補に出ない) | 028 |
+| 91 | 任意 | TextEdit | 長い文: 「あ」で `ohayou gozaimasu` を打って選択 → Shift+Space → Enter を 3 回。そのあと `ohayou` まで打つ | 入力メニューに登録の提案が出ない。予測にローマ字の文が出ない (ひらがなだけになる語を選ぶ。ならなければ別の語で記録) | 028 |
+| 92 | 任意 | TextEdit | 設定「変換後も続けて入力できる」OFF で、87 と同じ手順 | 今までどおり、ローマ字の語が出てこない | 028 |
+| 93 | 任意 | TextEdit | `hashiwo` Space で 1 番目でない候補 (例: `箸を`) を選び → `tanni` → Enter。次に `hashiwo` Space | 選んだ候補が 1 番目に出る (普通の変換の続けて入力は今も学習する。変えていないことの確認) | 028 |
+| | | | **要件 024 (サロゲートペアの漢字)**。今の変換エンジンは `𠮷` を返さないので実機では差が見えない。「表示が変わらない・壊れていない」だけを見る。 | | |
+| 94 | 任意 | TextEdit | `kara` Space | `から` が先頭で、`～` は後ろ (今と同じ) | 024 |
+| 95 | 任意 | TextEdit | `yoshi`・`hokke`・`yoshisan` を 1 つずつ Space | 候補の並びと区切りを記録 (BMP の外の漢字が出るか・何番目か。出なければ要件 024 の不具合は実機では起きない)。落ちない・表示が崩れない | 024 |
+| 96 | 任意 | TextEdit | Zenzai ON (4 章 C の設定) で、空の書類に `𠮷あいうえおかきくけ` を貼り付け、その後ろで `kawa` Space | 落ちない。表示も変わらない | 024 |
