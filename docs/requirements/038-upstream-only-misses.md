@@ -14,7 +14,7 @@ scope: core
 
 ## 今の動き (既に分かっていること)
 - 過去の決定 (読んだもの): `docs/UPSTREAM_PR_TRACKER.md` 2026-10-30 の行 (#1185 は入れない、B 群 26 件は見送り)、`docs/UPSTREAM_1185_CLASSIFICATION_2026-10-30.tsv`、`docs/IMPROVEMENT_PLAN.md` の W18-1 (shat・oss・app は打ち間違いの補正を壊すので足さない。image・garage・tone は悪化あり)、`docs/W12_SHORTWORDS_2026-10-24.md` (me/do/to の短い語。「広い一覧は日本語対照 63 件を壊した」)、`docs/KNOWN_LIMITS.md` K79 (`cd` などは一般アプリでは英語と判定しない)。
-- 測り方: 変更前 (origin/main `9ded846`) と変更後の Core を、同じ入力の一覧で打って出力を比べた (使い捨ての `[Test]`。コミットしていない)。入力は `jp_all.txt` (日本語 261,651 行)、`en_t.txt` (英語 + 日本語の語尾 92,015 行)、ベンチ 649 行、語ごとに作った近所の入力 (その語を含む `jp_all` の行 + 日本語の行を前後に置いた約 7,500 入力)。生データは `lanes/L5-data/` (リポジトリの外)。
+- 測り方: 変更前 (origin/main `9ded846`) と変更後の Core を、同じ入力の一覧で打って出力を比べた (使い捨ての `[Test]`。コミットしていない)。入力は `jp_all.txt` (日本語 261,651 行)、`en_t.txt` (英語 + 日本語の語尾 92,015 行)、ベンチ 649 行、語ごとに作った近所の入力 (その語を含む `jp_all` の行 + 日本語の行を前後に置いた約 7,500 入力)。生データはリポジトリ外の作業フォルダー。
 
 ## 13 行の結果
 
@@ -45,7 +45,7 @@ fix = その行を含め、変更で直った (Mac 版の出力が本家と同�
 - ベンチ 649 件: 変わったのは 9 行 (すべて上の直った行)。
 - `jp_all.txt` 261,651 行: **変化 0**。`en_t.txt` 92,015 行: **変化 0**。`me`・`do`・`we` を含む行だけに絞った 20,852 行・10,640 行も 0。
 - 英単語 22 語 (Slack・Zoom・Google・iPhone・Notion・Chrome・Excel・GitHub・Python・Windows・LINE・Mac・the・I・Tell・Not・Let・Why・We・You・And) + 空白 + 頭が me・do・we の日本語 (`jp_all` から各 300 行)、同じ 22 語 + 空白 + `me`・`do`・`we` + 助詞 14 通り、`kyouha` + 英単語 + `me`・`do` + 日本語の行: 8,942 入力で変わったのは 46。**46 件はすべて「英単語 + 空白 + 単独の me または do (入力の末尾)」**: 前が機能語 (the・I・Tell・Not・Let・Why・We・You・And) の 20 件は直る型、前が名詞 (Slack・Zoom・Google・iPhone・Notion・Chrome・Excel・GitHub・Python・Windows・LINE・Mac) の 24 件は `Slack me` → Slack め が `Slack me` に、`Zoom do` → Zoom ど が `Zoom do` になる。さらに `kyouha iPhone me son` など 2 件 (でたらめな続き)。後ろに日本語が続く形 (`Slack me wo`・`Slack dokusho`) は 0 件。
-- 判断が分かれる 24 件 (名詞 + 末尾の単独 me・do) は、英語の言い方として自然なもの (`Slack me`・`Google me`・`Python do`) が多く、日本語として め・ど を末尾で打つ入力に意味のあるものは見つからなかったので、悪化とは数えなかった。**ここは人が見る点** (下の「人の判断」)。
+- 判断が分かれるのは、**英単語 + 空白 + 単独の `me`・`do` が、末尾でも、直後が `.` `,` `!` `?` でも英語になる**こと (上の 24 件は末尾だけを数えた入力集合での数で、実際の範囲はもっと広い)。変更前→変更後: `Slack me.` → Slack め。 が `Slack me.`、`Zoom do.` → Zoom ど。 が `Zoom do.`、`Teams do?` → Teams ど？ が `Teams do?`、`kyouha Slack me,` → 今日はSlack め、 が `今日はSlack me,`、`Wi-Fi me` → Wi-Fi め が `Wi-Fi me`、`Slack me me` → Slack めめ が `Slack me me`、`the me`・`and do` も英語。**数字の後ろの `do` (〜度) も英語になる**: `iPhone 15 do` → iPhone 15 ど が `iPhone 15 do`、`Python 3 do` → Python 3 ど が `Python 3 do`。後ろに日本語を続けた形は変わらない (`Slack me wo` → Slack めを、`Slack doko` → Slack どこ、`Slack ni do` → Slack にど、`Slack ichi do` → Slack いちど)。ただし前の語で扱いが割れる: `Tell me wo` は 変更前 Tell めを → `Tell me を` に変わるが、`Slack me wo` は Slack めを のまま。日本語として め・ど を打つ入力に意味のあるものは見つからなかったが、`〜 15 do` (15 度) のような数字の後ろは日本語の読みもありうる。**ここは人が見る点** (下の「人の判断」)。
 
 ## minimum の要件 (これだけは満たす)
 1. 上の「採用」の 5 件 (cache・code (日本語の後ろ以外)・gpt-oss・create-next-app / create-react-app・me/do/we) で、直る入力が直り、日本語の隣人 (`tacodesu`・`chocodesu`・`kokodemo`・`ossna`・`appwo`・`tadaimagenzai`・`gamen` ほか) が変わらない。
@@ -78,10 +78,10 @@ fix = その行を含め、変更で直った (Mac 版の出力が本家と同�
 
 ## 得と損
 - 得: `cache`・`code` (英語の開発の文で毎日出る語)、`gpt-oss`・`create-next-app`、英文の末尾・途中の `me`・`do`・`we` (`Tell me more`・`Not me`・`We do`・`How do we do`・`I do`) が、日本語の かな に化けなくなる。日本語の入力 261,651 行・英語 92,015 行・ベンチ 649 行で他は変わらない。
-- 損: (1) 英単語の名詞の後ろの末尾の単独 `me`・`do` (`Zoom do`) が英字で確定する (24 件の型。上の「判断が分かれる」)。(2) `codebasewomiru` → codeばせをみる のように、`code` だけ英字になり残りが かな の形が出る (もとは こでばせをみる で、どちらも外れ。悪化ではない)。(3) 日本語のすぐ後ろの `code`・`cache` (`kyouhacodewokaita`) は かな のまま (tacodesu = たこです を守るための損。F10 で直す)。(4) 直らなかった行 (game・image・cd ~/ 2 行) と一般形 (oss・app 単独・Go on・my-app) は、本家との差として残る。
+- 損: (1) 英単語 (数字をはさんでもよい) + 空白 + 単独の `me`・`do` が、末尾・`. , ! ?` の直前でも英字で確定する (`Zoom do.`・`iPhone 15 do`。上の「判断が分かれる」)。後ろに日本語が続く形 (`Slack me wo`) は変わらないので、`Tell me wo` (→ Tell me を) と `Slack me wo` (→ Slack めを) で扱いが割れる。(2) `codegen` → codeげん (変更前 こでげん)・`codebasewomiru` → codeばせをみる のように、`code` だけ英字になり残りが かな の形が出る (もとは こでばせをみる で、どちらも外れ。悪化ではない)。(3) 日本語のすぐ後ろの `code`・`cache` (`kyouhacodewokaita`) は かな のまま (tacodesu = たこです を守るための損。F10 で直す)。(4) 直らなかった行 (game・image・cd ~/ 2 行) と一般形 (oss・app 単独・Go on・my-app) は、本家との差として残る。 (5) 限界: `code`・`cache` は、日本語のすぐ後ろだけでなく、かな側の記号 (`:`・`"`・`-`・`#`・`(`) の後ろでも こで・かちぇ のまま (`:code` → :こで、`-code` → ーこで、`#code`・`(code`)。`.code`・`/code`・`_code`・`@code` は英語。
 
 ## 人の判断
-1. **名詞 + 末尾の単独 me・do (24 件の型) を英語にしてよいか** (上の「判断が分かれる 24 件」)。→ 未判断。おすすめ: 受け入れる (`Slack me`・`Google me` は英語として自然、日本語で め・ど が末尾に来る入力は見つからなかった)。受け入れないなら、前の語を一覧 (Tell・Not・Let・Why・I・We・You・And・the …) に限る案があるが、検出器の判定は前の語を持たず点数だけなので、前の語の判定を足す作業になる。
+1. **英単語 + 空白 + 単独の me・do (末尾・`. , ! ?` の直前・数字の後ろの do を含む) を英語にしてよいか** (上の「判断が分かれる」。後ろに日本語が続く形は変わらず、前の語で `Tell me を` と `Slack めを` に割れる)。→ 未判断。おすすめ: 受け入れる (`Slack me.`・`Google me` は英語として自然、日本語で め・ど が来る入力は見つからなかった。数字の後ろの do (15 度) だけは日本語の読みもありうる)。受け入れないなら、前の語を一覧 (Tell・Not・Let・Why・I・We・You・And・the …) に限る案があるが、検出器の判定は前の語を持たず点数だけなので、前の語の判定を足す作業になる。
 2. **直さなかった 4 行 (game・image・`cd ~/…` 2 行)** と、一般形 (`my-app`・`Go on`) を、このまま「見送り」にしてよいか。→ 未判断。おすすめ: 見送り (数字は上の表)。
 
 ## 記録
