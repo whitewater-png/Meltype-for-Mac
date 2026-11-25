@@ -25,7 +25,7 @@ scope: dictionary
 - [x] テスト `FeedbackTests.cs` の `Req005_Beep_StaysEnglish_AndBeeWordsDoNot`。実装前は赤
 - [x] 回帰なし: eval-compare broken 0、Core 全件通過、`check-dictionaries.mjs`・`check-terms.mjs` エラー 0
 
-## Mac 実機チェックリスト (人が確かめる。すべて未確認)
+## Mac 実機チェックリスト (主項目のみ確認、2026-11-05 リョウさん)
 - [x] TextEdit: `beep` + Enter → `beep` … リョウさんの実機 (2026-11-05。「1～3＞OK」の一括報告で、項目ごとの記録は無い)
 - [ ] ターミナル (zsh): `beep sound` → `beep sound`
 - [ ] TextEdit: `beeru` → べえる (変わらない)
