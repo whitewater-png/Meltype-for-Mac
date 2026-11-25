@@ -50,6 +50,9 @@ internal static class ParticleBeforeTsuTests
         // 期待値は今の出力 (望ましい出力ではない)。この挙動が変わったら、要件 033 の「得と損」を見直す
         Assert.Equal("きょうはへあts", Committed("kyouhaheats"), "kyouhaheats");
         Assert.Equal("きょうはもあて", Committed("kyouhamoats"), "kyouhamoats");
+        Assert.Equal("きょうはもおつ", Committed("kyouhamoots"), "kyouhamoots");
+        Assert.Equal("きょうはとおつ", Committed("kyouhatoots"), "kyouhatoots");
+        Assert.Equal("きょうはとうts", Committed("kyouhatouts"), "kyouhatouts");
         Assert.Equal("heats", Committed("heats"), "語の頭の heats は英単語のまま");
         Assert.Equal("今日はheats", Committed("kyouha heats"), "空白の後ろの heats は英単語のまま (空白は変換で消える)");
     }

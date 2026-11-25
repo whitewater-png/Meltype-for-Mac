@@ -28,7 +28,7 @@ scope: core
 - 別の形の割れ (`soremoteishutsu` → そremoteいしゅつ、`nihonninitsuite` → にほんinitsuite)。今回の掃引で見つけたが、規則が違う (前者は t+s ではない)。
 
 ## 完成条件 (先に決める。機械で判定できる形)
-- [x] テスト: `src/Meltype.Core.Tests/ParticleBeforeTsuTests.cs` (3 件)。`Japanese_AfterParticle_ReadsTsu` は変更前の Core で赤 (totemoatsui → とてもatすい)、変更後に緑。`English_TsuRule_Unchanged` は前後とも緑 (commitする・heatする・debutする・moatする・きょうはcommitする・きょうはmomentする・これをdeceitする・shutした・reflectされた・heats)。`KnownLoss_PluralRightAfterParticle` は受け入れた損 (きょうはへあts・きょうはもあて) の今の出力を固定する (変更前の Core では赤。変更前は きょうはheats・きょうはmoats)。
+- [x] テスト: `src/Meltype.Core.Tests/ParticleBeforeTsuTests.cs` (3 件)。`Japanese_AfterParticle_ReadsTsu` は変更前の Core で赤 (totemoatsui → とてもatすい)、変更後に緑。`English_TsuRule_Unchanged` は前後とも緑 (commitする・heatする・debutする・moatする・きょうはcommitする・きょうはmomentする・これをdeceitする・shutした・reflectされた・heats)。`KnownLoss_PluralRightAfterParticle` は受け入れた損 (5 語すべて: きょうはへあts・きょうはもあて・きょうはもおつ・きょうはとおつ・きょうはとうts) の今の出力を固定する (変更前の Core では赤。変更前は きょうはheats・きょうはmoats)。
 - [x] 回帰なし: Core のテスト全件通過 (1328 → 1331)、`tools/eval-compare.sh` (base は origin/main cec762c) の broken 0 / fixed 0、`--eval` の出力は前後で同一 (md5 一致)、比較ベンチ 649 件で変わったのは `kyouhatotemoatsui` 1 件だけ (外れ → 当たり)。
 - [x] 日本語の大量掃引: readings.txt の 20,127 語 × 13 の前置き (無し・きょうも・とても・ここでも・きょうは・わたしが・これを・にほんに・ここで・きみと・きょうの・にほんへ・いぬや) = 261,651 入力で、変わったのは 103 件、すべて英字が残っていたものが かな だけになった (悪化 0)。`つ` を含む読み 1,583 語 × 14 の前置き = 22,162 入力では 149 件が直り、悪化 0。
 - [x] 英語の掃引: 辞書の t で終わる英単語 2,629 語 × 7 の前置き × 5 の後ろ (suru・shita・s・sareta・site) = 92,015 入力で、変わったのは 78 件。うち 48 件は変更前も英単語が割れていた (`kyouhaheatsuru`: きょうはへatする → きょうはへあつる など。どちらも外れ)。**悪化は 30 件**: かな + 助詞のすぐ後ろに続けて打った複数形 `heats`・`moats`・`moots`・`toots`・`touts` + Enter (`kyouhaheats`: きょうはheats → きょうはへあts)。語の頭や空白の後ろの複数形は今までどおり。
