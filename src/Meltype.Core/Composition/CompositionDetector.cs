@@ -152,12 +152,7 @@ public sealed class CompositionDetector
     private bool ReadableWordSplitsIntoJapanese(IReadOnlyList<CompositionUnit> units, int start, int end, string pending)
     {
         if (start < 1 || end - start < 3 || units[start - 1].Raw.Length == 0 || !units[start - 1].Raw.All(char.IsAsciiLetterLower)) return false;
-        if (start >= 2 && units[start - 2].Raw.All(char.IsAsciiLetter) && units[start - 2].Raw.Length > 0 && !IsParticle(units[start - 2].Raw)) return false;
-        // 助詞と同じ音で終わる語 (とも|あれ = ともあれ、わ|かれ = わかれ、もの|わかれ) の途中の あれ・かれ は代名詞ではない
-        for (var j = start - 2; j >= Math.Max(0, start - 4); j--)
-        {
-            if (ReadingOf(Raw(units, j, start + 1)) is { } longer && IsJapaneseReading(longer)) return false;
-        }
+        if (start >= 2 && IsKanaRun(units[start - 2].Raw) && !IsParticle(units[start - 2].Raw)) return false;
         var n = units.Count;
         if (!ReadableEnglish.Value.ContainsWord((Raw(units, start, end) + (end == n ? pending : "")).ToLowerInvariant())) return false;
         for (var k = start + 1; k < end - 1; k++)
@@ -167,7 +162,24 @@ public sealed class CompositionDetector
             for (var m = k + 1; m < n && units[m].Raw.Length > 0 && units[m].Raw.All(char.IsAsciiLetter); m++) rest.Append(units[m].Raw);
             if (rest.Length > 0 && Enumerable.Range(k + 1, n - k - 1).All(m => units[m].Raw.Length > 0 && units[m].Raw.All(char.IsAsciiLetter))) rest.Append(pending);
             var analysis = _romaji.AnalyzeFragment(rest.ToString().ToLowerInvariant());
-            if (analysis.IsValid && analysis.Kana.Length >= 2 && StartsJapaneseReadingKana(analysis.Kana)) return true;
+            if (analysis.IsValid && analysis.Kana.Length >= 2 && StartsJapaneseReadingKana(analysis.Kana)) return !EndsInsideJapaneseWord(units, start);
+        }
+        return false;
+    }
+
+    /// <summary>かなの並び (英字と、伸ばす音の -) だけの単位か。</summary>
+    private static bool IsKanaRun(string raw) => raw.Length > 0 && raw.All(c => char.IsAsciiLetter(c) || c == '-');
+
+    /// <summary>
+    /// 代名詞 (そ|れ) の前が助詞の音の単位 (も・と・に・は・で・の・わ・を) のとき、その助詞の音が語の一部ではないか。
+    /// 助詞の音の単位より前の かな の並び (入力の先頭・空白・記号まで) の最後から始まる語が、代名詞の頭の音 (そ) までで終わる読み (なに|か・と|か・お|と|こ・き|の|こ・ま|に|あ)、
+    /// または れ までで終わる読み (とも|あれ・わ|かれ) なら true。語の中の 助詞と同じ音なので、代名詞 + も… ではなく 日本語の語 + remote。
+    /// </summary>
+    private bool EndsInsideJapaneseWord(IReadOnlyList<CompositionUnit> units, int start)
+    {
+        for (var j = start - 2; j >= 0 && j >= start - 16 && IsKanaRun(units[j].Raw); j--)
+        {
+            if (IsJapaneseReading(Kana(units, j, start)) || IsJapaneseReading(Kana(units, j, start + 1))) return true;
         }
         return false;
     }

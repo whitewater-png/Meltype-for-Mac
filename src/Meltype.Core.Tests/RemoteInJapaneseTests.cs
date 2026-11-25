@@ -43,6 +43,9 @@ internal static class RemoteInJapaneseTests
             // 日本語の語 + remote (前の語の最後の 1 音 + れ が読みになる語。R6 の指摘): 代名詞でないので remote のまま
             ("yamadaremoteishutsu", "やまだremoteいしゅつ"), ("tsukuremoteishutsu", "つくremoteいしゅつ"), ("kaisharemoteishutsu", "かいしゃremoteいしゅつ"),
             ("bokuremotetsudau", "ぼくremoteつだう"), ("yamadaremoteni", "やまだremoteに"), ("yamadaremotega", "やまだremoteが"), ("yamadaremoteto", "やまだremoteと"),
+            // 語の中の助詞と同じ音 (な|に|か・お|と|こ・ま|に|あ・は|だ。R6b の指摘): 助詞 + 代名詞ではなく 日本語の語 + remote
+            ("nanikaremoteishutsu", "なにかremoteいしゅつ"), ("nantokaremoteishutsu", "なんとかremoteいしゅつ"), ("otokoremoteishutsu", "おとこremoteいしゅつ"),
+            ("maniaremoteishutsu", "まにあremoteいしゅつ"), ("hadaremoteishutsu", "はだremoteいしゅつ"), ("ba-jiniaremotetsudau", "ばーじにあremoteつだう"),
             ("tomoaremoteishutsu", "ともあremoteいしゅつ"), ("wakaremoteishutsu", "わかremoteいしゅつ"),
         })
             Assert.Equal(expected, Committed(typed), typed);
