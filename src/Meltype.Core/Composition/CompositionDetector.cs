@@ -102,9 +102,6 @@ public sealed class CompositionDetector
     /// <summary>ローマ字 letters の読みで始まる、よく使う日本語の語・ブランド名があるか。</summary>
     private bool StartsJapaneseReading(string letters) => ReadingOf(letters) is { } head && StartsJapaneseReadingKana(head);
 
-    /// <summary>読み (かな) が、よく使う日本語の語の読み・ブランド名の読み (readings.txt・brands.txt) と同じか。</summary>
-    private static bool IsJapaneseReading(string reading) => Array.BinarySearch(JapaneseReadings.Value, reading, StringComparer.Ordinal) >= 0;
-
     private static bool StartsJapaneseReadingKana(string head)
     {
         var readings = JapaneseReadings.Value;
@@ -140,19 +137,25 @@ public sealed class CompositionDetector
         return [.. words];
     });
 
-    /// <summary>入力の中で 1 語として完結していて、助詞が続く代名詞 (それも・これも・あれも・どれも・かれも・だれも)。</summary>
+    /// <summary>入力の中で 1 語として完結している代名詞 (それ・これ・あれ・どれ・かれ・だれ)。</summary>
     private static readonly HashSet<string> PronounsBeforeParticle = new(StringComparer.Ordinal) { "それ", "これ", "あれ", "どれ", "かれ", "だれ" };
 
+    private static readonly HashSet<string> PronounHeads = new(StringComparer.Ordinal) { "so", "ko", "a", "do", "ka", "da" };
+
+    /// <summary>かなの並び (英字と、伸ばす音の -) だけの単位か。</summary>
+    private static bool IsKanaRun(string raw) => raw.Length > 0 && raw.All(c => char.IsAsciiLetter(c) || c == '-');
+
     /// <summary>
-    /// 区間 [start, end) が english-readable.txt の語 (remote) で、その語の途中の単位が助詞で、前の単位から助詞の前まで (そ|れ = それ) が代名詞、
+    /// 区間 [start, end) が english-readable.txt の語 (remote) で、先頭の れ の前が代名詞の頭の音 (そ|れ = それ) で、その語の途中の単位が助詞 (も)、
     /// 助詞の後ろ (て|いしゅつ = ていしゅつ) が 2 音以上の日本語の語の頭になるか (soremoteishutsu = それも + 提出)。要件 039。
-    /// 代名詞は、入力の先頭・助詞・記号の後ろにあるときだけ (語として完結しているとき)。やまだ|れもて (yamadaremote) の だれ、つく|れもて の くれ のように、
-    /// 前の語の最後の 1 音 + れ が読みになる場合は、日本語の語 + remote なので対象にしない。後ろが 2 音未満 (soremote まで) は英語のまま (まだ日本語と決められない)。
+    /// 代名詞は、入力の先頭・空白や記号の後ろにあるときだけ (語として完結しているとき)。かな の後ろ (やまだ|れもて の だれ、きょうも|それもて) は、
+    /// 辞書に無い語 (ももこ・ともか) の途中かもしれず、辞書の照合では塞ぎきれないので、日本語の語 + remote のまま (安全側)。要件 039 の R6・R6b・R6c。
     /// </summary>
     private bool ReadableWordSplitsIntoJapanese(IReadOnlyList<CompositionUnit> units, int start, int end, string pending)
     {
-        if (start < 1 || end - start < 3 || units[start - 1].Raw.Length == 0 || !units[start - 1].Raw.All(char.IsAsciiLetterLower)) return false;
-        if (start >= 2 && IsKanaRun(units[start - 2].Raw) && !IsParticle(units[start - 2].Raw)) return false;
+        // 安い条件で先に返す (打つたびに全部の区間を調べるので、文字列を作る前に見る)
+        if (start < 1 || end - start < 3 || units[start].Raw != "re" || !PronounHeads.Contains(units[start - 1].Raw)) return false;
+        if (start >= 2 && IsKanaRun(units[start - 2].Raw)) return false;
         var n = units.Count;
         if (!ReadableEnglish.Value.ContainsWord((Raw(units, start, end) + (end == n ? pending : "")).ToLowerInvariant())) return false;
         for (var k = start + 1; k < end - 1; k++)
@@ -162,24 +165,7 @@ public sealed class CompositionDetector
             for (var m = k + 1; m < n && units[m].Raw.Length > 0 && units[m].Raw.All(char.IsAsciiLetter); m++) rest.Append(units[m].Raw);
             if (rest.Length > 0 && Enumerable.Range(k + 1, n - k - 1).All(m => units[m].Raw.Length > 0 && units[m].Raw.All(char.IsAsciiLetter))) rest.Append(pending);
             var analysis = _romaji.AnalyzeFragment(rest.ToString().ToLowerInvariant());
-            if (analysis.IsValid && analysis.Kana.Length >= 2 && StartsJapaneseReadingKana(analysis.Kana)) return !EndsInsideJapaneseWord(units, start);
-        }
-        return false;
-    }
-
-    /// <summary>かなの並び (英字と、伸ばす音の -) だけの単位か。</summary>
-    private static bool IsKanaRun(string raw) => raw.Length > 0 && raw.All(c => char.IsAsciiLetter(c) || c == '-');
-
-    /// <summary>
-    /// 代名詞 (そ|れ) の前が助詞の音の単位 (も・と・に・は・で・の・わ・を) のとき、その助詞の音が語の一部ではないか。
-    /// 助詞の音の単位より前の かな の並び (入力の先頭・空白・記号まで) の最後から始まる語が、代名詞の頭の音 (そ) までで終わる読み (なに|か・と|か・お|と|こ・き|の|こ・ま|に|あ)、
-    /// または れ までで終わる読み (とも|あれ・わ|かれ) なら true。語の中の 助詞と同じ音なので、代名詞 + も… ではなく 日本語の語 + remote。
-    /// </summary>
-    private bool EndsInsideJapaneseWord(IReadOnlyList<CompositionUnit> units, int start)
-    {
-        for (var j = start - 2; j >= 0 && j >= start - 16 && IsKanaRun(units[j].Raw); j--)
-        {
-            if (IsJapaneseReading(Kana(units, j, start)) || IsJapaneseReading(Kana(units, j, start + 1))) return true;
+            if (analysis.IsValid && analysis.Kana.Length >= 2 && StartsJapaneseReadingKana(analysis.Kana)) return true;
         }
         return false;
     }

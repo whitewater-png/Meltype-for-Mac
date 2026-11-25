@@ -25,7 +25,7 @@ internal static class RemoteInJapaneseTests
             ("soremoteishutsu", "それもていしゅつ"), ("soremotetsudau", "それもてつだう"), ("soremotekisetsu", "それもてきせつ"),
             ("soremotetsu", "それもてつ"), ("koremotetsudau", "これもてつだう"), ("aremoteishutsu", "あれもていしゅつ"),
             ("doremotetsudau", "どれもてつだう"), ("daremotetsudau", "だれもてつだう"), ("karemoteishutsu", "かれもていしゅつ"),
-            ("kyouhasoremoteishutsu", "きょうはそれもていしゅつ"), ("kyoumosoremoteishutsu", "きょうもそれもていしゅつ"),
+            ("sore,soremoteishutsu", "それ、それもていしゅつ"), ("a soremotetsudau", "あそれもてつだう"),
         })
             Assert.Equal(expected, Committed(typed), typed);
     }
@@ -46,8 +46,21 @@ internal static class RemoteInJapaneseTests
             // 語の中の助詞と同じ音 (な|に|か・お|と|こ・ま|に|あ・は|だ。R6b の指摘): 助詞 + 代名詞ではなく 日本語の語 + remote
             ("nanikaremoteishutsu", "なにかremoteいしゅつ"), ("nantokaremoteishutsu", "なんとかremoteいしゅつ"), ("otokoremoteishutsu", "おとこremoteいしゅつ"),
             ("maniaremoteishutsu", "まにあremoteいしゅつ"), ("hadaremoteishutsu", "はだremoteいしゅつ"), ("ba-jiniaremotetsudau", "ばーじにあremoteつだう"),
+            // 辞書に無い人名・かな語 (R6c): 代名詞は入力の先頭・空白・記号の後ろだけなので、かな の後ろの remote は塞がれない
+            ("momokoremoteishutsu", "ももこremoteいしゅつ"), ("tomokaremotetsudau", "ともかremoteつだう"), ("ikunokaremoteni", "いくのかremoteに"),
+            ("kanokoremotega", "かのこremoteが"), ("todaremoteishutsu", "とだremoteいしゅつ"),
             ("tomoaremoteishutsu", "ともあremoteいしゅつ"), ("wakaremoteishutsu", "わかremoteいしゅつ"),
         })
             Assert.Equal(expected, Committed(typed), typed);
+    }
+
+    [Test]
+    public static void KnownLimit_PronounAfterKanaStaysRemote()
+    {
+        // 直らない (remote のまま) と決めた形 (要件 039 の R6c の判断): 代名詞が かな の後ろ (助詞の後ろ) にあるとき。
+        // 期待値は今の出力 (望ましい出力ではない)。この挙動が変わったら、要件 039 の「残る外れ」を見直す
+        Assert.Equal("きょうはそremoteいしゅつ", Committed("kyouhasoremoteishutsu"), "kyouhasoremoteishutsu");
+        Assert.Equal("きょうもそremoteいしゅつ", Committed("kyoumosoremoteishutsu"), "kyoumosoremoteishutsu");
+        Assert.Equal("きょうもこremoteつだう", Committed("kyoumokoremotetsudau"), "kyoumokoremotetsudau");
     }
 }
