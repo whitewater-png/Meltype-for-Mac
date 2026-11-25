@@ -1543,7 +1543,7 @@ internal static class RomajiTypoTests
             {
                 ("vuln", "vuln"), ("--script vuln", "--script vuln"), ("vulnwo", "vulnを"), ("vulnde", "vulnで"),
                 ("vulns", "vulns"), ("vulnerable", "vulnerable"), ("AlmaLinux", "AlmaLinux"), ("salmon", "salmon"), ("almond", "almond"),
-                ("vu", "ゔ"), ("aruma", "あるま"), ("arumade", "あるまで"), ("karuma", "かるま"),
+                ("vu", "ゔ"), ("vuittonn", "ゔいっとん"), ("aruma", "あるま"), ("arumade", "あるまで"), ("karuma", "かるま"),
                 ("maalmae", "まあおまえ"), ("kinoualmamewoyonda", "きのうあおまめをよんだ"),
             })
             {
