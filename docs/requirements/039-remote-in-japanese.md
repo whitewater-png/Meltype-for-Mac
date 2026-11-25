@@ -61,6 +61,7 @@ scope: core
 - なし (悪化 0。設定・公開は伴わない)。
 
 ## 記録
+- 2026-11-25 リョウさんの実機 (要件 034〜040 をまとめた版 int/accuracy-1125 を入れて確認): `soremoteishutsu` → それも提出。`commitsuru` → commitする も今までどおり。
 - 2026-11-25 henrietta (L6): 経緯 (3 回の査読で、日本語の語 + remote が日本語に取られる悪化が 3 回出た。直し方を変えるたびに漏れの形が変わった)。
   - R6 (76aebaa → 3ac3dc6): 初版は 直前の 1 音 + れ を読みにしていて `yamadaremoteishutsu` → やまだれもていしゅつ。対象を代名詞 6 語に狭めた。
   - R6b (3ac3dc6 → 0a2c804): 代名詞の前が助詞 (も・と・に…) のとき、助詞の音が語の中の音 (なにか・おとこ・まにあ・はだ) でも通る (546 件)。助詞の音の前の かな の並びを readings.txt・brands.txt の読みで照合して塞いだ (EndsInsideJapaneseWord)。

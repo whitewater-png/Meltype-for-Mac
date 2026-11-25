@@ -86,6 +86,7 @@ fix = その行を含め、変更で直った (Mac 版の出力が本家と同�
 2. **直さなかった 4 行 (game・image・`cd ~/…` 2 行)** と、一般形 (`my-app`・`Go on`) を、このまま「見送り」にしてよいか。→ 未判断。おすすめ: 見送り (数字は上の表)。
 
 ## 記録
+- 2026-11-25 リョウさんの実機 (要件 034〜040 をまとめた版 int/accuracy-1125 を入れて確認): `cachewokeshitemite` → cacheを消してみて、`Tell me more` → Tell me more。`commitsuru` → commitする も今までどおり。
 - 最終の測定 (採用した変更を全部入れたビルド、変更前は origin/main `9ded846`): Core のテスト 1331 → 1338 (新規 7 件)。実装を外した状態で新しいテストは 7 件中 3 件が赤 (`cachewokeshitemite` → かちぇをけしてみて、`gpt-oss` → gpt-おっs、`Tell me more` → Tell めもれ)、残り 4 件 (日本語の守り) は前後とも緑。`eval-compare` broken 0 / fixed 17。`boundary-sweep full` 684,117 入力で日本語の損失 0・英語の損失 0・その他の変化 8 (`codewo`・`cachewo` など、すべて直り)。`jp_all` 261,651 行・`en_t` 92,015 行は変化 0、ベンチ 649 行は 9 行だけ変化 (すべて直り)。
 - 途中で見つかった悪化: `code` を日本語の後ろでも英語にした最初の版は、`jp_all`・近所の入力では悪化 0 だったが、boundary-sweep full が `tacodesu`・`chocodesu`・`sa-bisugyoucdemou` の 3 件を見つけた。`NotAfterJapanese` に `code`・`cache` を足して 0 にし、その 3 入力をテストと正解表で固定した。
 - 2026-11-25 henrietta (レーン L5): 測定・実装・テスト。ブランチ `fix/upstream-only-misses` (origin/main `9ded846` から)。本家が直した方法は、どの行も #1185 (ラティス) の副産物で、小さなコミットは無かった。
