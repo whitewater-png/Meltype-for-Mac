@@ -43,7 +43,7 @@ scope: dictionary
    表示と確定が同じになる。
 2. 次の形は今のまま守る:
    - 英字のまま: `vulns`・`vulnerable`・`AlmaLinux`・`salmon`・`almond`
-   - かなのまま: `vu`・`aruma`・`arumade`・`karuma`
+   - かなのまま: `vu`・`vuittonn`・`aruma`・`arumade`・`karuma`
 3. `alma` は辞書に入れない。入れると補正が効かなくなる形を、正解表とテストで固定する:
    - `maalmae` → `まあおまえ`
    - `kinoualmamewoyonda` → `きのうあおまめをよんだ`
@@ -53,6 +53,7 @@ scope: dictionary
   - `alma` (表示 `alma`・確定 `あおま`) はずれたまま残る。直すには判定の変更が要るので、別の要件にするかを人が決める。
 - 候補 2 (`nvm`・`nmap`)・候補 3 (入れ子の括弧の幅) は別の要件。
 - `vuln` の前の語 (`cve vuln` の `cve` がかなになり空白が消える) を直すこと。
+- 前に日本語がつながった `vuln` の表示と確定のずれ (`avuln` → 表示 `avuln`・確定 `あゔおん`、`kavulnwo` → 確定 `かゔおんを`)。base と同じで、この要件では直さない (査読 2 周目の任意指摘)。
 
 ## 受け入れる変化 (base と比べて分かったこと。受け入れてよいかは人が判断する)
 Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの両方で打った (2026-11-25、最後のキーは Enter。表示 / 確定)。
@@ -66,10 +67,12 @@ Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの�
 | `cve vuln` | `vuln` / `cゔぇゔおん` | `vuln` / `cゔぇvuln` | 後ろは直る。`cve` がかなになり空白が消えるのは base と同じ |
 
 - 悪くなる形は見つからなかった。次の形は base と同じ: `vul`・`vuon`・`vulon`・`ivulnn`・`vulnerab`・`vulnalma`・`alma`・`almade`・`maalmae`。
-- 境界例の一括比較 (`tools/boundary-sweep.sh` の full) の結果:
-  - base 627b77a と、base に `vuln alma` の 2 語を足した写しを比べた。684,117 入力で変化 0 件 (日本語の損失 0・英語の損失 0)。
-  - `vuln` だけの今の形は、その部分集合。
+- 境界例の一括比較 (`tools/boundary-sweep.sh` の full、base 627b77a と最終の形 (`vuln` だけ) を比べた。査読 2 周目の査読員が回した):
+  - 684,122 入力で、日本語の損失 0・英語の損失 0・その他の変化 5。
+  - 変化した 5 件は、どれも `vuln` が英字で確定するようになった形: `vuln`・`vulnwo`・`vulnga`・`vulnno`・`vulndesu` (base は `ゔおん`・`ゔおんを`・`ゔおんが`・`ゔおんお`・`ゔおんです`)。
+  - 実装者が先に回した 1 回目 (`vuln alma` の 2 語の版、684,117 入力で変化 0) は、入力の一覧を変更前の辞書から作っていた。そのため `vuln`・`alma` の入力を 1 件も打っておらず、記録に使わない。
   - `alma` の損失 (`maalmae`) は、この道具が作らない形 (1 文字の置き換え) なので、一括比較には出ない。査読員が手で見つけた。
+- 査読 2 周目の自作の境界例: 19,703 入力 (日本語の綴りに隣のキーへの 1 文字の置き換え・前後に語) を base と比べた。変化 651 件は、すべて `vuln` を含む入力で `vuln` が英字で残る形。`vuln` を含まない入力の変化は 0 件。
 
 ## 完成条件 (先に決める。機械で判定できる形)
 - [ ] 正解表: `eval/cases/short-words-in-english.tsv` に次の行を足し、実装前は外れ、実装後は当たる
@@ -79,7 +82,7 @@ Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの�
   vulnwo	vulnを	full
   vulnde	vulnで	full
   ```
-  - 守る行 (今も当たる): `vulns` → `vulns`、`vulnerable` → `vulnerable`、`AlmaLinux` → `AlmaLinux`、`salmon` → `salmon`、`almond` → `almond`、`vu` → `ゔ`、`aruma` → `あるま`、`arumade` → `あるまで`、`karuma` → `かるま`
+  - 守る行 (今も当たる): `vulns` → `vulns`、`vulnerable` → `vulnerable`、`AlmaLinux` → `AlmaLinux`、`salmon` → `salmon`、`almond` → `almond`、`vu` → `ゔ`、`vuittonn` → `ゔいっとん`、`aruma` → `あるま`、`arumade` → `あるまで`、`karuma` → `かるま`
   - 入れない理由の固定 (今も当たる。`alma` を辞書に入れると外れる): `maalmae` → `まあおまえ`、`kinoualmamewoyonda` → `きのうあおまめをよんだ`
 - [ ] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req032_Vuln_CommitsAsShown_AndAlmaTypoStillCorrected` を足す。
   - 要点: 上の行を `BuiltInWordChecker` で打ち、Enter の確定を比べる。`vuln`・`--script vuln` は、Enter の直前の表示と確定が同じことも比べる。
@@ -109,6 +112,9 @@ Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの�
   - 査読: 1 周目の止める指摘は無し。直す指摘は 2 件。
     - 直す 1: `alma` で、母音の後の `あおま` の打ち間違いの補正が効かなくなる → `alma` を外した。
     - 直す 2: `docs/AGENT_STATE.md` の更新 → PR の前に更新した。
+  - 査読 2 周目: 止める指摘は無し。直す 1 件・任意 2 件。
+    - 直す: 境界例の一括比較の記録が、`vuln` を打っていない 1 回目の値だった → 最終の形で回し直した値に差し替えた。
+    - 任意: 前に日本語がつながった `avuln` のずれを非目標に足した。`vuittonn` を守る行に足した。
 - 数字: Core のテスト・eval-compare・境界例の値は、`docs/AGENT_STATE.md` と PR 本文に書く。
 - 手戻りの原因: 境界例の一括比較は、1 文字の置き換えの打ち間違いを作らない。そのため、語の境目の `あ + おまえ` の打ち間違いを見落とした。査読員が手で作った境界例で見つかった。
 - PR: (作成後に追記)
