@@ -20,6 +20,7 @@ internal static class ForgetConversionTests
     /// </summary>
     private sealed class ShuuConverter : IKanjiConverter
     {
+        /// <summary>true なら、忘れたあとに 習 を返す (学習が消えると別の語が先頭になる実機の Zenzai ON の形)。false のままなら、忘れても 週 を返す (実機の Zenzai OFF で、単位が合わず消えなかった形)。</summary>
         public bool Forgotten { get; set; }
         public int ConvertCalls { get; private set; }
         private string Shuu => Forgotten ? "習" : "週";
@@ -199,7 +200,12 @@ internal static class ForgetConversionTests
     public static void DeleteWhileConverting_OnACopyOfTheRealHistory_RemovesOnlyThePair()
     {
         var source = Environment.GetEnvironmentVariable("MELTYPE_TEST_CONVERSIONS_COPY");
-        if (string.IsNullOrEmpty(source) || !File.Exists(source)) return;
+        if (string.IsNullOrEmpty(source) || !File.Exists(source))
+        {
+            // 空振りのときは、通ったように見えないよう出す (DictionaryManagementTests のスキップと同じ出し方)
+            Console.WriteLine("  DeleteWhileConverting_OnACopyOfTheRealHistory_RemovesOnlyThePair: スキップ (環境変数 MELTYPE_TEST_CONVERSIONS_COPY が実機の conversions.json のコピーを指していない)");
+            return;
+        }
         var directory = Path.Combine(Path.GetTempPath(), "meltype-forget-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
@@ -226,5 +232,105 @@ internal static class ForgetConversionTests
         {
             try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
         }
+    }
+
+    [Test]
+    public static void DeleteWhileConverting_WhenTheEngineStillReturnsTheSameWord_ForgetsTheHistoryAndKeepsTheWord()
+    {
+        // 実機の Zenzai OFF: 学習した単位が合わないと azooKey は忘れず、引き直しても同じ 週 が先頭に来る。
+        // そのとき Core は、履歴から消して引き直すだけで、ほかのことはしない (週 のまま。変換中のまま。選択も先頭)。
+        var history = new ConversionHistory(null);
+        history.Remember("しゅう", "週");
+        var converter = new ShuuConverter(); // Forgotten にしない = 忘れたあとも 週 を返す
+        var forgotten = new List<(string Reading, string Text)>();
+        var k = SelectShuu(history, converter, (reading, text) => forgotten.Add((reading, text)));
+        k.Press(0x2E);
+        Assert.Equal(null, history.Get("しゅう"), "履歴からは消える");
+        Assert.True(forgotten.SequenceEqual([("しゅう", "週")]), "エンジンには伝える: " + string.Join("|", forgotten));
+        Assert.True(k.Host.View?.Converting == true, "変換中のまま");
+        Assert.Equal("週", k.Host.View!.Candidates[k.Host.View.SelectedIndex], "エンジンが同じ語を返すなら、先頭は 週 のまま");
+        Assert.Equal("がく週を", k.Host.View.Text, "表示も変わらない");
+        Assert.Equal(0, k.Host.View.SelectedIndex, "先頭に戻る");
+        Assert.Equal(1, k.Host.View.SelectedClause, "選んでいる文節は変わらない");
+        k.Press(0x2E); // 続けて押しても、2 度目の ForgetConversion が (しゅう, 週) で呼ばれるだけで例外にならない
+        Assert.True(k.Host.View?.Converting == true, "2 度目も変換中のまま");
+    }
+
+    [Test]
+    public static void ShiftDelete_WhileConverting_DoesNotForget_AndPassesDeleteAsBefore()
+    {
+        var history = new ConversionHistory(null);
+        history.Remember("しゅう", "週");
+        var calls = 0;
+        var k = SelectShuu(history, new ShuuConverter(), (_, _) => calls++);
+        k.Key(VirtualKeys.LShift);
+        k.Press(0x2E);
+        k.Key(VirtualKeys.LShift, up: true);
+        Assert.Equal(0, calls, "Shift+Delete ではエンジンに忘れさせない");
+        Assert.Equal("週", history.Get("しゅう"), "履歴も消さない");
+        Assert.True(k.Host.Events.Any(e => e.StartsWith("down:2E", StringComparison.Ordinal)), "今までどおり、確定して Delete をアプリに渡す: " + string.Join("|", k.Host.Events));
+        Assert.Equal("がく週を", string.Concat(k.Host.Output), "選んでいた候補で確定する");
+    }
+
+    [Test]
+    public static void Delete_OnRomajiReconversion_DoesNotForget_AndPassesDeleteAsBefore()
+    {
+        // ローマ字の再変換は読みに戻れない (文節の「読み」は日本語にした文)。忘れる対象が無いので、今までどおり確定して Delete を渡す。
+        var history = new ConversionHistory(null);
+        var calls = 0;
+        var k = new CompositionTests.Keyboard(history: history, converter: new ShuuConverter()) { ForgetConversion = (_, _) => calls++ };
+        Assert.True(k.Controller.ReconvertRomaji("kyouha iitenki desu ne"), "前提: ローマ字の再変換が始まる");
+        k.Controller.Pump();
+        Assert.True(k.Host.View?.Converting == true, "前提: 変換中: " + k.Showing);
+        k.Press(0x2E);
+        Assert.Equal(0, calls, "ローマ字の再変換の Delete では忘れない");
+        Assert.True(k.Host.Events.Any(e => e.StartsWith("down:2E", StringComparison.Ordinal)), "確定して Delete をアプリに渡す: " + string.Join("|", k.Host.Events));
+    }
+
+    [Test]
+    public static void Delete_InTokMode_ForgetsTheSelectedClause_LikeNormalMode()
+    {
+        // ATOK スタイル (TokMode) が変えるのは ← → ↓ の意味だけ。Delete は変わらないので、同じく忘れる (Shift+→ で文節を選ぶ)。
+        var history = new ConversionHistory(null);
+        history.Remember("しゅう", "週");
+        var converter = new ShuuConverter();
+        var forgotten = new List<(string Reading, string Text)>();
+        var k = new CompositionTests.Keyboard(history: history, converter: converter) { TokMode = true, ForgetConversion = (r, t) => { forgotten.Add((r, t)); converter.Forgotten = true; } };
+        k.Type("gakushuuwo ");
+        Assert.True(k.Host.View?.Converting == true, "前提: 変換中");
+        k.Key(VirtualKeys.LShift);
+        k.Press(VirtualKeys.Right); // TokMode: Shift+→ は文節の移動
+        k.Key(VirtualKeys.LShift, up: true);
+        Assert.Equal(1, k.Host.View!.SelectedClause, "前提: しゅう の文節を選んだ");
+        k.Press(0x2E);
+        Assert.True(forgotten.SequenceEqual([("しゅう", "週")]), "TokMode でも (読み, 語) を忘れる: " + string.Join("|", forgotten));
+        Assert.Equal(null, history.Get("しゅう"), "履歴から消える");
+        Assert.Equal("がく習を", k.Host.View!.Text, "引き直した候補");
+    }
+
+    [Test]
+    public static void Delete_OnAFixedClause_WithContinueAfterConversion_ForgetsOnlyThatClauseAndStaysConsistent()
+    {
+        // 変換後も続けて入力 (固定した文節 _headCount > 0): 固定した しゅう の文節を選んで Delete しても、
+        // その文節の (読み, 語) だけを忘れて引き直し、固定した前後の文節と続けて打った分は壊れない。
+        var history = new ConversionHistory(null);
+        history.Remember("しゅう", "週");
+        var converter = new ShuuConverter();
+        var forgotten = new List<(string Reading, string Text)>();
+        var k = new CompositionTests.Keyboard(history: history, converter: converter) { Continue = true, ForgetConversion = (r, t) => { forgotten.Add((r, t)); converter.Forgotten = true; } };
+        k.Type("gakushuuwo ");
+        k.Type("ta"); // 変換した文節を固定して、続けて打つ
+        Assert.True(k.Host.View!.Clauses!.Take(3).SequenceEqual(["がく", "週", "を"]), "前提: 固定した文節: " + string.Join("|", k.Host.View.Clauses!));
+        k.Type(" "); // 続けて打った分を変換する (固定した文節は保つ)
+        Assert.True(k.Host.View?.Converting == true, "前提: 変換中");
+        var before = string.Join("|", k.Host.View!.Clauses!);
+        for (var i = 0; i < 5 && k.Host.View!.SelectedClause > 1; i++) k.Press(VirtualKeys.Left); // 固定した しゅう まで戻る
+        Assert.Equal(1, k.Host.View!.SelectedClause, "前提: しゅう の文節を選んだ: " + before);
+        k.Press(0x2E);
+        Assert.True(forgotten.Count <= 1 && forgotten.All(f => f == ("しゅう", "週")), "忘れるなら (しゅう, 週) の 1 つだけ: " + string.Join("|", forgotten));
+        Assert.True(k.Host.View?.Converting == true, "変換中のまま: " + k.Showing);
+        Assert.True(k.Host.View!.Clauses!.Count == before.Split('|').Length, "文節の数は変わらない: " + string.Join("|", k.Host.View.Clauses!));
+        Assert.True(k.Host.View.Clauses![0] == "がく" && k.Host.View.Clauses[2] == "を", "前後の固定した文節は変わらない: " + string.Join("|", k.Host.View.Clauses!));
+        Assert.True(k.Host.Output.Count == 0, "確定しない: " + string.Join("|", k.Host.Output));
     }
 }
