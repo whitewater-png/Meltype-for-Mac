@@ -365,6 +365,30 @@ final class MeltypeConverter {
         converter.forgetMemory(candidate)
     }
 
+    /// 変換中の文節の Delete (要件 031)。読み (reading) を変換した直近の候補のうち、文字 (text) が一致するものを azooKey の学習から消す
+    /// (`remember(_:for:)` が覚えた候補を使う。確定のときの `learn` と同じ候補の引き方)。
+    /// 覚えた候補に無ければ、その読みを変換し直して探す (10 読みを超える長い文で、古い読みが捨てられていることがある)。それでも無ければ何もしない (戻り値 false。評価の口 `--forget` が見つかったかを出す)。
+    /// 変換結果のキャッシュ (resultCache) は、忘れる前の並びのままなので捨てる (忘れたかどうかによらず。引き直すだけで害は無い)。
+    /// azooKey の forgetMemory は、候補を作っている語 (data の各語) の表層形を集め、長期記憶から表層形が一致する項目を消す (読みは見ない。取り消せない)。
+    /// なので、候補を作っている語の別の読みの学習も消えることがある。学習した単位 (がく週 など 1 つの語) と違う区切りの候補では、その単位は消えない。
+    /// 実測は docs/requirements/031-forget-conversion-candidate.md。
+    /// メインスレッドから呼ぶ (KanaKanjiConverter はスレッドセーフではない)。
+    @discardableResult
+    func forgetConversionMemory(reading: String, text: String) -> Bool {
+        var candidate = recentCandidates[reading]?.first(where: { $0.text == text })
+        if candidate == nil {
+            candidate = rawMainResults(for: reading).first(where: { $0.text == text })
+        }
+        if let candidate {
+            converter.forgetMemory(candidate)
+        }
+        resultCache.removeAll()
+        resultCacheOrder.removeAll()
+        // 忘れたので、覚えていた lattice も捨てる (次の変換は全計算から)。
+        endComposition()
+        return candidate != nil
+    }
+
     /// 読みに対する候補の一覧 (重複なし、30 個まで)。
     /// 読みの末尾が助詞 1 文字 (かいぎで・しりょうを) のときは、azooKey の辞書語の一覧 (同音異義語) が
     /// 語 + 助詞の形では出ないので、語幹でも引いて「語幹の候補 + 助詞」を後ろに足す (Q27)。

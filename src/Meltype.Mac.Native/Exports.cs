@@ -42,6 +42,13 @@ public static unsafe class Exports
     /// <summary>予測候補を選んでいる間の Delete で、azooKey の学習から語を消す。</summary>
     private static delegate* unmanaged<byte*, void> s_forget;
 
+    /// <summary>(読み, 文字) → 変換中の Delete で、azooKey の学習から「読み → 文字」を消す (要件 031)。meltype_set_forget_conversion で登録する。</summary>
+    private static delegate* unmanaged<byte*, byte*, void> s_forgetConversion;
+
+    /// <summary>変換中の Delete で学習から消す Swift 側の関数を登録する (meltype_init の後、最初に 1 回)。meltype_init の引数を増やさず、FFI の版数も変えないよう別にした。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_set_forget_conversion")]
+    public static void SetForgetConversion(delegate* unmanaged<byte*, byte*, void> forgetConversion) => s_forgetConversion = forgetConversion;
+
     /// <summary>漢字混じりの文字列 → 読み (ひらがな)。読めなければ NULL。確定後の再変換用 (macOS の CFStringTokenizer)。</summary>
     private static delegate* unmanaged<byte*, byte*> s_reading;
 
@@ -219,7 +226,7 @@ public static unsafe class Exports
         {
             var session = s_mozc is { } mozc
                 ? MeltypeSession.CreateDefault(mozc, mozc.Candidates, s_isWord == null ? null : new CallbackWordChecker())
-                : MeltypeSession.CreateDefault(new CallbackConverter(), MoreCandidates, s_isWord == null ? null : new CallbackWordChecker(), Predictions, s_reading == null ? null : ReadingOf, ClipboardText, ForgetPrediction);
+                : MeltypeSession.CreateDefault(new CallbackConverter(), MoreCandidates, s_isWord == null ? null : new CallbackWordChecker(), Predictions, s_reading == null ? null : ReadingOf, ClipboardText, ForgetPrediction, ForgetConversion);
             return GCHandle.ToIntPtr(GCHandle.Alloc(session));
         }
         catch (Exception ex)
@@ -1234,6 +1241,20 @@ public static unsafe class Exports
         var pointer = ToUtf8(text);
         try { s_forget(pointer); }
         finally { NativeMemory.Free(pointer); }
+    }
+
+    /// <summary>Swift 側の azooKey の学習から、「読み → 文字」を消す (変換中の Delete)。登録が無ければ何もしない。</summary>
+    private static void ForgetConversion(string reading, string text)
+    {
+        if (s_forgetConversion == null) return;
+        var readingPointer = ToUtf8(reading);
+        var textPointer = ToUtf8(text);
+        try { s_forgetConversion(readingPointer, textPointer); }
+        finally
+        {
+            NativeMemory.Free(readingPointer);
+            NativeMemory.Free(textPointer);
+        }
     }
 
     private static string? TakeUtf8(byte* text)

@@ -16,6 +16,9 @@ typealias ForgetCallback = @convention(c) (UnsafePointer<CChar>?) -> Void
 
 private typealias InitFunction = @convention(c) (ClausesCallback, CandidatesCallback, IsWordCallback, LearnCallback, PredictionsCallback, ClipboardCallback, ForgetCallback) -> Int32
 private typealias SetReaderFunction = @convention(c) (ReadingCallback) -> Void
+/// 変換中の Delete: (読み, 文字) を azooKey の学習から消す (要件 031)。
+typealias ForgetConversionCallback = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> Void
+private typealias SetForgetConversionFunction = @convention(c) (ForgetConversionCallback) -> Void
 private typealias CreateFunction = @convention(c) () -> UnsafeMutableRawPointer?
 private typealias DestroyFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
 private typealias HandleKeyFunction = @convention(c) (UnsafeMutableRawPointer?, Int32, Int32, Int32, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
@@ -82,6 +85,12 @@ private let clipboardCallback: ClipboardCallback = {
 private let forgetCallback: ForgetCallback = { text in
     guard let text else { return }
     MeltypeConverter.shared.forgetMemory(for: String(cString: text))
+}
+
+/// 変換中の文節の Delete。選んでいる文節の「読み → 候補の文字」を azooKey の学習から消す (要件 031)。
+private let forgetConversionCallback: ForgetConversionCallback = { reading, text in
+    guard let reading, let text else { return }
+    MeltypeConverter.shared.forgetConversionMemory(reading: String(cString: reading), text: String(cString: text))
 }
 
 /// 漢字混じりの文字列 → 読み (ひらがな)。確定後の再変換用 (他の読みが分からなかったときの最後の手段)。
@@ -203,6 +212,8 @@ final class NativeCore {
     private let library: UnsafeMutableRawPointer?
     private let initFunction: InitFunction?
     private let setReaderFunction: SetReaderFunction?
+    /// 無い (古い dylib) ときは何もしない。ABI 版数は上げない (meltype_init の引数を変えず、別の入口にした)。
+    private let setForgetConversionFunction: SetForgetConversionFunction?
     private let createFunction: CreateFunction?
     private let destroyFunction: DestroyFunction?
     private let handleKeyFunction: HandleKeyFunction?
@@ -277,6 +288,7 @@ final class NativeCore {
         }
         initFunction = symbol("meltype_init", as: InitFunction.self)
         setReaderFunction = symbol("meltype_set_reader", as: SetReaderFunction.self)
+        setForgetConversionFunction = symbol("meltype_set_forget_conversion", as: SetForgetConversionFunction.self)
         createFunction = symbol("meltype_create", as: CreateFunction.self)
         destroyFunction = symbol("meltype_destroy", as: DestroyFunction.self)
         handleKeyFunction = symbol("meltype_handle_key", as: HandleKeyFunction.self)
@@ -333,6 +345,7 @@ final class NativeCore {
         isCompatible = true
         _ = initFunction?(clausesCallback, candidatesCallback, isWordCallback, learnCallback, predictionsCallback, clipboardCallback, forgetCallback)
         setReaderFunction?(readingCallback)
+        setForgetConversionFunction?(forgetConversionCallback)
     }
 
     func createSession() -> UnsafeMutableRawPointer? { isCompatible ? createFunction?() : nil }

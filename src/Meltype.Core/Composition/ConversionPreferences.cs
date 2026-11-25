@@ -310,6 +310,25 @@ public sealed class ConversionHistory
         }
     }
 
+    /// <summary>
+    /// 読み (reading) → 語 (text) の学習を、完全に一致するときだけ消す。変換中の Delete 用 (要件 031)。
+    /// 読みが同じでも別の語を学習していれば、同じ語でも別の読みなら、何も消さない。消したら true。
+    /// ユーザー辞書・専門用語集は消さない。
+    /// </summary>
+    public bool ForgetPair(string reading, string text)
+    {
+        if (string.IsNullOrEmpty(reading) || string.IsNullOrEmpty(text)) return false;
+        lock (_gate)
+        {
+            if (!_entries.TryGetValue(reading, out var entry) || entry.Text != text) return false;
+            _entries.Remove(reading);
+            _usageCache = null;
+            Version++;
+            Save();
+            return true;
+        }
+    }
+
     /// <summary>学習した変換 (読み → 選んだ語) の一覧 (新しく使ったものから)。設定の「学習した語」に出す。</summary>
     public IReadOnlyList<(string Reading, string Text, DateTime Used)> Entries()
     {

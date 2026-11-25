@@ -168,7 +168,7 @@ public sealed class MeltypeSession
     /// </summary>
     public static MeltypeSession CreateDefault(IKanjiConverter converter, Func<string, IReadOnlyList<string>>? moreCandidates, IWordChecker? wordChecker,
         Func<string, IReadOnlyList<string>>? predictions = null, Func<string, string?>? reader = null, Func<string?>? clipboard = null,
-        Action<string>? forgetPrediction = null)
+        Action<string>? forgetPrediction = null, Action<string, string>? forgetConversion = null)
     {
         AppPaths.MigrateFromOldName();
         Config.SafeFile.EnsureDirectory(AppPaths.DataDirectory);
@@ -237,6 +237,7 @@ public sealed class MeltypeSession
             // Zenzai が ON のとき、前の文 (最大 20 文字) も変換エンジンに渡す (要件 017)。Mozc・Windows は今までどおり。
             WideConversionContext = WideContextProvider(converter, () => shared.Current.Zenzai),
             ForgetPrediction = forgetPrediction,
+            ForgetConversion = forgetConversion,
             Meanings = MeaningDictionary.Load(),
             CandidateMeanings = () => shared.Current.ShowCandidateMeanings,
             RomajiTypos = RomajiTypoCorrector.Load(detector.Romaji),
