@@ -509,7 +509,13 @@ public sealed class CompositionText
     /// </summary>
     private bool ReadsAsJapaneseAfterParticle(int start, int last)
     {
-        if (start < 1 || start + 2 != last || !IsParticleUnit(_units[start]) || !IsKanaUnit(_units[start - 1]) || !IsKanaUnit(_units[start + 1])) return false;
+        if (start < 1 || start + 2 != last || !IsKanaUnit(_units[start - 1])) return false;
+        // い + に + t (i|ni|t の init): にほんい|について・せつめい|について の に + つ。要件 040
+        // 助詞の を の後ろは除く (を で終わる語は無いので、これをinitする は英単語のまま)。u|ni|t の unit は対象にしない
+        // (きょう|について の u は IsLongVowelU が見ている。unit の損を増やさない)
+        if (_units[start] is { Raw: "i", Kana: "い" } && _units[start + 1] is { Kana: "に" } ni && IsKanaUnit(ni) && _units[start - 1].Kana != "を")
+            return _detector.IsJapaneseWordOrPrefix("につ") || TypoCorrector?.IsReadingPrefix("につ") == true;
+        if (!IsParticleUnit(_units[start]) || !IsKanaUnit(_units[start + 1])) return false;
         var reading = _units[start + 1].Kana + "つ";
         return _detector.IsJapaneseWordOrPrefix(reading) || TypoCorrector?.IsReadingPrefix(reading) == true;
     }
