@@ -5,7 +5,9 @@ source: docs/voice/2026-11-23.md (ブランチ voice/2026-11-23) 候補 1 / 本�
 scope: core
 ---
 
-# 031 本家 11-23 の誤判定の 3 形 (fork ではかなのまま・英字のまま) を正解表とテストで守る
+# 041 本家 11-23 の誤判定の 3 形 (fork ではかなのまま・英字のまま) を正解表とテストで守る
+
+番号について: 定期タスクは 031 (ブランチ `req/031-upstream-1123-guard`) で切ったが、main には別の要件 031 (変換中の Delete で学習を忘れる) が入ったので、統合のときに 041 へ付け替えた。
 
 ## 背景 (誰が、何に困っているか)
 - 本家 (1.7.x。#2261・#2258 は Windows、#2254 は OS 不明) に 2026-11-23 に出た報告 (docs/voice/2026-11-23.md の要約。本文は WebFetch の要約を通したもので、細部は原文と違う可能性がある):
@@ -38,17 +40,17 @@ scope: core
 - [x] 正解表: 新しい表 `eval/cases/upstream-guards-1123.tsv` に次の行を足し、今の main でも当たる (019〜025 と同じく、日付ごとの別の表にする)
   ```
   nonbirimiroyo	のんびりみろよ	full	本家 #2261
-  kokowomiroyo	ここをみろよ	full	要件 031 (要件の書き手の作例: 同じ形)
-  asitamiroyo	あしたみろよ	full	要件 031 (要件の書き手の作例: 同じ形)
-  nonbirimiro	のんびりみろ	full	要件 031 (声の文書で打った同じ形。語の終わりで止める)
-  kokowomiro	ここをみろ	full	要件 031 (声の文書で打った同じ形)
-  asitamiro	あしたみろ	full	要件 031 (声の文書で打った同じ形)
+  kokowomiroyo	ここをみろよ	full	要件 041 (要件の書き手の作例: 同じ形)
+  asitamiroyo	あしたみろよ	full	要件 041 (要件の書き手の作例: 同じ形)
+  nonbirimiro	のんびりみろ	full	要件 041 (声の文書で打った同じ形。語の終わりで止める)
+  kokowomiro	ここをみろ	full	要件 041 (声の文書で打った同じ形)
+  asitamiro	あしたみろ	full	要件 041 (声の文書で打った同じ形)
   What are things made you happy?	What are things made you happy?	full	本家 #2258
-  made you happy	made you happy	full	要件 031 (声の文書で打った同じ形。文頭)
-  it made you happy	it made you happy	full	要件 031 (声の文書で打った同じ形)
+  made you happy	made you happy	full	要件 041 (声の文書で打った同じ形。文頭)
+  it made you happy	it made you happy	full	要件 041 (声の文書で打った同じ形)
   /usr/bin/php	/usr/bin/php	full	本家 #2254
   ```
-- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req031_Upstream1123Shapes_StayKanaOrEnglish` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
+- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req041_Upstream1123Shapes_StayKanaOrEnglish` を足す (要点: 上の行を打って Enter の確定を完全一致で比べる。テスト用の判定器で)。
 - [x] わざと崩した木で、足した 10 行がどれも少なくとも 1 回は外れ、テストが赤になる (崩し方と結果を記録欄に書く)。
 - [x] 回帰なし: `tools/eval-compare.sh` の broken 0、Core のテスト全件通過。
 - [x] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。`eval/README.md` と `docs/requirements/README.md` の一覧には足さない (019〜025 と同じ扱い)。
@@ -63,7 +65,7 @@ scope: core
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
 
 ## 記録 (ループが書く)
-- わざと崩した木 (作業ツリーで一時的に変え、テスト `Req031` と新しい表だけを `--expect-all` で回し、`git checkout` で戻した。2026-11-24):
+- わざと崩した木 (作業ツリーで一時的に変え、テスト `Req041` と新しい表だけを `--expect-all` で回し、`git checkout` で戻した。2026-11-24):
   | 崩し方 | 外れた行 → 確定 |
   |---|---|
   | `src/Meltype.Core/Detection/RomajiDetector.cs` の `("み", ["mi"])` を `miq` に | `kokowomiroyo` → `ここをmiroよ`・`asitamiroyo` → `あしたmiroよ` (本家 #2261 と同じ形)、`nonbirimiroyo` → `のんびrimいろよ`、`kokowomiro` → `ここをmiro`、`asitamiro` → `あしたmiro`、`nonbirimiro` → `のんびrimいろ` |
@@ -76,12 +78,12 @@ scope: core
 - `docs/KNOWN_LIMITS.md` に `miro`・`made you`・`/usr/bin/php` の記載なし (確認のみ)。
 - `/usr/bin/php` は表とテストでは一般アプリとして打つ。査読員が `# app: code` の表で確かめ、コード系アプリでも `/usr/bin/php`・`cd /usr/bin/php`・`ls /usr/local/bin/node`・`cd ~/bin` は当たった (表には足していない)。
 - 査読 1 周目 (実装を見ていない別のエージェント。Core 1305/1305・eval-compare broken 0 / fixed 0 / added 0 / removed 0 (745/849) を再実行、10 行の `--repro` を照合、崩した木は `miq`・`isPath`・`english.txt` の 4 語を別の worktree で再現し記録と一致。境界例 (`tabero`・`okiroyo`・`What made you happy?`・`/usr/local/bin/node` など) で要件の記述との矛盾なし): [止める] なし。
-  - [直す・対応] `docs/AGENT_STATE.md` が未更新 → 進行中の要件に 031 の行を足した。
+  - [直す・対応] `docs/AGENT_STATE.md` が未更新 → 進行中の要件に 041 の行を足した。
   - [直す・対応] 背景の「Windows の報告」が #2254 (OS 不明) にもかかっていた → 件ごとに書き分け、#2258 に「bot の main・1.7.1 では再現せず」を足した。
   - [任意・対応] 出典の「作者の作例」が本家の作者と紛らわしい → 「要件の書き手の作例」に直した (表も)。
   - [任意・対応] 実機チェックリストの `/usr/bin/php` はターミナルだが表は一般アプリ → 上の 1 行を記録に足した。
   - [任意・範囲外] 近い形で今の main が崩れるもの (main と同じ。一般アプリの `--repro`): 日本語と空白の後のパス `sore ha /usr/bin/php desu` → `それは/usr/びん/php です`、`sore ha /tmp/foo desu` → `それは/tmp/ふぉおです`、`kore ha ./build.sh desu` → `これは。/build.sh です`、`phpha/usr/bin/phpniaru` → `phpは/usr/びん/phpにある`、一般アプリの `cd /usr/bin/php` → `cd/usr/びん/php`。本家 #2254 の形 (先頭の `/` が `・`) ではないので、この要件では扱わない (次の声の文書の候補にするかは人が決める)。
 - 査読 2 周目 (1 周目とは別のエージェント。Core 1305/1305・eval-compare broken 0 / fixed 0 / added 0 / removed 0 (745/849) を再実行、崩した木は `miq` + `isPath` と `english.txt` の 4 語を別の worktree で再現し記録と一致、範囲外の例 5 つを `--repro` で打ち直して一致): [止める]・[直す] なし。
-  - [任意・対応] `docs/AGENT_STATE.md` の 031 の行に査読の周回数が無い → 2 周と書いた。
+  - [任意・対応] `docs/AGENT_STATE.md` の 041 の行に査読の周回数が無い → 2 周と書いた。
   - [任意・範囲外] `docs/AGENT_STATE.md` の基準の数字の Core 件数が 1301 (030 の後) のまま → 基準の数字は測った HEAD と組で書く表なので、この要件では変えない (次に基準を測り直すときに直す)。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/33

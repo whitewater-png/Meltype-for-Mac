@@ -5,9 +5,9 @@ source: docs/voice/2026-11-24.md (ブランチ voice/2026-11-24) 候補 1 / 本�
 scope: dictionary
 ---
 
-# 032 vuln が、打っている間は英字なのに Enter で ゔおん と確定する (alma は入れない理由を固定する)
+# 042 vuln が、打っている間は英字なのに Enter で ゔおん と確定する (alma は入れない理由を固定する)
 
-番号について: 031 は PR #33 (ブランチ `req/031-upstream-1123-guard`) が使っているので、032 にした。
+番号について: 定期タスクは 032 (ブランチ `req/032-vuln-alma-english`) で切ったが、main には別の要件 032 (拍数) が入ったので、統合のときに 042 へ付け替えた。
 
 範囲を変えた経緯: 最初は `vuln`・`alma` の 2 語を辞書に足す要件として書いた。査読 1 周目で、`alma` を足すと母音の後の `あおま` の `o` を `l` と打った 1 打鍵の打ち間違い (`maalmae` = まあおまえ) が補正されなくなると分かった。これはこの要件の止める条件に当たるので、`alma` は入れず、入れない理由を正解表とテストで固定する形に絞った (2026-11-25)。`alma` の表示と確定のずれをどう直すか (判定の変更が要る) は人が決める。
 
@@ -84,7 +84,7 @@ Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの�
   ```
   - 守る行 (今も当たる): `vulns` → `vulns`、`vulnerable` → `vulnerable`、`AlmaLinux` → `AlmaLinux`、`salmon` → `salmon`、`almond` → `almond`、`vu` → `ゔ`、`vuittonn` → `ゔいっとん`、`aruma` → `あるま`、`arumade` → `あるまで`、`karuma` → `かるま`
   - 入れない理由の固定 (今も当たる。`alma` を辞書に入れると外れる): `maalmae` → `まあおまえ`、`kinoualmamewoyonda` → `きのうあおまめをよんだ`
-- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req032_Vuln_CommitsAsShown_AndAlmaTypoStillCorrected` を足す。
+- [x] テスト: `src/Meltype.Core.Tests/FeedbackTests.cs` に `Req042_Vuln_CommitsAsShown_AndAlmaTypoStillCorrected` を足す。
   - 要点: 上の行を `BuiltInWordChecker` で打ち、Enter の確定を比べる。`vuln`・`--script vuln` は、Enter の直前の表示と確定が同じことも比べる。
   - 実装前は赤。`alma` を辞書に足しても赤になる (`maalmae`)。
 - [x] 回帰なし: 次をすべて満たす。

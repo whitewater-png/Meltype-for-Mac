@@ -1529,7 +1529,7 @@ internal static class RomajiTypoTests
     }
 
     [Test]
-    public static void Req031_Upstream1123Shapes_StayKanaOrEnglish()
+    public static void Req041_Upstream1123Shapes_StayKanaOrEnglish()
     {
         // 本家 #2261・#2258・#2254 (2026-11-23): nonbirimiroyo が のんびりmiroよ、What are things made you happy? の途中が
         // かな・漢字になり、/usr/bin/php の先頭の / が ・ になる、という報告。この fork では確定は今も崩れない (判定ロジック・辞書は変えていない)。
@@ -1886,7 +1886,7 @@ internal static class RomajiTypoTests
     }
 
     [Test]
-    public static void Req032_Vuln_CommitsAsShown_AndAlmaTypoStillCorrected()
+    public static void Req042_Vuln_CommitsAsShown_AndAlmaTypoStillCorrected()
     {
         // 本家 #2312: 打っている間は vuln と見えるのに、Enter で ゔおん が確定していた (確定直前の打ち間違いの補正が l を o と読み直す)。
         // dictionaries/english.txt に足した。vulns・vulnerable・AlmaLinux・salmon・almond と、aruma・karuma・vu のかなは変わらない。
