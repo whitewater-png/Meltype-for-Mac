@@ -19,6 +19,11 @@ import Foundation
 /// `--product-candidates` を付けると、`--top` の候補を `MeltypeConverter.candidates(for:)` (製品の候補ウィンドウに渡る一覧。
 /// 末尾が助詞のときの語幹の候補を足し、キャッシュと 30 個の上限を通る。左文脈は常に無し) から取る。画面と同じ経路の azooKey 側の候補を見るための口。
 /// 学習データは一時フォルダーを使い、利用者の `~/Library/Application Support/Meltype/azooKey` に触りません。
+/// 環境変数 `MELTYPE_EVAL_MEMORY_COPY=<フォルダー>` があれば、その中身 (azooKey の学習のファイル) を一時フォルダーにコピーして使います
+/// (実機の学習データのコピーで、不具合の再現と修正の確認をするため。元のフォルダーは読むだけで、書き換えません。既定は今までどおり空の一時フォルダー)。
+/// `--forget <読み>=<語>` (複数回指定できる) を付けると、測り始める前に、その読みを変換して候補を覚えさせてから
+/// `MeltypeConverter.forgetConversionMemory(reading:text:)` を呼びます (変換中の Delete が学習から忘れる動作の確認。要件 031)。
+/// 忘れた結果 (候補が見つかったか) は `# forget ...` の行で出します。
 ///
 /// `--weights <gguf>` を付けると Zenzai (ニューラル変換) を ON にして測ります。製品の `ZenzaiModel` と同じ検査
 /// (サイズ・SHA-256 をアプリに固定した値と比べる) を通したモデルだけ使い、検査が通らなければ測らずに終了します。
@@ -117,6 +122,18 @@ enum ConvertEval {
         let memory = FileManager.default.temporaryDirectory.appendingPathComponent("meltype-convert-eval-\(getpid())", isDirectory: true)
         try? FileManager.default.createDirectory(at: memory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: memory) }
+        // 実機の学習データのコピーを使うとき (元は読むだけ。コピー先は一時フォルダーで、終われば消す)
+        if let source = ProcessInfo.processInfo.environment["MELTYPE_EVAL_MEMORY_COPY"], !source.isEmpty {
+            let sourceURL = URL(fileURLWithPath: source, isDirectory: true)
+            guard let names = try? FileManager.default.contentsOfDirectory(atPath: sourceURL.path) else {
+                print("MELTYPE_EVAL_MEMORY_COPY のフォルダーが読めません: \(source)")
+                return false
+            }
+            for name in names {
+                try? FileManager.default.copyItem(at: sourceURL.appendingPathComponent(name), to: memory.appendingPathComponent(name))
+            }
+            print("# summary 学習データのコピーを使う: \(names.count) 個のファイル (元は読み取りだけ)")
+        }
         // `--weights` があれば Zenzai を ON にする。通らなければ測らない (推測で測った数字にしない)
         var zenzai: ZenzaiModel?
         if let weightsFlag = arguments.firstIndex(of: "--weights"), arguments.indices.contains(weightsFlag + 1) {
@@ -131,6 +148,20 @@ enum ConvertEval {
                                          zenzai: zenzai, zenzaiEnabled: { zenzai != nil })
         _ = converter.clauses(for: "きょうはいいてんき", context: nil)   // ウォームアップ (辞書・モデルの読み込み)
         converter.endComposition()
+        // `--forget <読み>=<語>`: 変換中の Delete と同じ、学習から忘れる動作。読みを変換して候補を覚えさせてから忘れさせる
+        var index = 0
+        while index < arguments.count {
+            defer { index += 1 }
+            guard arguments[index] == "--forget", arguments.indices.contains(index + 1) else { continue }
+            let pair = arguments[index + 1].split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+            guard pair.count == 2, !pair[0].isEmpty, !pair[1].isEmpty else {
+                print("--forget は <読み>=<語> の形です: \(arguments[index + 1])")
+                return false
+            }
+            _ = converter.candidates(for: pair[0])   // 製品の候補ウィンドウと同じ経路で、読みの候補を覚えさせる
+            let found = converter.forgetConversionMemory(reading: pair[0], text: pair[1])
+            print("# forget \(pair[0]) -> \(pair[1]): \(found ? "候補が見つかり、azooKey の学習から忘れさせた" : "その語の候補が見つからなかった (何もしていない)")")
+        }
         print("# summary Zenzai \(zenzai == nil ? "なし (AzooKeyKanaKanjiConverter の変換だけ)" : "ON (\(ZenzaiModel.Source.production.fileName))")")
 
         var hits = 0
