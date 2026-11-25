@@ -42,4 +42,15 @@ internal static class ParticleBeforeTsuTests
         })
             Assert.Equal(expected, Committed(typed), typed);
     }
+
+    [Test]
+    public static void KnownLoss_PluralRightAfterParticle()
+    {
+        // 受け入れた損 (要件 033 の人の判断 1): かな + 助詞のすぐ後ろに空白なしで続けた、助詞の音で始まる 4 文字の英単語の複数形は割れる。
+        // 期待値は今の出力 (望ましい出力ではない)。この挙動が変わったら、要件 033 の「得と損」を見直す
+        Assert.Equal("きょうはへあts", Committed("kyouhaheats"), "kyouhaheats");
+        Assert.Equal("きょうはもあて", Committed("kyouhamoats"), "kyouhamoats");
+        Assert.Equal("heats", Committed("heats"), "語の頭の heats は英単語のまま");
+        Assert.Equal("今日はheats", Committed("kyouha heats"), "空白の後ろの heats は英単語のまま (空白は変換で消える)");
+    }
 }
