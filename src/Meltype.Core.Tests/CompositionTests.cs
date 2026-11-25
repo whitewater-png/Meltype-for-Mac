@@ -244,6 +244,9 @@ internal static class CompositionTests
         /// <summary>予測の Delete で呼ばれる、エンジンの予測を消す関数 (CompositionOptions.ForgetPrediction)。</summary>
         public Action<string>? ForgetPrediction { get; set; }
 
+        /// <summary>変換中の Delete で呼ばれる、エンジンの学習から「読み → 文字」を消す関数 (CompositionOptions.ForgetConversion。要件 031)。</summary>
+        public Action<string, string>? ForgetConversion { get; set; }
+
         /// <summary>かな入力で、仮想キーを順に打つ (shift: その打鍵で Shift を押す)。</summary>
         public void TypeKeys(params (int Vk, bool Shift)[] keys)
         {
@@ -315,6 +318,7 @@ internal static class CompositionTests
                 ClipboardCandidates = () => ClipboardCandidates,
                 WideConversionContext = () => WideContext,
                 ForgetPrediction = text => ForgetPrediction?.Invoke(text),
+                ForgetConversion = (reading, text) => ForgetConversion?.Invoke(reading, text),
                 RomajiTypos = Typos,
                 CorrectTypos = () => CorrectTypos,
                 SpaceAroundEnglish = () => SpaceAroundEnglish,

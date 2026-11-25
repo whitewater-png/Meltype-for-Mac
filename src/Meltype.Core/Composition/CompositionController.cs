@@ -221,6 +221,12 @@ public sealed class CompositionOptions
     /// <summary>予測候補を選んでいる間の Delete で、その語を学習から消す (azooKey の予測も消す。本家 #788)。</summary>
     public Action<string>? ForgetPrediction { get; init; }
 
+    /// <summary>
+    /// 変換中に文節の候補を選んでいる間の Delete で、その「読み → 候補の文字」を学習から消す (azooKey の学習も消す。要件 031)。
+    /// 引数は (文節の読み, 今表示している候補の文字)。履歴 (History) は Core が自分で消すので、変換エンジン側の学習だけを消す関数を渡す。
+    /// </summary>
+    public Action<string, string>? ForgetConversion { get; init; }
+
     /// <summary>候補の日本語の意味 (ウィクショナリー)。null なら英訳だけ。</summary>
     public MeaningDictionary? Meanings { get; init; }
 
@@ -1618,6 +1624,11 @@ public sealed class CompositionController
                     Commit();
                 }
                 return true;
+            // Delete (Mac では fn+delete): 選んでいる文節の「読み → 今の候補」を学習から忘れて、その文節の候補を引き直す (要件 031)。
+            // 英語の文節 (打った英字の候補) とローマ字の再変換 (読みに戻れない) は、今までどおり (確定して Delete をアプリに渡す)。
+            case 0x2E when !clause.IsEnglish && !_reconvertRomaji:
+                ForgetSelectedConversion(clause);
+                return true;
             // 候補ウィンドウの 1 ページ (9 個) 分ずつ進む／戻る。端では止まる。
             case VirtualKeys.Next:
                 if (!clause.IsEnglish && !clause.Expanded) Expand(clause);
@@ -2936,6 +2947,32 @@ public sealed class CompositionController
         clause.ClipboardText = null;
         MarkClipboardChoice(clause);
         if (_options.History?.Get(clause.Reading) is { } learned) Prefer(clause, learned);
+    }
+
+    /// <summary>
+    /// 変換中の Delete: 選んでいる文節の読み R と、今表示している候補の文字 T について、R → T の学習を忘れる (要件 031)。
+    /// 消すのは完全に (R, T) が一致する学習だけ: 履歴 (History) の R → T と、変換エンジン (azooKey) の学習。
+    /// 同じ T の別の読みや、同じ R の別の語の学習は残す (予測の Delete が同じ語を全部消すのとは違う)。
+    /// ユーザー辞書・専門用語集は消さない。忘れるものが無くても、候補を引き直すだけで害は無い。
+    /// 得: 実機で「学習する」が「がく週する」になるような、誤って覚えた 1 語を 1 キーで直せる。
+    /// 損: 候補を引き直すので、選んでいた候補の位置は先頭に戻る。文の中での文脈ルール (ContextRules) の並びは、文節の単独の変換に戻る。
+    /// </summary>
+    private void ForgetSelectedConversion(Clause clause)
+    {
+        var reading = clause.Reading;
+        var text = clause.Text;
+        _options.History?.ForgetPair(reading, text);
+        _options.ForgetConversion?.Invoke(reading, text);
+        // 忘れる前の結果 (エンジンの区切り・変換・ライブ変換) は捨てる。残すと、忘れた語がまた先頭に出る。
+        _conversionCache.Clear();
+        _liveCache.Clear();
+        _clauseCache.Clear();
+        Reconvert(clause);
+        // Reconvert は、変換を始めたときに足した候補 (英訳・旧かな・打ったままの英字) を作り直さないので、足し直す。
+        clause.Translations.Clear();
+        AddOldKana(clause);
+        AddTranslations(clause);
+        AddRawCandidates(clause);
     }
 
     /// <summary>同じかなを何度も変換しないようにキャッシュする。</summary>
