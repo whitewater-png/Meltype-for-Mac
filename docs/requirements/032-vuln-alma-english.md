@@ -43,6 +43,23 @@ scope: dictionary
 - 候補 2 (`nvm`・`nmap`)・候補 3 (入れ子の括弧の幅) は別の要件。
 - `vuln`・`alma` 自体の打ち間違い (`vulnn`・`almaa` など) を直すこと。
 
+## 受け入れる変化 (実装後に base と比べて分かったこと。受け入れてよいかは人が判断する)
+Core の `--repro` を base (`origin/main` 627b77a) とこのブランチの両方で打った (2026-11-25、最後のキーは Enter。表示 / 確定)。
+
+| 打鍵 | base | このブランチ | 向き |
+|---|---|---|---|
+| `vulnn`・`vulne`・`vulnu` | `vulnn` / `ゔおん`・`vulne` / `ゔおね`・`vulnu` / `ゔんぅ` | 英字のまま (表示と確定が同じ) | ずれが消える |
+| `vulnni`・`vulnno`・`vulnha`・`vulnto` | 確定 `ゔおんい`・`ゔおんお`・`ゔおんは`・`ゔおんと` | `vulnに`・`vulnの`・`vulnは`・`vulnと` | 良くなる |
+| `almani`・`almano`・`almaha`・`almadesu`・`almaa` | 確定 `あおまに`・`あおまの`・`あおまは`・`あおまです`・`あおまあ` | `almaに`・`almaの`・`almaは`・`almaです`・`almaa` | 良くなる |
+| `vuln_` | `vuon_` / `vuon_` | `vuln_` / `vuln_` | 良くなる |
+| `cve vuln` | `vuln` / `cゔぇゔおん` | `vuln` / `cゔぇvuln` | 後ろは直る。`cve` がかなになり空白が消えるのは base と同じ (この要件では直さない) |
+| `alma mater` | `まてr` / `あおままて` | `mater` / `alma mate` | 前は直る。最後の `r` が落ちるのは base と同じ (この要件では直さない) |
+| `almame`・`almae`・`almari`・`almaeda` | 確定 `あおまめ`・`あおまえ`・`あおまり`・`あおまえだ` | `almaめ`・`almaえ`・`almaり`・`almaえだ` | **悪くなる**: 入力の先頭の `あおま〜` の `o` を隣の `l` と打ち間違えた形は、補正が効かなくなる (`aomame` = 青豆 の打ち間違いなど) |
+
+- 悪くなる形は「入力の先頭が `alma` で、`あおま` で始まる語を `o` → `l` と 1 文字打ち間違えたとき」だけ。リポジトリの日本語の辞書 (`readings.txt`・`japanese.txt`) に `あおま` を含む語は無い。語の途中・境目の形 (`kimihalmae` → `きみはおまえ`、`hanalmatsuri` → `はなおまつり`、`kalmawari` → `かおまわり`、`nalmasa` → `なおまさ`) は base と同じに補正される。
+- `vuln` を足して悪くなる形は見つからなかった (`vuon`・`vulon`・`ivulnn` は base と同じ)。
+- 悪くなる形を受け入れないなら、`alma` を外して `vuln` だけにする (その場合、正解表の `alma`・`almaga`・`almade`・`alma linux` は外れのまま残す)。
+
 ## 完成条件 (先に決める。機械で判定できる形)
 - [ ] 正解表: `eval/cases/short-words-in-english.tsv` に次の行を足し、実装前は外れ、実装後は当たる
   ```
