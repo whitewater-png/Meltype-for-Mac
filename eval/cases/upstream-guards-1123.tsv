@@ -1,0 +1,18 @@
+# 本家 (yksr-melt/Meltype) に 2026-11-23 に報告された誤判定の形のうち、この fork では起きないもの (かなのまま・英字のまま確定する) を守る行。期待は今の Mac 版 Core の出力 (今も当たる行)。
+# 本家では、動詞の命令形の miro が英字で残る・英文の途中がかな (漢字) になる・パスの先頭の / が ・ になる、という形だった。漢字の形 (見ろ) はここでは測れない。
+# 確定 (Enter) だけを見る。打っている途中の表示 (のんびりmiro など) は確定と食い違うが、ここでは守らない (docs/voice/2026-11-23.md 候補 3)。
+# 後の変更 (辞書への語の追加・判定ロジックの変更・本家への追従) で崩れたら、回帰ゲートで気付けるようにする。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打った結果を測る。実機の記録ではない。
+# 出典の docs/voice/<日付>.md は、ブランチ voice/<日付> にある (main には無い)。
+# 要件 019〜025 の守りの表と同じ考えの表 (日付ごとの別の表。まとめてよい)。
+# カテゴリ: 要件 031 (本家 2026-11-23 の報告。docs/requirements/031-upstream-1123-guard.md。本家での形は出典の欄)
+nonbirimiroyo	のんびりみろよ	full	本家 #2261 (本家では のんびりmiroよ。docs/voice/2026-11-23.md 候補 1)
+kokowomiroyo	ここをみろよ	full	要件 031 (要件の書き手の作例: 同じ形)
+asitamiroyo	あしたみろよ	full	要件 031 (要件の書き手の作例: 同じ形)
+nonbirimiro	のんびりみろ	full	要件 031 (声の文書で打った同じ形。語の終わりで止める)
+kokowomiro	ここをみろ	full	要件 031 (声の文書で打った同じ形)
+asitamiro	あしたみろ	full	要件 031 (声の文書で打った同じ形)
+What are things made you happy?	What are things made you happy?	full	本家 #2258 (本家では What あれ things まで 用 happy?。docs/voice/2026-11-23.md 候補 1)
+made you happy	made you happy	full	要件 031 (声の文書で打った同じ形。文頭)
+it made you happy	it made you happy	full	要件 031 (声の文書で打った同じ形)
+/usr/bin/php	/usr/bin/php	full	本家 #2254 (本家では先頭の / が ・。docs/voice/2026-11-23.md 候補 1)
