@@ -337,6 +337,19 @@ internal static class LiveEnterLearningTests
     }
 
     [Test]
+    public static void RomajiReconversion_ContinuedLiveEnter_TeachesNothingToTheConverter()
+    {
+        // 要件 028 の R7: 再変換の文 (きょうはいいてんきですね) も変換エンジンに渡さない。Taught() は対照を除いた分
+        var s = new Setup();
+        s.Keyboard.Continue = true;
+        Assert.True(s.Keyboard.Controller.ReconvertRomaji("kyouha iitenki desu ne"), "前提: ローマ字の再変換が始まる");
+        s.Keyboard.Type("tanniwotoru");
+        s.Keyboard.Type("\n");
+        Assert.True(s.Keyboard.Host.Document.EndsWith("単位を取る", StringComparison.Ordinal), "確定はする: " + s.Keyboard.Host.Document);
+        Assert.Equal("", s.Taught(), "再変換の文を azooKey に学習させない");
+    }
+
+    [Test]
     public static void LiveOff_KanaEnter_DoesNotCount()
     {
         var s = new Setup(live: false);

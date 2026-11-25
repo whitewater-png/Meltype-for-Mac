@@ -1,6 +1,6 @@
 ---
 title: 設定「変換後も続けて入力できる」ON で、ローマ字の再変換の文を学習してしまう (固定した文節の確定)
-status: approved   # 2026-11-22 の人の指示「OK、両方おすすめで」(人の判断 1〜4 は、その前の指示「おすすめでお願い」で決定。案 A)。実装は要件 027 のあと (027 の人の判断 1) / 棚卸し 2026-11-25: 実装は main に無い (要件定義書のみ。完成条件の [x] が 0 件・テスト ContinueAfterConversion_IsNotLearned が main に無い)
+status: approved   # 2026-11-22 の人の指示「OK、両方おすすめで」(人の判断 1〜4 は、その前の指示「おすすめでお願い」で決定。案 A)。実装は要件 027 のあと (027 の人の判断 1) / 2026-11-25 実装 (fix/continue-after-conversion-learning)。実機は未確認 (done にするのは実機のあと)
 source: 要件 026 (旧 018。ライブ変換の確定の学習。PR #29、ブランチ ccr-0fc8aeab-sra4z7 の docs/requirements/026-live-conversion-learning.md) の記録「範囲外で見つけたこと」(2026-11-22)
 scope: core
 ---
@@ -115,17 +115,18 @@ scope: core
 - 要件の番号の重なり (人の判断 3) の片付け。
 
 ## 完成条件 (先に決める。機械で判定できる形)
-- [ ] テスト (赤 → 緑): `src/Meltype.Core.Tests/ReconvertRomajiTests.cs` に `Reconvert_RomajiSentence_ContinueAfterConversion_IsNotLearned` (名前は仮) を足す。要点: 設定 ON の `MeltypeSession` で `Reconvert("kyouha iitenki desu ne")` から、R1〜R6・R10・R11 の各経路 (Space 0・1・2 回 → `yo` → Enter、`hello` + Space、`kyouhagoogle` + Space、`yo` → `CommitPending()`、`yo` → Shift+Enter、`yo` → Tab) と R9 (`kyouha`) を流し、変換エンジンへの学習 0 回・選び直しの記録 0 件・登録提案 0 件。**実装前は赤** (表のとおり入る)、実装後は緑。
-- [ ] テスト (赤 → 緑): R7 の形 (ライブ変換 ON・`CompositionTests.Keyboard` と `Controller.ReconvertRomaji`) を main のテストにも足し、変換エンジンへの学習が空になることを見る (PR #29 のマージの順に関係なく測れる)。実装前は赤 (今は `きょうはいいてんきですね=きょうはいいてんきですね` が渡る)。
-- [ ] テスト (赤 → 緑): S1・S3 (再変換のあとに続けて変換した文節) で、変換エンジンへの学習・選び直しの記録・登録提案がどれも 0 (人の判断 2 の案 A)。実装前は赤 (表のとおり入る)。設定 OFF の S2・S4 は今のまま (緑のまま)。
-- [ ] 待ち方: 「渡していない」を確かめるテストなので、最後に必ず学習する確定 (対照) を流し、その学習が届くまで待ってから数える (PR #29 の `LiveEnterLearningTests` の `Taught()` と同じ考え。固定の `Thread.Sleep` だけにしない)。
-- [ ] 守りが効いていること: 足した守りの条件を外す (直す所が 2 か所なら 1 か所ずつ) と、上のテストが落ちることを一度確かめて PR に書く。
-- [ ] 守りすぎていないこと: 設定 OFF の同じ手順 (C1・C2) は 0 のまま。既存の `ContinueAfterConversionTests.On_EnterWithoutConvertingTail_LearnsFixedClauses`・`On_EnterCommitsEverything_AndLearnsAllClauses` が通ったまま。N3 (`hashiwo` → 箸を → `kyouhagoogle` + Space で `はしを=箸を` を覚える) のテストを `ContinueAfterConversionTests.cs` に足す (今も緑。今は守るテストが無いので、1951 行の `Learn()` を外すと落ちることを一度確かめる)。
-- [ ] 要件 026 と一緒のとき: PR #29 が先に main に入っていれば、`LiveEnterLearningTests` が全件通ったまま (特に `ContinueAfterConversion_CountsFixedClausesAndLiveRestOnceEach`)。`RomajiReconversion_ContinuedLiveEnter_DoesNotCount` に「変換エンジンへの学習が空 (`Taught()` が空)」の確かめを足し、実装前は赤 (R7) になることを確かめる。PR #29 がまだ入っていなければ、この項目は「対象外 (026 のテストが無い)」と書く (PR #29 の側でどうするかは人が決める)。
-- [ ] 回帰なし: Core のテストが全件通る (base の数字: main 5544133 で 1266/1266。スキップ 6 件は、root の環境で権限を使うテスト 5 件と、ファイルシステムの作成時刻の条件のテスト 1 件。PR #29 の先頭 d5bbd0f は 026 の記録で 1290/1290)。`tools/eval-compare.sh` の broken 0 (判定は変えないので fixed・added・removed も 0 の見込み)。品質テストの基準 (全体 95 %・各カテゴリー 80 %) を満たしたまま。
-- [ ] 文書: 直す所は無い見込み (上の「既存のテストと文書」)。
+- [x] テスト (赤 → 緑。名前は仮のまま採用): `src/Meltype.Core.Tests/ReconvertRomajiTests.cs` に `Reconvert_RomajiSentence_ContinueAfterConversion_IsNotLearned` を足した (実装前は R1〜R6・R9〜R11・S1・S3 が全部赤、R2・R3 は変換エンジンへの学習だけ入る。C1・C2 は 0)。要点: 設定 ON の `MeltypeSession` で `Reconvert("kyouha iitenki desu ne")` から、R1〜R6・R10・R11 の各経路 (Space 0・1・2 回 → `yo` → Enter、`hello` + Space、`kyouhagoogle` + Space、`yo` → `CommitPending()`、`yo` → Shift+Enter、`yo` → Tab) と R9 (`kyouha`) を流し、変換エンジンへの学習 0 回・選び直しの記録 0 件・登録提案 0 件。**実装前は赤** (表のとおり入る)、実装後は緑。
+- [x] テスト (赤 → 緑): R7 の形 (`LiveEnterLearningTests.RomajiReconversion_ContinuedLiveEnter_TeachesNothingToTheConverter`。既存の `RomajiReconversion_ContinuedLiveEnter_DoesNotCount` は、026 のテストなので 028 の確かめを別テストに分けた) (ライブ変換 ON・`CompositionTests.Keyboard` と `Controller.ReconvertRomaji`) を main のテストにも足し、変換エンジンへの学習が空になることを見る (PR #29 のマージの順に関係なく測れる)。実装前は赤 (今は `きょうはいいてんきですね=きょうはいいてんきですね` が渡る)。
+- [x] テスト (赤 → 緑。上のテストの S1・S3 の行): S1・S3 (再変換のあとに続けて変換した文節) で、変換エンジンへの学習・選び直しの記録・登録提案がどれも 0 (人の判断 2 の案 A)。実装前は赤 (表のとおり入る)。設定 OFF の S2・S4 は今のまま (緑のまま)。
+- [x] 待ち方 (対照の `hashiwo` Space Enter の学習が届くまで 10 ms ずつ最大 2 秒待つ): 「渡していない」を確かめるテストなので、最後に必ず学習する確定 (対照) を流し、その学習が届くまで待ってから数える (PR #29 の `LiveEnterLearningTests` の `Taught()` と同じ考え。固定の `Thread.Sleep` だけにしない)。
+- [x] 守りが効いていること (2026-11-25 実測。`Commit` の守りを外すと上の 2 テストが落ち、`TakeFixedClauses` の守りを外すと R4・R5 の行で `ReconvertRomajiTests` の 1 テストが落ちる): 足した守りの条件を外す (直す所が 2 か所なら 1 か所ずつ) と、上のテストが落ちることを一度確かめて PR に書く。
+- [x] 守りすぎていないこと (C1・C2 は 0 のまま。既存の 2 テストは緑。N3 は `ContinueAfterConversionTests.On_JapaneseThenEnglishSpace_LearnsFixedClauses`。`TakeFixedClauses` の `Learn()` を外すと落ちることを確かめた。N1・N2 は既存の `On_EnterWithoutConvertingTail_LearnsFixedClauses` が守る): 設定 OFF の同じ手順 (C1・C2) は 0 のまま。既存の `ContinueAfterConversionTests.On_EnterWithoutConvertingTail_LearnsFixedClauses`・`On_EnterCommitsEverything_AndLearnsAllClauses` が通ったまま。N3 (`hashiwo` → 箸を → `kyouhagoogle` + Space で `はしを=箸を` を覚える) のテストを `ContinueAfterConversionTests.cs` に足す (今も緑。今は守るテストが無いので、1951 行の `Learn()` を外すと落ちることを一度確かめる)。
+- [x] 要件 026 と一緒のとき (026 の `LiveEnterLearningTests` は main に入っていて全件緑。`ContinueAfterConversion_CountsFixedClausesAndLiveRestOnceEach` も緑): PR #29 が先に main に入っていれば、`LiveEnterLearningTests` が全件通ったまま (特に `ContinueAfterConversion_CountsFixedClausesAndLiveRestOnceEach`)。`RomajiReconversion_ContinuedLiveEnter_DoesNotCount` に「変換エンジンへの学習が空 (`Taught()` が空)」の確かめを足し、実装前は赤 (R7) になることを確かめる。PR #29 がまだ入っていなければ、この項目は「対象外 (026 のテストが無い)」と書く (PR #29 の側でどうするかは人が決める)。
+- [x] 回帰なし (2026-11-25: Core 1348/1348 → 1351/1351 (+3 テスト)。`eval-compare` base bc1b603: broken 0 / fixed 0 / added 0 / removed 0。判定 (英語・日本語の振り分け) は変えていないので boundary-sweep は流していない。Swift は変えていないので swift build も不要): Core のテストが全件通る (base の数字: main 5544133 で 1266/1266。スキップ 6 件は、root の環境で権限を使うテスト 5 件と、ファイルシステムの作成時刻の条件のテスト 1 件。PR #29 の先頭 d5bbd0f は 026 の記録で 1290/1290)。`tools/eval-compare.sh` の broken 0 (判定は変えないので fixed・added・removed も 0 の見込み)。品質テストの基準 (全体 95 %・各カテゴリー 80 %) を満たしたまま。
+- [x] 文書: 直す所は無い見込み (上の「既存のテストと文書」)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
+実機で試す手順は、下の各行が「打つ > 期待」。学習の有無は、次に同じ語を打ったときの Space の最初の候補・予測候補・もう一度の再変換の候補で目で見る。まだ実機では試していない (2026-11-25)。
 前提: 入力メニューの「設定・辞書…」→「設定」タブの「変換後も続けて入力できる」を ON。TextEdit で、日本語入力 (「あ」) にして試す。直っていない版で試すと、選び直しの記録と登録提案に誤学習が入る (入力メニューの「学習データをすべて消去…」で消せるが、ほかの学習も消える。登録提案だけなら「辞書の登録提案の履歴を消去」)。長い文は azooKey が文節に分けるので、Space の候補・ライブ表示では直ったかを見分けにくい見込み (推定)。1 文節で済む短い語で試す。直す前の版と比べるときは、1 回ごとに学習データを消すか、別の語で試す (同じ語で続けると、2 回目からはローマ字の再変換を通らない。I4)。
 - [ ] 1 文節で済む短いローマ字の語を選ぶ (例: `arigatou`)。選んで Shift+Space で、候補が「日本語にした語 (ひらがなだけ。例: ありがとう)」と「選んだままの `arigatou`」の 2 つになることを確かめる (ならなければ別の語で。どうなるかは azooKey 次第で未確認)。Space (選んだままの `arigatou`) → 続けて `yo` → Enter。確定は `arigatouよ`。
 - [ ] そのあと `ariga` まで打ったときの予測候補に `arigatou` が出ない。`arigatou` を打ったときのライブ表示も、Space の最初の候補も、`arigatou` (ローマ字) にならない (直す前はなる見込み。I1〜I3・I5 の形。推定)。見るだけで、確定せずに Esc (Space で変換したあとは 2 回) で取り消す (確定すると記録が変わり、次の確かめが崩れることがある)。
@@ -152,6 +153,7 @@ scope: core
 - 実装の順番 (要件 027 の人の判断 1 で、2026-11-22 に決定): 027 を先にして、028 は 027 のあとに進める (どちらも `Commit` の同じ分岐と `ReconvertRomajiTests.cs` を触るので、同時に進めない)。
 
 ## 記録 (ループが書く)
+- 実装 (2026-11-25、レーン R028): 学習するかの判断は Core で、Swift は変えていない。`CompositionController.Commit` の固定した文節の分岐を `if (fixedOnly && !_reconvertRomaji) Learn();` に、`TakeFixedClauses` の `Learn()` を `if (!_reconvertRomaji) Learn();` に変えた (2 行)。得: 再変換の文が変換エンジン・選び直しの記録・登録提案に入らない (案 A なので S1・S3 も)。損: 再変換のあとに続けて変換して選び直した語 (S3 の 箸を) も覚えない (設定 OFF の S4 は覚える。人の判断 2 で受け入れ済み)。日英の学習 (`LearnLanguage`) は触っていない (要件 027)。
 - 下書き: 2026-11-22。要件 026 の記録「範囲外で見つけたこと」から起こした。「今の動き」の表は、写しの木での使い捨てのテストの出力 (コミットしていない)。
 - 下書きの査読 1 周目 (2026-11-22): 止める 0・直す 4・任意 12。直す 4 件 (設定 OFF の言い過ぎと日英の学習の漏れ、続けて変換した文節 (S1〜S4) の期待、実機での出方の推定とチェックリスト、設定の場所) と任意 12 件を、自分のテストで測り直してから入れた。
 - 下書きの査読 2 周目 (2026-11-22): 止める 0・直す 3・任意 5。番号 024 が別のセッションのブランチと重なったので 025 に付け直し (人の判断 3)、チェックリストの「3 回で登録提案が出ない」の確かめを、2 回目の再変換の確かめ (I4) に替え、行番号の書き方をそろえた。任意 5 件も入れた。査読員の推測「ふつうに打って 3 回で登録提案が出る」は、1 語では数えないこと (I5) を測ってから書いた。

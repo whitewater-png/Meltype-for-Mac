@@ -1970,7 +1970,8 @@ public sealed class CompositionController
         if (_headCount == 0) return "";
         var text = FixedText;
         TrimToFixedClauses();
-        Learn();
+        // ローマ字の再変換を含む確定は学習しない (要件 028。Commit の変換中の分岐と同じ規則)
+        if (!_reconvertRomaji) Learn();
         return text;
     }
 
@@ -3116,7 +3117,8 @@ public sealed class CompositionController
         if (converting && !_reconvertRomaji) Learn();
         else
         {
-            if (fixedOnly) Learn();
+            // 固定した文節にローマ字の再変換の文が入っていても学習しない (要件 028)
+            if (fixedOnly && !_reconvertRomaji) Learn();
             if (toggle is null) LearnLanguage();
         }
         // 日英の学習は、ここで 1 回だけ (Learn・LearnLanguage は、打った英字が無い変換ボックスでは日英を書かないので、二重にならない。R41-6)
