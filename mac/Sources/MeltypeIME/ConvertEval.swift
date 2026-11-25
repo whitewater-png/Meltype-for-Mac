@@ -130,7 +130,13 @@ enum ConvertEval {
                 return false
             }
             for name in names {
-                try? FileManager.default.copyItem(at: sourceURL.appendingPathComponent(name), to: memory.appendingPathComponent(name))
+                do {
+                    try FileManager.default.copyItem(at: sourceURL.appendingPathComponent(name), to: memory.appendingPathComponent(name))
+                } catch {
+                    // 途中までのコピーで測ると、学習が欠けたまま「再現できない」と読み違えるので、止める
+                    print("MELTYPE_EVAL_MEMORY_COPY のコピーに失敗しました (\(name)): \(error.localizedDescription)")
+                    return false
+                }
             }
             print("# summary 学習データのコピーを使う: \(names.count) 個のファイル (元は読み取りだけ)")
         }

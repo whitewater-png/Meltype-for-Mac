@@ -369,8 +369,9 @@ final class MeltypeConverter {
     /// (`remember(_:for:)` が覚えた候補を使う。確定のときの `learn` と同じ候補の引き方)。
     /// 覚えた候補に無ければ、その読みを変換し直して探す (10 読みを超える長い文で、古い読みが捨てられていることがある)。それでも無ければ何もしない (戻り値 false。評価の口 `--forget` が見つかったかを出す)。
     /// 変換結果のキャッシュ (resultCache) は、忘れる前の並びのままなので捨てる (忘れたかどうかによらず。引き直すだけで害は無い)。
-    /// azooKey の forgetMemory は、候補を作っている語 (data の各語) の、読みと表層形が一致する学習だけを消す。学習した単位と違う区切りの候補 (しゅう → 週 では、
-    /// がくしゅう → がく週 の学習は消えない) では消えない。実測は docs/requirements/031-forget-conversion-candidate.md。
+    /// azooKey の forgetMemory は、候補を作っている語 (data の各語) の表層形を集め、長期記憶から表層形が一致する項目を消す (読みは見ない。取り消せない)。
+    /// なので、候補を作っている語の別の読みの学習も消えることがある。学習した単位 (がく週 など 1 つの語) と違う区切りの候補では、その単位は消えない。
+    /// 実測は docs/requirements/031-forget-conversion-candidate.md。
     /// メインスレッドから呼ぶ (KanaKanjiConverter はスレッドセーフではない)。
     @discardableResult
     func forgetConversionMemory(reading: String, text: String) -> Bool {
