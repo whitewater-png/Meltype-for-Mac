@@ -214,6 +214,20 @@ internal static class ContinueAfterConversionTests
     }
 
     [Test]
+    public static void On_JapaneseThenEnglishSpace_LearnsFixedClauses()
+    {
+        // 要件 028 の N3: 日本語 + 英語で終わる Space (TakeFixedClauses の経路) でも、固定した文節を学習する (再変換でない普通の変換)
+        var history = new ConversionHistory(null);
+        var k = new CompositionTests.Keyboard(history: history) { Continue = true };
+        k.Type("hashiwo ");
+        var index = k.Host.View!.Candidates.ToList().IndexOf("箸を");
+        for (var i = 0; i < index; i++) k.Type(" ");
+        k.Type("kyouhagoogle ");
+        Assert.Equal("箸をきょうはgoogle ", k.Host.Output.Single());
+        Assert.Equal("箸を", history.Get("はしを"), "日本語 + 英語で終わる確定でも固定した文節を学習する");
+    }
+
+    [Test]
     public static void On_FunctionKeys_ApplyToUnconvertedClauseOnly()
     {
         var k = Converted(on: true);

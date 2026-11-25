@@ -160,6 +160,75 @@ internal static class ReconvertRomajiTests
         }
     }
 
+    [Test]
+    public static void Reconvert_RomajiSentence_ContinueAfterConversion_IsNotLearned()
+    {
+        // 要件 028: 設定「変換後も続けて入力できる」ON で、再変換のあとに続けて打って確定しても、再変換の文を学習しない
+        // (変換エンジンへの学習・選び直しの記録・登録提案のどれにも入れない)。
+        // 「渡していない」を確かめるので、最後に必ず学習する確定 (対照) を流し、その学習が届いてから数える
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            const string sentence = "kyouha iitenki desu ne";
+            var routes = new (string Name, bool On, string Selected, bool ShiftEnter, Action<MeltypeSession> Run)[]
+            {
+                ("R1 Space→yo→Enter", true, sentence, false, s => { Press(s, VirtualKeys.Space); Type(s, "yo"); Press(s, VirtualKeys.Return); }),
+                ("R2 yo→Enter", true, sentence, false, s => { Type(s, "yo"); Press(s, VirtualKeys.Return); }),
+                ("R3 Space×2→yo→Enter", true, sentence, false, s => { Press(s, VirtualKeys.Space); Press(s, VirtualKeys.Space); Type(s, "yo"); Press(s, VirtualKeys.Return); }),
+                ("R4 Space→hello→Space", true, sentence, false, s => { Press(s, VirtualKeys.Space); Type(s, "hello"); Press(s, VirtualKeys.Space); }),
+                ("R5 Space→kyouhagoogle→Space", true, sentence, false, s => { Press(s, VirtualKeys.Space); Type(s, "kyouhagoogle"); Press(s, VirtualKeys.Space); }),
+                ("R6 Space→yo→CommitPending", true, sentence, false, s => { Press(s, VirtualKeys.Space); Type(s, "yo"); s.CommitPending(); }),
+                ("R9 kyouha Space→yo→Enter", true, "kyouha", false, s => { Press(s, VirtualKeys.Space); Type(s, "yo"); Press(s, VirtualKeys.Return); }),
+                ("R10 Space→yo→Shift+Enter", true, sentence, true, s => { Press(s, VirtualKeys.Space); Type(s, "yo"); s.HandleKey(VirtualKeys.Return, null, true, false, false, false); }),
+                ("R11 Space→yo→Tab", true, sentence, false, s => { Press(s, VirtualKeys.Space); Type(s, "yo"); Press(s, VirtualKeys.Tab); }),
+                ("S1 Space→hashiwo→Space→yo→Enter", true, sentence, false, s => { Press(s, VirtualKeys.Space); Type(s, "hashiwo"); Press(s, VirtualKeys.Space); Type(s, "yo"); Press(s, VirtualKeys.Return); }),
+                ("S3 Space→hashiwo→Space×2→yo→Enter", true, sentence, false, s => { Press(s, VirtualKeys.Space); Type(s, "hashiwo"); Press(s, VirtualKeys.Space); Press(s, VirtualKeys.Space); Type(s, "yo"); Press(s, VirtualKeys.Return); }),
+                ("C1 OFF Space→yo→Enter", false, sentence, false, s => { Press(s, VirtualKeys.Space); Type(s, "yo"); Press(s, VirtualKeys.Return); }),
+                ("C2 OFF yo→Enter", false, sentence, false, s => { Type(s, "yo"); Press(s, VirtualKeys.Return); }),
+            };
+            var leaked = new List<string>();
+            foreach (var (name, on, selected, shiftEnter, run) in routes)
+            {
+                var converter = new RecordingConverter();
+                var history = new ConversionHistory(null);
+                var suggestions = new DictionarySuggestions(null);
+                CompositionOptions Options() => new()
+                {
+                    History = history, Suggestions = suggestions, DictionarySuggest = () => true, DictionarySuggestThreshold = () => 1,
+                    ContinueAfterConversion = () => on, ShiftEnterNewline = () => shiftEnter,
+                };
+                var session = Create(Options(), converter);
+                Assert.True(session.Reconvert(selected).Consumed, name + ": 再変換が始まっている");
+                run(session);
+                session.CommitPending();
+                // 対照: 普通の変換 (Space → Enter) は必ず学習する。これが届いたら、先に渡した分も届いている
+                var control = Create(Options(), converter);
+                Type(control, "hashiwo");
+                Press(control, VirtualKeys.Space);
+                Press(control, VirtualKeys.Return);
+                var arrived = false;
+                for (var i = 0; i < 200 && !arrived; i++)
+                {
+                    lock (converter.Learned) arrived = converter.Learned.Any(l => l.Contains("はしを=", StringComparison.Ordinal) && !l.Contains("kyouha", StringComparison.Ordinal) && !l.Contains("きょう", StringComparison.Ordinal));
+                    if (!arrived) Thread.Sleep(10);
+                }
+                Assert.True(arrived, name + ": 対照の学習が届く");
+                string learned;
+                lock (converter.Learned) learned = string.Join(" / ", converter.Learned.Where(l => l.Contains("kyouha", StringComparison.Ordinal) || l.Contains("きょう", StringComparison.Ordinal)));
+                var records = history.Entries().Where(e => e.Reading != "はしを").Select(e => $"{e.Reading}={e.Text}").ToList();
+                var pending = suggestions.Pending(1).Where(w => w.Word != "箸を").Select(w => w.Word).ToList();
+                if (learned.Length > 0 || records.Count > 0 || pending.Count > 0)
+                    leaked.Add($"{name} (変換エンジン: {learned} / 記録: {string.Join(",", records)} / 登録提案: {string.Join(",", pending)})");
+            }
+            Assert.True(leaked.Count == 0, "再変換の文を学習してしまった経路: " + string.Join(" || ", leaked));
+        }
+        finally
+        {
+            CompositionTests.Detector.SpellChecker = savedChecker;
+        }
+    }
+
     private static string Dump(LanguageMemory langs) =>
         string.Join(", ", langs.Entries().Select(e => $"{e.Word}={(e.English ? "英" : "日")}x{e.Count}"));
 
