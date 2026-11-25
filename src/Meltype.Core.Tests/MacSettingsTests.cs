@@ -190,6 +190,24 @@ internal static class MacSettingsTests
         finally { restore(); }
     }
 
+    /// <summary>要件 035: Zenzai の案内は、得 (同音異義語) と損 (ダウンロード・遅さ・古い Mac は未確認) の両方を書く。選別した表の数字は出さない。既定は OFF のまま。</summary>
+    [Test]
+    public static void Zenzai_Guidance_SaysBothSides_NoCherryPickedNumbers()
+    {
+        var item = MacSettingsCatalog.Items.Single(i => i.Key == nameof(Settings.Zenzai));
+        Assert.True(!new Settings().Zenzai, "既定は OFF のまま");
+        var summary = item.Summary!;
+        Assert.True(summary.Contains("同音異義語") && summary.Contains("74 MB") && summary.Contains("遅く"), "要約に 得 と 損 (ダウンロード・遅さ) がある: " + summary);
+        foreach (var text in new[] { item.DisplayDescription, item.Description })
+        {
+            Assert.True(text.Contains("同音異義語") && text.Contains("74 MB") && text.Contains("遅く"), "説明に 得 と 損 がある: " + text);
+            Assert.True(!text.Contains("82.5") && !text.Contains("44.0") && !System.Text.RegularExpressions.Regex.IsMatch(text, @"\d+(\.\d+)?\s*%"), "選別した表の数字 (%) を画面に出さない: " + text);
+        }
+        var detail = item.DisplayDescription;
+        Assert.True(detail.Contains("M4 Max") && detail.Contains("未確認") && detail.Contains("送りません"), "詳しくに、測った機械・未確認・送らないことがある");
+        Assert.True(item.Example is { } e && e.Contains("→") && e.Contains("石"), "例がある");
+    }
+
     [Test]
     public static void Zenzai_DefaultsOff_SavesAndReloads()
     {

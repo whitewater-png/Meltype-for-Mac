@@ -83,6 +83,7 @@ internal static class MacSettingsCatalog
     {
         [nameof(Settings.LiveConversion)] = "Space を押さなくても、打ったそばから漢字に変換して表示します。",
         [nameof(Settings.DetectionLevel)] = "英語か日本語かを自動で見分ける強さ。積極的 = 英語らしければすぐ英字 / 標準 = 短い語 (no, to, ga) は前後が英語のときだけ英字 / 慎重 = 確信度が高いときだけ英字 / 手動 = 自動では切り替えず提案だけ (変換ボックスで Tab を押すと提案どおり英字に)。",
+        [nameof(Settings.Zenzai)] = "前後の文脈を見て漢字を選ぶ変換モデル (Zenzai) を使い、同音異義語 (公園/講演、石/医師 など) の第一候補が合いやすくなります。引き換えに、(1) 初めて ON にしたとき、モデル (約 74 MB) を Hugging Face から 1 回ダウンロードします (終わるまでは今までどおりの変換。取得するのはモデルだけで、打った内容は送りません)、(2) 変換が少し遅くなり、メモリも使います、(3) 速さは M4 Max でしか測っておらず、古い Mac での速さは未確認です。1 キーの変換が 0.3 秒を超えることが 3 キー続くと、入力プログラムが起動し直されるまで自動で使わなくなります (ここの設定は ON のまま)。OFF に戻せば、いつでも今までの変換になります。",
         [nameof(Settings.InputStyle)] = "ローマ字入力 / かな入力 (JIS)。かな入力は JIS キーボード専用の実験的な機能です (US 配列では使えません)。JIS かな配列で入力し (Shift+E = ぃ, Shift+Z = っ, Shift+ね = 、、濁点・半濁点は直前のかなに付く)、打ったキーの英字が英単語なら英字で見せます。JIS キーボード以外 (US 配列など) では、かな入力にしてもローマ字入力のまま動きます。変えると、次に打つ文字から効きます。",
         [nameof(Settings.CorrectTypos)] = "Space・Enter で変換・確定するときに打ち間違いを直します。ローマ字: 読めない子音が残ったとき、隣のキーの押し間違い・入れ替わり・抜けを 1 文字だけ直します (onegaishimsu → お願いします、sumimasne → すみません。よく使う語の読みになるときだけ)。英語: 同梱のよくある打ち間違いの一覧にある語を直します (teh → the、recieve → receive)。",
         [nameof(Settings.FileLog)] = "~/Library/Application Support/Meltype/meltype.log にログを書きます (OFF のときは書きません)。判定した語の先頭の数文字・アプリ名・入力欄の名前が含まれます。確定した文字列などは「ログに入力した文字を残す」が ON のときだけ残ります。",
@@ -102,7 +103,7 @@ internal static class MacSettingsCatalog
     private static readonly Dictionary<string, string> MacSummaries = new()
     {
         [nameof(Settings.LiveConversion)] = "Space を押さなくても、打ったそばから漢字に変換して表示します。",
-        [nameof(Settings.Zenzai)] = "ON にすると、初回だけ変換モデル (約 74 MB) をダウンロードします。文脈に合う漢字が先頭に来やすくなります。",
+        [nameof(Settings.Zenzai)] = "同音異義語 (公園/講演 など) に強くなります。初回に約 74 MB を取得し、変換は少し遅くなります。",
         [nameof(Settings.InputStyle)] = "ローマ字入力か、かな入力 (JIS キーボード専用・実験的) かを選びます。",
         [nameof(Settings.CustomRomajiTable)] = "自分で書いたローマ字の綴り (dictionaries/romaji.tsv) を、標準の綴りより優先します。",
         [nameof(Settings.Prediction)] = "ひらがなを数文字打つと、続きの候補を変換ボックスの下に出します (Tab で選ぶ)。",
@@ -149,6 +150,7 @@ internal static class MacSettingsCatalog
     private static readonly Dictionary<string, string> MacExamples = new()
     {
         [nameof(Settings.LiveConversion)] = "kyouhagoogledekensaku → 今日はgoogleで検索 (Space なし)",
+        [nameof(Settings.Zenzai)] = "いしをひろった → 石を拾った (OFF では 意志を拾った)",
         [nameof(Settings.InputStyle)] = "かな入力: Shift+E → ぃ、Shift+Z → っ",
         [nameof(Settings.CustomRomajiTable)] = "表に ry[タブ]らい と書くと ry → らい",
         [nameof(Settings.KanaInJapaneseMode)] = "日本語の中の exe → えぇ (拡張子の .exe は英字のまま)",
@@ -184,7 +186,7 @@ internal static class MacSettingsCatalog
             "Keyboard モードで、Space を押さなくても打ったそばから漢字に変換して表示します。",
             BasicGroup, s => s.LiveConversion, (s, v) => s.LiveConversion = v),
         Bool(nameof(Settings.Zenzai), "Zenzai (ニューラル変換、実験的)",
-            "文脈に合う漢字が先頭に来やすくなります。ON にすると変換モデル (約 74 MB) を 1 回だけダウンロードします。ダウンロードが終わるまでは今までどおりの変換です。",
+            "前後の文脈を見て漢字を選ぶので、同音異義語 (公園/講演、石/医師 など) が合いやすくなります。引き換えに、ON にすると変換モデル (約 74 MB) を 1 回だけダウンロードし、変換が少し遅くなります。ダウンロードが終わるまでは今までどおりの変換です。",
             BasicGroup, s => s.Zenzai, (s, v) => s.Zenzai = v),
         Choice(nameof(Settings.InputStyle), "入力方式",
             "ローマ字入力 / かな入力 (JIS) / 両方を判定。Meltype キーボードでは、かな入力を選ぶと JIS かな配列で入力し (Shift+E = ぃ, Shift+Z = っ, Shift+ね = 、)、打ったキーの英字が英単語なら英字で見せます。「両方を判定」は IME 自動切替のみ (Meltype キーボードではローマ字入力)。",
