@@ -488,6 +488,7 @@ public sealed class CompositionText
         var last = count;
         if (extra.Length == 0 && count > start && _units[count - 1].Raw is "t" or "T") last = count - 1;
         else if (extra is not ("t" or "T")) return false;
+        if (ReadsAsJapaneseAfterParticle(start, last)) return true;
         var kana = "";
         for (var i = last - 1; i >= 0; i--)
         {
@@ -497,6 +498,27 @@ public sealed class CompositionText
         }
         return false;
     }
+
+    /// <summary>
+    /// 英単語が「助詞の単位 + 1 音 + 最後の t」(と|て|mo|a|t の moat・he|a|t の heat・de|bu|t の debut) で、助詞の前が かな のとき、
+    /// 助詞の次の 1 音 + t + s の つ を読むと日本語の語かその頭になるか (あつ・おつ・うつ・いつ・ぶつ)。要件 033。
+    /// 助詞から読む <see cref="ReadsAsJapaneseWithTsu"/> の本体は「もあつ」「てもあつ」…しか見ないので、totemoatsui が とてもatすい になっていた。
+    /// 得: 今日も暑い・とても暑い・ここでも暑い・それもお疲れさま が英字に割れない。
+    /// 損: かな + 助詞のすぐ後ろに空白なしで続けた heats・moats・toots などの複数形が、Enter で へあts のように割れる
+    /// (語の頭・空白の後ろは今までどおり英単語)。助詞の次が 2 音以上の語 (moment・deceit) は対象にしない (きょうはmomentする を守る)。
+    /// </summary>
+    private bool ReadsAsJapaneseAfterParticle(int start, int last)
+    {
+        if (start < 1 || start + 2 != last || !IsParticleUnit(_units[start]) || !IsKanaUnit(_units[start - 1]) || !IsKanaUnit(_units[start + 1])) return false;
+        var reading = _units[start + 1].Kana + "つ";
+        return _detector.IsJapaneseWordOrPrefix(reading) || TypoCorrector?.IsReadingPrefix(reading) == true;
+    }
+
+    private static bool IsParticleUnit(CompositionUnit unit) =>
+        unit.Kana is "も" or "は" or "が" or "を" or "に" or "で" or "と" or "の" or "へ" or "や" && unit.Raw.All(char.IsAsciiLetter);
+
+    private static bool IsKanaUnit(CompositionUnit unit) =>
+        unit.Raw.Length > 0 && unit.Raw.All(char.IsAsciiLetter) && unit.Kana.Length > 0 && unit.Kana.All(c => c is >= 'ぁ' and <= 'ゖ' or 'ー');
 
     /// <summary>
     /// 単位 i が、前の かな (o・u の段) を伸ばす う (そ|u・ほんと|u) か。本家 7a20aff。
