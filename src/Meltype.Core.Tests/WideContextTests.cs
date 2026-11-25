@@ -94,6 +94,23 @@ internal static class WideContextTests
     }
 
     [Test]
+    public static void Context_IsNullAfterEnglish_InSameInput()
+    {
+        // 要件 036 (見送り): 同じ入力の中で確定済みの英語 (excel・python) の直後の日本語にも、広い文脈は渡さない (今の動きを固定)。
+        // 英語を文脈に入れる案は測って見送った (docs/requirements/036-wide-context-english.md)。変えるなら、そこの測定をやり直す
+        foreach (var wide in new[] { true, false })
+        {
+            foreach (var typed in new[] { "excelnohyouwookurimasu ", "pythondekaita ", "excel nohyouwookurimasu " })
+            {
+                var converter = new RecordingConverter();
+                var k = new CompositionTests.Keyboard(converter: converter) { WideContext = wide };
+                k.Type(typed);
+                Assert.True(converter.Calls.Count > 0 && converter.Calls.All(c => c.Context is null), $"wide={wide} {typed}: 英語の後ろの日本語は文脈なしで変換する");
+            }
+        }
+    }
+
+    [Test]
     public static void ClauseRule_StillAppliesToWideContext()
     {
         // 前の文に「記号等」があると、変換エンジンは き|ごうとう と区切りを変える。広い文脈でも、区切りが違えば文脈なしを採る
