@@ -87,3 +87,6 @@ scope: core
   - [任意・対応] `docs/AGENT_STATE.md` の 041 の行に査読の周回数が無い → 2 周と書いた。
   - [任意・範囲外] `docs/AGENT_STATE.md` の基準の数字の Core 件数が 1301 (030 の後) のまま → 基準の数字は測った HEAD と組で書く表なので、この要件では変えない (次に基準を測り直すときに直す)。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/33
+
+## 人の判断
+- **決定 (2026-11-25 リョウさん「おすすめで」): main に取り込む (PR #33、旧 031)。要件番号は main の 031・032 と重なるので付け替えた**
