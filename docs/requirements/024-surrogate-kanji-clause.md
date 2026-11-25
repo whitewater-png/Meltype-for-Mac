@@ -1,6 +1,6 @@
 ---
 title: サロゲートペアの漢字 (𠮷・𩸽) だけの文節を「記号だけ」とみなし、変換・確定がひらがなになる
-status: approved   # 2026-11-22 の人の指示「案 A で approved にして、PR を作って」(「人の判断」の 1 の決定) / 棚卸し 2026-11-25: 実装は main に無い (要件定義書のみ。IsSymbolOnly は UTF-16 のまま・サロゲートのテスト無し)
+status: approved   # 2026-11-22 の人の指示「案 A で approved にして、PR を作って」(「人の判断」の 1 の決定) / 実装 2026-11-25 (ブランチ fix/surrogate-kanji-clause。実機の確認待ちで approved のまま) / 棚卸し 2026-11-25: 実装は main に無かった (要件定義書のみ。IsSymbolOnly は UTF-16 のまま・サロゲートのテスト無し)
 source: PR #29 の要件 017 (前の文を Zenzai に渡す。ブランチ ccr-0fc8aeab-sra4z7) の作業中に見つけた不具合 (2026-11-22)
 scope: core
 ---
@@ -263,22 +263,23 @@ $ dotnet run -c Release --no-build --project src/Meltype.Core.Tests -- Scratch02
 - Windows・Linux: 対象外。
 
 ## 完成条件 (先に決める。機械で判定できる形)
-- [ ] テスト (先に赤): 新しいファイル `src/Meltype.Core.Tests/SurrogatePairTests.cs` に次の 6 つを足す (開いている PR #29 が `CompositionTests.cs` を変えているので、衝突しないよう別のファイルにする)。偽の変換エンジンは「読み → 文節」を返す小さなもの (再現 2・4 と同じ形)。**実装前に 1・2・5・6 が赤になることを確かめる。**
+> 実装 2026-11-25 (ブランチ `fix/surrogate-kanji-clause`、base = main `bc1b603`)。実測の数は末尾の「記録」の「実装の記録」に書いた。テストは 6 つに、異体字セレクタ・結合文字・絵文字の列を固定する 7 つ目 (`Req024_VariationSelectorsAndCombiningMarks`) を足した。
+- [x] テスト (先に赤): 新しいファイル `src/Meltype.Core.Tests/SurrogatePairTests.cs` に次の 6 つを足す (開いている PR #29 が `CompositionTests.cs` を変えているので、衝突しないよう別のファイルにする)。偽の変換エンジンは「読み → 文節」を返す小さなもの (再現 2・4 と同じ形)。**実装前に 1・2・5・6 が赤になることを確かめる。**
   1. `Req024_SurrogateKanjiClause_StaysFirst`: よし → 𠮷・ほっけ → 𩸽・よしよし → 𠮷𠮷 のそれぞれで、`yoshi`・`hokke`・`yoshiyoshi` + Space の文節と先頭の候補が変換エンジンの答え (𠮷・𩸽・𠮷𠮷) で、+ Enter の確定も同じ。複数の文節の形として、[よし → 𠮷][さん] で `yoshisan` + Space の文節が `𠮷` と `さん`、Enter で `𠮷さん`。今: よし・ほっけ・よしよし (A1〜A3)、`よし` と `さん`・`よしさん` (M1)。
   2. `Req024_SurrogateKanjiClause_LiveConversion`: ライブ変換 ON で `yoshiyoshi` の表示が `𠮷𠮷`、Enter の確定も `𠮷𠮷`。今: どちらも よしよし (A4)。
   3. `Req024_SymbolOnlyClause_StaysBehindHiragana` (守り): から → ～ で `kara` + Space の候補の先頭 2 つが `から,～`・Enter で `から`。にこにこ → 😊 で `にこにこ,😊`・Enter で `にこにこ`。今も通る (B3・B4)。
   4. `Req024_BmpAndMixedClauses_Unchanged` (守り): よし → 吉 で `yoshi` + Space + Enter が `吉`、よしのや → 𠮷野家 で `yoshinoya` + Space + Enter が `𠮷野家`。今も通る (B1・B2)。
   5. `Req024_Context_FromTextBeforeCaret_DoesNotSplitSurrogatePair`: キャレットの前が `𠮷あいうえおかきくけ` (11 単位) で `kawa` + Space のとき、変換エンジンに渡る文脈が `あいうえおかきくけ` (9 単位)。`𠮷あいうえおかき` (9 単位) なら `𠮷あいうえおかき` のまま。切り目が上位サロゲートに当たる `あ𠮷あいうえおかきく` (11 単位) なら `𠮷あいうえおかきく` (10 単位) のまま (落としすぎない)。今: C1 は U+DFB7 + `あいうえおかきくけ`、C2・C3 は期待どおり。
   6. `Req024_Context_FromOwnCommits_DoesNotSplitSurrogatePair`: Mac の経路 (`MeltypeSession`。入力欄の文字は渡さない) で、`yoshinoya` + Space + Enter (𠮷野家) → `aiueokaki` + Enter → 何も入力していないときの Space 10 回 → `kawa` + Space のとき、変換エンジンに渡る文脈が `野家あいうえおかき` (9 単位)。今: U+DFB7 + `野家あいうえおかき` (D1)。案 A では、このテストは `ContextOf` の「いつも落とす」で緑になる (記録の切り方は確かめない。再現 4 の試しの直しで緑の形になった)。
-- [ ] 守りのテスト 3・4 は、わざと崩した木で赤になることを一度確かめ、記録欄に書く: `IsSymbolOnly` を一時的に「いつも false」にすると 3 が赤 (既存のテストは 1266/1266 のまま)、「いつも true」にすると 4 が赤 (既存のテストも 1156/1266 に落ちる)。どちらも確かめた後に戻す。
-- [ ] 回帰なし:
+- [x] 守りのテスト 3・4 は、わざと崩した木で赤になることを一度確かめ、記録欄に書く: `IsSymbolOnly` を一時的に「いつも false」にすると 3 が赤 (既存のテストは 1266/1266 のまま)、「いつも true」にすると 4 が赤 (既存のテストも 1156/1266 に落ちる)。どちらも確かめた後に戻す。
+- [x] 回帰なし:
   - Core のテストが全件通る (base の main `5544133` は 1266/1266。クラウド Linux)。
   - `tools/eval-compare.sh` の broken 0。
   - `tools/boundary-sweep.sh <base-tree> <new-tree> <out-dir> light` の違いが 0 件 (`compare.md` の日本語の損失・英語の損失・その他の変化がどれも 0。終了コード 0 だけでは「その他の変化」を見落とす)。
   - 品質テスト (`-- --eval`) の出力が base と同じ。
   - どれも既定の偽の変換エンジンで打つので、この直しの効果は出ない見込み (違いが出たら意図しない変化)。
   - `tools/boundary-sweep.sh` は今は PR #29 の要件 015 にだけあり、main に無い。PR #29 が main に入る前に着手するなら、PR #29 の写しにある `tools/boundary-sweep.sh` に base と new の木を渡して使う (道具は渡された 2 つの木を比べる)。入力の一覧は道具のある木の辞書から作られる。main は分岐点 `20736db` の後に `dictionaries/english.txt` に 3 語 (pazolite・oeksound・obsidian) を足しているので、PR #29 の写しで作る入力は、main の辞書で作る入力とその分だけ違う。
-- [ ] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ。`サロゲート` で探して 0 件)。
+- [x] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ。`サロゲート` で探して 0 件)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 azooKey の候補は Core では測れないので、まず並びを記録する。文脈の直しの効果 (Zenzai の左文脈の先頭が U+FFFD かどうか) は画面に出ないので、その項目は落ちないことだけを確かめる。
@@ -337,3 +338,35 @@ azooKey の候補は Core では測れないので、まず並びを記録する
 - 査読 2 周目 (2026-11-22、同じエージェント): 止める 0・直す 0・任意 7。任意 1〜6 (「どの案でも」の言い過ぎ・か所の数え方・候補が先頭 6 つまでの注・記録を使う所の言い過ぎ・LESSONS の原因の当て方・PR #29 に当てた木のテストの数) と、7 の後半 (査読員の読み違いを LESSONS に 1 行) を反映した。7 の前半 (今回の決まりを `docs/requirements/TEMPLATE.md` にも書く) は依頼の範囲の外なので、人の判断に残す。
 - 査読 3 周目 (2026-11-22、同じエージェント。2 周目の後の差分だけ): 止める 0・直す 0・任意 1 (非目標の、記録を使う所の一覧に「など」を足す) を反映した。査読を終える。
 - 承認 (2026-11-22): 人の指示「案 A で approved にして、PR を作って」で approved (案 A)。minimum 3・非目標・テスト 6 を案 A の決定に合わせて書き直した。この要件定義書の PR #30 を作った。実装は未着手 (`/improve 024` で回す)。
+- 実装の記録 (2026-11-25、ブランチ `fix/surrogate-kanji-clause`。base = main `bc1b603`、基準 1348/1348):
+  - **変えたのは 2 か所** (`src/Meltype.Core/Composition/CompositionController.cs`): `IsSymbolOnly` を `text.EnumerateRunes().Any(Rune.IsLetterOrDigit)` (コードポイント) に。`ContextOf` は末尾 10 単位で切ったあと、先頭が下位サロゲート単独なら落とす (`WideContextOf` と同じ形)。記録を切る 5 か所は案 A のとおり変えていない。Swift は変えていない。
+  - **先に赤**: テストを足した変更前の Core で 7 つ中 5 つが赤 (1 `StaysFirst`・2 `LiveConversion`・5 `FromTextBeforeCaret`・6 `FromOwnCommits`・7 `VariationSelectorsAndCombiningMarks`)、守りの 3・4 は緑。直した後は 7/7 緑。5 の実際の出力は U+DFB7 + `あいうえおかきくけ`、6 は U+DFB7 + `野家あいうえおかき` で、再現 2 の C1・D1 と同じ。
+  - **わざと崩した木** (確かめた後に戻した): `IsSymbolOnly` を「いつも false」にすると 3 (と 7 の絵文字の列) だけが赤で、既存の 1348 件は緑のまま (1353/1355)。「いつも true」にすると 4 が赤になり、既存のテストも 139 件落ちる (1216/1355)。規則そのものは、既存のテストでは「いつも false」を検出できないので、3 と 7 が初めてこの規則を守る。
+  - **全件テスト**: 1348/1348 → 1355/1355 (新規 7 件)。
+  - **eval-compare** (base = `bc1b603` の木): 804/905 → 804/905、broken 0 / fixed 0 / added 0 / removed 0。`--eval` の出力 (20 行) は base と md5 一致 (`5c5e2c61…`)。
+  - **boundary-sweep full** (base = `bc1b603`): 684,122 入力で日本語の損失 0 / 英語の損失 0 / その他の変化 0。既定の偽の変換エンジンは 𠮷 を返さないので、変わらないのが期待どおり (変わったら意図しない変化)。生データは作業木の外に置いた。
+  - **受け入れた変化 (表の予想との照合)**: テスト 1・2・5・6・7 の出力が表の「試しの直し」の列になった。Z1〜Z4 (𝟘・𐀀・𠀋・𠮷～) は、BMP の外の「字」(漢字以外の数字・線文字を含む) を返す変換エンジンのとき、先頭が変換エンジンの答えになる (漢字だけでなく Letter / DecimalDigitNumber の全部。要件の minimum 1 の書き方どおり)。固定したのは 𠮷・𩸽・異体字セレクタ・結合文字・絵文字で、Z1〜Z4 は固定していない (実機で出る見込みが無いため)。
+  - **異体字セレクタ・結合文字** (テスト 7 で固定): 漢字 + U+FE0F・U+E0100 (IVS)・濁点の結合文字は漢字を含むので記号だけでない (変換エンジンの答えが先頭)。BMP の漢字 + IVS も同じ。絵文字 + U+FE0F・肌色・ZWJ で繋いだ絵文字は記号だけのまま (ひらがなが先)。文脈: 切り目が 𠮷 の下位サロゲートに当たると、残った IVS (U+E0100) から始まる (落とすのは下位サロゲート単独だけ。IVS・結合文字で始まる文脈は直さない。Zenzai の左文脈に出る影響は測れていない)。
+  - **実際の azooKey は 𠮷・𩸽 を返すか** (3 つ目の人の判断の材料。`MeltypeIME --convert-eval --top`、base `bc1b603` を `swift build` したもの): Zenzai OFF の上位 12・Zenzai ON (`zenz-v3.1-small-Q5_K_M`) の上位 20 の候補に、`よし`・`ほっけ`・`よしさん`・`よしのや`・`よしだ`・`つちよし`・`ほっけの`・`じょう` と、左文脈付きの `よしのや`・`よし` のどれにも 𠮷・𩸽・𠀋 は無かった (`よし` の先頭は よし・ヨシ・吉・義、`よしのや` は 吉野家・吉野や)。**今の azooKey (と Zenzai) では、この不具合は実機で目に見えない**。直しは、変換エンジンが BMP の外の漢字を返すようになったとき (azooKey の更新・別の変換エンジン) の備え。
+  - **同じ種類の判定の洗い出し** (`git grep` で `char.IsLetter`・`IsLetterOrDigit`・`IsSymbol`・`IsPunctuation`・`IsDigit`・`IsLowSurrogate` などを `src/` で探した。`IsAscii…` は ASCII だけを見るので対象外):
+    - 直した: `CompositionController.IsSymbolOnly` (文節の記号判定)、`ContextOf` (文脈の切れ目)。
+    - 既に安全: `WideContextOf` (先頭の下位サロゲートを落とす)・`DictionaryManagement.Tail`/`Head`・`LanguageMemory` 469 行・`TermDomains.User` 172・341 行 (ペアを切らない)。
+    - 範囲外 (直さない。1 単位ずつ見るので、BMP の外の字はどれも「文字でも記号でもない」側に落ちる):
+      - `CompositionController` の数式 (かける・わる) の後ろの判定 `char.IsLetter(following)` (今 2447 行): 後ろの最初の字が 𠮷 などだと「文の終わり」とみなして × ÷ にしうる。
+      - `LengthForLiveConversion` の `char.IsLetterOrDigit` (読みはかななので影響なし)。
+      - `CompositionText` の全角 ！〜～ を半角にする `!char.IsLetterOrDigit` (BMP の全角の範囲だけ)。
+      - `DictionarySuggestions` 103 行の `IsPunctuation`・`IsSymbol` (単語に絵文字などの記号があるかを見る。サロゲートは記号と数えない)。
+      - `Input/LineContext` 102・133・235 行の `char.IsLetterOrDigit` (引用符・拡張子の前後の字の判定)。
+      - Windows の `src/Meltype/Composition/ColorTextRenderer.cs` の `char.IsSurrogate` (絵文字の判定)。
+    - 記録を切る 5 か所 (`[^20..]`) と `CODE_REVIEW_2026-10.md` の L1a-5・L1b-6・L7-4 は、文書の非目標のとおり。
+
+## Mac 実機で試す手順 (打つ > 期待)
+実機の入れ替えは AI はしていない。リョウさんが入れ替えたあとの確認用。**今の azooKey は 𠮷・𩸽 だけの文節を返さない (上の「実装の記録」)ので、「𠮷 が先頭になる」ことは実機では再現できない。** ユーザー辞書・学習は規則より先に先頭を決める (`ContextRules`・`History` が先) ので、これらに 𠮷 を入れても変更前後で同じになる (E1b)。そのため、実機の確認は「何も壊れていない」ことと「𠮷 を出せる経路が今までどおり」を見る。
+1. ユーザー辞書に 読み `よし`・単語 `𠮷` を登録 → TextEdit で `yoshi` + Space > 先頭が 𠮷、Enter で 𠮷 が入る (変更前も同じ)。
+2. 𠮷 を 1 回選んで確定 (Space を押して候補から選ぶ) → もう一度 `yoshi` + Space > 𠮷 が先頭 (学習。変更前も同じ)。
+3. `yoshinoya` + Space > 候補に 𠮷野家 が出るなら選んで Enter > 表示と確定が同じ (出ない環境ではユーザー辞書に よしのや → 𠮷野家 を登録して同じことをする)。
+4. `kara` + Space > `から` が先頭で `～` は後ろ (記号だけの文節の規則が壊れていない)。`nikoniko` + Space > ひらがなが先頭 (絵文字の候補があっても)。
+5. `yoshi`・`hokke`・`yoshisan` + Space > 候補の並びを記録する (azooKey が 𠮷・𩸽 を出し始めたら、その読みで先頭が 𠮷・𩸽 になり Enter で入る = この直しの効果)。
+6. Zenzai ON・OFF のそれぞれで、𠮷野家 を確定した直後 (1.5 秒以内) に `kawa` + Space > 落ちずに候補が出る (文脈の先頭の直しは画面に出ない。落ちないことだけ)。
+7. TextEdit に `𠮷あいうえおかきくけ` を貼り付け、その後ろで `kawa` + Space > 落ちずに候補が出る (11 単位。切り目がペアの途中に当たる形)。
+8. Safari のフォーム: `yoshi` + Space + Enter > TextEdit と同じ結果。

@@ -2572,14 +2572,18 @@ public sealed class CompositionController
         if (string.IsNullOrEmpty(text) || LanguageOf(text) != false) return null;
         var start = text.LastIndexOfAny(SentenceEnds);
         text = text[(start + 1)..].Trim();
-        return text.Length == 0 ? null : text.Length > 10 ? text[^10..] : text;
+        if (text.Length > 10) text = text[^10..];
+        // サロゲートペアの途中から始めない (要件 024)。ここで切ったときだけでなく、自分の確定の記録 (_lastCommitText) が 20 単位で切ってあるときもある
+        if (text.Length > 0 && char.IsLowSurrogate(text[0])) text = text[1..];
+        return text.Length == 0 ? null : text;
     }
 
     private static readonly char[] SentenceEnds = ['。', '！', '？', '\n', '\r'];
 
     private static readonly HashSet<string> Particles = ["は", "が", "を", "に", "で", "と", "も", "へ", "の", "や", "か", "から", "まで", "より"];
 
-    private static bool IsSymbolOnly(string text) => text.Length > 0 && !text.Any(char.IsLetterOrDigit);
+    // コードポイントで見る (要件 024)。𠮷・𩸽 は UTF-16 では 2 単位 (サロゲート) で、char.IsLetterOrDigit は false を返す。単独のサロゲートは U+FFFD (記号) で数える
+    private static bool IsSymbolOnly(string text) => text.Length > 0 && !text.EnumerateRunes().Any(Rune.IsLetterOrDigit);
 
     private static void Prefer(Clause clause, string text)
     {
