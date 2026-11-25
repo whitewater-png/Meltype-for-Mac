@@ -253,3 +253,5 @@ env into instal
 endif elifndef pragma
 # --- 本家 #1763 (obsidian が おbしぢあn になる。o が読めて b が残り、確定では おんしぢあん になる) ---
 obsidian
+# --- 本家 #2312 (vuln)・#1487 (alma): 打っている間は英字なのに、確定直前の打ち間違いの補正が l を o と読み直し、Enter で ゔおん・あおま になる (要件 032) ---
+vuln alma
