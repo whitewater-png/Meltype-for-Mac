@@ -22,26 +22,27 @@ scope: core
   - `jp_tsu.txt` (つ を含む読み 1,583 語 × 14 の前置き = 22,162 入力): remote が 27 行 (すべて 前置き それも)。
 
 ## minimum の要件 (これだけは満たす)
-1. 英語の区間が english-readable.txt の語で、その語の途中の単位が助詞で、前の単位から助詞の前まで (そ|れ) が日本語の語 (readings.txt・brands.txt の読み)、助詞の後ろ (て|いしゅつ) が 2 音以上の日本語の語の頭になるなら、その区間は英語にしない (`ReadableWordSplitsIntoJapanese`)。
-2. 英語の remote は今までどおり: 語の頭 (`remote`・`remoteishutsu`・`remotes`)、空白の後ろ (`sore remotetsudau`)、助詞のすぐ後ろ (`kyouharemotesuru`・`sorenoremotetsudau`・`sorekaremote`)、日本語の後ろ (`kyouremoteishutsu`)、後ろが日本語として読めない (`kyouharemoteworkdesu`)、打ちかけの `soremote`。
+1. 英語の区間が english-readable.txt の語で、その語の途中の単位が助詞で、前の単位から助詞の前まで (そ|れ) が**代名詞 (それ・これ・あれ・どれ・かれ・だれ)**、助詞の後ろ (て|いしゅつ) が 2 音以上の日本語の語の頭になるなら、その区間は英語にしない (`ReadableWordSplitsIntoJapanese`)。代名詞は入力の先頭・助詞の後ろ (きょうも + それも…) にあるときだけ。前が助詞でない かな (やまだ|れもて の だれ、つく|れもて の くれ) や、助詞と同じ音で終わる語 (とも|あれ、わ|かれ、もの|わかれ) の途中は対象にしない。
+2. 英語の remote は今までどおり: 語の頭 (`remote`・`remoteishutsu`・`remotes`)、空白の後ろ (`sore remotetsudau`)、助詞のすぐ後ろ (`kyouharemotesuru`・`sorenoremotetsudau`・`sorekaremote`)、日本語の後ろ (`kyouremoteishutsu`)、後ろが日本語として読めない (`kyouharemoteworkdesu`)、打ちかけの `soremote`、**日本語の語 + remote** (`yamadaremoteishutsu`・`tsukuremoteishutsu`・`kaisharemoteishutsu`・`bokuremotetsudau`・`tomoaremoteishutsu`・`wakaremoteishutsu`、後ろが ni・ga・to でも)。
 3. 新しい設定項目は作らない。辞書 (english-readable.txt) も変えない。
 
 ## 非目標 (今回はやらない)
 - `nihonninitsuite` → にほんinitsuite (L7 の別の要件)。
 - `soremote-buru` (それもテーブル) は そremoteーぶる のまま (`てーぶる` が readings.txt に無い。カタカナ語は読みの表に無い)。`soremotetsuzuki` (typo の つづき) も同じ。
-- 助詞のすぐ後ろ (きょうは + remote) と、か・や の後ろ (それか + remote。入力の先頭の か は語の頭として見る = `karemote…` は 彼も) の remote は英語のままにする。
+- 代名詞以外の語の最後の 1 音 + れ (だれ・くれ・しゃれ …) を読みとして使うこと。最初の版 (76aebaa) はこれを使い、`yamadaremoteishutsu` → やまだれもていしゅつ の悪化を出した (査読 R6)。
 
 ## 完成条件 (先に決める。機械で判定できる形)
 - [x] テスト: `src/Meltype.Core.Tests/RemoteInJapaneseTests.cs` (2 件)。`Japanese_WordParticleWord_IsNotRemote` は変更前の Core で赤 (soremoteishutsu → そremoteいしゅつ)、変更後に緑。`English_Remote_Unchanged` は前後とも緑。
-- [x] 回帰なし: Core のテスト全件 1331 → 1333 通過。`tools/eval-compare.sh` (base は origin/main 9ded846) の broken 0 / fixed 0。
-- [x] 日本語の掃引 (変更前後の Core を同じ入力で打って比べた。生データ `lanes/L6-data/`): `jp_all.txt` 261,651 入力で変化 0。`jp_tsu.txt` 22,162 入力で 26 件が直り (英字が残らなくなった)、悪化 0 (残る 1 件は上の `soremotetsuzuki`)。`jp_gen.txt` 13,538 入力で 1,565 件が直り (sore・kore・are・dore・kare × 313)、悪化 0。
-- [x] 英語の掃引: `en_t.txt` (t で終わる英単語 2,629 語 × 7 の前置き × 5 の後ろ = 92,015 入力、要件 033 と同じ) で変化 0。`en_gen.txt` (english-readable.txt の 298 語 (複数形と remoteness・remotely を含む) × 前置き 19 × 後ろ 13 = 70,756 入力、前置きに きょう・きょうは・きょうを・それ・これ・あれ・どれ・かれ・それの・それで・きみと …) で変化 0。
+- [x] 回帰なし: Core のテスト全件 1331 → 1333 (初版と同じ) 通過。`tools/eval-compare.sh` (base は origin/main 9ded846) の broken 0 / fixed 0。
+- [x] 日本語の掃引 (変更前後の Core を同じ入力で打って比べた。生データ `lanes/L6-data/`): `jp_all.txt` 261,651 入力で変化 0。`jp_tsu.txt` 22,162 入力で 26 件が直り (英字が残らなくなった)、悪化 0 (初版と同じ 26 件。代名詞に絞っても減らない: 26 件はすべて それも)。`jp_gen.txt` 13,538 入力で 1,565 件が直り (sore・kore・are・dore・kare × 313)、悪化 0 (初版と同じ件数)。
+- [x] 英語の掃引: `en_t.txt` (92,015 入力、要件 033 と同じ) で変化 0。`en_gen.txt` (english-readable.txt の 298 語 × 前置き 19 × 後ろ 13 = 70,756 入力) で変化 0。**`en_pre.txt` (査読 R6 で追加。前の語の最後の 1 音 + れ が readings.txt の語になる 93 語 (akeku・amada・moare・monowaka …) + yamada・tsuku・kaisha・boku など 16 語 = 109 前置き × 後ろ 12 (remoteishutsu・remotetsudau・remotekisetsu・remoteni・remotega・remoteto・remotewo・remotede・remotehaisuru・remotesuru・remoteishiki・remotenotame) = 1,308 入力)**: 初版 (76aebaa) は yamada・tsuku・kaisha・boku などで悪化 (査読の指摘)、代名詞に絞っただけの版でも もあれ・ともあれ・わかれ・ものわかれ の 24 件が悪化、現行は **変化 0**。
 - [x] 境界例の一括比較 `tools/boundary-sweep.sh` (full、base は origin/main 9ded846): 684,117 入力で日本語の損失 0・英語の損失 0・その他の変化 0。
 
 ## 得と損
-- 得: 「それも提出・それも手伝う・これも手伝う・あれも提出・どれも手伝う・彼も提出」のような、代名詞 + も + て で始まる語が、remote に割れなくなる (jp_tsu で 26 件、自作で 1,565 件)。
-- 損 (測った範囲では 0 件): 英語側の掃引 (162,771 入力) と境界例 684,117 入力で、変わった出力は無い。理屈の上の損は、`これもてつだう` と読める入力を `これremoteつだう` (これ + remote + つだう) の意味で打つ場合だけ。日本語として読める (これ + も + てつだう) ほうを優先した。助詞のすぐ後ろ・空白の後ろ・語の頭・助詞の無い形は影響しない。
-- 打ち途中の見え方: `soremote` までは そremote、`soremotei` (て + い の 2 音) から それもてい に変わる (1 音ぶん途中で見え方が変わる)。
+- 得: 「それも提出・それも手伝う・これも手伝う・あれも提出・どれも手伝う・だれも手伝う・彼も提出」のような、代名詞 + も + て… で始まる語が、remote に割れなくなる (jp_tsu で 26 件、自作 jp_gen で 1,565 件)。
+- 損: 「悪化 0」は**測った範囲** (上の掃引と境界例) での話で、すべての入力ではない。理屈の上の損は、代名詞と同じ綴りで終わる形 (そ・こ・あ・ど・か・だ + remote。例 `soremoteishutsu` = そ + remote + いしゅつ) を、空白なしで「そ + remote」の意味で打つ場合だけ。`soreremote` (それ + remote) とは綴りが違い、「そremote」と打つ人はほぼいないと見ている (推測)。日本語として読める (それ + も + ていしゅつ) ほうを優先した。助詞のすぐ後ろ・空白の後ろ・語の頭・助詞の無い形・日本語の語 + remote は影響しない。
+- 打ち途中の見え方が揺れる (実測、`--repro`): `soremote` は そremote、`soremotei` から それもてい (後ろが 2 音以上の日本語の頭になった時点) に変わる。`soremoteni`・`soremotega` は それもてに・それもてが と日本語に変わるが、`soremotewo` (を は readings.txt に頭が無い) と `soremotesuru` は そremoteを・そremoteする のまま。後ろの形によって、日本語にならない打ち方も残る。
+- 初版からの変更の損: 代名詞 + も + て… の対象を、readings.txt の読みになる すべての語 (くれ・しゃれ …) から代名詞 6 語に狭めた。測った範囲で、直る件数は減っていない (jp_tsu 26・jp_gen 1,565 のまま)。代名詞以外の れ で終わる語 + も + て… (`yamadaremotetsudau` = やまだ + れも + てつだう ではなく やまだ + remote + つだう) は remote のまま。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] `soremoteishutsu` + Enter → 「それも提出」(候補は 提出 を含む)。`soremotetsudau` → 「それも手伝う」。
@@ -54,5 +55,5 @@ scope: core
 - なし (悪化 0。設定・公開は伴わない)。
 
 ## 記録
-- 2026-11-25 henrietta (L6): ブランチ `fix/remote-in-japanese` (origin/main 9ded846 から)。掃引は使い捨ての打鍵の一覧 (コミットしない。入力・出力・道具は `lanes/L6-data/`)。
+- 2026-11-25 henrietta (L6): 査読 R6 の指摘 1 (中: 日本語の語 + remote が日本語に取られる) を直し、指摘 2・3 (低: 打ち途中の見え方・損の書き方) を文書に反映。初版 76aebaa は前の語の最後の 1 音 + れ を読みとして使っていたため悪化した (`yamadaremoteishutsu`)。ブランチ `fix/remote-in-japanese` (origin/main 9ded846 から)。掃引は使い捨ての打鍵の一覧 (コミットしない。入力・出力・道具は `lanes/L6-data/`)。
 - 本家 main (ビルド済み up、`--repro`) との比較 (7 件だけ打った): `soremoteishutsu`・`soremotetsudau`・`soremotekisetsu`・`koremotetsudau`・`karemoteishutsu` は本家 main では日本語 (それもていしゅつ …) で、この修正後と同じ。`kyouharemotesuru` は きょうはremoteする で同じ。`remoteishutsu` は本家 main では reもていしゅつ (この修正後と変更前は remoteいしゅつ) で、ここだけ本家と違う (本件の範囲外。語の頭の remote は英語のままにする)。

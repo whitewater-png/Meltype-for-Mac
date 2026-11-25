@@ -140,21 +140,29 @@ public sealed class CompositionDetector
         return [.. words];
     });
 
+    /// <summary>入力の中で 1 語として完結していて、助詞が続く代名詞 (それも・これも・あれも・どれも・かれも・だれも)。</summary>
+    private static readonly HashSet<string> PronounsBeforeParticle = new(StringComparer.Ordinal) { "それ", "これ", "あれ", "どれ", "かれ", "だれ" };
+
     /// <summary>
-    /// 区間 [start, end) が english-readable.txt の語 (remote) で、その語の途中の単位が助詞で、前の単位から助詞の前まで (そ|れ = それ) が日本語の語、
-    /// 助詞の後ろ (て|いしゅつ = ていしゅつ) が日本語の語の頭になるか (soremoteishutsu = それも + 提出)。
-    /// 英語にするのは、日本語の語の途中から始まる語でないとき。後ろが 2 音未満 (soremote まで) は英語のまま (まだ日本語と決められない)。要件 039。
+    /// 区間 [start, end) が english-readable.txt の語 (remote) で、その語の途中の単位が助詞で、前の単位から助詞の前まで (そ|れ = それ) が代名詞、
+    /// 助詞の後ろ (て|いしゅつ = ていしゅつ) が 2 音以上の日本語の語の頭になるか (soremoteishutsu = それも + 提出)。要件 039。
+    /// 代名詞は、入力の先頭・助詞・記号の後ろにあるときだけ (語として完結しているとき)。やまだ|れもて (yamadaremote) の だれ、つく|れもて の くれ のように、
+    /// 前の語の最後の 1 音 + れ が読みになる場合は、日本語の語 + remote なので対象にしない。後ろが 2 音未満 (soremote まで) は英語のまま (まだ日本語と決められない)。
     /// </summary>
     private bool ReadableWordSplitsIntoJapanese(IReadOnlyList<CompositionUnit> units, int start, int end, string pending)
     {
         if (start < 1 || end - start < 3 || units[start - 1].Raw.Length == 0 || !units[start - 1].Raw.All(char.IsAsciiLetterLower)) return false;
-        // 助詞のすぐ後ろ (きょうは + remote、それか + remote) は、日本語の語の途中ではなく 助詞 + 英単語。か・や は表の助詞ではないので、入力の先頭の か (kare) だけ語の頭として見る
-        if (IsParticle(units[start - 1].Raw) || start >= 2 && units[start - 1].Raw is "ka" or "ya") return false;
+        if (start >= 2 && units[start - 2].Raw.All(char.IsAsciiLetter) && units[start - 2].Raw.Length > 0 && !IsParticle(units[start - 2].Raw)) return false;
+        // 助詞と同じ音で終わる語 (とも|あれ = ともあれ、わ|かれ = わかれ、もの|わかれ) の途中の あれ・かれ は代名詞ではない
+        for (var j = start - 2; j >= Math.Max(0, start - 4); j--)
+        {
+            if (ReadingOf(Raw(units, j, start + 1)) is { } longer && IsJapaneseReading(longer)) return false;
+        }
         var n = units.Count;
         if (!ReadableEnglish.Value.ContainsWord((Raw(units, start, end) + (end == n ? pending : "")).ToLowerInvariant())) return false;
         for (var k = start + 1; k < end - 1; k++)
         {
-            if (!IsParticle(units[k].Raw) || ReadingOf(Raw(units, start - 1, k)) is not { } word || !IsJapaneseReading(word)) continue;
+            if (!IsParticle(units[k].Raw) || ReadingOf(Raw(units, start - 1, k)) is not { } word || !PronounsBeforeParticle.Contains(word)) continue;
             var rest = new StringBuilder();
             for (var m = k + 1; m < n && units[m].Raw.Length > 0 && units[m].Raw.All(char.IsAsciiLetter); m++) rest.Append(units[m].Raw);
             if (rest.Length > 0 && Enumerable.Range(k + 1, n - k - 1).All(m => units[m].Raw.Length > 0 && units[m].Raw.All(char.IsAsciiLetter))) rest.Append(pending);

@@ -24,7 +24,8 @@ internal static class RemoteInJapaneseTests
         {
             ("soremoteishutsu", "それもていしゅつ"), ("soremotetsudau", "それもてつだう"), ("soremotekisetsu", "それもてきせつ"),
             ("soremotetsu", "それもてつ"), ("koremotetsudau", "これもてつだう"), ("aremoteishutsu", "あれもていしゅつ"),
-            ("doremotetsudau", "どれもてつだう"),
+            ("doremotetsudau", "どれもてつだう"), ("daremotetsudau", "だれもてつだう"), ("karemoteishutsu", "かれもていしゅつ"),
+            ("kyouhasoremoteishutsu", "きょうはそれもていしゅつ"), ("kyoumosoremoteishutsu", "きょうもそれもていしゅつ"),
         })
             Assert.Equal(expected, Committed(typed), typed);
     }
@@ -39,6 +40,10 @@ internal static class RemoteInJapaneseTests
             ("kyouremoteishutsu", "きょうremoteいしゅつ"), ("sore remotetsudau", "それremoteつだう"), ("sorenoremotetsudau", "それのremoteつだう"),
             ("sorekaremote", "それかremote"), ("kyouharemotesuru", "きょうはremoteする"), ("kyouharemoteworkdesu", "きょうはremoteworkです"),
             ("soremote", "そremote"),
+            // 日本語の語 + remote (前の語の最後の 1 音 + れ が読みになる語。R6 の指摘): 代名詞でないので remote のまま
+            ("yamadaremoteishutsu", "やまだremoteいしゅつ"), ("tsukuremoteishutsu", "つくremoteいしゅつ"), ("kaisharemoteishutsu", "かいしゃremoteいしゅつ"),
+            ("bokuremotetsudau", "ぼくremoteつだう"), ("yamadaremoteni", "やまだremoteに"), ("yamadaremotega", "やまだremoteが"), ("yamadaremoteto", "やまだremoteと"),
+            ("tomoaremoteishutsu", "ともあremoteいしゅつ"), ("wakaremoteishutsu", "わかremoteいしゅつ"),
         })
             Assert.Equal(expected, Committed(typed), typed);
     }
