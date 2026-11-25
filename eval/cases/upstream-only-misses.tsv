@@ -1,0 +1,45 @@
+# 要件 038: 本家 main では当たり Mac 版だけ外れていた入力 (docs/requirements/038-upstream-only-misses.md)。直したものと、直さなかったもの (既知の外れ)、守る日本語。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。
+# カテゴリ: 直した (要件 038)
+cachewokeshitemite	cacheをけしてみて	full	要件 038 (cache を english-readable.txt に)
+codereviewwoonegaishimasu	codereviewをおねがいします	full	要件 038 (code を english-readable.txt に)
+Tell me more	Tell me more	full	要件 038 (前が英語なら me・do・we は 1 語でも英語)
+Not me	Not me	full	要件 038
+We do	We do	full	要件 038
+Let me go	Let me go	full	要件 038
+Why do we go	Why do we go	full	要件 038
+How do we do	How do we do	full	要件 038
+gpt-oss wo tsukau	gpt-oss をつかう	full	要件 038 (gpt-oss を HyphenatedWords に)
+npx create-next-app	npx create-next-app	full	要件 038 (create-next-app を HyphenatedWords に)
+# カテゴリ: 守る日本語・打ち間違いの補正 (悪化 0 の確認。1 件でも崩れたら採用しない)
+tacodesu	たこです	full	要件 038 の守り (boundary-sweep が見つけた code の悪化。NotAfterJapanese)
+chocodesu	ちょこです	full	要件 038 の守り
+sa-bisugyoucdemou	さーびすぎょうこでもう	full	要件 038 の守り
+kokodemo	ここでも	full	要件 038 の守り
+sokode	そこで	full	要件 038 の守り
+kodomo	こども	full	要件 038 の守り
+gamen	がめん	full	要件 038 の守り
+gamenwomiru	がめんをみる	full	要件 038 の守り
+gametsui	がめつい	full	要件 038 の守り
+togameru	とがめる	full	要件 038 の守り
+nagame	ながめ	full	要件 038 の守り
+tadaimagenzai	ただいまげんざい	full	要件 038 の守り
+ossna	おっさん	full	要件 038 の守り
+ossan	おっさん	full	要件 038 の守り
+appwo	あっぷを	full	要件 038 の守り
+appurodo	あっぷろど	full	要件 038 の守り
+kappa	かっぱ	full	要件 038 の守り
+shats	しゃつ	full	要件 038 の守り
+me wo tojiru	めをとじる	full	要件 038 の守り
+kyouha do suru	今日はどする	full	要件 038 の守り
+kyouha me	今日はめ	full	要件 038 の守り
+Slack me wo	Slack めを	full	要件 038 の守り
+Slack de hanasu	Slack ではなす	full	要件 038 の守り
+Slack to	Slack と	full	要件 038 の守り
+dokusho	どくしょ	full	要件 038 の守り
+Let me know	Let me know	full	要件 038 の守り
+# カテゴリ: 直さなかった (既知の外れ。本家の main では当たる)
+gamewohajimeta	gameをはじめた	full	既知の外れ: game を足すと gamenwomiru が gameんをみる になる (要件 038)
+dockernoimagewotsukurinaosu	dockerのimageをつくりなおす	full	既知の外れ: image は tadaimagenzai を守るため残した (W1・W18-1)
+kyouhacodewokaita	きょうはcodeをかいた	full	既知の外れ: code・cache は日本語のすぐ後ろでは かな のまま (tacodesu を守るため。要件 038)
+kyouhacachewo	きょうはcacheを	full	既知の外れ: 同上

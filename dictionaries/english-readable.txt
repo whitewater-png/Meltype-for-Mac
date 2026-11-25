@@ -6,7 +6,7 @@
 # Q3 (change は入れない: 「ゆうちゃん元気」yuuchangenki など、ちゃん付けの名前+げ… と同じ綴りで衝突するため。リョウさんの判断: ちゃん付けの名前を優先):
 # Q3: 「これは change してほしい」のように日本語の文の中で、よく使う英単語 (change → ちゃんげ、before → べふぉれ) が日本語になる問題の対策で足した語。
 #   選び方: english-words.txt の 4 文字以上で、ローマ字として最後まで読め、読みが readings.txt・loanwords.txt・brands.txt の語やその頭にならない語のうち、
-#   英語の頻度 (wordfreq の Zipf) が 4.0 以上のもの。助詞と同じ綴りで始まる・終わる語 (note, mouse, nine, side, code, line, white …) と、
+#   英語の頻度 (wordfreq の Zipf) が 4.0 以上のもの。助詞と同じ綴りで始まる・終わる語 (note, mouse, nine, side, line, white …。code は要件 038 で入れた。日本語のすぐ後ろでは かな のまま (NotAfterJapanese)) と、
 #   日本語の入力に偶然その綴りが現れて悪化した語 (ride, shade, image, open, area …) は入れない (日本語の語の途中・前後と区別できないため)。
 feature features future futures nature mature figure figures measure measures tenure rename remote remotes
 abandon achieve alike alive animation appearance arrange assume attendance aviation bacon beaten
@@ -37,3 +37,5 @@ datamation enshittification
 japanese
 # 本家追従 W18 (2026-10-30): dice (4 文字。だいせ…の日本語の語と衝突しない。測定済み)
 dice
+# 要件 038 (2026-11-25): cache・code (かちぇ・こで)。入力の先頭と英語の後ろでは英語。日本語のすぐ後ろでは今までどおりかな (tacodesu = たこです、chocodesu = ちょこです。NotAfterJapanese)
+cache code

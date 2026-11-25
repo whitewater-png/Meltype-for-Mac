@@ -229,8 +229,8 @@ internal static class FeedbackTests
                 ("umanushi", "うまぬし"), ("gemu", "げむ"), ("geta", "げた"), ("jamu", "じゃむ"), ("kodomo", "こども"), ("imagawa", "いまがわ"),
                 // 辞書に入れなかった AI の名前は、今までの答えのまま (既知の限界)
                 ("minimax", "みにmax"), ("nemotron", "ねもちろん"), ("aider", "あいで"), ("autogen", "あうとげん"), ("manus", "まぬs"),
-                // codegemma (code + gemma) は、辞書の語 gemma の前に こで がつくので、gemma だけ英字になる (今は直せない)
-                ("codegemma", "こでgemma"),
+                // codegemma (code + gemma): 要件 038 で code を english-readable.txt に入れたので、全体が英字になる (以前は こでgemma)
+                ("codegemma", "codegemma"),
             })
             {
                 Assert.Equal(expected, Enter(typed), typed);
@@ -1557,7 +1557,8 @@ internal static class RomajiTypoTests
     {
         // english-readable.txt に語を足したとき、日本語の語の中・前後に偶然その綴りが現れても日本語のままであること。
         // 下の入力は、足す語を選ぶときに readings.txt のローマ字 (単独・助詞つき・語の組み合わせ) と辞書の説明文のローマ字で悪化した形 (ride・shade・nine・gone・note・mouse など)。
-        // 助詞と同じ綴りで始まる・終わる語 (note・mouse・nine・side・code・line・white) は、日本語の語と区別できないので入れていない。今の答えを固定する (限界)。
+        // 助詞と同じ綴りで始まる・終わる語 (note・mouse・nine・side・line・white) は、日本語の語と区別できないので入れていない。今の答えを固定する (限界)。
+        // code・cache は要件 038 で入れたが、日本語のすぐ後ろでは かな のまま (tacodesu = たこです・chocodesu = ちょこです を守るため。NotAfterJapanese)。korehacodewokaku は今までどおり。
         var savedChecker = CompositionTests.Detector.SpellChecker;
         CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
         try

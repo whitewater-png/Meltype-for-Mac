@@ -97,7 +97,8 @@ public sealed class CompositionDetector
     /// 同じ入力の中の日本語や、かな側の記号 (`main`・(main)・。) の後ろでは今までどおりかな。入力の先頭は、前に確定した文 (前の行) が日本語でも英語にする
     /// (前の行が日本語の TextEdit で mainnima-ji が まいんに → mine に になっていた。Q11 の実機確認)。
     /// </summary>
-    private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain", "data" };
+    // code・cache (要件 038): c 綴りの日本語 (tacodesu = たこです、chocodesu = ちょこです) を守るため、日本語のすぐ後ろでは英語にしない。
+    private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain", "data", "code", "cache" };
 
     /// <summary>ローマ字 letters の読みで始まる、よく使う日本語の語・ブランド名があるか。</summary>
     private bool StartsJapaneseReading(string letters)
@@ -900,6 +901,10 @@ public sealed class CompositionDetector
             // 助詞と同じ形の 2 文字の語 (no, to, ga) は両側が必要。子音で終わる語 (is, at, my) は日本語の語にならないので片側でよい。
             _ => lower.Length <= 2 && _romaji.Analyze(lower) is { IsValid: true, Partial: "" or "n" } ? 2 : 1,
         };
+        // 前の語が英語 (Tell・Not・Let・Why・I) で、続く語が me・do・we のとき (Tell me more・Not me・We do・Let me go・Why do we go) は、前の 1 語だけでも英語にする。
+        // 標準では助詞と同じ形の 2 文字の語 (no・to) と同じに、前後の両方が英語でないと英語にしないので、英文の末尾や途中の me・do が め・ど になっていた (本家 #1185 の B 群。要件 038)。
+        // 前が日本語 (before < 0) のときは今までどおり (kyouha me → きょうは め)。
+        if (lower is "me" or "do" or "we" && before >= 1) needed = 1;
         // スペルチェッカーだけが知っている、最後までローマ字として読める語 (shite, kore) は、前の英単語 1 つ (push) では足りない
         // (pushshite → pushして)。英文の続き (+2) か、前後の両方が英語のときだけ。
         if (spellWord && !inDictionary && _romaji.Analyze(lower) is { IsValid: true, Partial: "" }) needed = Math.Max(needed, 2);
@@ -1050,7 +1055,7 @@ public sealed class CompositionDetector
     private static readonly HashSet<string> HyphenPrefixes = ["e", "x", "re", "co", "ex", "non", "anti", "semi", "multi", "pre", "sub", "post", "mid", "self", "well"];
 
     // 接頭辞の規則では拾えない、- の入ったよく使う英単語 (後ろが 2 文字以下など)
-    private static readonly HashSet<string> HyphenatedWords = ["bio-break", "co-op", "re-do", "x-ray", "t-shirt", "wi-fi", "hi-fi", "lo-fi", "sci-fi", "e-book", "e-sports", "k-pop", "j-pop", "j-rock", "j-core", "p-hub", "talk-admin", "r-18", "sub-6", "gpt-6.7", "a-z", "u-turn", "check-in", "log-in", "sign-in", "add-on", "plug-in", "built-in", "follow-up", "set-up", "pop-up", "drop-down", "blu-ray"];
+    private static readonly HashSet<string> HyphenatedWords = ["bio-break", "co-op", "re-do", "x-ray", "t-shirt", "wi-fi", "hi-fi", "lo-fi", "sci-fi", "e-book", "e-sports", "k-pop", "j-pop", "j-rock", "j-core", "p-hub", "talk-admin", "r-18", "sub-6", "gpt-6.7", "gpt-oss", "create-next-app", "create-react-app", "a-z", "u-turn", "check-in", "log-in", "sign-in", "add-on", "plug-in", "built-in", "follow-up", "set-up", "pop-up", "drop-down", "blu-ray"];
     // 日本語のローマ字の途中を英語の接頭辞と誤認しないよう、日本語に続けて拾うのは明示した英数字表記だけ。
     private static readonly HashSet<string> NumericHyphenatedWords = ["r-18", "sub-6", "gpt-6.7"];
 
