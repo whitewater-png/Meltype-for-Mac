@@ -1,6 +1,6 @@
 ---
 title: 助詞の後ろの「あつ・おつ・うつ・いつ・ぶつ」が英字に割れる (とてもあつい が とてもatすい になる)
-status: approved   # draft | approved | done。approved にするのは人 (2026-11-25 リョウさん「おすすめで対応してください」)
+status: done   # draft | approved | done。approved にするのは人 (2026-11-25 リョウさん「おすすめで対応してください」)
 source: 派生フォーク比較ベンチ (2026-11-22 計測の xlsx、649 件) の「本家では直っていて fork だけ外れる」行 / リョウさんの実機 (2026-11-25、`totemoatsui` → `toてもatすい`)
 scope: core
 ---
@@ -39,10 +39,10 @@ scope: core
 - 損: かな + 助詞のすぐ後ろに空白なしで打った、助詞の音で始まる 4 文字の英単語の複数形 (heats・moats・moots・toots・touts) が、Enter で割れる (上の 30 件。`kyouhaheats` → きょうはへあts、`kyouhatouts` → きょうはとうts、`kyouhamoats` → きょうはもあて、`kyouhamoots` → きょうはもおつ、`kyouhatoots` → きょうはとおつ)。テスト `KnownLoss_PluralRightAfterParticle` で今の出力を固定してある (変わったら気づけるように)。変更前も `heatsuru` の形はこの位置で割れていた。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
-**未確認。今入っているアプリには、この修正は入っていない。**
-- [ ] TextEdit: `kyoumoatsui` + Enter → 「今日も暑い」(英字が混ざらない)。
-- [ ] TextEdit: `totemoatsui` + Enter → 「とても暑い」。先頭の `to` が英字に残るかは別の問題として記録する (非目標)。
-- [ ] TextEdit: `commitsuru` + Enter → `commitする`、`kyouhacommitsuru` + Enter → `きょうはcommitする` (今までどおり)。
+**確認済み (2026-11-25 13:40 頃、リョウさんの実機。ブランチ fix/particle-atsu d61c872 のビルドを入れて打った)。**
+- [x] `kyoumoatsui` + Enter → 「今日も暑い」(英字が混ざらない)。
+- [x] `totemoatsui` + Enter → 「とても暑い」。修正前に実機で見えた先頭の `to` の英字残り (`toてもatすい`) も、今回は出なかった (理由は未確認)。
+- [x] `commitsuru` + Enter → `commitする` (今までどおり)。`kyouhacommitsuru` は実機では未確認 (テストで固定)。
 
 ## 止める条件
 - 日本語の掃引で悪化が出て、例外の条件を狭めても消えないとき。
