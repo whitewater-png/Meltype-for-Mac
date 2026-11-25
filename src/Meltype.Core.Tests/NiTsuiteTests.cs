@@ -47,11 +47,13 @@ internal static class NiTsuiteTests
     [Test]
     public static void KnownLoss_InitAfterKana()
     {
-        // 受け入れた損 (要件 040): かなの後ろに空白なしで続けた init + tsu… (initする) は、に + つ と読む。
+        // 受け入れた損 (要件 040): かなで終わる語 (助詞に限らない。reinit の れ も) に空白なしで続けた init + tsu… (initする・initsuru) は、に + つ と読む。
+        // 期待値は今の出力で、望ましい出力ではない (変更前は れinitする・にほんいinitする など)。
         // 期待値は今の出力 (望ましい出力ではない)。この挙動が変わったら、要件 040 の「得と損」を見直す
         foreach (var (typed, expected) in new[]
         {
             ("kyouhainitsuru", "きょうはいにつる"), ("kokodeinitsuru", "ここでいにつる"), ("kyouhainits", "きょうはいにて"),
+            ("reinitsuru", "れいにつる"), ("nihonninitsuru", "にほんいにつる"),
         })
             Assert.Equal(expected, Committed(typed), typed);
     }

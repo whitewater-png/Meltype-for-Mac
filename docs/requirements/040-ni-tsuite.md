@@ -31,12 +31,12 @@ scope: core
 - [x] テスト: `src/Meltype.Core.Tests/NiTsuiteTests.cs` (3 件)。`Japanese_VowelNiTsu_ReadsKana` は変更前の Core で赤 (にほんinitsuite など)、`KnownLoss_InitAfterKana` も変更前で赤、`English_Init_Unchanged` は前後とも緑。
 - [x] 回帰なし: Core のテスト全件 1331 → 1334 通過 (新しい 3 件)、`tools/eval-compare.sh` の broken 0 / fixed 0。
 - [x] 日本語の大量掃引: jp_all.txt (readings.txt の 20,127 語 × 13 の前置き = 261,651 入力) で変わったのは `nihonninitsuite` 系の 3 件 (英字が かな だけになった。悪化 0)。常用語 29 語 × 7 の語尾 (203 入力) で 25 件が直り (もんだい・せつめい・あい・かい・みらい + について・につき・につめる・につきまして・につつ)、悪化 0。20,177 語 × 4 の語尾 (80,708 入力) で 3,780 件が直り (英字 → かな だけ)、悪化 0。
-- [x] 英語の掃引 (en_t.txt の 92,015 入力): 変わったのは 5 件、すべて悪化 (下の損)。
+- [x] 英語の掃引 (en_t.txt の 92,015 入力): 変わったのは 5 件、すべて悪化 (下の損。助詞 + init の形だけを測った数で、損の範囲全体ではない)。
 - [x] 境界例の一括比較 `tools/boundary-sweep.sh` (full、base は origin/main 9ded846): 684,117 入力で日本語の損失 0・英語の損失 0・その他の変化 19。19 件はすべて、英字の残りが かな だけになったもの (`kanaeruinitsukau`: かなえるinitすかう → かなえるいにつかう、`shuuryouinitsukau`: しゅうりょうinitすかう → しゅうりょういにつかう など。い + に使う)。
 
 ## 得と損
 - 得: 「〜い + について・につき・につめる」(せつめいについて・もんだいについて・みらいについて・おもいについて・ぜいについて・にほんいについて) が英字に割れない。い で終わる語は日本語に非常に多い (readings.txt の 1,890 語)。
-- 損 (5 件、英語の入力 `<かな><助詞>init + suru`): `kyouhainitsuru` → きょうはinitする が きょうはいにつる に変わる。`kokodeinitsuru`・`watashigainitsuru`・`kyoumoinitsuru`・`soredeinitsuru` も同じ形。かなの後ろに空白なしで続けた init + tsu… (initする・initsuite) だけ。`korewoinitsuru` (を の後ろ)・`initshita`・`init` 単独・`git init`・`npm init`・語の頭は変わらない。テスト `KnownLoss_InitAfterKana` で今の出力を固定してある。t と s を打つ時点では、あとに続く文字 (`uru` か `uite` か) が見えないので、この 2 つは見分けられない (033 と同じ限界)。
+- 損: **かなで終わる語に空白なしで続けた `init` / `reinit` + `tsu…` の形全般** (助詞に限らない。条件は「直前がかな (を 以外) + i + ni + t」で、助詞かどうかは見ていない)。後ろが す・する・すると・すれば・すいて・すか・すめる のとき、`つ` にまとまる。例: `kyouhainitsuru` → きょうはinitする が きょうはいにつる、`nihonninitsuru` → にほんいにつる (変更前 にほんいinitする)、`kyouhareinitsuru` → きょうはれいにつる、`reinitsuru` → れいにつる (変更前 れinitする)。数: 査読 (R7) の 31,372 入力 (31 前置き × 44 語 × 23 後ろ) で変わったのは 354 件、すべて init / reinit + tsu… で、前置きは 59 通り。自分の掃引 (en_t.txt) では 5 件 (助詞 + init の形だけ)。`shita`・`sareta`・`shite`・`site` の後ろ、空白あり、大文字 (`Init`)、`initialize`、-it で終わる他の語、`korewoinitsuru` (を の後ろ)、語の頭の `init` は変わらない。t と s を打つ時点では後ろが `uru` か `uite` か見えないので区別できない (033 と同じ限界)。テスト `KnownLoss_InitAfterKana` で今の出力を固定してある (望ましい出力ではない)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] `nihonninitsuite` + Enter → 「にほんいについて」(にほんinitsuite にならない)。
@@ -45,11 +45,11 @@ scope: core
 
 ## 止める条件
 - 日本語の掃引で悪化が出て、条件を狭めても消えないとき。
-- 英語の悪化が `<かな><助詞>init + tsu…` 以外 (`initshita`・`git init`・`npm init` など) に出たとき。
+- 英語の悪化が `<かな>init / reinit + tsu…` 以外 (`initshita`・`git init`・`npm init` など) に出たとき。
 
 ## 人の判断
-1. 上の損 (`kyouhainitsuru` の形、5 件) を受け入れるか。
+1. 上の損 (かなで終わる語 + init / reinit + tsu… の形全般、354 件規模) を受け入れるか。
 2. `u|ni|t` (unit) まで直すか (非目標。直すと英語の損が 6 件増える)。
 
 ## 記録
-- 2026-11-25 henrietta (L7): 実装・テスト・掃引。ブランチ `fix/ni-tsuite` (origin/main 9ded846 から)。掃引は使い捨ての打鍵の一覧 (コミットしない) を変更前後のビルドで打って比べた。生データは lanes/L7-data/。
+- 2026-11-25 henrietta (L7): 実装・テスト・掃引。ブランチ `fix/ni-tsuite` (origin/main 9ded846 から)。掃引は使い捨ての打鍵の一覧 (コミットしない) を変更前後のビルドで打って比べた。生データはリポジトリ外の作業フォルダーにある。
