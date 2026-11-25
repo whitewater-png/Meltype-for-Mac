@@ -414,6 +414,17 @@ internal static class UserWordAlignmentTests
         {
             Assert.Equal(mora, CompositionController.UserWordMoraCount(reading), $"{reading} の拍数");
         }
+        // 小さいかな 8 つを、1 つずつ確かめる。どれも、直前の文字といっしょに 1 拍 (カタカナの読みは、登録のときひらがなに直されるので、ひらがなだけ数える)
+        foreach (var small in "ゃゅょぁぃぅぇぉ")
+        {
+            Assert.Equal(1, CompositionController.UserWordMoraCount("き" + small), $"き{small} は 1 拍");
+            Assert.Equal(3, CompositionController.UserWordMoraCount("あき" + small + "た"), $"あき{small}た は 3 拍");
+        }
+        // 小さいかなでも、っ・ん・ー は 1 拍。大きい「や・ゆ・よ・あ・い・う・え・お」は 1 拍ずつ数える
+        Assert.Equal(3, CompositionController.UserWordMoraCount("かっこ"), "っ は 1 拍");
+        Assert.Equal(3, CompositionController.UserWordMoraCount("かんこ"), "ん は 1 拍");
+        Assert.Equal(3, CompositionController.UserWordMoraCount("かーこ"), "ー は 1 拍");
+        Assert.Equal(3, CompositionController.UserWordMoraCount("きやゆ"), "大きい や・ゆ は 1 拍ずつ");
         // 先頭の小さいかなは、直前の文字が無いので 1 拍
         Assert.Equal(2, CompositionController.UserWordMoraCount("ぁい"), "先頭の ぁ は 1 拍");
         // 文字数 3 でも 2 拍の語は、しきい値 (3) に届かない。3 拍の語は届く
@@ -424,12 +435,12 @@ internal static class UserWordAlignmentTests
     [Test]
     public static void TwoMoraWordWrittenInThreeLetters_InsideAnEngineClause_IsNotUsed()
     {
-        // 実機の「がく週する」: しゅう (し・ゅ・う = 3 文字・2 拍) → 珠佑 を登録していると、がくしゅうする (エンジンは 学習する の 1 文節) に割り込み、
+        // 実機で起きた「がく週する」の再現: しゅう (し・ゅ・う = 3 文字・2 拍) → 秋 を登録していると、がくしゅうする (エンジンは 学習する の 1 文節) に割り込み、
         // さらに学習 (しゅう → 週) で がく|週|する になっていた。拍で数えれば 2 拍の語なので、文節の途中では使わない
         var history = new ConversionHistory(null);
         history.Remember("しゅう", "週");
         var k = new CompositionTests.Keyboard(converter: new WholeClauseConverter("がくしゅうする", "学習する"), history: history,
-            userDictionary: Dictionary(("しゅう", "珠佑")));
+            userDictionary: Dictionary(("しゅう", "秋")));
         k.Type("gakushuusuru ");
         Assert.Equal("学習する", Clauses(k), "しゅう は文節 がくしゅうする の途中なので使わない");
     }
@@ -438,14 +449,14 @@ internal static class UserWordAlignmentTests
     public static void TwoMoraWord_AtAClauseHead_IsStillUsed()
     {
         // 文節の頭から始まるなら、今までどおり使う (starts.Contains(position) の条件は変えない)
-        var k = new CompositionTests.Keyboard(converter: new LexiconConverter(), userDictionary: Dictionary(("しゅう", "珠佑")));
+        var k = new CompositionTests.Keyboard(converter: new LexiconConverter(), userDictionary: Dictionary(("しゅう", "秋")));
         k.Type("shuugakita ");
-        Assert.Equal("珠佑|が|来た", Clauses(k), "先頭の しゅう は使う");
+        Assert.Equal("秋|が|来た", Clauses(k), "先頭の しゅう は使う");
 
         // 先頭でなく、エンジンの文節の頭にあたる位置 (がく|しゅうする の しゅう) でも使う
-        k = new CompositionTests.Keyboard(converter: new SplitConverter("がくしゅうする", ("がく", "学"), ("しゅうする", "修する")), userDictionary: Dictionary(("しゅう", "珠佑")));
+        k = new CompositionTests.Keyboard(converter: new SplitConverter("がくしゅうする", ("がく", "学"), ("しゅうする", "修する")), userDictionary: Dictionary(("しゅう", "秋")));
         k.Type("gakushuusuru ");
-        Assert.Equal("がく|珠佑|する", Clauses(k), "文節の頭に当たる しゅう は使う");
+        Assert.Equal("がく|秋|する", Clauses(k), "文節の頭に当たる しゅう は使う");
     }
 
     /// <summary>reading を、指定した文節に区切って返す変換エンジン (他の読みはそのまま返す)。</summary>

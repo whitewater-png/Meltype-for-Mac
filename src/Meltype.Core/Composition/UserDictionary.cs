@@ -13,7 +13,8 @@ public sealed record UserWord(string Reading, string Word);
 /// ユーザー辞書 (%LOCALAPPDATA%\Meltype\userdict.txt、1 行に「読み[Tab]単語」)。
 /// 変換で最優先に使う: 変換する読みの中に登録した読みが含まれていれば、その部分は変換エンジンの区切りに関係なく
 /// 登録した単語にする (きごうとう → 記号等 を登録すると、きごうとうふくめ → 記号等|含め)。
-/// ただし、ユーザーが登録した語 (自作の専門用語集の語を含む) のうち読みが短い語 (拍数が CompositionController.InsideClauseMinReadingLength より短い語。しゅう・じゅん は 3 文字でも 2 拍) が
+/// ただし、ユーザーが登録した語 (自作の専門用語集の語を含む) のうち読みが短い語 (拍数が CompositionController.InsideClauseMinReadingLength より短い語。拍数は小さいかな ゃゅょぁぃぅぇぉ を前の文字と合わせて 1 拍と数える。しゅう・じゅん は 3 文字でも 2 拍。
+/// 影響は、小さいかなを含み拍数が 3 未満の語だけ。読みはひらがなで数える。カタカナの読みは登録のときひらがなに直される) が
 /// 変換エンジンの文節の途中から始まるときは使わない (<see cref="IsUserReading"/>・CompositionController.AlignUserWords。
 /// しの → 紫乃 で わたしのことがすき が 綿紫乃事が好き になるのを防ぐ)。長い語は途中からでも使う。同梱の語句・同梱の専門用語集は、従来どおり。
 /// トレイの「ユーザー辞書...」(Windows)・「Meltype 辞書」の画面 (Mac) から登録・編集・削除する。
