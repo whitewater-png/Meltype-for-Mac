@@ -57,6 +57,7 @@ Core の `--repro` を base (`origin/main` 627b77a) とこのブランチの両�
 | `almame`・`almae`・`almari`・`almaeda` | 確定 `あおまめ`・`あおまえ`・`あおまり`・`あおまえだ` | `almaめ`・`almaえ`・`almaり`・`almaえだ` | **悪くなる**: 入力の先頭の `あおま〜` の `o` を隣の `l` と打ち間違えた形は、補正が効かなくなる (`aomame` = 青豆 の打ち間違いなど) |
 
 - 悪くなる形は「入力の先頭が `alma` で、`あおま` で始まる語を `o` → `l` と 1 文字打ち間違えたとき」だけ。リポジトリの日本語の辞書 (`readings.txt`・`japanese.txt`) に `あおま` を含む語は無い。語の途中・境目の形 (`kimihalmae` → `きみはおまえ`、`hanalmatsuri` → `はなおまつり`、`kalmawari` → `かおまわり`、`nalmasa` → `なおまさ`) は base と同じに補正される。
+- 境界例の一括比較 (`tools/boundary-sweep.sh` full、base 627b77a と、base に `vuln alma` を足した写し) は 684,117 入力で変化 0 件 (日本語の損失 0・英語の損失 0)。上の悪くなる形は、この道具が作らない形 (1 文字の置き換えの打ち間違い・辞書に無い語) なので出ない。
 - `vuln` を足して悪くなる形は見つからなかった (`vuon`・`vulon`・`ivulnn` は base と同じ)。
 - 悪くなる形を受け入れないなら、`alma` を外して `vuln` だけにする (その場合、正解表の `alma`・`almaga`・`almade`・`alma linux` は外れのまま残す)。
 
