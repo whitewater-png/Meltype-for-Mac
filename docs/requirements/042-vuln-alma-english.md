@@ -1,6 +1,6 @@
 ---
 title: vuln が、打っている間は英字なのに Enter で ゔおん と確定する (alma は入れない理由を固定する)
-status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-24.md 候補 1)
+status: done   # draft | approved | done。approved にするのは人
 source: docs/voice/2026-11-24.md (ブランチ voice/2026-11-24) 候補 1 / 本家 #2312 (vuln) / 本家 #1487 (alma。docs/voice/2026-11-03.md 候補 1)
 scope: dictionary
 ---
@@ -122,3 +122,6 @@ Core の `--repro` を、base (`origin/main` 627b77a) とこのブランチの�
 
 ## 人の判断
 - **決定 (2026-11-25 リョウさん「おすすめで」): main に取り込む (PR #34、旧 032)。要件番号は main の 031・032 と重なるので付け替えた**
+
+## 記録
+- 2026-11-25 リョウさんの実機 (PR #33・#34 と状態の棚卸しをまとめた版): `vuln` → vuln、`vulnwo` → vulnを (ゔおん にならない)。問題なし。
