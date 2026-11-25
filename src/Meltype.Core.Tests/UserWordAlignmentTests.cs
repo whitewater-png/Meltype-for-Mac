@@ -389,6 +389,154 @@ internal static class UserWordAlignmentTests
         Assert.True(!converter.Calls.Any(c => c.StartsWith("しのがきた|", StringComparison.Ordinal)), "先頭の語だけなら全体を変換しない: " + string.Join(",", converter.Calls));
     }
 
+    // ---- しきい値は文字数でなく拍数 (しゅう・じゅん・しょう は 3 文字でも 2 拍。要件 032) ----
+
+    /// <summary>
+    /// 読み reading を 1 つの文節にまとめて返す変換エンジン (がくしゅうする → 学習する のように、エンジン単体では 1 文節になる読み用)。
+    /// 登録しない読み (がく・する など) はそのまま返す。
+    /// </summary>
+    private sealed class WholeClauseConverter(string reading, string text) : IKanjiConverter
+    {
+        public string? Convert(string hiragana) => ConvertClauses(hiragana) is { } c ? string.Concat(c.Select(x => x.Text)) : null;
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null) =>
+            hiragana == reading ? [new(reading, text)] : [new(hiragana, hiragana)];
+    }
+
+    [Test]
+    public static void UserWordMoraCount_CountsSmallKanaWithThePreviousCharacter()
+    {
+        // 直前の文字といっしょに 1 拍と数える小さいかな (ゃゅょぁぃぅぇぉ) は引く。っ・ん・長音は 1 拍のまま
+        foreach (var (reading, mora) in new[]
+        {
+            ("しゅう", 2), ("じゅん", 2), ("しょう", 2), ("さくら", 3), ("ふぁいる", 3), ("ちゃんと", 3), ("っぱ", 2), ("らーめん", 4),
+            ("しの", 2), ("じゅんすけ", 4), ("ひなた", 3), ("ゆうき", 3), ("きゃりーぱみゅぱみゅ", 7), ("", 0),
+        })
+        {
+            Assert.Equal(mora, CompositionController.UserWordMoraCount(reading), $"{reading} の拍数");
+        }
+        // 先頭の小さいかなは、直前の文字が無いので 1 拍
+        Assert.Equal(2, CompositionController.UserWordMoraCount("ぁい"), "先頭の ぁ は 1 拍");
+        // 文字数 3 でも 2 拍の語は、しきい値 (3) に届かない。3 拍の語は届く
+        Assert.True(CompositionController.UserWordMoraCount("しゅう") < CompositionController.InsideClauseMinReadingLength, "しゅう はしきい値に届かない");
+        Assert.True(CompositionController.UserWordMoraCount("さくら") >= CompositionController.InsideClauseMinReadingLength, "さくら はしきい値に届く");
+    }
+
+    [Test]
+    public static void TwoMoraWordWrittenInThreeLetters_InsideAnEngineClause_IsNotUsed()
+    {
+        // 実機の「がく週する」: しゅう (し・ゅ・う = 3 文字・2 拍) → 珠佑 を登録していると、がくしゅうする (エンジンは 学習する の 1 文節) に割り込み、
+        // さらに学習 (しゅう → 週) で がく|週|する になっていた。拍で数えれば 2 拍の語なので、文節の途中では使わない
+        var history = new ConversionHistory(null);
+        history.Remember("しゅう", "週");
+        var k = new CompositionTests.Keyboard(converter: new WholeClauseConverter("がくしゅうする", "学習する"), history: history,
+            userDictionary: Dictionary(("しゅう", "珠佑")));
+        k.Type("gakushuusuru ");
+        Assert.Equal("学習する", Clauses(k), "しゅう は文節 がくしゅうする の途中なので使わない");
+    }
+
+    [Test]
+    public static void TwoMoraWord_AtAClauseHead_IsStillUsed()
+    {
+        // 文節の頭から始まるなら、今までどおり使う (starts.Contains(position) の条件は変えない)
+        var k = new CompositionTests.Keyboard(converter: new LexiconConverter(), userDictionary: Dictionary(("しゅう", "珠佑")));
+        k.Type("shuugakita ");
+        Assert.Equal("珠佑|が|来た", Clauses(k), "先頭の しゅう は使う");
+
+        // 先頭でなく、エンジンの文節の頭にあたる位置 (がく|しゅうする の しゅう) でも使う
+        k = new CompositionTests.Keyboard(converter: new SplitConverter("がくしゅうする", ("がく", "学"), ("しゅうする", "修する")), userDictionary: Dictionary(("しゅう", "珠佑")));
+        k.Type("gakushuusuru ");
+        Assert.Equal("がく|珠佑|する", Clauses(k), "文節の頭に当たる しゅう は使う");
+    }
+
+    /// <summary>reading を、指定した文節に区切って返す変換エンジン (他の読みはそのまま返す)。</summary>
+    private sealed class SplitConverter(string reading, params (string Reading, string Text)[] clauses) : IKanjiConverter
+    {
+        public string? Convert(string hiragana) => ConvertClauses(hiragana) is { } c ? string.Concat(c.Select(x => x.Text)) : null;
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null) =>
+            hiragana == reading ? clauses.Select(c => new ConversionClause(c.Reading, c.Text)).ToList() : [new(hiragana, hiragana)];
+    }
+
+    [Test]
+    public static void ThreeMoraOrLongerNames_InsideAnEngineClause_AreStillUsed()
+    {
+        // 拍が 3 以上の名前は、今までどおり文節の途中からでも使う (さくら・ひなた・ゆうき・じゅんすけ・ふぁいる・ちゃんと)
+        foreach (var (typed, reading) in new[]
+        {
+            ("sakura", "さくら"), ("hinata", "ひなた"), ("yuuki", "ゆうき"), ("junsuke", "じゅんすけ"), ("fairu", "ふぁいる"), ("chanto", "ちゃんと"),
+        })
+        {
+            var full = "おとうとの" + reading + "です";
+            var k = new CompositionTests.Keyboard(converter: new SplitConverter(full, ("おとうと", "弟"), ("の" + reading + "です", "の?です")),
+                userDictionary: Dictionary((reading, "★")));
+            k.Type("otoutono" + typed + "desu ");
+            var clauses = Clauses(k);
+            Assert.True(clauses.Contains('★'), $"{reading} は文節の途中からでも使う: " + clauses);
+        }
+    }
+
+    [Test]
+    public static void TwoMoraNames_WrittenInThreeLetters_InsideAnEngineClause_AreNotUsed()
+    {
+        // しゅう・じゅん・しょう は 3 文字だが 2 拍。文節の途中では使わない (文節の頭なら使う: TwoMoraWord_AtAClauseHead_IsStillUsed)
+        foreach (var (typed, reading) in new[] { ("shuu", "しゅう"), ("junn", "じゅん"), ("shou", "しょう") })
+        {
+            var full = "おとうとの" + reading + "です";
+            var k = new CompositionTests.Keyboard(converter: new SplitConverter(full, ("おとうと", "弟"), ("の" + reading + "です", "の?です")),
+                userDictionary: Dictionary((reading, "★")));
+            k.Type("otoutono" + typed + "desu ");
+            var clauses = Clauses(k);
+            Assert.True(!clauses.Contains('★'), $"{reading} は 2 拍なので文節の途中では使わない: " + clauses);
+        }
+    }
+
+    /// <summary>
+    /// 実機のユーザー辞書と学習データのコピーで、がくしゅうする が がく|週|する に割れないことを確かめる (要件 032)。
+    /// MELTYPE_TEST_USERDICT_COPY・MELTYPE_TEST_CONVERSIONS_COPY にコピーのパスを入れたときだけ動く (本物のファイルは読まず、さらに一時フォルダーへ写して使う)。
+    /// 語の中身は出力しない。
+    /// </summary>
+    [Test]
+    public static void RealDeviceDataCopy_GakuShuuSuru_IsNotSplit()
+    {
+        var userdictCopy = Environment.GetEnvironmentVariable("MELTYPE_TEST_USERDICT_COPY");
+        var conversionsCopy = Environment.GetEnvironmentVariable("MELTYPE_TEST_CONVERSIONS_COPY");
+        if (string.IsNullOrEmpty(userdictCopy) || !File.Exists(userdictCopy))
+        {
+            Console.WriteLine("  RealDeviceDataCopy_GakuShuuSuru_IsNotSplit: スキップ (MELTYPE_TEST_USERDICT_COPY が無い)");
+            return;
+        }
+        var directory = Path.Combine(Path.GetTempPath(), "meltype-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var dictionaryPath = Path.Combine(directory, "userdict.txt");
+            File.Copy(userdictCopy, dictionaryPath);
+            string? historyPath = null;
+            if (!string.IsNullOrEmpty(conversionsCopy) && File.Exists(conversionsCopy))
+            {
+                historyPath = Path.Combine(directory, "conversions.json");
+                File.Copy(conversionsCopy, historyPath);
+            }
+            var dictionary = new UserDictionary(dictionaryPath, builtIn: false);
+            Assert.True(dictionary.IsUserReading("しゅう"), "前提: コピーのユーザー辞書に しゅう の語がある");
+            var history = new ConversionHistory(historyPath);
+            var k = new CompositionTests.Keyboard(converter: new WholeClauseConverter("がくしゅうする", "学習する"), history: history, userDictionary: dictionary);
+            k.Type("gakushuusuru ");
+            var clauses = Clauses(k);
+            Console.WriteLine($"  RealDeviceDataCopy_GakuShuuSuru_IsNotSplit: 文節 {k.Host.View!.Clauses!.Count} 個 (学習データのコピー: {(historyPath is null ? "なし" : "あり")}、しゅう の学習: {(history.Get("しゅう") is null ? "なし" : "あり")})");
+            // 語の中身は出さず、数だけ報告する: 文字数でなく拍数で数えると、途中から使う語が何件、使わない語に変わるか
+            var others = dictionary.Words.Where(w => w.Reading != "しゅう").ToList();
+            var n = CompositionController.InsideClauseMinReadingLength;
+            var changed = others.Count(w => w.Reading.Length >= n && CompositionController.UserWordMoraCount(w.Reading) < n);
+            Console.WriteLine($"  RealDeviceDataCopy_GakuShuuSuru_IsNotSplit: 語 {dictionary.Count} 件のうち しゅう 以外 {others.Count} 件。途中から使う→使わないに変わる語 {changed} 件、"
+                + $"もともと使わない (文字数が 3 未満) {others.Count(w => w.Reading.Length < n)} 件、拍数も 3 以上で変わらない {others.Count(w => CompositionController.UserWordMoraCount(w.Reading) >= n)} 件");
+            Assert.Equal("学習する", clauses, "実機のコピーでも がくしゅうする は 1 文節 (学習する)");
+        }
+        finally
+        {
+            try { Directory.Delete(directory, recursive: true); } catch { }
+        }
+    }
+
     // ---- 自作の専門用語集 (ユーザー辞書の語と同じ扱い) ----
 
     [Test]
