@@ -3,6 +3,7 @@
 #   https://github.com/Serugu/Meltype-Zenzai-Vulkan/blob/6973b307eb6e969d28ff372245de8505ff1f6d38/tools/zenzai-cases.txt
 #   https://github.com/Serugu/Meltype-Zenzai-Vulkan/blob/6973b307eb6e969d28ff372245de8505ff1f6d38/tools/zenzai-holdout.txt
 #   (2 ファイルとも最終変更は 6973b307、2026-10-17。リポジトリの先頭は 520ac08。GitHub の API でライセンスが gpl-3.0 と確かめた)
+# 著作権: 表の文の追加者は Serugu (コミット 6973b307 の作者)。フォークの README の表記は、本家のまま Copyright (C) 2026 雪代 / Yukishiro (@yksr_melt / @yksr-melt)。ファイル自体に著作権・ライセンスの行は無い。
 # ライセンス: GPL-3.0 (LICENSE 同梱)。この表は GPL-3.0 の派生物として、このリポジトリの GPL-3.0-or-later に含めます。
 # 変えたこと:
 #   1. 原文の「文 / 読み」を「id<Tab>読み<Tab>文<Tab>(左文脈は空)」に並べ替えた。id は原文の順の連番 (Z001〜Z080、H001〜H040)。読みと文は原文のまま。

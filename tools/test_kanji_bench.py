@@ -42,6 +42,21 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(got[0]["context"], "左")
         self.assertEqual(got[1]["accepted"], ["人間", "ニンゲン"])
 
+    def test_duplicate_ids_stop(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "t.tsv")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("A1\tあ\tあ\t\nA2\tい\tい\t\nA1\tう\tう\t\n")
+            with self.assertRaises(SystemExit) as cm:
+                kb.load_table(path)
+        self.assertIn("id の重複", str(cm.exception))
+        self.assertIn("A1", str(cm.exception))
+
+    def test_missing_table_file_stops(self):
+        with self.assertRaises(SystemExit) as cm:
+            kb.load_table("/nonexistent/none.tsv")
+        self.assertIn("表のファイルがありません", str(cm.exception))
+
     def test_sentence_of(self):
         self.assertEqual(kb.sentence_of("M01_1"), "M01")
         self.assertEqual(kb.sentence_of("Z001"), "Z001")
@@ -174,6 +189,66 @@ class EndToEndTests(unittest.TestCase):
         # --fail-on-regression 無しなら差が出ても 0
         code, _, _ = self.run_main("--baseline", record, env={"FAKE_OFF": worse})
         self.assertEqual(code, 0)
+
+    def record_of(self, **mods):
+        """FAKE の出力を --save で記録にして、読み込んで返す (mods で作り替えて baseline にする)。"""
+        same = self.tops("same", M01_0="今日は", M01_1="で", Z001="川")
+        path = os.path.join(self.d.name, "full.json")
+        code, _, _ = self.run_main("--weights", self.weights, "--save", path, env={"FAKE_OFF": same, "FAKE_ON": same})
+        self.assertEqual(code, 0)
+        with open(path, encoding="utf-8") as f:
+            return json.load(f), same
+
+    def write_json(self, name, data):
+        path = os.path.join(self.d.name, name)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        return path
+
+    def test_fail_on_regression_without_baseline_is_exit_2(self):
+        _, same = self.record_of()
+        code, _, err = self.run_main("--fail-on-regression", env={"FAKE_OFF": same})
+        self.assertEqual(code, 2)
+        self.assertIn("--baseline が無い", err)
+
+    def test_fail_on_regression_with_empty_baseline_or_missing_table_is_exit_2(self):
+        _, same = self.record_of()
+        for name, data, word in (("empty.json", {}, "空"), ("notables.json", {"version": 1}, "空"),
+                                 ("othertable.json", {"tables": {"other": {"off": {}}}}, "この表が無い")):
+            code, _, err = self.run_main("--baseline", self.write_json(name, data), "--fail-on-regression", env={"FAKE_OFF": same})
+            self.assertEqual(code, 2, name)
+            self.assertIn(word, err, name)
+
+    def test_fail_on_regression_when_baseline_has_no_on_but_on_was_measured_is_exit_2(self):
+        full, same = self.record_of()
+        off_only = {"version": 1, "tables": {"mini": {"off": full["tables"]["mini"]["off"]}}}
+        code, _, err = self.run_main("--weights", self.weights, "--baseline", self.write_json("offonly.json", off_only),
+                                     "--fail-on-regression", env={"FAKE_OFF": same, "FAKE_ON": same})
+        self.assertEqual(code, 2)
+        self.assertIn("ON (Zenzai) が無い", err)
+        # 同じ baseline でも OFF だけ測るなら比べられる
+        code, _, _ = self.run_main("--baseline", self.write_json("offonly.json", off_only), "--fail-on-regression", env={"FAKE_OFF": same})
+        self.assertEqual(code, 0)
+
+    def test_fewer_compared_rows_than_table_warns_and_fails_with_flag(self):
+        full, same = self.record_of()
+        del full["tables"]["mini"]["off"]["Z001"]
+        path = self.write_json("short.json", full)
+        code, _, err = self.run_main("--baseline", path, env={"FAKE_OFF": same})
+        self.assertEqual(code, 0)   # 旗が無ければ警告だけ
+        self.assertIn("警告", err)
+        self.assertIn("2 / 表 3 行", err)
+        code, _, err = self.run_main("--baseline", path, "--fail-on-regression", env={"FAKE_OFF": same})
+        self.assertEqual(code, 2)
+
+    def test_missing_baseline_file_and_missing_table_path_are_clear_errors(self):
+        _, same = self.record_of()
+        code, _, _ = self.run_main("--baseline", os.path.join(self.d.name, "nothing.json"), env={"FAKE_OFF": same})
+        self.assertIn("前回の記録がありません", str(code))
+        out = io.StringIO()
+        with contextlib.redirect_stderr(out), self.assertRaises(SystemExit) as cm:
+            kb.main(["--binary", self.binary, "--tables", os.path.join(self.d.name, "nothing.tsv")])
+        self.assertIn("表のファイルがありません", str(cm.exception))
 
     def test_off_only_without_weights(self):
         same = self.tops("same", M01_0="今日は", M01_1="で", Z001="河")

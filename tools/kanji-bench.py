@@ -14,6 +14,8 @@
 - `--baseline` を渡すと、前回の記録 (`--save` で書いたもの) と行ごとに突き合わせ、当たり → 外れ・外れ → 当たりの行を出す。
   突き合わせは「記録した第一候補」を **今の表** で採点し直して行う (表の許容を足した分は、エンジンの変化に数えない)。
 - `--fail-on-regression` を付けると、当たり → 外れが 1 行でもあれば終了コード 1 (OFF・ON どちらも見る)。
+  比べられないもの (`--baseline` 無し・記録が空・記録に表や測ったモード (ON など) が無い・突き合わせた行が表の行数より少ない) があれば、
+  黙って 0 にせず、理由を出して終了コード 2。`--fail-on-regression` が無いときも、突き合わせの不足は警告を出す。
 - 速さ (p50 / p95) は測った機械の値。記録に機械の名前を残す。別の機械の記録とは比べない。
 
 注意 (過学習): `bench-homophones.tsv` は Zenzai の評価用の表で、同音異義語に偏っている。この表の外れを直すために辞書や規則を足すと、
@@ -40,6 +42,8 @@ MODE_LABEL = {"off": "OFF (Zenzai なし)", "on": "ON (Zenzai)"}
 
 def load_table(path: str) -> list:
     """4 列の表を読む。`#` の行と空行は読まない (`ConvertEval.parse` と同じ)。正解の 1 つ目 = 原文の期待。"""
+    if not os.path.isfile(path):
+        raise SystemExit(f"表のファイルがありません: {path}")
     rows = []
     with open(path, encoding="utf-8") as handle:
         for line in handle.read().split("\n"):
@@ -53,6 +57,14 @@ def load_table(path: str) -> list:
                 continue
             rows.append({"id": columns[0], "reading": columns[1], "accepted": accepted,
                          "context": columns[3] if len(columns) >= 4 else ""})
+    seen, duplicated = set(), []
+    for row in rows:
+        if row["id"] in seen and row["id"] not in duplicated:
+            duplicated.append(row["id"])
+        seen.add(row["id"])
+    if duplicated:
+        # id で行を突き合わせるので、重複があると片方の結果が黙って消える
+        raise SystemExit(f"表に id の重複があります ({path}): {', '.join(duplicated[:10])}")
     return rows
 
 
@@ -201,7 +213,7 @@ def render(record: dict, tables: dict, baseline=None) -> tuple:
             on_tops = {k: v["top"] for k, v in data["on"].items()}
             d = diff_records(rows, off_tops, on_tops)
             md += [f"OFF → ON (許容あり、行): 外れ → 当たり {len(d['fixed'])} 行 / 当たり → 外れ {len(d['broken'])} 行", ""]
-        if baseline and name in baseline["tables"]:
+        if baseline and name in (baseline.get("tables") or {}):
             for mode in MODES:
                 if mode not in data or mode not in baseline["tables"][name]:
                     continue
@@ -229,6 +241,32 @@ def render(record: dict, tables: dict, baseline=None) -> tuple:
     md += ["---", "注意: `bench-homophones` は Zenzai の評価用で同音異義語に偏る。この表に合わせた辞書・規則の追加は過学習になる。"
            "表の外の文 (eval/kanji/kanji-cases.tsv・tools/ajimee-eval.py) でも悪化していないことを併せて確かめる。"]
     return "\n".join(md) + "\n", total_broken
+
+
+def coverage_problems(record: dict, tables: dict, baseline) -> list:
+    """測ったもの (表 × モード) のうち、前回の記録と全行を突き合わせられないものの理由の一覧。空なら全部比べられた。"""
+    if baseline is None:
+        return ["--baseline が無い (比べる記録が無い)"]
+    base_tables = baseline.get("tables") if isinstance(baseline, dict) else None
+    if not base_tables:
+        return ["前回の記録が空 (tables が無い)"]
+    problems = []
+    for name, data in record["tables"].items():
+        if name not in base_tables:
+            problems.append(f"{name}: 前回の記録にこの表が無い")
+            continue
+        for mode in MODES:
+            if mode not in data:
+                continue
+            if mode not in base_tables[name]:
+                problems.append(f"{name}: 前回の記録に {MODE_LABEL[mode]} が無い")
+                continue
+            old = {k: v["top"] for k, v in base_tables[name][mode].items()}
+            new = {k: v["top"] for k, v in data[mode].items()}
+            common = diff_records(tables[name], old, new)["common"]
+            if common < len(tables[name]):
+                problems.append(f"{name}: {MODE_LABEL[mode]} で突き合わせた行が {common} / 表 {len(tables[name])} 行")
+    return problems
 
 
 def revision() -> str:
@@ -269,6 +307,8 @@ def main(argv=None) -> int:
             record["tables"][name][mode] = {r["id"]: {"top": r["top"], "ms": r["ms"]} for r in results}
     baseline = None
     if args.baseline:
+        if not os.path.isfile(args.baseline):
+            raise SystemExit(f"前回の記録がありません: {args.baseline}")
         with open(args.baseline, encoding="utf-8") as handle:
             baseline = json.load(handle)
     markdown, broken = render(record, tables, baseline)
@@ -283,9 +323,16 @@ def main(argv=None) -> int:
         os.makedirs(args.out, exist_ok=True)
         with open(os.path.join(args.out, "report.md"), "w", encoding="utf-8") as handle:
             handle.write(markdown)
-    if args.fail_on_regression and baseline and broken:
-        print(f"当たり → 外れが {broken} 行あります", file=sys.stderr)
-        return 1
+    problems = coverage_problems(record, tables, baseline) if (baseline or args.fail_on_regression) else []
+    for problem in problems:
+        print(f"警告: 前回の記録と比べられない: {problem}", file=sys.stderr)
+    if args.fail_on_regression:
+        if problems:
+            print("--fail-on-regression: 比べられない表・モードがあるので、判定できません (終了コード 2)", file=sys.stderr)
+            return 2
+        if broken:
+            print(f"当たり → 外れが {broken} 行あります", file=sys.stderr)
+            return 1
     return 0
 
 

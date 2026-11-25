@@ -2,6 +2,7 @@
 # 出典: yksr-melt/Meltype (本家) tools/mozc-compare-cases.tsv の 60 行 (「打った文字<Tab>期待」)。GPL-3.0。
 #   https://github.com/yksr-melt/Meltype/blob/01672c871dd7ab88fb406927fbd7957dec8a5d10/tools/mozc-compare-cases.tsv
 #   (main 01672c87、2026-11-25 取得。ファイルの最終変更は a2bf6e00。本家の clone とブラウザーの raw の md5 が一致)
+# 著作権: Copyright (C) 2026 雪代 / Yukishiro (@yksr_melt / @yksr-melt) (本家の README の表記。ソースは SPDX-License-Identifier: GPL-3.0-or-later)。
 # ライセンス: 本家 GPL-3.0 (LICENSE 同梱)。この表は GPL-3.0 の派生物として、このリポジトリの GPL-3.0-or-later に含めます。
 # 変えたこと:
 #   1. 原文はローマ字の打鍵と期待の組なので、期待を英字の連なりで切り、日本語の部分ごとに 1 行にした (id = M<原文の行番号 2 桁>_<部分の番号>)。
