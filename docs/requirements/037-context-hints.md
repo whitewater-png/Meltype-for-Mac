@@ -1,6 +1,6 @@
 ---
 title: Zenzai OFF の人向けに、よく外れる同音異義語の組を文脈の手がかり辞書 (contexts.txt) に足す → 測った結果、見送りを推奨
-status: draft   # draft | approved | done。approved にするのは人
+status: done   # draft | approved | done。approved にするのは人
 source: 比較ベンチ (かな漢字 120 文) の Zenzai OFF の外れ 38 文 (REPORT.md §4 案 D)
 scope: dictionary
 ---
@@ -60,6 +60,9 @@ scope: dictionary
 ## 完成条件
 - [x] 測った結果の文書 (この文書)
 - [ ] (足さないので) 辞書の行・テストの追加はなし。Core の全件テスト・eval-compare・--eval は、コードも辞書も変えていないので走らせていない (基準 1331/1331)
+
+## 人の判断
+- **決定 (2026-11-25 リョウさん「おすすめで対応して」): 見送り。辞書・コードは変えない (測定の記録だけを残す)。**
 
 ## 記録
 - 測定の素データ: リポジトリ外の作業フォルダー (入力の文・道具・変換結果・集計)。公開していない。

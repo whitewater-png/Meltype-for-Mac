@@ -1,6 +1,6 @@
 ---
 title: かな漢字の正解表に比較ベンチの 180 文を取り込み、Zenzai OFF/ON を変更ごとに測れるようにする
-status: draft   # draft | approved | done。approved にするのは人
+status: approved   # draft | approved | done。approved にするのは人
 source: 派生フォーク比較ベンチ (2026-11-22 計測の xlsx、649 件) の A 日英混在 60 文・B かな漢字 120 文と、その検証 (2026-11-25 の測り直し。REPORT §3・§5)
 scope: docs     # 表・測る道具・文書だけ。Core・Swift のコードは変えない
 ---
@@ -134,6 +134,7 @@ python3 tools/kanji-bench.py --binary mac/.build/release/MeltypeIME --weights "$
 - 出典のライセンスが GPL-3.0 でなくなる・確認できないとき (今回は API と LICENSE 本文で確認した)。
 
 ## 人の判断
+- **決定 (2026-11-25 リョウさん「おすすめで対応して」): 許容を足した 18 行はこのまま。Serugu の表は GPL-3.0 として出典と著作権者を明記したまま取り込む (LICENSE は GPL-3.0 の標準全文で「or any later version」を含み、README も or later の表記を引き継いでいる)。**
 1. 表を入れること自体 (GPL-3.0 の出典の派生物として入れる)。本家の表は -or-later で問題なし。**Serugu の表 (`bench-homophones.tsv`) は、フォークの README が -or-later なので同じ扱いにしたが、Serugu 自身の追加分に固有の表示は無い。** 気になるなら、(a) Serugu に追加分のライセンスを確認する、(b) この表だけ「GPL-3.0 のデータファイル」として別ライセンスのまま置く (表の頭と THIRD-PARTY-NOTICES.md に書いてある形のまま。表は測る道具が読むだけで、アプリには入らず、コードとリンクしない)、のどちらかを選ぶ。公開は親がリョウさんに確認するまでしない。
 2. 許容を足した 18 行の理由。特に `M33_0` (2人)・`Z026` (1人)・`H008` (10分)・`H036` (革) は好みが分かれうる。
 

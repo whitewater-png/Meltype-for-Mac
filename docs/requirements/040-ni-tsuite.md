@@ -1,6 +1,6 @@
 ---
 title: 「い + について」が英字に割れる (にほんいについて が にほんinitsuite になる)
-status: draft   # draft | approved | done。approved にするのは人
+status: approved   # draft | approved | done。approved にするのは人
 source: 要件 033 の掃引で見つかった別の形 (2026-11-25、レーン L7)
 scope: core
 ---
@@ -48,6 +48,7 @@ scope: core
 - 英語の悪化が `<かな>init / reinit + tsu…` 以外 (`initshita`・`git init`・`npm init` など) に出たとき。
 
 ## 人の判断
+- **決定 (2026-11-25 リョウさん「おすすめで対応して」): 損 (かなで終わる語に空白なしで続けた init / reinit + tsu… の形。31,372 入力中 354 件) は受け入れる。u|ni|t (unit) は今回は直さない。**
 1. 上の損 (かなで終わる語 + init / reinit + tsu… の形全般、354 件規模) を受け入れるか。
 2. `u|ni|t` (unit) まで直すか (非目標。直すと英語の損が 6 件増える)。
 

@@ -1,6 +1,6 @@
 ---
 title: 「それも + て…」のような日本語が、英単語 remote に取られて割れる (soremoteishutsu が そremoteいしゅつ になる)
-status: draft   # draft | approved | done。approved にするのは人
+status: approved   # draft | approved | done。approved にするのは人
 source: 要件 033 の掃引 (2026-11-25) で見つかった別の形の割れ。`soremoteishutsu`・`soremotetsudau`・`soremotekisetsu` など (jp_tsu の 26 件)
 scope: core
 ---
@@ -57,6 +57,7 @@ scope: core
 - 日本語・英語の掃引で、条件を狭めても消えない悪化が出たとき (今回は出なかった)。
 
 ## 人の判断
+- **決定 (2026-11-25 リョウさん「おすすめで対応して」): 直す範囲は、代名詞が入力の先頭・空白の後ろ・記号の後ろにあるときだけ (助詞の後ろ「きょうもそれもて…」は直さない)。**
 - なし (悪化 0。設定・公開は伴わない)。
 
 ## 記録
