@@ -101,10 +101,10 @@ public sealed class CompositionDetector
     private static readonly HashSet<string> NotAfterJapanese = new(StringComparer.Ordinal) { "main", "domain", "data", "code", "cache" };
 
     /// <summary>ローマ字 letters の読みで始まる、よく使う日本語の語・ブランド名があるか。</summary>
-    private bool StartsJapaneseReading(string letters)
+    private bool StartsJapaneseReading(string letters) => ReadingOf(letters) is { } head && StartsJapaneseReadingKana(head);
+
+    private static bool StartsJapaneseReadingKana(string head)
     {
-        var head = ReadingOf(letters);
-        if (head is null) return false;
         var readings = JapaneseReadings.Value;
         var index = Array.BinarySearch(readings, head, StringComparer.Ordinal);
         if (index < 0) index = ~index;
@@ -137,6 +137,39 @@ public sealed class CompositionDetector
         }
         return [.. words];
     });
+
+    /// <summary>入力の中で 1 語として完結している代名詞 (それ・これ・あれ・どれ・かれ・だれ)。</summary>
+    private static readonly HashSet<string> PronounsBeforeParticle = new(StringComparer.Ordinal) { "それ", "これ", "あれ", "どれ", "かれ", "だれ" };
+
+    private static readonly HashSet<string> PronounHeads = new(StringComparer.Ordinal) { "so", "ko", "a", "do", "ka", "da" };
+
+    /// <summary>かなの並び (英字と、伸ばす音の -) だけの単位か。</summary>
+    private static bool IsKanaRun(string raw) => raw.Length > 0 && raw.All(c => char.IsAsciiLetter(c) || c == '-');
+
+    /// <summary>
+    /// 区間 [start, end) が english-readable.txt の語 (remote) で、先頭の れ の前が代名詞の頭の音 (そ|れ = それ) で、その語の途中の単位が助詞 (も)、
+    /// 助詞の後ろ (て|いしゅつ = ていしゅつ) が 2 音以上の日本語の語の頭になるか (soremoteishutsu = それも + 提出)。要件 039。
+    /// 代名詞は、入力の先頭・空白や記号の後ろにあるときだけ (語として完結しているとき)。かな の後ろ (やまだ|れもて の だれ、きょうも|それもて) は、
+    /// 辞書に無い語 (ももこ・ともか) の途中かもしれず、辞書の照合では塞ぎきれないので、日本語の語 + remote のまま (安全側)。要件 039 の R6・R6b・R6c。
+    /// </summary>
+    private bool ReadableWordSplitsIntoJapanese(IReadOnlyList<CompositionUnit> units, int start, int end, string pending)
+    {
+        // 安い条件で先に返す (打つたびに全部の区間を調べるので、文字列を作る前に見る)
+        if (start < 1 || end - start < 3 || units[start].Raw != "re" || !PronounHeads.Contains(units[start - 1].Raw)) return false;
+        if (start >= 2 && IsKanaRun(units[start - 2].Raw)) return false;
+        var n = units.Count;
+        if (!ReadableEnglish.Value.ContainsWord((Raw(units, start, end) + (end == n ? pending : "")).ToLowerInvariant())) return false;
+        for (var k = start + 1; k < end - 1; k++)
+        {
+            if (!IsParticle(units[k].Raw) || ReadingOf(Raw(units, start - 1, k)) is not { } word || !PronounsBeforeParticle.Contains(word)) continue;
+            var rest = new StringBuilder();
+            for (var m = k + 1; m < n && units[m].Raw.Length > 0 && units[m].Raw.All(char.IsAsciiLetter); m++) rest.Append(units[m].Raw);
+            if (rest.Length > 0 && Enumerable.Range(k + 1, n - k - 1).All(m => units[m].Raw.Length > 0 && units[m].Raw.All(char.IsAsciiLetter))) rest.Append(pending);
+            var analysis = _romaji.AnalyzeFragment(rest.ToString().ToLowerInvariant());
+            if (analysis.IsValid && analysis.Kana.Length >= 2 && StartsJapaneseReadingKana(analysis.Kana)) return true;
+        }
+        return false;
+    }
 
     /// <summary>english-readable.txt の語か (ローマ字として最後まで読めても英語にする語)。</summary>
     public bool IsReadableEnglishWord(string lower) => ReadableEnglish.Value.ContainsWord(lower);
@@ -387,6 +420,8 @@ public sealed class CompositionDetector
                 // カスタム表: 実機のスペルチェッカーだけが英単語と言う短い綴り (hast) の後ろに表のキーが続き (kt)、
                 // 区間と続きの英字を合わせると表でだけ最後まで読める綴りになる (hastkt = ha + st + kt) なら、英語の区間にしない。
                 if (!kanaInput && !ReferenceMode && j < n && IsTableOnlyContinuation(table.Raw(i, j), table.Raw(j, n) + pending)) continue;
+                // english-readable.txt の語 (remote = れもて) が、日本語の語 + 助詞 + 日本語の語 (そ|れ|も|て… = それも + て…) の途中から始まっているなら、英語にしない (要件 039)。
+                if (!kanaInput && ReadableWordSplitsIntoJapanese(units, i, j, pending)) continue;
                 var english = kanaInput
                     ? IsEnglishSpanKana(table.Raw(i, j), table.Kana(i, j), atEnd: j == n, BeforeScore(i), after, level, final)
                     : IsEnglishSpan(table.Raw(i, j) + (j == n ? pending : ""), atEnd: j == n, BeforeScore(i), after, startOfInput: i == 0, level, final, endsWord: symbolsAfter,

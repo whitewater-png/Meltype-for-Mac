@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Yukishiro
+
+namespace Meltype.Tests;
+
+/// <summary>
+/// 「それも + て…」のような日本語が、英単語 remote に取られて割れる (soremoteishutsu → そremoteいしゅつ。要件 039)。
+/// english-readable.txt の remote (= れもて) は、日本語の語の途中から始まっていても英語になっていた。
+/// 日本語の語 + 助詞 + 日本語の語 (そ|れ + も + て|いしゅつ) と読めるときは英語にしない。
+/// </summary>
+internal static class RemoteInJapaneseTests
+{
+    private static string Committed(string typed)
+    {
+        var k = new CompositionTests.Keyboard();
+        k.Type(typed + "\n");
+        return k.Host.Document;
+    }
+
+    [Test]
+    public static void Japanese_WordParticleWord_IsNotRemote()
+    {
+        foreach (var (typed, expected) in new[]
+        {
+            ("soremoteishutsu", "それもていしゅつ"), ("soremotetsudau", "それもてつだう"), ("soremotekisetsu", "それもてきせつ"),
+            ("soremotetsu", "それもてつ"), ("koremotetsudau", "これもてつだう"), ("aremoteishutsu", "あれもていしゅつ"),
+            ("doremotetsudau", "どれもてつだう"), ("daremotetsudau", "だれもてつだう"), ("karemoteishutsu", "かれもていしゅつ"),
+            ("sore,soremoteishutsu", "それ、それもていしゅつ"), ("a soremotetsudau", "あそれもてつだう"),
+        })
+            Assert.Equal(expected, Committed(typed), typed);
+    }
+
+    [Test]
+    public static void English_Remote_Unchanged()
+    {
+        // 語の頭・空白の後ろ・日本語 + remote のあとに 助詞/する/英単語が続く形は今までどおり英単語
+        foreach (var (typed, expected) in new[]
+        {
+            ("remote", "remote"), ("remotes", "remotes"), ("remoteishutsu", "remoteいしゅつ"), ("remotework", "remotework"),
+            ("kyouremoteishutsu", "きょうremoteいしゅつ"), ("sore remotetsudau", "それremoteつだう"), ("sorenoremotetsudau", "それのremoteつだう"),
+            ("sorekaremote", "それかremote"), ("kyouharemotesuru", "きょうはremoteする"), ("kyouharemoteworkdesu", "きょうはremoteworkです"),
+            ("soremote", "そremote"),
+            // 日本語の語 + remote (前の語の最後の 1 音 + れ が読みになる語。R6 の指摘): 代名詞でないので remote のまま
+            ("yamadaremoteishutsu", "やまだremoteいしゅつ"), ("tsukuremoteishutsu", "つくremoteいしゅつ"), ("kaisharemoteishutsu", "かいしゃremoteいしゅつ"),
+            ("bokuremotetsudau", "ぼくremoteつだう"), ("yamadaremoteni", "やまだremoteに"), ("yamadaremotega", "やまだremoteが"), ("yamadaremoteto", "やまだremoteと"),
+            // 語の中の助詞と同じ音 (な|に|か・お|と|こ・ま|に|あ・は|だ。R6b の指摘): 助詞 + 代名詞ではなく 日本語の語 + remote
+            ("nanikaremoteishutsu", "なにかremoteいしゅつ"), ("nantokaremoteishutsu", "なんとかremoteいしゅつ"), ("otokoremoteishutsu", "おとこremoteいしゅつ"),
+            ("maniaremoteishutsu", "まにあremoteいしゅつ"), ("hadaremoteishutsu", "はだremoteいしゅつ"), ("ba-jiniaremotetsudau", "ばーじにあremoteつだう"),
+            // 辞書に無い人名・かな語 (R6c): 代名詞は入力の先頭・空白・記号の後ろだけなので、かな の後ろの remote は塞がれない
+            ("momokoremoteishutsu", "ももこremoteいしゅつ"), ("tomokaremotetsudau", "ともかremoteつだう"), ("ikunokaremoteni", "いくのかremoteに"),
+            ("kanokoremotega", "かのこremoteが"), ("todaremoteishutsu", "とだremoteいしゅつ"),
+            ("tomoaremoteishutsu", "ともあremoteいしゅつ"), ("wakaremoteishutsu", "わかremoteいしゅつ"),
+        })
+            Assert.Equal(expected, Committed(typed), typed);
+    }
+
+    [Test]
+    public static void KnownLimit_PronounAfterKanaStaysRemote()
+    {
+        // 直らない (remote のまま) と決めた形 (要件 039 の R6c の判断): 代名詞が かな の後ろ (助詞の後ろ) にあるとき。
+        // 期待値は今の出力 (望ましい出力ではない)。この挙動が変わったら、要件 039 の「残る外れ」を見直す
+        Assert.Equal("きょうはそremoteいしゅつ", Committed("kyouhasoremoteishutsu"), "kyouhasoremoteishutsu");
+        Assert.Equal("きょうもそremoteいしゅつ", Committed("kyoumosoremoteishutsu"), "kyoumosoremoteishutsu");
+        Assert.Equal("きょうもこremoteつだう", Committed("kyoumokoremotetsudau"), "kyoumokoremotetsudau");
+    }
+}
