@@ -1529,6 +1529,36 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req032_VulnAlma_CommitAsShown()
+    {
+        // 本家 #2312 (vuln)・#1487 (alma): 打っている間は vuln・alma と見えるのに、Enter で ゔおん・あおま が確定していた
+        // (確定直前の打ち間違いの補正が l を o と読み直す)。dictionaries/english.txt に足した。
+        // vulns・vulnerable・AlmaLinux・salmon・almond と、aruma・karuma・vu のかなは変わらない。正解表: eval/cases/short-words-in-english.tsv。
+        var savedChecker = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            foreach (var (typed, expected) in new[]
+            {
+                ("vuln", "vuln"), ("--script vuln", "--script vuln"), ("vulnwo", "vulnを"), ("vulnde", "vulnで"),
+                ("alma", "alma"), ("almaga", "almaが"), ("almade", "almaで"), ("alma linux", "alma linux"),
+                ("vulns", "vulns"), ("vulnerable", "vulnerable"), ("AlmaLinux", "AlmaLinux"), ("salmon", "salmon"), ("almond", "almond"),
+                ("vu", "ゔ"), ("aruma", "あるま"), ("arumade", "あるまで"), ("karuma", "かるま"),
+            })
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type(typed);
+                var shown = k.Host.Document + k.Showing;
+                k.Type("\n");
+                Assert.Equal(expected, k.Host.Document, typed);
+                // 打っている間に見えていたもの (確定済みの部分 + 変換中の部分) と、Enter で入るものが同じ
+                if (typed is "vuln" or "--script vuln" or "alma") Assert.Equal(shown, k.Host.Document, typed + " の表示");
+            }
+        }
+        finally { CompositionTests.Detector.SpellChecker = savedChecker; }
+    }
+
+    [Test]
     public static void Req004_ConsonantOnlyLettersThenHyphen_StayHalfWidth_AndLongVowelsDoNot()
     {
         // 本家 #1349: pt-query-digest が ptーquery-digest になる。母音の無い英字の並び (pt・ls・cd・rm) の直後の - は長音にしない。
