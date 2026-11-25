@@ -37,7 +37,7 @@ scope: core
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] TextEdit: `apinoerror` + Enter → `apiのerror` (ライブ変換 ON のまま)
-- [ ] ターミナル (zsh): `apinoerror` → `apiのerror`。`api` 単体と `error` 単体が英字のままであること
+- [ ] ターミナル (zsh): `apinoerror` → `apiのerror`。`error` 単体が英字のままであること。`api` 単体は `あぴ` になる (Core の `--repro api` で確認。ローマ字として読める語は単体ではかなになる。単体で英字に残すのは 001 の範囲外。旧文面「`api` 単体も英字のまま」は書き間違い)
 - [ ] TextEdit: `youtubenodouga` → `youtubeの動画` のように、長い英単語 + の でも壊れていないこと (回帰の目視)
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
