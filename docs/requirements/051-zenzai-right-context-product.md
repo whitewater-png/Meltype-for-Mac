@@ -69,6 +69,7 @@ scope: swift (実機必須)
 - トレースログ (`MeltypeTraceIMK`) が要りそうになったとき (取る前に同意を得る)
 
 ## 記録 (ループが書く)
+- 2026-11-26: 査読 1 周目の指摘で、登録語・英字の区間で割った途中の部分と再変換にも右文脈を渡さないようにした。クラウドで Core 1387/1387、eval-compare broken 0。
 - 2026-11-26: リョウさんが承認 (「051 承認」)。status を approved にした。
 - 2026-11-26: 人が決めること 1〜3 をおすすめで決定。実装: Core (`IRightContextConverter`・`RightConversionContext`)、FFI (`meltype_set_right_clauses`)、Swift (`clauses(for:context:rightContext:)`。049 の `measurementRightContext` は消し、`--convert-eval` も同じ口を使う)。クラウドで Core 1384/1384、eval-compare broken 0。Swift のビルドと測定は Mac で未確認。
 - 2026-11-26: 下書き (要件 049 の結果から)。
