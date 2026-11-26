@@ -37,7 +37,7 @@ scope: core
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] TextEdit: `apinoerror` + Enter → `apiのerror` (ライブ変換 ON のまま)
-- [ ] ターミナル (zsh): `apinoerror` → `apiのerror`。`error` 単体が英字のままであること。`api` 単体は `あぴ` になる (Core の `--repro api` で確認。ローマ字として読める語は単体ではかなになる。単体で英字に残すのは 001 の範囲外。旧文面「`api` 単体も英字のまま」は書き間違い)
+- [x] ターミナル (zsh): `apinoerror` → `apiのerror`。`error` 単体が英字のままであること。`api` 単体は、Core の `--repro api` では `あぴ` (ローマ字として読める語は単体ではかなになる。単体で英字に残すのは 001 の範囲外。旧文面「`api` 単体も英字のまま」は Core の結果としては書き間違い)。ただし実機のターミナルでは英字のままだった (2026-11-26 リョウさん。差の原因は未確認) … 2026-11-26 リョウさんの実機 (確認表 46・47: OK。ただし `api` 単体は実機では英字のまま): OK
 - [ ] TextEdit: `youtubenodouga` → `youtubeの動画` のように、長い英単語 + の でも壊れていないこと (回帰の目視)
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
@@ -51,3 +51,4 @@ scope: core
 - 範囲を絞った理由: 1 周目の「辞書の英単語 + 助詞」全般への適用は `sorenoerror` などの回帰を出したため、「`loanwords.txt` の大文字略語 + の + 英字の残る英単語」に絞った。新しく英字になるのは `api`・`ide`・`uri`・`gui`・`who` の 5 語で、`uri` (売り・瓜) は人の判断待ち。
 - Mac 実機チェックリスト: 未確認。
 - PR の URL: https://github.com/whitewater-png/Meltype-for-Mac/pull/5 (base = ccr-27ad1b0c-qzazzd、CI 緑、2026-10-24 マージ)
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 46・47: ターミナル (zsh) の `apinoerror` → `apiのerror`・`error` 単体は英字のまま OK。`api` 単体 Enter は実機のターミナルでは英字のままだった (Core の `--repro api` は `あぴ`。差の原因は未確認: 学習データの英語の記憶か、コード系アプリの判定か。ここまでの「単体は かな」は Core の結果で、実機は違った)

@@ -38,7 +38,7 @@ scope: core
 ## Mac 実機チェックリスト (人が確かめる。[x] は 2026-11-11 にリョウさんが確認、ほかは未確認)
 - [x] TextEdit: `karento` + Enter → `かれんと` (Space で `カレント` が候補に出るかは変換エンジン次第。こちらは記録だけの項目で、結果の詳細は無い)
 - [ ] TextEdit: `karen` + Enter → `karen`、`karenda-` → `かれんだー` (`karenda-` → かれんだー と `Karento` → Karenと は確認済み。`karen` 単独は未確認)
-- [ ] ターミナル (zsh): `karen` → `karen`
+- [x] ターミナル (zsh): `karen` → `karen` … 2026-11-26 リョウさんの実機 (確認表 52): OK
 
 ## 止める条件
 - 日本語の正解表の行が 1 件でも崩れる。
@@ -46,3 +46,4 @@ scope: core
 ## 記録
 - 定期タスクによる自動実行 (2026-11-07)。
 - 2026-11-11 リョウさんの Mac 実機 (TextEdit、Enter で確定。試し版 int/q41-q43 に main を合わせた手元の版 verify/q41-q43-plus-1111 を入れて確認。19 行の確認表と記録だけの 4 行への「全て期待結果通り」の一括報告で、項目ごとの記録は無い): `karento` → かれんと、`Karento` → Karenと、`karenda-` → かれんだー。
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 52: ターミナルの `karen` → `karen` OK

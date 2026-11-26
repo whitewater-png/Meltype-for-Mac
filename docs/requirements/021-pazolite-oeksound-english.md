@@ -93,3 +93,4 @@ scope: dictionary
 - 査読の境界例 (Core、Enter で確定、同梱の英単語の一覧): `readings.txt` の約 2 万語 (ヘボン式 1 通り) + `japanese.txt` 930 語から、正しい打ち方 20,441、+ 助詞 11 種 224,808、1 打鍵の打ち間違いのうち 2 語の断片 (`paz`・`pazol`・`oek`・`oeks`・`eks`・`kso`・`zol` など) を含むもの全件 16,874、それ以外の打ち間違い約 841 万件の 4 % の標本 332,414、語の境目に断片が出る複合語とその打ち間違い 326,829。重複を除いて 915,400 入力で、確定・表示とも変化 0 件。
 - 測れていないこと: 断片を含まない打ち間違いの残り 96 %、別の綴り (`si`・`tu`・`n'` など) の打ち間違いの残り 97 % (2 周目に正しい形・助詞付きは全件、打ち間違いは 3 % の標本を比べた)、Space で変換する形、実機の `NSSpellChecker`、azooKey の漢字変換、実機の入力欄。本家の直し方 (クラウドから届かない)。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/26
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 60: Hermes の入力欄で `oeksoundwo` → `oeksoundを` OK (Safari のフォームの代わり。Safari 固有の挙動は未確認のまま)
