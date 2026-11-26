@@ -1,0 +1,3390 @@
+[
+ {
+  "index": "K002",
+  "input": "しんぶんを",
+  "expected_output": [
+   "新聞を"
+  ],
+  "context_text": "",
+  "right_context": "読んで感心した",
+  "source": "kanji-cases (人)",
+  "original": "新聞を読んで感心した"
+ },
+ {
+  "index": "K003",
+  "input": "かんしんのある",
+  "expected_output": [
+   "関心のある"
+  ],
+  "context_text": "",
+  "right_context": "分野を調べる",
+  "source": "kanji-cases (人)",
+  "original": "関心のある分野を調べる"
+ },
+ {
+  "index": "K004",
+  "input": "でんしゃの",
+  "expected_output": [
+   "電車の"
+  ],
+  "context_text": "",
+  "right_context": "車窓から景色を見る",
+  "source": "kanji-cases (人)",
+  "original": "電車の車窓から景色を見る"
+ },
+ {
+  "index": "K005",
+  "input": "じこに",
+  "expected_output": [
+   "事故に"
+  ],
+  "context_text": "",
+  "right_context": "遭わないように注意する",
+  "source": "kanji-cases (人)",
+  "original": "事故に遭わないように注意する"
+ },
+ {
+  "index": "K006",
+  "input": "たいしょうを",
+  "expected_output": [
+   "対象を"
+  ],
+  "context_text": "",
+  "right_context": "選んで調査する",
+  "source": "kanji-cases (人)",
+  "original": "対象を選んで調査する"
+ },
+ {
+  "index": "K007",
+  "input": "かれは",
+  "expected_output": [
+   "彼は"
+  ],
+  "context_text": "",
+  "right_context": "高校で講師を務めた",
+  "source": "kanji-cases (人)",
+  "original": "彼は高校で講師を務めた"
+ },
+ {
+  "index": "K008",
+  "input": "しかくを",
+  "expected_output": [
+   "資格を"
+  ],
+  "context_text": "",
+  "right_context": "取るために勉強する",
+  "source": "kanji-cases (人)",
+  "original": "資格を取るために勉強する"
+ },
+ {
+  "index": "K009",
+  "input": "しかくの",
+  "expected_output": [
+   "四角の"
+  ],
+  "context_text": "",
+  "right_context": "形を書いた",
+  "source": "kanji-cases (人)",
+  "original": "四角の形を書いた"
+ },
+ {
+  "index": "K010",
+  "input": "はやしの",
+  "expected_output": [
+   "林の"
+  ],
+  "context_text": "",
+  "right_context": "中を散歩した",
+  "source": "kanji-cases (人)",
+  "original": "林の中を散歩した"
+ },
+ {
+  "index": "K011",
+  "input": "かみを",
+  "expected_output": [
+   "髪を"
+  ],
+  "context_text": "",
+  "right_context": "切って紙に書いた",
+  "source": "kanji-cases (人)",
+  "original": "髪を切って紙に書いた"
+ },
+ {
+  "index": "K013",
+  "input": "かわのかばんを",
+  "expected_output": [
+   "革のかばんを",
+   "革の鞄を",
+   "革のカバンを"
+  ],
+  "context_text": "",
+  "right_context": "買った",
+  "source": "kanji-cases (人)",
+  "original": "革のかばんを買った"
+ },
+ {
+  "index": "K014",
+  "input": "そらを",
+  "expected_output": [
+   "空を"
+  ],
+  "context_text": "",
+  "right_context": "飛ぶ鳥を見た",
+  "source": "kanji-cases (人)",
+  "original": "空を飛ぶ鳥を見た"
+ },
+ {
+  "index": "K015",
+  "input": "いけんを",
+  "expected_output": [
+   "意見を"
+  ],
+  "context_text": "",
+  "right_context": "述べて反論した",
+  "source": "kanji-cases (人)",
+  "original": "意見を述べて反論した"
+ },
+ {
+  "index": "K016",
+  "input": "せいふが",
+  "expected_output": [
+   "政府が"
+  ],
+  "context_text": "",
+  "right_context": "新しい法案を発表した",
+  "source": "kanji-cases (人)",
+  "original": "政府が新しい法案を発表した"
+ },
+ {
+  "index": "K017",
+  "input": "ぶんしょうの",
+  "expected_output": [
+   "文章の"
+  ],
+  "context_text": "",
+  "right_context": "構成を見直す",
+  "source": "kanji-cases (人)",
+  "original": "文章の構成を見直す"
+ },
+ {
+  "index": "K018",
+  "input": "びょういんで",
+  "expected_output": [
+   "病院で"
+  ],
+  "context_text": "",
+  "right_context": "医師に相談した",
+  "source": "kanji-cases (人)",
+  "original": "病院で医師に相談した"
+ },
+ {
+  "index": "K019",
+  "input": "きのうから",
+  "expected_output": [
+   "昨日から",
+   "きのうから"
+  ],
+  "context_text": "",
+  "right_context": "喉が痛い",
+  "source": "kanji-cases (人)",
+  "original": "昨日から喉が痛い"
+ },
+ {
+  "index": "K020",
+  "input": "はを",
+  "expected_output": [
+   "歯を"
+  ],
+  "context_text": "",
+  "right_context": "磨いて寝る",
+  "source": "kanji-cases (人)",
+  "original": "歯を磨いて寝る"
+ },
+ {
+  "index": "K021",
+  "input": "はしを",
+  "expected_output": [
+   "橋を"
+  ],
+  "context_text": "あの",
+  "right_context": "渡ると駅がある",
+  "source": "kanji-cases (人)",
+  "original": "あの橋を渡ると駅がある"
+ },
+ {
+  "index": "K022",
+  "input": "きしゃの",
+  "expected_output": [
+   "貴社の"
+  ],
+  "context_text": "",
+  "right_context": "記者が汽車で帰社した",
+  "source": "kanji-cases (人)",
+  "original": "貴社の記者が汽車で帰社した"
+ },
+ {
+  "index": "K023",
+  "input": "こうえんで",
+  "expected_output": [
+   "公園で"
+  ],
+  "context_text": "",
+  "right_context": "講演会が開かれた",
+  "source": "kanji-cases (人)",
+  "original": "公園で講演会が開かれた"
+ },
+ {
+  "index": "K024",
+  "input": "あついお",
+  "expected_output": [
+   "熱いお"
+  ],
+  "context_text": "",
+  "right_context": "茶を飲んでから暑い夏を過ごす",
+  "source": "kanji-cases (人)",
+  "original": "熱いお茶を飲んでから暑い夏を過ごす"
+ },
+ {
+  "index": "K025",
+  "input": "かれは",
+  "expected_output": [
+   "彼は"
+  ],
+  "context_text": "",
+  "right_context": "意志が強い人だ",
+  "source": "kanji-cases (人)",
+  "original": "彼は意志が強い人だ"
+ },
+ {
+  "index": "K026",
+  "input": "はなを",
+  "expected_output": [
+   "花を"
+  ],
+  "context_text": "",
+  "right_context": "買って花を見に行く",
+  "source": "kanji-cases (人)",
+  "original": "花を買って花を見に行く"
+ },
+ {
+  "index": "K027",
+  "input": "あめが",
+  "expected_output": [
+   "雨が"
+  ],
+  "context_text": "",
+  "right_context": "降る前に飴を舐めた",
+  "source": "kanji-cases (人)",
+  "original": "雨が降る前に飴を舐めた"
+ },
+ {
+  "index": "K028",
+  "input": "きかいを",
+  "expected_output": [
+   "機械を"
+  ],
+  "context_text": "",
+  "right_context": "入手して機会を改善する",
+  "source": "kanji-cases (人)",
+  "original": "機械を入手して機会を改善する"
+ },
+ {
+  "index": "K029",
+  "input": "ほうりつを",
+  "expected_output": [
+   "法律を"
+  ],
+  "context_text": "",
+  "right_context": "守る義務がある",
+  "source": "kanji-cases (人)",
+  "original": "法律を守る義務がある"
+ },
+ {
+  "index": "K030",
+  "input": "せいかくな",
+  "expected_output": [
+   "正確な"
+  ],
+  "context_text": "",
+  "right_context": "情報を収集する",
+  "source": "kanji-cases (人)",
+  "original": "正確な情報を収集する"
+ },
+ {
+  "index": "K033",
+  "input": "ひろい",
+  "expected_output": [
+   "広い"
+  ],
+  "context_text": "",
+  "right_context": "敷地に家を建てた",
+  "source": "kanji-cases (人)",
+  "original": "広い敷地に家を建てた"
+ },
+ {
+  "index": "K034",
+  "input": "むずかしい",
+  "expected_output": [
+   "難しい"
+  ],
+  "context_text": "",
+  "right_context": "問題を解く方法を教えてください",
+  "source": "kanji-cases (人)",
+  "original": "難しい問題を解く方法を教えてください"
+ },
+ {
+  "index": "K035",
+  "input": "はしは",
+  "expected_output": [
+   "橋は"
+  ],
+  "context_text": "この",
+  "right_context": "三十年前に作られた",
+  "source": "kanji-cases (人)",
+  "original": "この橋は三十年前に作られた"
+ },
+ {
+  "index": "K036",
+  "input": "かいぎしつで",
+  "expected_output": [
+   "会議室で"
+  ],
+  "context_text": "",
+  "right_context": "会議を行う",
+  "source": "kanji-cases (人)",
+  "original": "会議室で会議を行う"
+ },
+ {
+  "index": "K038",
+  "input": "しけんの",
+  "expected_output": [
+   "試験の"
+  ],
+  "context_text": "",
+  "right_context": "結果を報告する",
+  "source": "kanji-cases (人)",
+  "original": "試験の結果を報告する"
+ },
+ {
+  "index": "K039",
+  "input": "しりょうを",
+  "expected_output": [
+   "資料を"
+  ],
+  "context_text": "この",
+  "right_context": "確認してください",
+  "source": "kanji-cases (人)",
+  "original": "この資料を確認してください"
+ },
+ {
+  "index": "K040",
+  "input": "かんがえを",
+  "expected_output": [
+   "考えを"
+  ],
+  "context_text": "",
+  "right_context": "改善する方法を検討する",
+  "source": "kanji-cases (人)",
+  "original": "考えを改善する方法を検討する"
+ },
+ {
+  "index": "K042",
+  "input": "あしたは",
+  "expected_output": [
+   "明日は"
+  ],
+  "context_text": "",
+  "right_context": "朝から雨が降るそうだ",
+  "source": "kanji-cases (人)",
+  "original": "明日は朝から雨が降るそうだ"
+ },
+ {
+  "index": "K043",
+  "input": "かれは",
+  "expected_output": [
+   "彼は"
+  ],
+  "context_text": "",
+  "right_context": "毎日図書館で勉強している",
+  "source": "kanji-cases (人)",
+  "original": "彼は毎日図書館で勉強している"
+ },
+ {
+  "index": "K044",
+  "input": "みちに",
+  "expected_output": [
+   "道に"
+  ],
+  "context_text": "",
+  "right_context": "迷って約束に遅れた",
+  "source": "kanji-cases (人)",
+  "original": "道に迷って約束に遅れた"
+ },
+ {
+  "index": "K045",
+  "input": "おもい",
+  "expected_output": [
+   "重い"
+  ],
+  "context_text": "",
+  "right_context": "荷物を運んで腰が痛くなった",
+  "source": "kanji-cases (人)",
+  "original": "重い荷物を運んで腰が痛くなった"
+ },
+ {
+  "index": "K046",
+  "input": "あたたかいスープを",
+  "expected_output": [
+   "温かいスープを"
+  ],
+  "context_text": "",
+  "right_context": "飲んで体が温まった",
+  "source": "kanji-cases (人)",
+  "original": "温かいスープを飲んで体が温まった"
+ },
+ {
+  "index": "K047",
+  "input": "さいふを",
+  "expected_output": [
+   "財布を"
+  ],
+  "context_text": "",
+  "right_context": "落として警察に届けた",
+  "source": "kanji-cases (人)",
+  "original": "財布を落として警察に届けた"
+ },
+ {
+  "index": "K048",
+  "input": "まどを",
+  "expected_output": [
+   "窓を"
+  ],
+  "context_text": "",
+  "right_context": "開けて空気を入れ替えた",
+  "source": "kanji-cases (人)",
+  "original": "窓を開けて空気を入れ替えた"
+ },
+ {
+  "index": "K049",
+  "input": "かぎをかけ",
+  "expected_output": [
+   "鍵をかけ",
+   "鍵を掛け"
+  ],
+  "context_text": "",
+  "right_context": "忘れて引き返した",
+  "source": "kanji-cases (人)",
+  "original": "鍵をかけ忘れて引き返した"
+ },
+ {
+  "index": "K050",
+  "input": "てがみを",
+  "expected_output": [
+   "手紙を"
+  ],
+  "context_text": "",
+  "right_context": "書いて郵便局で出した",
+  "source": "kanji-cases (人)",
+  "original": "手紙を書いて郵便局で出した"
+ },
+ {
+  "index": "K051",
+  "input": "ことしの",
+  "expected_output": [
+   "今年の"
+  ],
+  "context_text": "",
+  "right_context": "夏は特に暑かった",
+  "source": "kanji-cases (人)",
+  "original": "今年の夏は特に暑かった"
+ },
+ {
+  "index": "K052",
+  "input": "おくれて",
+  "expected_output": [
+   "遅れて"
+  ],
+  "context_text": "",
+  "right_context": "申し訳ございません",
+  "source": "kanji-cases (人)",
+  "original": "遅れて申し訳ございません"
+ },
+ {
+  "index": "K053",
+  "input": "ごかくにんのほどよろしくお",
+  "expected_output": [
+   "ご確認のほどよろしくお",
+   "ご確認の程よろしくお"
+  ],
+  "context_text": "",
+  "right_context": "願いいたします",
+  "source": "kanji-cases (人)",
+  "original": "ご確認のほどよろしくお願いいたします"
+ },
+ {
+  "index": "K054",
+  "input": "らいしゅうの",
+  "expected_output": [
+   "来週の"
+  ],
+  "context_text": "",
+  "right_context": "打ち合わせの日程を調整したい",
+  "source": "kanji-cases (人)",
+  "original": "来週の打ち合わせの日程を調整したい"
+ },
+ {
+  "index": "K055",
+  "input": "ほうこくしょを",
+  "expected_output": [
+   "報告書を"
+  ],
+  "context_text": "",
+  "right_context": "今日中に提出してください",
+  "source": "kanji-cases (人)",
+  "original": "報告書を今日中に提出してください"
+ },
+ {
+  "index": "K056",
+  "input": "みなさまにはいつも",
+  "expected_output": [
+   "皆様にはいつも",
+   "みなさまにはいつも"
+  ],
+  "context_text": "",
+  "right_context": "大変お世話になっております",
+  "source": "kanji-cases (人)",
+  "original": "皆様にはいつも大変お世話になっております"
+ },
+ {
+  "index": "K057",
+  "input": "あたらしい",
+  "expected_output": [
+   "新しい"
+  ],
+  "context_text": "",
+  "right_context": "商品の発売日が決まりました",
+  "source": "kanji-cases (人)",
+  "original": "新しい商品の発売日が決まりました"
+ },
+ {
+  "index": "K058",
+  "input": "いけんを",
+  "expected_output": [
+   "意見を"
+  ],
+  "context_text": "いただいたご",
+  "right_context": "踏まえて計画を見直します",
+  "source": "kanji-cases (人)",
+  "original": "いただいたご意見を踏まえて計画を見直します"
+ },
+ {
+  "index": "K059",
+  "input": "けんとうした",
+  "expected_output": [
+   "検討した"
+  ],
+  "context_text": "市の担当課が、住民向けの新しい取り組みについて方針を話し合った。",
+  "right_context": "結果施策を再決定いたしました",
+  "source": "kanji-cases (LLM)",
+  "original": "検討した結果施策を再決定いたしました"
+ },
+ {
+  "index": "K061",
+  "input": "しがつから",
+  "expected_output": [
+   "四月から",
+   "4月から"
+  ],
+  "context_text": "",
+  "right_context": "新しい体制で業務を進めていきます",
+  "source": "kanji-cases (人)",
+  "original": "四月から新しい体制で業務を進めていきます"
+ },
+ {
+  "index": "K062",
+  "input": "ひようたいこうかを",
+  "expected_output": [
+   "費用対効果を"
+  ],
+  "context_text": "",
+  "right_context": "踏まえて導入を検討する",
+  "source": "kanji-cases (人)",
+  "original": "費用対効果を踏まえて導入を検討する"
+ },
+ {
+  "index": "K063",
+  "input": "ぜんいんの",
+  "expected_output": [
+   "全員の"
+  ],
+  "context_text": "",
+  "right_context": "賛成を得て方針を決定した",
+  "source": "kanji-cases (人)",
+  "original": "全員の賛成を得て方針を決定した"
+ },
+ {
+  "index": "K064",
+  "input": "うりあげが",
+  "expected_output": [
+   "売上が",
+   "売り上げが"
+  ],
+  "context_text": "",
+  "right_context": "前年に比べて5割増加した",
+  "source": "kanji-cases (人)",
+  "original": "売上が前年に比べて5割増加した"
+ },
+ {
+  "index": "K065",
+  "input": "けいやくの",
+  "expected_output": [
+   "契約の"
+  ],
+  "context_text": "",
+  "right_context": "更新手続きを行ってください",
+  "source": "kanji-cases (人)",
+  "original": "契約の更新手続きを行ってください"
+ },
+ {
+  "index": "K066",
+  "input": "かいぎの",
+  "expected_output": [
+   "会議の"
+  ],
+  "context_text": "",
+  "right_context": "議事録を作成して共有する",
+  "source": "kanji-cases (人)",
+  "original": "会議の議事録を作成して共有する"
+ },
+ {
+  "index": "K067",
+  "input": "きかくを",
+  "expected_output": [
+   "企画を"
+  ],
+  "context_text": "新製品の開発会議で、最初に作った見本の出来が悪かった。",
+  "right_context": "立て直して試作を再検討する",
+  "source": "kanji-cases (LLM)",
+  "original": "企画を立て直して試作を再検討する"
+ },
+ {
+  "index": "K068",
+  "input": "ぎじゅつてきな",
+  "expected_output": [
+   "技術的な"
+  ],
+  "context_text": "",
+  "right_context": "修正を行った",
+  "source": "kanji-cases (人)",
+  "original": "技術的な修正を行った"
+ },
+ {
+  "index": "K069",
+  "input": "でんわをかけ",
+  "expected_output": [
+   "電話をかけ",
+   "電話を掛け"
+  ],
+  "context_text": "",
+  "right_context": "直すのでしばらくお待ちください",
+  "source": "kanji-cases (人)",
+  "original": "電話をかけ直すのでしばらくお待ちください"
+ },
+ {
+  "index": "K070",
+  "input": "せんじつはお",
+  "expected_output": [
+   "先日はお"
+  ],
+  "context_text": "",
+  "right_context": "忙しい中お時間をいただきありがとうございました",
+  "source": "kanji-cases (人)",
+  "original": "先日はお忙しい中お時間をいただきありがとうございました"
+ },
+ {
+  "index": "K071",
+  "input": "にもつは",
+  "expected_output": [
+   "荷物は"
+  ],
+  "context_text": "",
+  "right_context": "来週の水曜日に届くそうです",
+  "source": "kanji-cases (人)",
+  "original": "荷物は来週の水曜日に届くそうです"
+ },
+ {
+  "index": "K074",
+  "input": "せいさくの",
+  "expected_output": [
+   "制作の"
+  ],
+  "context_text": "映画のスタッフと打ち合わせをした。",
+  "right_context": "進捗を聞いた",
+  "source": "kanji-cases (LLM)",
+  "original": "制作の進捗を聞いた"
+ },
+ {
+  "index": "K075",
+  "input": "せいさくの",
+  "expected_output": [
+   "政策の"
+  ],
+  "context_text": "市役所の企画課を訪ねて話を聞いた。",
+  "right_context": "進捗を聞いた",
+  "source": "kanji-cases (LLM)",
+  "original": "政策の進捗を聞いた"
+ },
+ {
+  "index": "K076",
+  "input": "きかんを",
+  "expected_output": [
+   "期間を"
+  ],
+  "context_text": "契約書を最初から読み返した。",
+  "right_context": "確認した",
+  "source": "kanji-cases (LLM)",
+  "original": "期間を確認した"
+ },
+ {
+  "index": "K077",
+  "input": "きかんを",
+  "expected_output": [
+   "機関を"
+  ],
+  "context_text": "船のエンジンを分解して点検した。",
+  "right_context": "確認した",
+  "source": "kanji-cases (LLM)",
+  "original": "機関を確認した"
+ },
+ {
+  "index": "K078",
+  "input": "しょうかいを",
+  "expected_output": [
+   "紹介を"
+  ],
+  "context_text": "同僚から新しい取引先の担当者を引き合わされた。",
+  "right_context": "受けた",
+  "source": "kanji-cases (LLM)",
+  "original": "紹介を受けた"
+ },
+ {
+  "index": "K079",
+  "input": "しょうかいを",
+  "expected_output": [
+   "照会を"
+  ],
+  "context_text": "他の会社から在庫の問い合わせが来た。",
+  "right_context": "受けた",
+  "source": "kanji-cases (LLM)",
+  "original": "照会を受けた"
+ },
+ {
+  "index": "K080",
+  "input": "いどうが",
+  "expected_output": [
+   "異動が"
+  ],
+  "context_text": "四月の人事発表が貼り出された。",
+  "right_context": "決まった",
+  "source": "kanji-cases (LLM)",
+  "original": "異動が決まった"
+ },
+ {
+  "index": "K081",
+  "input": "いどうが",
+  "expected_output": [
+   "移動が"
+  ],
+  "context_text": "会場が別の建物に変更になった。",
+  "right_context": "決まった",
+  "source": "kanji-cases (LLM)",
+  "original": "移動が決まった"
+ },
+ {
+  "index": "K082",
+  "input": "かいとうを",
+  "expected_output": [
+   "回答を"
+  ],
+  "context_text": "顧客からのアンケートが届いた。",
+  "right_context": "送った",
+  "source": "kanji-cases (LLM)",
+  "original": "回答を送った"
+ },
+ {
+  "index": "K083",
+  "input": "かいとうを",
+  "expected_output": [
+   "解答を"
+  ],
+  "context_text": "数学の宿題の問題を解き終えた。",
+  "right_context": "送った",
+  "source": "kanji-cases (LLM)",
+  "original": "解答を送った"
+ },
+ {
+  "index": "K084",
+  "input": "いしが",
+  "expected_output": [
+   "意志が"
+  ],
+  "context_text": "彼は最後まで考えを変えなかった。",
+  "right_context": "固い",
+  "source": "kanji-cases (LLM)",
+  "original": "意志が固い"
+ },
+ {
+  "index": "K085",
+  "input": "いしが",
+  "expected_output": [
+   "石が"
+  ],
+  "context_text": "河原で拾った石を割ろうとした。",
+  "right_context": "硬い",
+  "source": "kanji-cases (LLM)",
+  "original": "石が硬い"
+ },
+ {
+  "index": "K088",
+  "input": "かていを",
+  "expected_output": [
+   "仮定を"
+  ],
+  "context_text": "前提条件を置いて証明を始めた。",
+  "right_context": "考える",
+  "source": "kanji-cases (LLM)",
+  "original": "仮定を考える"
+ },
+ {
+  "index": "K089",
+  "input": "かていを",
+  "expected_output": [
+   "過程を"
+  ],
+  "context_text": "結果ばかり気にしていたと気づいた。",
+  "right_context": "考える",
+  "source": "kanji-cases (LLM)",
+  "original": "過程を考える"
+ },
+ {
+  "index": "K090",
+  "input": "こうかを",
+  "expected_output": [
+   "効果を"
+  ],
+  "context_text": "新しい薬の臨床試験が終わった。",
+  "right_context": "調べた",
+  "source": "kanji-cases (LLM)",
+  "original": "効果を調べた"
+ },
+ {
+  "index": "K091",
+  "input": "こうかを",
+  "expected_output": [
+   "硬貨を"
+  ],
+  "context_text": "古い財布の中身を机に出した。",
+  "right_context": "調べた",
+  "source": "kanji-cases (LLM)",
+  "original": "硬貨を調べた"
+ },
+ {
+  "index": "K092",
+  "input": "しようを",
+  "expected_output": [
+   "仕様を"
+  ],
+  "context_text": "開発の依頼書を受け取った。",
+  "right_context": "確認した",
+  "source": "kanji-cases (LLM)",
+  "original": "仕様を確認した"
+ },
+ {
+  "index": "K093",
+  "input": "しようを",
+  "expected_output": [
+   "使用を"
+  ],
+  "context_text": "会議室の予約表を見ていた。",
+  "right_context": "確認した",
+  "source": "kanji-cases (LLM)",
+  "original": "使用を確認した"
+ },
+ {
+  "index": "K094",
+  "input": "きょうぎが",
+  "expected_output": [
+   "協議が"
+  ],
+  "context_text": "両国の代表が会場に集まった。",
+  "right_context": "始まる",
+  "source": "kanji-cases (LLM)",
+  "original": "協議が始まる"
+ },
+ {
+  "index": "K095",
+  "input": "きょうぎが",
+  "expected_output": [
+   "競技が"
+  ],
+  "context_text": "選手たちが会場に入場してきた。",
+  "right_context": "始まる",
+  "source": "kanji-cases (LLM)",
+  "original": "競技が始まる"
+ },
+ {
+  "index": "K096",
+  "input": "しじを",
+  "expected_output": [
+   "指示を"
+  ],
+  "context_text": "上司から連絡が来ていた。",
+  "right_context": "受けた",
+  "source": "kanji-cases (LLM)",
+  "original": "指示を受けた"
+ },
+ {
+  "index": "K097",
+  "input": "しじを",
+  "expected_output": [
+   "支持を"
+  ],
+  "context_text": "選挙の開票結果が発表された。",
+  "right_context": "受けた",
+  "source": "kanji-cases (LLM)",
+  "original": "支持を受けた"
+ },
+ {
+  "index": "K098",
+  "input": "せんたくを",
+  "expected_output": [
+   "洗濯を"
+  ],
+  "context_text": "家事の分担について話し合った。",
+  "right_context": "任せた",
+  "source": "kanji-cases (LLM)",
+  "original": "洗濯を任せた"
+ },
+ {
+  "index": "K099",
+  "input": "せんたくを",
+  "expected_output": [
+   "選択を"
+  ],
+  "context_text": "進路についての相談を受けた。",
+  "right_context": "任せた",
+  "source": "kanji-cases (LLM)",
+  "original": "選択を任せた"
+ },
+ {
+  "index": "K100",
+  "input": "ほしょうを",
+  "expected_output": [
+   "補償を"
+  ],
+  "context_text": "事故で車が壊れてしまった。",
+  "right_context": "求めた",
+  "source": "kanji-cases (LLM)",
+  "original": "補償を求めた"
+ },
+ {
+  "index": "K101",
+  "input": "ほしょうを",
+  "expected_output": [
+   "保証を"
+  ],
+  "context_text": "製品の品質に不安があった。",
+  "right_context": "求めた",
+  "source": "kanji-cases (LLM)",
+  "original": "保証を求めた"
+ },
+ {
+  "index": "K102",
+  "input": "はしでご",
+  "expected_output": [
+   "箸でご"
+  ],
+  "context_text": "",
+  "right_context": "飯を食べた",
+  "source": "kanji-cases (LLM)",
+  "original": "箸でご飯を食べた"
+ },
+ {
+  "index": "K103",
+  "input": "きしょうが",
+  "expected_output": [
+   "起床が"
+  ],
+  "context_text": "",
+  "right_context": "早いので寝不足だ",
+  "source": "kanji-cases (LLM)",
+  "original": "起床が早いので寝不足だ"
+ },
+ {
+  "index": "K104",
+  "input": "ひなんを",
+  "expected_output": [
+   "非難を"
+  ],
+  "context_text": "",
+  "right_context": "浴びて謝罪した",
+  "source": "kanji-cases (LLM)",
+  "original": "非難を浴びて謝罪した"
+ },
+ {
+  "index": "K105",
+  "input": "いけんの",
+  "expected_output": [
+   "意見の"
+  ],
+  "context_text": "",
+  "right_context": "対立が解消された",
+  "source": "kanji-cases (LLM)",
+  "original": "意見の対立が解消された"
+ },
+ {
+  "index": "K106",
+  "input": "ねつが",
+  "expected_output": [
+   "熱が"
+  ],
+  "context_text": "",
+  "right_context": "下がって体調が回復した",
+  "source": "kanji-cases (LLM)",
+  "original": "熱が下がって体調が回復した"
+ },
+ {
+  "index": "K107",
+  "input": "しんぞうの",
+  "expected_output": [
+   "心臓の"
+  ],
+  "context_text": "",
+  "right_context": "音を聞いて安心した",
+  "source": "kanji-cases (LLM)",
+  "original": "心臓の音を聞いて安心した"
+ },
+ {
+  "index": "K108",
+  "input": "ふねで",
+  "expected_output": [
+   "船で",
+   "舟で"
+  ],
+  "context_text": "",
+  "right_context": "川を渡った",
+  "source": "kanji-cases (LLM)",
+  "original": "船で川を渡った"
+ },
+ {
+  "index": "K109",
+  "input": "ほけんしつで",
+  "expected_output": [
+   "保健室で"
+  ],
+  "context_text": "",
+  "right_context": "熱を測った",
+  "source": "kanji-cases (LLM)",
+  "original": "保健室で熱を測った"
+ },
+ {
+  "index": "K110",
+  "input": "ふうとうに",
+  "expected_output": [
+   "封筒に"
+  ],
+  "context_text": "",
+  "right_context": "切手を貼った",
+  "source": "kanji-cases (LLM)",
+  "original": "封筒に切手を貼った"
+ },
+ {
+  "index": "K111",
+  "input": "けいけんを",
+  "expected_output": [
+   "経験を"
+  ],
+  "context_text": "",
+  "right_context": "生かして仕事を探す",
+  "source": "kanji-cases (LLM)",
+  "original": "経験を生かして仕事を探す"
+ },
+ {
+  "index": "K112",
+  "input": "こんばんはやく",
+  "expected_output": [
+   "今晩早く"
+  ],
+  "context_text": "",
+  "right_context": "帰れそうです",
+  "source": "kanji-cases (LLM)",
+  "original": "今晩早く帰れそうです"
+ },
+ {
+  "index": "K113",
+  "input": "あしたの",
+  "expected_output": [
+   "明日の"
+  ],
+  "context_text": "",
+  "right_context": "会議は午後に変更になりました",
+  "source": "kanji-cases (LLM)",
+  "original": "明日の会議は午後に変更になりました"
+ },
+ {
+  "index": "K114",
+  "input": "けさの",
+  "expected_output": [
+   "今朝の"
+  ],
+  "context_text": "",
+  "right_context": "電車が遅れて困った",
+  "source": "kanji-cases (LLM)",
+  "original": "今朝の電車が遅れて困った"
+ },
+ {
+  "index": "K115",
+  "input": "おかしを",
+  "expected_output": [
+   "お菓子を"
+  ],
+  "context_text": "",
+  "right_context": "買っておくのを忘れた",
+  "source": "kanji-cases (LLM)",
+  "original": "お菓子を買っておくのを忘れた"
+ },
+ {
+  "index": "K116",
+  "input": "こんしゅうの",
+  "expected_output": [
+   "今週の"
+  ],
+  "context_text": "",
+  "right_context": "土曜日は予定が空いている",
+  "source": "kanji-cases (LLM)",
+  "original": "今週の土曜日は予定が空いている"
+ },
+ {
+  "index": "K117",
+  "input": "かい",
+  "expected_output": [
+   "買い"
+  ],
+  "context_text": "",
+  "right_context": "物に行く前に冷蔵庫を確認する",
+  "source": "kanji-cases (LLM)",
+  "original": "買い物に行く前に冷蔵庫を確認する"
+ },
+ {
+  "index": "K118",
+  "input": "おそくなってごめんね、",
+  "expected_output": [
+   "遅くなってごめんね、"
+  ],
+  "context_text": "",
+  "right_context": "今向かっているよ",
+  "source": "kanji-cases (LLM)",
+  "original": "遅くなってごめんね、今向かっているよ"
+ },
+ {
+  "index": "K119",
+  "input": "ほんは",
+  "expected_output": [
+   "本は"
+  ],
+  "context_text": "この",
+  "right_context": "面白かったので貸してあげる",
+  "source": "kanji-cases (LLM)",
+  "original": "この本は面白かったので貸してあげる"
+ },
+ {
+  "index": "K120",
+  "input": "へやの",
+  "expected_output": [
+   "部屋の"
+  ],
+  "context_text": "",
+  "right_context": "鍵を鞄の中に入れたままだった",
+  "source": "kanji-cases (LLM)",
+  "original": "部屋の鍵を鞄の中に入れたままだった"
+ },
+ {
+  "index": "K121",
+  "input": "しゅうまつは",
+  "expected_output": [
+   "週末は"
+  ],
+  "context_text": "",
+  "right_context": "家族で温泉に行く予定",
+  "source": "kanji-cases (LLM)",
+  "original": "週末は家族で温泉に行く予定"
+ },
+ {
+  "index": "K122",
+  "input": "ばんご",
+  "expected_output": [
+   "晩ご",
+   "晩御"
+  ],
+  "context_text": "",
+  "right_context": "飯は何にしようか迷っている",
+  "source": "kanji-cases (LLM)",
+  "original": "晩ご飯は何にしようか迷っている"
+ },
+ {
+  "index": "K123",
+  "input": "たんじょうびのぷれぜんとを",
+  "expected_output": [
+   "誕生日のプレゼントを"
+  ],
+  "context_text": "",
+  "right_context": "選んだ",
+  "source": "kanji-cases (LLM)",
+  "original": "誕生日のプレゼントを選んだ"
+ },
+ {
+  "index": "K125",
+  "input": "おふろに",
+  "expected_output": [
+   "お風呂に"
+  ],
+  "context_text": "",
+  "right_context": "入ってから電話するね",
+  "source": "kanji-cases (LLM)",
+  "original": "お風呂に入ってから電話するね"
+ },
+ {
+  "index": "K126",
+  "input": "まいあさろくじに",
+  "expected_output": [
+   "毎朝六時に",
+   "毎朝6時に"
+  ],
+  "context_text": "",
+  "right_context": "起きて散歩している",
+  "source": "kanji-cases (LLM)",
+  "original": "毎朝六時に起きて散歩している"
+ },
+ {
+  "index": "K127",
+  "input": "かさを",
+  "expected_output": [
+   "傘を"
+  ],
+  "context_text": "",
+  "right_context": "忘れて濡れてしまった",
+  "source": "kanji-cases (LLM)",
+  "original": "傘を忘れて濡れてしまった"
+ },
+ {
+  "index": "K128",
+  "input": "ともだちの",
+  "expected_output": [
+   "友達の",
+   "友だちの"
+  ],
+  "context_text": "",
+  "right_context": "結婚式に招待された",
+  "source": "kanji-cases (LLM)",
+  "original": "友達の結婚式に招待された"
+ },
+ {
+  "index": "K129",
+  "input": "にゅうがくしきの",
+  "expected_output": [
+   "入学式の"
+  ],
+  "context_text": "",
+  "right_context": "写真を送ります",
+  "source": "kanji-cases (LLM)",
+  "original": "入学式の写真を送ります"
+ },
+ {
+  "index": "K130",
+  "input": "むいておいたから",
+  "expected_output": [
+   "剥いておいたから",
+   "むいておいたから"
+  ],
+  "context_text": "りんごを",
+  "right_context": "食べてね",
+  "source": "kanji-cases (LLM)",
+  "original": "りんごを剥いておいたから食べてね"
+ },
+ {
+  "index": "K131",
+  "input": "へやは",
+  "expected_output": [
+   "部屋は"
+  ],
+  "context_text": "この",
+  "right_context": "日が当たって暖かい",
+  "source": "kanji-cases (LLM)",
+  "original": "この部屋は日が当たって暖かい"
+ },
+ {
+  "index": "K132",
+  "input": "にほんごの",
+  "expected_output": [
+   "日本語の"
+  ],
+  "context_text": "",
+  "right_context": "授業に出るために早起きした",
+  "source": "kanji-cases (LLM)",
+  "original": "日本語の授業に出るために早起きした"
+ },
+ {
+  "index": "K133",
+  "input": "ちずを",
+  "expected_output": [
+   "地図を"
+  ],
+  "context_text": "",
+  "right_context": "見ながら駅まで歩いた",
+  "source": "kanji-cases (LLM)",
+  "original": "地図を見ながら駅まで歩いた"
+ },
+ {
+  "index": "K134",
+  "input": "さむいのでまふらーをして",
+  "expected_output": [
+   "寒いのでマフラーをして"
+  ],
+  "context_text": "",
+  "right_context": "出かけた",
+  "source": "kanji-cases (LLM)",
+  "original": "寒いのでマフラーをして出かけた"
+ },
+ {
+  "index": "K135",
+  "input": "おとうとがげーむを",
+  "expected_output": [
+   "弟がゲームを"
+  ],
+  "context_text": "",
+  "right_context": "片付けないので怒った",
+  "source": "kanji-cases (LLM)",
+  "original": "弟がゲームを片付けないので怒った"
+ },
+ {
+  "index": "K136",
+  "input": "きょうは",
+  "expected_output": [
+   "今日は"
+  ],
+  "context_text": "",
+  "right_context": "残業なしで帰れた",
+  "source": "kanji-cases (LLM)",
+  "original": "今日は残業なしで帰れた"
+ },
+ {
+  "index": "K137",
+  "input": "やさいを",
+  "expected_output": [
+   "野菜を"
+  ],
+  "context_text": "スーパーで",
+  "right_context": "安く買えた",
+  "source": "kanji-cases (LLM)",
+  "original": "スーパーで野菜を安く買えた"
+ },
+ {
+  "index": "K138",
+  "input": "あしたの",
+  "expected_output": [
+   "明日の"
+  ],
+  "context_text": "",
+  "right_context": "天気を調べて服を決める",
+  "source": "kanji-cases (LLM)",
+  "original": "明日の天気を調べて服を決める"
+ },
+ {
+  "index": "K139",
+  "input": "ふるいあるばむを",
+  "expected_output": [
+   "古いアルバムを"
+  ],
+  "context_text": "",
+  "right_context": "見て懐かしくなった",
+  "source": "kanji-cases (LLM)",
+  "original": "古いアルバムを見て懐かしくなった"
+ },
+ {
+  "index": "K140",
+  "input": "せんせいに",
+  "expected_output": [
+   "先生に"
+  ],
+  "context_text": "",
+  "right_context": "質問をして納得した",
+  "source": "kanji-cases (LLM)",
+  "original": "先生に質問をして納得した"
+ },
+ {
+  "index": "K141",
+  "input": "りょこうの",
+  "expected_output": [
+   "旅行の"
+  ],
+  "context_text": "",
+  "right_context": "会計を割り勘にした",
+  "source": "kanji-cases (LLM)",
+  "original": "旅行の会計を割り勘にした"
+ },
+ {
+  "index": "K142",
+  "input": "しちょうが",
+  "expected_output": [
+   "市長が"
+  ],
+  "context_text": "",
+  "right_context": "新しい公園の計画を発表した",
+  "source": "kanji-cases (LLM)",
+  "original": "市長が新しい公園の計画を発表した"
+ },
+ {
+  "index": "K143",
+  "input": "ほくぶちほうで",
+  "expected_output": [
+   "北部地方で"
+  ],
+  "context_text": "",
+  "right_context": "大雨が続き避難指示が出た",
+  "source": "kanji-cases (LLM)",
+  "original": "北部地方で大雨が続き避難指示が出た"
+ },
+ {
+  "index": "K144",
+  "input": "ちほうの",
+  "expected_output": [
+   "地方の"
+  ],
+  "context_text": "",
+  "right_context": "銀行が金利を引き上げた",
+  "source": "kanji-cases (LLM)",
+  "original": "地方の銀行が金利を引き上げた"
+ },
+ {
+  "index": "K145",
+  "input": "だいがくの",
+  "expected_output": [
+   "大学の"
+  ],
+  "context_text": "",
+  "right_context": "研究チームが新しい材料を開発した",
+  "source": "kanji-cases (LLM)",
+  "original": "大学の研究チームが新しい材料を開発した"
+ },
+ {
+  "index": "K146",
+  "input": "けんが",
+  "expected_output": [
+   "県が"
+  ],
+  "context_text": "",
+  "right_context": "道路の補修計画をまとめた",
+  "source": "kanji-cases (LLM)",
+  "original": "県が道路の補修計画をまとめた"
+ },
+ {
+  "index": "K147",
+  "input": "あきの",
+  "expected_output": [
+   "秋の"
+  ],
+  "context_text": "",
+  "right_context": "祭りに例年の三倍の人出があった",
+  "source": "kanji-cases (LLM)",
+  "original": "秋の祭りに例年の三倍の人出があった"
+ },
+ {
+  "index": "K148",
+  "input": "きしょうかんそくじょは",
+  "expected_output": [
+   "気象観測所は"
+  ],
+  "context_text": "",
+  "right_context": "来週の大雪に警戒を呼びかけた",
+  "source": "kanji-cases (LLM)",
+  "original": "気象観測所は来週の大雪に警戒を呼びかけた"
+ },
+ {
+  "index": "K149",
+  "input": "こうそくどうろで",
+  "expected_output": [
+   "高速道路で"
+  ],
+  "context_text": "",
+  "right_context": "渋滞が発生し最大十キロに及んだ",
+  "source": "kanji-cases (LLM)",
+  "original": "高速道路で渋滞が発生し最大十キロに及んだ"
+ },
+ {
+  "index": "K150",
+  "input": "としょかんの",
+  "expected_output": [
+   "図書館の"
+  ],
+  "context_text": "",
+  "right_context": "開館時間が延びて利用者が増えた",
+  "source": "kanji-cases (LLM)",
+  "original": "図書館の開館時間が延びて利用者が増えた"
+ },
+ {
+  "index": "K151",
+  "input": "げんりょうかかくの",
+  "expected_output": [
+   "原料価格の"
+  ],
+  "context_text": "",
+  "right_context": "高騰で食品が値上がりした",
+  "source": "kanji-cases (LLM)",
+  "original": "原料価格の高騰で食品が値上がりした"
+ },
+ {
+  "index": "K152",
+  "input": "ちいきの",
+  "expected_output": [
+   "地域の"
+  ],
+  "context_text": "",
+  "right_context": "消防団が防災訓練を行った",
+  "source": "kanji-cases (LLM)",
+  "original": "地域の消防団が防災訓練を行った"
+ },
+ {
+  "index": "K153",
+  "input": "おんしつこうかがすの",
+  "expected_output": [
+   "温室効果ガスの"
+  ],
+  "context_text": "",
+  "right_context": "排出量が減少した",
+  "source": "kanji-cases (LLM)",
+  "original": "温室効果ガスの排出量が減少した"
+ },
+ {
+  "index": "K154",
+  "input": "しんえきが",
+  "expected_output": [
+   "新駅が"
+  ],
+  "context_text": "",
+  "right_context": "開業し地域の人口が増加した",
+  "source": "kanji-cases (LLM)",
+  "original": "新駅が開業し地域の人口が増加した"
+ },
+ {
+  "index": "K155",
+  "input": "こうれいかが",
+  "expected_output": [
+   "高齢化が"
+  ],
+  "context_text": "",
+  "right_context": "進み医療費が増大している",
+  "source": "kanji-cases (LLM)",
+  "original": "高齢化が進み医療費が増大している"
+ },
+ {
+  "index": "K156",
+  "input": "すうねんぶりに",
+  "expected_output": [
+   "数年ぶりに"
+  ],
+  "context_text": "",
+  "right_context": "西部の川が氾濫した",
+  "source": "kanji-cases (LLM)",
+  "original": "数年ぶりに西部の川が氾濫した"
+ },
+ {
+  "index": "K157",
+  "input": "かいがいからの",
+  "expected_output": [
+   "海外からの"
+  ],
+  "context_text": "",
+  "right_context": "観光客が前年を上回った",
+  "source": "kanji-cases (LLM)",
+  "original": "海外からの観光客が前年を上回った"
+ },
+ {
+  "index": "K158",
+  "input": "こうこうの",
+  "expected_output": [
+   "高校の"
+  ],
+  "context_text": "",
+  "right_context": "体育館が改修工事のためしばらく閉館する",
+  "source": "kanji-cases (LLM)",
+  "original": "高校の体育館が改修工事のためしばらく閉館する"
+ },
+ {
+  "index": "K159",
+  "input": "のうかの",
+  "expected_output": [
+   "農家の"
+  ],
+  "context_text": "",
+  "right_context": "後継者不足が問題になっている",
+  "source": "kanji-cases (LLM)",
+  "original": "農家の後継者不足が問題になっている"
+ },
+ {
+  "index": "K160",
+  "input": "あらたな",
+  "expected_output": [
+   "新たな"
+  ],
+  "context_text": "",
+  "right_context": "法律が来月から施行される",
+  "source": "kanji-cases (LLM)",
+  "original": "新たな法律が来月から施行される"
+ },
+ {
+  "index": "K161",
+  "input": "かわの",
+  "expected_output": [
+   "川の"
+  ],
+  "context_text": "",
+  "right_context": "水位が上昇して堤防の点検が行われた",
+  "source": "kanji-cases (LLM)",
+  "original": "川の水位が上昇して堤防の点検が行われた"
+ },
+ {
+  "index": "K162",
+  "input": "しみんだんたいが",
+  "expected_output": [
+   "市民団体が"
+  ],
+  "context_text": "",
+  "right_context": "環境保護を訴える署名を集めた",
+  "source": "kanji-cases (LLM)",
+  "original": "市民団体が環境保護を訴える署名を集めた"
+ },
+ {
+  "index": "K163",
+  "input": "けんりつびょういんの",
+  "expected_output": [
+   "県立病院の"
+  ],
+  "context_text": "",
+  "right_context": "診療時間が短縮される",
+  "source": "kanji-cases (LLM)",
+  "original": "県立病院の診療時間が短縮される"
+ },
+ {
+  "index": "K164",
+  "input": "さんちちょくそうの",
+  "expected_output": [
+   "産地直送の"
+  ],
+  "context_text": "",
+  "right_context": "野菜が評判を呼んでいる",
+  "source": "kanji-cases (LLM)",
+  "original": "産地直送の野菜が評判を呼んでいる"
+ },
+ {
+  "index": "K165",
+  "input": "だいがくせいの",
+  "expected_output": [
+   "大学生の"
+  ],
+  "context_text": "",
+  "right_context": "就職内定率が上昇した",
+  "source": "kanji-cases (LLM)",
+  "original": "大学生の就職内定率が上昇した"
+ },
+ {
+  "index": "K166",
+  "input": "たいふうの",
+  "expected_output": [
+   "台風の"
+  ],
+  "context_text": "",
+  "right_context": "接近に備えて航空便が欠航した",
+  "source": "kanji-cases (LLM)",
+  "original": "台風の接近に備えて航空便が欠航した"
+ },
+ {
+  "index": "K167",
+  "input": "しゅうせいして",
+  "expected_output": [
+   "修正して"
+  ],
+  "context_text": "プログラムのエラーを",
+  "right_context": "再実行した",
+  "source": "kanji-cases (LLM)",
+  "original": "プログラムのエラーを修正して再実行した"
+ },
+ {
+  "index": "K168",
+  "input": "かいはつちーむで",
+  "expected_output": [
+   "開発チームで"
+  ],
+  "context_text": "",
+  "right_context": "試作品の評価を行う",
+  "source": "kanji-cases (LLM)",
+  "original": "開発チームで試作品の評価を行う"
+ },
+ {
+  "index": "K169",
+  "input": "ほぞんさきを",
+  "expected_output": [
+   "保存先を"
+  ],
+  "context_text": "データの",
+  "right_context": "変更してバックアップを取った",
+  "source": "kanji-cases (LLM)",
+  "original": "データの保存先を変更してバックアップを取った"
+ },
+ {
+  "index": "K170",
+  "input": "ふかが",
+  "expected_output": [
+   "負荷が"
+  ],
+  "context_text": "サーバーの",
+  "right_context": "高い時間帯を特定した",
+  "source": "kanji-cases (LLM)",
+  "original": "サーバーの負荷が高い時間帯を特定した"
+ },
+ {
+  "index": "K171",
+  "input": "しりょうのまとめ",
+  "expected_output": [
+   "資料のまとめ"
+  ],
+  "context_text": "",
+  "right_context": "方について会議で提案した",
+  "source": "kanji-cases (LLM)",
+  "original": "資料のまとめ方について会議で提案した"
+ },
+ {
+  "index": "K172",
+  "input": "ぎじろくを",
+  "expected_output": [
+   "議事録を"
+  ],
+  "context_text": "",
+  "right_context": "確認して修正点を連絡する",
+  "source": "kanji-cases (LLM)",
+  "original": "議事録を確認して修正点を連絡する"
+ },
+ {
+  "index": "K173",
+  "input": "せっけいしょの",
+  "expected_output": [
+   "設計書の"
+  ],
+  "context_text": "",
+  "right_context": "変更履歴を整理した",
+  "source": "kanji-cases (LLM)",
+  "original": "設計書の変更履歴を整理した"
+ },
+ {
+  "index": "K174",
+  "input": "ひょうけいさんの",
+  "expected_output": [
+   "表計算の"
+  ],
+  "context_text": "",
+  "right_context": "関数を使って合計を求める",
+  "source": "kanji-cases (LLM)",
+  "original": "表計算の関数を使って合計を求める"
+ },
+ {
+  "index": "K175",
+  "input": "にゅうりょくがめんの",
+  "expected_output": [
+   "入力画面の"
+  ],
+  "context_text": "",
+  "right_context": "検証処理を追加した",
+  "source": "kanji-cases (LLM)",
+  "original": "入力画面の検証処理を追加した"
+ },
+ {
+  "index": "K176",
+  "input": "きょうゆうのふぁいるに",
+  "expected_output": [
+   "共有のファイルに"
+  ],
+  "context_text": "",
+  "right_context": "権限を設定した",
+  "source": "kanji-cases (LLM)",
+  "original": "共有のファイルに権限を設定した"
+ },
+ {
+  "index": "K177",
+  "input": "ぎじゅつしりょうの",
+  "expected_output": [
+   "技術資料の"
+  ],
+  "context_text": "",
+  "right_context": "改訂版を公開する",
+  "source": "kanji-cases (LLM)",
+  "original": "技術資料の改訂版を公開する"
+ },
+ {
+  "index": "K178",
+  "input": "いっしゅうかんの",
+  "expected_output": [
+   "一週間の",
+   "1週間の"
+  ],
+  "context_text": "",
+  "right_context": "分析結果をスライドにまとめた",
+  "source": "kanji-cases (LLM)",
+  "original": "一週間の分析結果をスライドにまとめた"
+ },
+ {
+  "index": "K179",
+  "input": "あたらしいめんばーの",
+  "expected_output": [
+   "新しいメンバーの"
+  ],
+  "context_text": "",
+  "right_context": "入社に合わせて研修を行う",
+  "source": "kanji-cases (LLM)",
+  "original": "新しいメンバーの入社に合わせて研修を行う"
+ },
+ {
+  "index": "K180",
+  "input": "かいぎの",
+  "expected_output": [
+   "会議の"
+  ],
+  "context_text": "",
+  "right_context": "日程を再調整して参加者に通知した",
+  "source": "kanji-cases (LLM)",
+  "original": "会議の日程を再調整して参加者に通知した"
+ },
+ {
+  "index": "K181",
+  "input": "げんいんを",
+  "expected_output": [
+   "原因を"
+  ],
+  "context_text": "バグの",
+  "right_context": "分析して対策案を考えた",
+  "source": "kanji-cases (LLM)",
+  "original": "バグの原因を分析して対策案を考えた"
+ },
+ {
+  "index": "K182",
+  "input": "ひんしつかんりの",
+  "expected_output": [
+   "品質管理の"
+  ],
+  "context_text": "",
+  "right_context": "担当者が検査結果を報告した",
+  "source": "kanji-cases (LLM)",
+  "original": "品質管理の担当者が検査結果を報告した"
+ },
+ {
+  "index": "K183",
+  "input": "こうていひょうを",
+  "expected_output": [
+   "工程表を"
+  ],
+  "context_text": "",
+  "right_context": "見直して作業の順序を変えた",
+  "source": "kanji-cases (LLM)",
+  "original": "工程表を見直して作業の順序を変えた"
+ },
+ {
+  "index": "K184",
+  "input": "こうしんじこくを",
+  "expected_output": [
+   "更新時刻を"
+  ],
+  "context_text": "ファイルの",
+  "right_context": "記録する機能を追加する",
+  "source": "kanji-cases (LLM)",
+  "original": "ファイルの更新時刻を記録する機能を追加する"
+ },
+ {
+  "index": "K185",
+  "input": "かいはつかんきょうを",
+  "expected_output": [
+   "開発環境を"
+  ],
+  "context_text": "",
+  "right_context": "再構築して性能を改善した",
+  "source": "kanji-cases (LLM)",
+  "original": "開発環境を再構築して性能を改善した"
+ },
+ {
+  "index": "K186",
+  "input": "いけんをもとに",
+  "expected_output": [
+   "意見をもとに"
+  ],
+  "context_text": "ユーザーの",
+  "right_context": "画面を再設計した",
+  "source": "kanji-cases (LLM)",
+  "original": "ユーザーの意見をもとに画面を再設計した"
+ },
+ {
+  "index": "K187",
+  "input": "けんしゅうしりょうの",
+  "expected_output": [
+   "研修資料の"
+  ],
+  "context_text": "",
+  "right_context": "監修を担当者に頼んだ",
+  "source": "kanji-cases (LLM)",
+  "original": "研修資料の監修を担当者に頼んだ"
+ },
+ {
+  "index": "K188",
+  "input": "かんりしゃけんげんを",
+  "expected_output": [
+   "管理者権限を"
+  ],
+  "context_text": "",
+  "right_context": "持つ人だけが設定を変更できる",
+  "source": "kanji-cases (LLM)",
+  "original": "管理者権限を持つ人だけが設定を変更できる"
+ },
+ {
+  "index": "K189",
+  "input": "じゅんびで",
+  "expected_output": [
+   "準備で"
+  ],
+  "context_text": "プレゼンの",
+  "right_context": "資料の段落を並べ替えた",
+  "source": "kanji-cases (LLM)",
+  "original": "プレゼンの準備で資料の段落を並べ替えた"
+ },
+ {
+  "index": "K190",
+  "input": "せんじつの",
+  "expected_output": [
+   "先日の"
+  ],
+  "context_text": "",
+  "right_context": "資料を全員に配布する",
+  "source": "kanji-cases (LLM)",
+  "original": "先日の資料を全員に配布する"
+ },
+ {
+  "index": "K191",
+  "input": "しんちょくを",
+  "expected_output": [
+   "進捗を"
+  ],
+  "context_text": "",
+  "right_context": "定例会議で確認する",
+  "source": "kanji-cases (LLM)",
+  "original": "進捗を定例会議で確認する"
+ },
+ {
+  "index": "K193",
+  "input": "てんきよほうによると",
+  "expected_output": [
+   "天気予報によると"
+  ],
+  "context_text": "",
+  "right_context": "明日は朝から曇りで、午後から強い雨が降るそうだ",
+  "source": "kanji-cases (LLM)",
+  "original": "天気予報によると明日は朝から曇りで、午後から強い雨が降るそうだ"
+ },
+ {
+  "index": "K195",
+  "input": "しゅうまつに",
+  "expected_output": [
+   "週末に"
+  ],
+  "context_text": "",
+  "right_context": "家族で近所の店へ買い物に行って、久しぶりにゆっくりご飯を食べた",
+  "source": "kanji-cases (LLM)",
+  "original": "週末に家族で近所の店へ買い物に行って、久しぶりにゆっくりご飯を食べた"
+ },
+ {
+  "index": "K196",
+  "input": "きゅうな",
+  "expected_output": [
+   "急な"
+  ],
+  "context_text": "",
+  "right_context": "環境の変化に合わせて計画を早めに見直し、必要なら予算も調整する",
+  "source": "kanji-cases (LLM)",
+  "original": "急な環境の変化に合わせて計画を早めに見直し、必要なら予算も調整する"
+ },
+ {
+  "index": "K197",
+  "input": "ちいきの",
+  "expected_output": [
+   "地域の"
+  ],
+  "context_text": "",
+  "right_context": "調査で分かった課題を整理して、来月の会議で提案する予定だ",
+  "source": "kanji-cases (LLM)",
+  "original": "地域の調査で分かった課題を整理して、来月の会議で提案する予定だ"
+ },
+ {
+  "index": "K198",
+  "input": "ふるい",
+  "expected_output": [
+   "古い"
+  ],
+  "context_text": "",
+  "right_context": "機械を新しいものに交換したことで、作業の効率が大きく上がった",
+  "source": "kanji-cases (LLM)",
+  "original": "古い機械を新しいものに交換したことで、作業の効率が大きく上がった"
+ },
+ {
+  "index": "K199",
+  "input": "こどもの",
+  "expected_output": [
+   "子供の",
+   "子どもの"
+  ],
+  "context_text": "",
+  "right_context": "頃に住んでいた町を久しぶりに訪れ、変わらない景色にほっとした",
+  "source": "kanji-cases (LLM)",
+  "original": "子供の頃に住んでいた町を久しぶりに訪れ、変わらない景色にほっとした"
+ },
+ {
+  "index": "K200",
+  "input": "けんしゅうの",
+  "expected_output": [
+   "研修の"
+  ],
+  "context_text": "",
+  "right_context": "内容を振り返りながら、自分に足りない点を書き出してみた",
+  "source": "kanji-cases (LLM)",
+  "original": "研修の内容を振り返りながら、自分に足りない点を書き出してみた"
+ },
+ {
+  "index": "K201",
+  "input": "えきの",
+  "expected_output": [
+   "駅の"
+  ],
+  "context_text": "",
+  "right_context": "前の店は去年閉店したが、新しい店舗が来月には開店するという",
+  "source": "kanji-cases (LLM)",
+  "original": "駅の前の店は去年閉店したが、新しい店舗が来月には開店するという"
+ },
+ {
+  "index": "K204",
+  "input": "とってからまいぐれーしょんを",
+  "expected_output": [
+   "取ってからマイグレーションを",
+   "とってからマイグレーションを"
+  ],
+  "context_text": "データベースのバックアップを",
+  "right_context": "実行した",
+  "source": "kanji-cases (LLM)",
+  "original": "データベースのバックアップを取ってからマイグレーションを実行した"
+ },
+ {
+  "index": "K205",
+  "input": "げんいんをろぐから",
+  "expected_output": [
+   "原因をログから"
+  ],
+  "context_text": "アプリのクラッシュの",
+  "right_context": "分析した",
+  "source": "kanji-cases (LLM)",
+  "original": "アプリのクラッシュの原因をログから分析した"
+ },
+ {
+  "index": "K207",
+  "input": "じっこうしてえらーが",
+  "expected_output": [
+   "実行してエラーが"
+  ],
+  "context_text": "テストを",
+  "right_context": "出たのですぐに修正した",
+  "source": "kanji-cases (LLM)",
+  "original": "テストを実行してエラーが出たのですぐに修正した"
+ },
+ {
+  "index": "K208",
+  "input": "あたらしい",
+  "expected_output": [
+   "新しい"
+  ],
+  "context_text": "",
+  "right_context": "機能をリリースする前にレビューをお願いした",
+  "source": "kanji-cases (LLM)",
+  "original": "新しい機能をリリースする前にレビューをお願いした"
+ },
+ {
+  "index": "K209",
+  "input": "せつぞくが",
+  "expected_output": [
+   "接続が"
+  ],
+  "context_text": "ネットワークの",
+  "right_context": "不安定なのでルーターを再起動した",
+  "source": "kanji-cases (LLM)",
+  "original": "ネットワークの接続が不安定なのでルーターを再起動した"
+ },
+ {
+  "index": "K210",
+  "input": "じょうほうをくらうどに",
+  "expected_output": [
+   "情報をクラウドに"
+  ],
+  "context_text": "ユーザーのログイン",
+  "right_context": "保存した",
+  "source": "kanji-cases (LLM)",
+  "original": "ユーザーのログイン情報をクラウドに保存した"
+ },
+ {
+  "index": "K212",
+  "input": "あげて",
+  "expected_output": [
+   "上げて",
+   "あげて"
+  ],
+  "context_text": "フレームワークのバージョンを",
+  "right_context": "環境を更新した",
+  "source": "kanji-cases (LLM)",
+  "original": "フレームワークのバージョンを上げて環境を更新した"
+ },
+ {
+  "index": "Z002",
+  "input": "かんじへんかんの",
+  "expected_output": [
+   "漢字変換の"
+  ],
+  "context_text": "",
+  "right_context": "精度を上げる",
+  "source": "bench-homophones (第三者)",
+  "original": "漢字変換の精度を上げる"
+ },
+ {
+  "index": "Z003",
+  "input": "いしを",
+  "expected_output": [
+   "意思を"
+  ],
+  "context_text": "",
+  "right_context": "伝える",
+  "source": "bench-homophones (第三者)",
+  "original": "意思を伝える"
+ },
+ {
+  "index": "Z004",
+  "input": "いしが",
+  "expected_output": [
+   "石が"
+  ],
+  "context_text": "",
+  "right_context": "転がる",
+  "source": "bench-homophones (第三者)",
+  "original": "石が転がる"
+ },
+ {
+  "index": "Z005",
+  "input": "いしに",
+  "expected_output": [
+   "医師に"
+  ],
+  "context_text": "",
+  "right_context": "診てもらう",
+  "source": "bench-homophones (第三者)",
+  "original": "医師に診てもらう"
+ },
+ {
+  "index": "Z006",
+  "input": "きょうはいい",
+  "expected_output": [
+   "今日はいい"
+  ],
+  "context_text": "",
+  "right_context": "天気ですね",
+  "source": "bench-homophones (第三者)",
+  "original": "今日はいい天気ですね"
+ },
+ {
+  "index": "Z007",
+  "input": "あしたの",
+  "expected_output": [
+   "明日の"
+  ],
+  "context_text": "",
+  "right_context": "予定を確認してください",
+  "source": "bench-homophones (第三者)",
+  "original": "明日の予定を確認してください"
+ },
+ {
+  "index": "Z008",
+  "input": "えきまえの",
+  "expected_output": [
+   "駅前の"
+  ],
+  "context_text": "",
+  "right_context": "本屋で雑誌を買った",
+  "source": "bench-homophones (第三者)",
+  "original": "駅前の本屋で雑誌を買った"
+ },
+ {
+  "index": "Z009",
+  "input": "かれは",
+  "expected_output": [
+   "彼は"
+  ],
+  "context_text": "",
+  "right_context": "機械を壊した",
+  "source": "bench-homophones (第三者)",
+  "original": "彼は機械を壊した"
+ },
+ {
+  "index": "Z010",
+  "input": "きかいがあれば",
+  "expected_output": [
+   "機会があれば"
+  ],
+  "context_text": "",
+  "right_context": "行きたい",
+  "source": "bench-homophones (第三者)",
+  "original": "機会があれば行きたい"
+ },
+ {
+  "index": "Z011",
+  "input": "こうえんで",
+  "expected_output": [
+   "公園で"
+  ],
+  "context_text": "",
+  "right_context": "講演を聞いた",
+  "source": "bench-homophones (第三者)",
+  "original": "公園で講演を聞いた"
+ },
+ {
+  "index": "Z012",
+  "input": "せいかくな",
+  "expected_output": [
+   "正確な"
+  ],
+  "context_text": "",
+  "right_context": "情報を集める",
+  "source": "bench-homophones (第三者)",
+  "original": "正確な情報を集める"
+ },
+ {
+  "index": "Z013",
+  "input": "かのじょは",
+  "expected_output": [
+   "彼女は"
+  ],
+  "context_text": "",
+  "right_context": "優しい性格だ",
+  "source": "bench-homophones (第三者)",
+  "original": "彼女は優しい性格だ"
+ },
+ {
+  "index": "Z014",
+  "input": "あたらしいぷろぐらむを",
+  "expected_output": [
+   "新しいプログラムを"
+  ],
+  "context_text": "",
+  "right_context": "開発した",
+  "source": "bench-homophones (第三者)",
+  "original": "新しいプログラムを開発した"
+ },
+ {
+  "index": "Z015",
+  "input": "いけんには",
+  "expected_output": [
+   "意見には"
+  ],
+  "context_text": "その",
+  "right_context": "賛成できない",
+  "source": "bench-homophones (第三者)",
+  "original": "その意見には賛成できない"
+ },
+ {
+  "index": "Z016",
+  "input": "おくじょうからの",
+  "expected_output": [
+   "屋上からの"
+  ],
+  "context_text": "",
+  "right_context": "景色がきれいだ",
+  "source": "bench-homophones (第三者)",
+  "original": "屋上からの景色がきれいだ"
+ },
+ {
+  "index": "Z017",
+  "input": "でんしゃが",
+  "expected_output": [
+   "電車が"
+  ],
+  "context_text": "",
+  "right_context": "遅れているらしい",
+  "source": "bench-homophones (第三者)",
+  "original": "電車が遅れているらしい"
+ },
+ {
+  "index": "Z018",
+  "input": "じしんの",
+  "expected_output": [
+   "地震の"
+  ],
+  "context_text": "",
+  "right_context": "情報を確認した",
+  "source": "bench-homophones (第三者)",
+  "original": "地震の情報を確認した"
+ },
+ {
+  "index": "Z019",
+  "input": "じしんを",
+  "expected_output": [
+   "自信を"
+  ],
+  "context_text": "",
+  "right_context": "持って発表する",
+  "source": "bench-homophones (第三者)",
+  "original": "自信を持って発表する"
+ },
+ {
+  "index": "Z020",
+  "input": "そうぞうりょくを",
+  "expected_output": [
+   "想像力を"
+  ],
+  "context_text": "",
+  "right_context": "働かせる",
+  "source": "bench-homophones (第三者)",
+  "original": "想像力を働かせる"
+ },
+ {
+  "index": "Z021",
+  "input": "けいさんきで",
+  "expected_output": [
+   "計算機で"
+  ],
+  "context_text": "",
+  "right_context": "計算する",
+  "source": "bench-homophones (第三者)",
+  "original": "計算機で計算する"
+ },
+ {
+  "index": "Z023",
+  "input": "てんきよほうでは",
+  "expected_output": [
+   "天気予報では"
+  ],
+  "context_text": "",
+  "right_context": "雨だった",
+  "source": "bench-homophones (第三者)",
+  "original": "天気予報では雨だった"
+ },
+ {
+  "index": "Z024",
+  "input": "しょうらいの",
+  "expected_output": [
+   "将来の"
+  ],
+  "context_text": "",
+  "right_context": "夢を語る",
+  "source": "bench-homophones (第三者)",
+  "original": "将来の夢を語る"
+ },
+ {
+  "index": "Z025",
+  "input": "きかいがくしゅうのもでるを",
+  "expected_output": [
+   "機械学習のモデルを"
+  ],
+  "context_text": "",
+  "right_context": "作る",
+  "source": "bench-homophones (第三者)",
+  "original": "機械学習のモデルを作る"
+ },
+ {
+  "index": "Z027",
+  "input": "みずを",
+  "expected_output": [
+   "水を"
+  ],
+  "context_text": "",
+  "right_context": "飲みすぎた",
+  "source": "bench-homophones (第三者)",
+  "original": "水を飲みすぎた"
+ },
+ {
+  "index": "Z028",
+  "input": "かいしゃの",
+  "expected_output": [
+   "会社の"
+  ],
+  "context_text": "",
+  "right_context": "構成を変える",
+  "source": "bench-homophones (第三者)",
+  "original": "会社の構成を変える"
+ },
+ {
+  "index": "Z029",
+  "input": "げんこうの",
+  "expected_output": [
+   "原稿の"
+  ],
+  "context_text": "",
+  "right_context": "校正をお願いします",
+  "source": "bench-homophones (第三者)",
+  "original": "原稿の校正をお願いします"
+ },
+ {
+  "index": "Z030",
+  "input": "たいしょうとなる",
+  "expected_output": [
+   "対象となる"
+  ],
+  "context_text": "",
+  "right_context": "商品",
+  "source": "bench-homophones (第三者)",
+  "original": "対象となる商品"
+ },
+ {
+  "index": "Z031",
+  "input": "さゆうたいしょうの",
+  "expected_output": [
+   "左右対称の"
+  ],
+  "context_text": "",
+  "right_context": "図形",
+  "source": "bench-homophones (第三者)",
+  "original": "左右対称の図形"
+ },
+ {
+  "index": "Z032",
+  "input": "きょうかしょを",
+  "expected_output": [
+   "教科書を"
+  ],
+  "context_text": "",
+  "right_context": "読んでおく",
+  "source": "bench-homophones (第三者)",
+  "original": "教科書を読んでおく"
+ },
+ {
+  "index": "Z033",
+  "input": "おかねを",
+  "expected_output": [
+   "お金を"
+  ],
+  "context_text": "",
+  "right_context": "払う",
+  "source": "bench-homophones (第三者)",
+  "original": "お金を払う"
+ },
+ {
+  "index": "Z034",
+  "input": "ねこが",
+  "expected_output": [
+   "猫が"
+  ],
+  "context_text": "",
+  "right_context": "鳴いている",
+  "source": "bench-homophones (第三者)",
+  "original": "猫が鳴いている"
+ },
+ {
+  "index": "Z035",
+  "input": "こどもが",
+  "expected_output": [
+   "子供が",
+   "子どもが"
+  ],
+  "context_text": "",
+  "right_context": "泣いている",
+  "source": "bench-homophones (第三者)",
+  "original": "子供が泣いている"
+ },
+ {
+  "index": "Z036",
+  "input": "ほんは",
+  "expected_output": [
+   "本は"
+  ],
+  "context_text": "この",
+  "right_context": "厚い",
+  "source": "bench-homophones (第三者)",
+  "original": "この本は厚い"
+ },
+ {
+  "index": "Z037",
+  "input": "きょうはとても",
+  "expected_output": [
+   "今日はとても"
+  ],
+  "context_text": "",
+  "right_context": "暑い",
+  "source": "bench-homophones (第三者)",
+  "original": "今日はとても暑い"
+ },
+ {
+  "index": "Z038",
+  "input": "おちゃが",
+  "expected_output": [
+   "お茶が"
+  ],
+  "context_text": "",
+  "right_context": "熱いので気をつけて",
+  "source": "bench-homophones (第三者)",
+  "original": "お茶が熱いので気をつけて"
+ },
+ {
+  "index": "Z039",
+  "input": "はしの",
+  "expected_output": [
+   "橋の"
+  ],
+  "context_text": "",
+  "right_context": "端を歩く",
+  "source": "bench-homophones (第三者)",
+  "original": "橋の端を歩く"
+ },
+ {
+  "index": "Z040",
+  "input": "はしで",
+  "expected_output": [
+   "箸で"
+  ],
+  "context_text": "",
+  "right_context": "豆をつまむ",
+  "source": "bench-homophones (第三者)",
+  "original": "箸で豆をつまむ"
+ },
+ {
+  "index": "Z041",
+  "input": "にわには",
+  "expected_output": [
+   "庭には"
+  ],
+  "context_text": "",
+  "right_context": "二羽鶏がいる",
+  "source": "bench-homophones (第三者)",
+  "original": "庭には二羽鶏がいる"
+ },
+ {
+  "index": "Z042",
+  "input": "しじょうの",
+  "expected_output": [
+   "市場の"
+  ],
+  "context_text": "",
+  "right_context": "動向を調査する",
+  "source": "bench-homophones (第三者)",
+  "original": "市場の動向を調査する"
+ },
+ {
+  "index": "Z043",
+  "input": "かのじょは",
+  "expected_output": [
+   "彼女は"
+  ],
+  "context_text": "",
+  "right_context": "医者に行った",
+  "source": "bench-homophones (第三者)",
+  "original": "彼女は医者に行った"
+ },
+ {
+  "index": "Z044",
+  "input": "かがくの",
+  "expected_output": [
+   "科学の"
+  ],
+  "context_text": "",
+  "right_context": "実験をする",
+  "source": "bench-homophones (第三者)",
+  "original": "科学の実験をする"
+ },
+ {
+  "index": "Z046",
+  "input": "しゅうまつに",
+  "expected_output": [
+   "週末に"
+  ],
+  "context_text": "",
+  "right_context": "映画を見に行こう",
+  "source": "bench-homophones (第三者)",
+  "original": "週末に映画を見に行こう"
+ },
+ {
+  "index": "Z047",
+  "input": "へんじが",
+  "expected_output": [
+   "返事が"
+  ],
+  "context_text": "",
+  "right_context": "遅くなってすみません",
+  "source": "bench-homophones (第三者)",
+  "original": "返事が遅くなってすみません"
+ },
+ {
+  "index": "Z048",
+  "input": "しりょうを",
+  "expected_output": [
+   "資料を"
+  ],
+  "context_text": "",
+  "right_context": "添付しました",
+  "source": "bench-homophones (第三者)",
+  "original": "資料を添付しました"
+ },
+ {
+  "index": "Z049",
+  "input": "ごけんとうのほどよろしくお",
+  "expected_output": [
+   "ご検討のほどよろしくお",
+   "ご検討の程よろしくお"
+  ],
+  "context_text": "",
+  "right_context": "願いします",
+  "source": "bench-homophones (第三者)",
+  "original": "ご検討のほどよろしくお願いします"
+ },
+ {
+  "index": "Z050",
+  "input": "かいぎしつを",
+  "expected_output": [
+   "会議室を"
+  ],
+  "context_text": "",
+  "right_context": "予約しておきます",
+  "source": "bench-homophones (第三者)",
+  "original": "会議室を予約しておきます"
+ },
+ {
+  "index": "Z051",
+  "input": "せんせいに",
+  "expected_output": [
+   "先生に"
+  ],
+  "context_text": "",
+  "right_context": "質問があります",
+  "source": "bench-homophones (第三者)",
+  "original": "先生に質問があります"
+ },
+ {
+  "index": "Z052",
+  "input": "しけんの",
+  "expected_output": [
+   "試験の"
+  ],
+  "context_text": "",
+  "right_context": "結果が発表された",
+  "source": "bench-homophones (第三者)",
+  "original": "試験の結果が発表された"
+ },
+ {
+  "index": "Z053",
+  "input": "だいがくで",
+  "expected_output": [
+   "大学で"
+  ],
+  "context_text": "",
+  "right_context": "経済学を専攻している",
+  "source": "bench-homophones (第三者)",
+  "original": "大学で経済学を専攻している"
+ },
+ {
+  "index": "Z054",
+  "input": "あさごはんにぱんを",
+  "expected_output": [
+   "朝ごはんにパンを"
+  ],
+  "context_text": "",
+  "right_context": "食べた",
+  "source": "bench-homophones (第三者)",
+  "original": "朝ごはんにパンを食べた"
+ },
+ {
+  "index": "Z055",
+  "input": "まどを",
+  "expected_output": [
+   "窓を"
+  ],
+  "context_text": "",
+  "right_context": "開けて換気する",
+  "source": "bench-homophones (第三者)",
+  "original": "窓を開けて換気する"
+ },
+ {
+  "index": "Z056",
+  "input": "さむけがするので",
+  "expected_output": [
+   "寒気がするので"
+  ],
+  "context_text": "",
+  "right_context": "早く寝る",
+  "source": "bench-homophones (第三者)",
+  "original": "寒気がするので早く寝る"
+ },
+ {
+  "index": "Z057",
+  "input": "あたらしい",
+  "expected_output": [
+   "新しい"
+  ],
+  "context_text": "",
+  "right_context": "服を着て出かける",
+  "source": "bench-homophones (第三者)",
+  "original": "新しい服を着て出かける"
+ },
+ {
+  "index": "Z058",
+  "input": "きの",
+  "expected_output": [
+   "木の"
+  ],
+  "context_text": "",
+  "right_context": "下で休む",
+  "source": "bench-homophones (第三者)",
+  "original": "木の下で休む"
+ },
+ {
+  "index": "Z059",
+  "input": "きを",
+  "expected_output": [
+   "気を"
+  ],
+  "context_text": "",
+  "right_context": "付けて帰ってね",
+  "source": "bench-homophones (第三者)",
+  "original": "気を付けて帰ってね"
+ },
+ {
+  "index": "Z060",
+  "input": "はなが",
+  "expected_output": [
+   "花が"
+  ],
+  "context_text": "",
+  "right_context": "咲いている",
+  "source": "bench-homophones (第三者)",
+  "original": "花が咲いている"
+ },
+ {
+  "index": "Z061",
+  "input": "はなみずが",
+  "expected_output": [
+   "鼻水が"
+  ],
+  "context_text": "",
+  "right_context": "止まらない",
+  "source": "bench-homophones (第三者)",
+  "original": "鼻水が止まらない"
+ },
+ {
+  "index": "Z062",
+  "input": "あめが",
+  "expected_output": [
+   "雨が"
+  ],
+  "context_text": "",
+  "right_context": "降りそうだ",
+  "source": "bench-homophones (第三者)",
+  "original": "雨が降りそうだ"
+ },
+ {
+  "index": "Z064",
+  "input": "かみに",
+  "expected_output": [
+   "紙に"
+  ],
+  "context_text": "",
+  "right_context": "名前を書く",
+  "source": "bench-homophones (第三者)",
+  "original": "紙に名前を書く"
+ },
+ {
+  "index": "Z065",
+  "input": "かみを",
+  "expected_output": [
+   "髪を"
+  ],
+  "context_text": "",
+  "right_context": "切りに行く",
+  "source": "bench-homophones (第三者)",
+  "original": "髪を切りに行く"
+ },
+ {
+  "index": "Z066",
+  "input": "かみさまにお",
+  "expected_output": [
+   "神様にお"
+  ],
+  "context_text": "",
+  "right_context": "願いする",
+  "source": "bench-homophones (第三者)",
+  "original": "神様にお願いする"
+ },
+ {
+  "index": "Z067",
+  "input": "あたたかい",
+  "expected_output": [
+   "暖かい"
+  ],
+  "context_text": "",
+  "right_context": "部屋で過ごす",
+  "source": "bench-homophones (第三者)",
+  "original": "暖かい部屋で過ごす"
+ },
+ {
+  "index": "Z068",
+  "input": "あたたかいすーぷを",
+  "expected_output": [
+   "温かいスープを"
+  ],
+  "context_text": "",
+  "right_context": "飲む",
+  "source": "bench-homophones (第三者)",
+  "original": "温かいスープを飲む"
+ },
+ {
+  "index": "Z069",
+  "input": "はやく",
+  "expected_output": [
+   "早く"
+  ],
+  "context_text": "",
+  "right_context": "起きる",
+  "source": "bench-homophones (第三者)",
+  "original": "早く起きる"
+ },
+ {
+  "index": "Z070",
+  "input": "はやく",
+  "expected_output": [
+   "速く"
+  ],
+  "context_text": "",
+  "right_context": "走る",
+  "source": "bench-homophones (第三者)",
+  "original": "速く走る"
+ },
+ {
+  "index": "Z071",
+  "input": "びょういんで",
+  "expected_output": [
+   "病院で"
+  ],
+  "context_text": "",
+  "right_context": "診察を受ける",
+  "source": "bench-homophones (第三者)",
+  "original": "病院で診察を受ける"
+ },
+ {
+  "index": "Z072",
+  "input": "どうろを",
+  "expected_output": [
+   "道路を"
+  ],
+  "context_text": "",
+  "right_context": "横断する",
+  "source": "bench-homophones (第三者)",
+  "original": "道路を横断する"
+ },
+ {
+  "index": "Z073",
+  "input": "れきしの",
+  "expected_output": [
+   "歴史の"
+  ],
+  "context_text": "",
+  "right_context": "授業が好きだ",
+  "source": "bench-homophones (第三者)",
+  "original": "歴史の授業が好きだ"
+ },
+ {
+  "index": "Z074",
+  "input": "らいしゅうから",
+  "expected_output": [
+   "来週から"
+  ],
+  "context_text": "",
+  "right_context": "夏休みが始まる",
+  "source": "bench-homophones (第三者)",
+  "original": "来週から夏休みが始まる"
+ },
+ {
+  "index": "Z075",
+  "input": "としょかんで",
+  "expected_output": [
+   "図書館で"
+  ],
+  "context_text": "",
+  "right_context": "本を借りる",
+  "source": "bench-homophones (第三者)",
+  "original": "図書館で本を借りる"
+ },
+ {
+  "index": "Z076",
+  "input": "かぞくで",
+  "expected_output": [
+   "家族で"
+  ],
+  "context_text": "",
+  "right_context": "旅行に行った",
+  "source": "bench-homophones (第三者)",
+  "original": "家族で旅行に行った"
+ },
+ {
+  "index": "Z077",
+  "input": "げんいんを",
+  "expected_output": [
+   "原因を"
+  ],
+  "context_text": "バグの",
+  "right_context": "調べる",
+  "source": "bench-homophones (第三者)",
+  "original": "バグの原因を調べる"
+ },
+ {
+  "index": "Z078",
+  "input": "せっていを",
+  "expected_output": [
+   "設定を"
+  ],
+  "context_text": "",
+  "right_context": "変更して再起動する",
+  "source": "bench-homophones (第三者)",
+  "original": "設定を変更して再起動する"
+ },
+ {
+  "index": "Z079",
+  "input": "かんきょうへんすうを",
+  "expected_output": [
+   "環境変数を"
+  ],
+  "context_text": "",
+  "right_context": "確認する",
+  "source": "bench-homophones (第三者)",
+  "original": "環境変数を確認する"
+ },
+ {
+  "index": "Z080",
+  "input": "かんすうの",
+  "expected_output": [
+   "関数の"
+  ],
+  "context_text": "",
+  "right_context": "引数を追加する",
+  "source": "bench-homophones (第三者)",
+  "original": "関数の引数を追加する"
+ },
+ {
+  "index": "H001",
+  "input": "らいげつの",
+  "expected_output": [
+   "来月の"
+  ],
+  "context_text": "",
+  "right_context": "会議の日程を調整します",
+  "source": "bench-homophones (第三者)",
+  "original": "来月の会議の日程を調整します"
+ },
+ {
+  "index": "H002",
+  "input": "ぶちょうに",
+  "expected_output": [
+   "部長に"
+  ],
+  "context_text": "",
+  "right_context": "報告書を提出した",
+  "source": "bench-homophones (第三者)",
+  "original": "部長に報告書を提出した"
+ },
+ {
+  "index": "H003",
+  "input": "あたらしい",
+  "expected_output": [
+   "新しい"
+  ],
+  "context_text": "",
+  "right_context": "技術を導入する",
+  "source": "bench-homophones (第三者)",
+  "original": "新しい技術を導入する"
+ },
+ {
+  "index": "H005",
+  "input": "ちゅうもんした",
+  "expected_output": [
+   "注文した"
+  ],
+  "context_text": "",
+  "right_context": "商品が届いた",
+  "source": "bench-homophones (第三者)",
+  "original": "注文した商品が届いた"
+ },
+ {
+  "index": "H006",
+  "input": "でんわで",
+  "expected_output": [
+   "電話で"
+  ],
+  "context_text": "",
+  "right_context": "問い合わせる",
+  "source": "bench-homophones (第三者)",
+  "original": "電話で問い合わせる"
+ },
+ {
+  "index": "H007",
+  "input": "てんきが",
+  "expected_output": [
+   "天気が"
+  ],
+  "context_text": "",
+  "right_context": "良いので散歩する",
+  "source": "bench-homophones (第三者)",
+  "original": "天気が良いので散歩する"
+ },
+ {
+  "index": "H008",
+  "input": "えきまで",
+  "expected_output": [
+   "駅まで"
+  ],
+  "context_text": "",
+  "right_context": "歩いて十分です",
+  "source": "bench-homophones (第三者)",
+  "original": "駅まで歩いて十分です"
+ },
+ {
+  "index": "H009",
+  "input": "せつめいしょをよく",
+  "expected_output": [
+   "説明書をよく"
+  ],
+  "context_text": "",
+  "right_context": "読んでください",
+  "source": "bench-homophones (第三者)",
+  "original": "説明書をよく読んでください"
+ },
+ {
+  "index": "H010",
+  "input": "しゃしんを",
+  "expected_output": [
+   "写真を"
+  ],
+  "context_text": "",
+  "right_context": "撮るのが趣味です",
+  "source": "bench-homophones (第三者)",
+  "original": "写真を撮るのが趣味です"
+ },
+ {
+  "index": "H011",
+  "input": "とうきょうに",
+  "expected_output": [
+   "東京に"
+  ],
+  "context_text": "",
+  "right_context": "住んでいます",
+  "source": "bench-homophones (第三者)",
+  "original": "東京に住んでいます"
+ },
+ {
+  "index": "H013",
+  "input": "やさいを",
+  "expected_output": [
+   "野菜を"
+  ],
+  "context_text": "",
+  "right_context": "細かく切る",
+  "source": "bench-homophones (第三者)",
+  "original": "野菜を細かく切る"
+ },
+ {
+  "index": "H014",
+  "input": "うんどうぶそくを",
+  "expected_output": [
+   "運動不足を"
+  ],
+  "context_text": "",
+  "right_context": "解消する",
+  "source": "bench-homophones (第三者)",
+  "original": "運動不足を解消する"
+ },
+ {
+  "index": "H015",
+  "input": "かぎをかけ",
+  "expected_output": [
+   "鍵をかけ",
+   "鍵を掛け"
+  ],
+  "context_text": "",
+  "right_context": "忘れた",
+  "source": "bench-homophones (第三者)",
+  "original": "鍵をかけ忘れた"
+ },
+ {
+  "index": "H016",
+  "input": "きげんまでに",
+  "expected_output": [
+   "期限までに"
+  ],
+  "context_text": "",
+  "right_context": "提出する",
+  "source": "bench-homophones (第三者)",
+  "original": "期限までに提出する"
+ },
+ {
+  "index": "H017",
+  "input": "きげんが",
+  "expected_output": [
+   "機嫌が"
+  ],
+  "context_text": "",
+  "right_context": "悪いようだ",
+  "source": "bench-homophones (第三者)",
+  "original": "機嫌が悪いようだ"
+ },
+ {
+  "index": "H018",
+  "input": "きげんぜんの",
+  "expected_output": [
+   "紀元前の"
+  ],
+  "context_text": "",
+  "right_context": "遺跡を見学する",
+  "source": "bench-homophones (第三者)",
+  "original": "紀元前の遺跡を見学する"
+ },
+ {
+  "index": "H019",
+  "input": "せんしゅが",
+  "expected_output": [
+   "選手が"
+  ],
+  "context_text": "",
+  "right_context": "記録を更新した",
+  "source": "bench-homophones (第三者)",
+  "original": "選手が記録を更新した"
+ },
+ {
+  "index": "H020",
+  "input": "がめんの",
+  "expected_output": [
+   "画面の"
+  ],
+  "context_text": "",
+  "right_context": "表示がおかしい",
+  "source": "bench-homophones (第三者)",
+  "original": "画面の表示がおかしい"
+ },
+ {
+  "index": "H021",
+  "input": "ほぞんしてから",
+  "expected_output": [
+   "保存してから"
+  ],
+  "context_text": "ファイルを",
+  "right_context": "閉じる",
+  "source": "bench-homophones (第三者)",
+  "original": "ファイルを保存してから閉じる"
+ },
+ {
+  "index": "H022",
+  "input": "もんだいを",
+  "expected_output": [
+   "問題を"
+  ],
+  "context_text": "",
+  "right_context": "解決する方法を考える",
+  "source": "bench-homophones (第三者)",
+  "original": "問題を解決する方法を考える"
+ },
+ {
+  "index": "H023",
+  "input": "いがいな",
+  "expected_output": [
+   "意外な"
+  ],
+  "context_text": "",
+  "right_context": "結果になった",
+  "source": "bench-homophones (第三者)",
+  "original": "意外な結果になった"
+ },
+ {
+  "index": "H024",
+  "input": "いがいの",
+  "expected_output": [
+   "以外の"
+  ],
+  "context_text": "それ",
+  "right_context": "方法はない",
+  "source": "bench-homophones (第三者)",
+  "original": "それ以外の方法はない"
+ },
+ {
+  "index": "H025",
+  "input": "どりょくが",
+  "expected_output": [
+   "努力が"
+  ],
+  "context_text": "",
+  "right_context": "報われた",
+  "source": "bench-homophones (第三者)",
+  "original": "努力が報われた"
+ },
+ {
+  "index": "H026",
+  "input": "ともだちと",
+  "expected_output": [
+   "友達と"
+  ],
+  "context_text": "",
+  "right_context": "映画を見た",
+  "source": "bench-homophones (第三者)",
+  "original": "友達と映画を見た"
+ },
+ {
+  "index": "H028",
+  "input": "たいふうが",
+  "expected_output": [
+   "台風が"
+  ],
+  "context_text": "",
+  "right_context": "近づいている",
+  "source": "bench-homophones (第三者)",
+  "original": "台風が近づいている"
+ },
+ {
+  "index": "H029",
+  "input": "にもつを",
+  "expected_output": [
+   "荷物を"
+  ],
+  "context_text": "",
+  "right_context": "二階に運ぶ",
+  "source": "bench-homophones (第三者)",
+  "original": "荷物を二階に運ぶ"
+ },
+ {
+  "index": "H030",
+  "input": "じぶんの",
+  "expected_output": [
+   "自分の"
+  ],
+  "context_text": "",
+  "right_context": "考えを述べる",
+  "source": "bench-homophones (第三者)",
+  "original": "自分の考えを述べる"
+ },
+ {
+  "index": "H031",
+  "input": "ははに",
+  "expected_output": [
+   "母に"
+  ],
+  "context_text": "",
+  "right_context": "手紙を書いた",
+  "source": "bench-homophones (第三者)",
+  "original": "母に手紙を書いた"
+ },
+ {
+  "index": "H032",
+  "input": "そふは",
+  "expected_output": [
+   "祖父は"
+  ],
+  "context_text": "",
+  "right_context": "元気に暮らしている",
+  "source": "bench-homophones (第三者)",
+  "original": "祖父は元気に暮らしている"
+ },
+ {
+  "index": "H033",
+  "input": "りょうりの",
+  "expected_output": [
+   "料理の"
+  ],
+  "context_text": "",
+  "right_context": "味を確かめる",
+  "source": "bench-homophones (第三者)",
+  "original": "料理の味を確かめる"
+ },
+ {
+  "index": "H034",
+  "input": "しあいに",
+  "expected_output": [
+   "試合に"
+  ],
+  "context_text": "",
+  "right_context": "勝って喜んだ",
+  "source": "bench-homophones (第三者)",
+  "original": "試合に勝って喜んだ"
+ },
+ {
+  "index": "H035",
+  "input": "かわの",
+  "expected_output": [
+   "川の"
+  ],
+  "context_text": "",
+  "right_context": "水が冷たい",
+  "source": "bench-homophones (第三者)",
+  "original": "川の水が冷たい"
+ },
+ {
+  "index": "H036",
+  "input": "かわの",
+  "expected_output": [
+   "皮の",
+   "革の"
+  ],
+  "context_text": "",
+  "right_context": "財布を買った",
+  "source": "bench-homophones (第三者)",
+  "original": "皮の財布を買った"
+ },
+ {
+  "index": "H037",
+  "input": "あつさで",
+  "expected_output": [
+   "暑さで"
+  ],
+  "context_text": "",
+  "right_context": "食欲がない",
+  "source": "bench-homophones (第三者)",
+  "original": "暑さで食欲がない"
+ },
+ {
+  "index": "H038",
+  "input": "あつさを",
+  "expected_output": [
+   "厚さを"
+  ],
+  "context_text": "",
+  "right_context": "測る",
+  "source": "bench-homophones (第三者)",
+  "original": "厚さを測る"
+ },
+ {
+  "index": "H039",
+  "input": "まわりの",
+  "expected_output": [
+   "周りの"
+  ],
+  "context_text": "",
+  "right_context": "意見を聞く",
+  "source": "bench-homophones (第三者)",
+  "original": "周りの意見を聞く"
+ },
+ {
+  "index": "H040",
+  "input": "じかんを",
+  "expected_output": [
+   "時間を"
+  ],
+  "context_text": "",
+  "right_context": "守ってください",
+  "source": "bench-homophones (第三者)",
+  "original": "時間を守ってください"
+ }
+]
