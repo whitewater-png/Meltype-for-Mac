@@ -283,14 +283,14 @@ $ dotnet run -c Release --no-build --project src/Meltype.Core.Tests -- Scratch02
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 azooKey の候補は Core では測れないので、まず並びを記録する。文脈の直しの効果 (Zenzai の左文脈の先頭が U+FFFD かどうか) は画面に出ないので、その項目は落ちないことだけを確かめる。
-- [ ] TextEdit: `yoshi`・`hokke`・`yoshisan` + Space → 候補の並びと区切りを記録する (BMP の外の漢字が出るか・何番目か)。直す前の版でも記録しておくと、直した後と比べられる
-- [ ] TextEdit: 上で azooKey が BMP の外の漢字だけの文節を最初に返した読みがあれば、直した版でその読み + Space → その漢字が先頭で、Enter でその漢字が入る
-- [ ] TextEdit: `yoshinoya` + Space → 𠮷野家 が候補に出るなら選んで Enter (表示と確定が同じ)
-- [ ] TextEdit: `kara` + Space → `から` が先頭で、`～` は後ろ (今と同じ)
+- [x] TextEdit: `yoshi`・`hokke`・`yoshisan` + Space → 候補の並びと区切りを記録する (BMP の外の漢字が出るか・何番目か)。直す前の版でも記録しておくと、直した後と比べられる (2026-11-26 自動打鍵 (TextEdit) で記録: 先頭は 良し / ほっけ / 吉さん。`yoshi` は 9 件目まで見て 𠮷 は無し。azooKey は 𠮷 を返さないので、直しの効果は画面に出ない)
+- [ ] TextEdit: 上で azooKey が BMP の外の漢字だけの文節を最初に返した読みがあれば、直した版でその読み + Space → その漢字が先頭で、Enter でその漢字が入る (2026-11-26 自動打鍵 (TextEdit): 該当する読みが無かった (𠮷・𩸽 を返さない)。未確認)
+- [ ] TextEdit: `yoshinoya` + Space → 𠮷野家 が候補に出るなら選んで Enter (表示と確定が同じ) (2026-11-26 自動打鍵 (TextEdit): 先頭は 吉野家。窓の見えた範囲に 𠮷野家 は無く、選べなかった。未確認)
+- [ ] TextEdit: `kara` + Space → `から` が先頭で、`～` は後ろ (今と同じ) (2026-11-26 自動打鍵 (TextEdit): 先頭が から は確認。`～` が後ろかどうかは見ていない。未確認)
 - [ ] TextEdit: 𠮷 を 1 回選んで確定したあと、もう一度 `yoshi` + Space → 𠮷 が先頭 (学習。今と同じ)
 - [ ] TextEdit: ユーザー辞書に よし → 𠮷 を登録して `yoshi` + Space → 𠮷 が先頭 (今と同じ)
 - [ ] TextEdit (Zenzai ON・OFF): 𠮷野家 を確定した直後 (1.5 秒以内) に `kawa` + Space → 落ちない (落ちないことだけ)
-- [ ] TextEdit (Zenzai ON): 空の書類に `𠮷あいうえおかきくけ` を貼り付け、その後ろで `kawa` + Space → 落ちない (落ちないことだけ。PR #29 の前の版では `ContextOf` の切り目を通る形。PR #29 の後は広い文脈になり、11 単位なので切らない)
+- [x] TextEdit (Zenzai ON): 空の書類に `𠮷あいうえおかきくけ` を貼り付け、その後ろで `kawa` + Space → 落ちない (落ちないことだけ。PR #29 の前の版では `ContextOf` の切り目を通る形。PR #29 の後は広い文脈になり、11 単位なので切らない) (2026-11-26 自動打鍵 (TextEdit) で確認: 貼り付けのあと `kawa` + Space で IME は落ちない (pid 不変は端末での確認のみ)。候補 躱。落ちないことだけの確認)
 - [ ] Safari のフォーム: `yoshi` + Space + Enter → TextEdit と同じ結果
 
 ## 測れていないこと
@@ -360,6 +360,7 @@ azooKey の候補は Core では測れないので、まず並びを記録する
       - Windows の `src/Meltype/Composition/ColorTextRenderer.cs` の `char.IsSurrogate` (絵文字の判定)。
     - 記録を切る 5 か所 (`[^20..]`) と `CODE_REVIEW_2026-10.md` の L1a-5・L1b-6・L7-4 は、文書の非目標のとおり。
 - 2026-11-26 自動打鍵 (リョウさんの依頼。人の手ではない。TextEdit。手順と結果は docs/HANDS_ON_CHECKLIST_2026-11.md の追加分 94〜96): 94〜96 は OK。`yoshi`・`hokke`・`yoshisan` の先頭 10 件前後に BMP の外の漢字 (𠮷・𩸽) は出ず、実機では差が見えない (この不具合は今の変換エンジンでは起きない見込み。推定)。`kara` は `から` が先頭。𠮷 を含む文字列を貼り付けたあとの `kawa` Space でも落ちず、表示も崩れない。status は変えない。
+- 2026-11-26 自動打鍵 (TextEdit、入っている版 1.2.9 = main f558dfa。リョウさんの今の設定: ライブ変換 ON・Zenzai ON・変換後も続けて入力 ON。OFF の行は一時的にライブ変換を切った。人の手ではない) (再確認。上の同日の記録とは別の打鍵): `yoshi`・`hokke`・`yoshisan`・`kara`・`yoshinoya` + Space の先頭は 良し・ほっけ・吉さん・から・吉野家。`yoshi`・`yoshinoya` の窓の見えた範囲 (`yoshi` は 9 件目まで) に 𠮷 は無く、azooKey が 𠮷 を返さないので、直しの効果は画面に出ない (文書の見込みどおり)。`𠮷あいうえおかきくけ` を貼り付けて `kawa` + Space (Zenzai ON) は IME が落ちない (pid が変わらないことは端末での確認のみ)。つまり**落ちない確認だけ**で、直しの効果の確認ではない。チェックリストは記録の行と貼り付けの行を [x] にした。学習・ユーザー辞書・Safari・Zenzai OFF・𠮷野家 の確定直後の形は打っていない。リョウさんの手での確認ではない。status は変えない。
 
 ## Mac 実機で試す手順 (打つ > 期待)
 実機の入れ替えは AI はしていない。リョウさんが入れ替えたあとの確認用。**今の azooKey は 𠮷・𩸽 だけの文節を返さない (上の「実装の記録」)ので、「𠮷 が先頭になる」ことは実機では再現できない。** ユーザー辞書・学習は規則より先に先頭を決める (`ContextRules`・`History` が先) ので、これらに 𠮷 を入れても変更前後で同じになる (E1b)。そのため、実機の確認は「何も壊れていない」ことと「𠮷 を出せる経路が今までどおり」を見る。

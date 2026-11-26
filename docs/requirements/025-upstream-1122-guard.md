@@ -53,10 +53,10 @@ scope: core
 - [x] 文書: `docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。`eval/README.md` と `docs/requirements/README.md` の一覧には足さない (019〜023 と同じ扱い。開いている PR #29 が同じ場所を変えている)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
-- [ ] TextEdit: `setteisiteirundakedo` + Enter → `せっていしているんだけど` (Space の候補に `設定しているんだけど` が出るか)
-- [ ] TextEdit: `mainkannsuu` + Enter → `mainかんすう` (Space の候補に `main関数` が出るか)
-- [ ] TextEdit: `@exampleabc-jh.ed.jpdesu` + Enter → `@exampleabc-jh.ed.jpdesu`
-- [ ] TextEdit: 21 文字以上の文字を確定した直後に `@exampleabc-jh.ed.jpdesu` を打ち、途中から日本語にならないか (本家 #2205 の前の文字の長さの話。Core では測れない)
+- [x] TextEdit: `setteisiteirundakedo` + Enter → `せっていしているんだけど` (Space の候補に `設定しているんだけど` が出るか) (2026-11-26 自動打鍵 (TextEdit) で確認: OFF は `せっていしているんだけど`。ON は Enter も Space の先頭も `設定しているんだけど`)
+- [x] TextEdit: `mainkannsuu` + Enter → `mainかんすう` (Space の候補に `main関数` が出るか) (2026-11-26 自動打鍵 (TextEdit) で確認: OFF は `mainかんすう`。ON は `main関数`。Space の先頭も `main関数`)
+- [x] TextEdit: `@exampleabc-jh.ed.jpdesu` + Enter → `@exampleabc-jh.ed.jpdesu` (2026-11-26 自動打鍵 (TextEdit) で確認: ON・OFF ともそのまま)
+- [ ] TextEdit: 21 文字以上の文字を確定した直後に `@exampleabc-jh.ed.jpdesu` を打ち、途中から日本語にならないか (本家 #2205 の前の文字の長さの話。Core では測れない) (2026-11-26 自動打鍵 (TextEdit): 前の 25 文字を貼り付けで用意し、直後に同じメールの形を打つとそのままで途中から日本語にならなかった。ただし IME で確定した文字ではないので [ ] のまま)
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
@@ -81,3 +81,4 @@ scope: core
 - 査読 2 周目 (1 周目とは別のエージェント。Core 1267/1267・eval-compare broken 0 / fixed 0 / added 0 / removed 0 (712/818) を再実行、文書の出力例を `--repro` で打ち直して一致、崩した木は `kaq` を別の worktree で再現。PR #29 との衝突は増えていない): [止める]・[直す] なし。
   - [任意・対応] 崩し方の表の `kaq` の行にファイル名が無く、外れた行の `mainnokannsuu` が抜けていた → 直した (実装者の最初の試しの出力にも `まいんおかんすう` があった)。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/31
+- 2026-11-26 自動打鍵 (TextEdit、入っている版 1.2.9 = main f558dfa。リョウさんの今の設定: ライブ変換 ON・Zenzai ON・変換後も続けて入力 ON。OFF の行は一時的にライブ変換を切った。人の手ではない): `setteisiteirundakedo` は OFF で `せっていしているんだけど`、ON で `設定しているんだけど` (Space の先頭も同じ)。`mainkannsuu` は OFF で `mainかんすう`、ON で `main関数`。`@exampleabc-jh.ed.jpdesu` は ON・OFF ともそのまま。この 3 行を [x] にした。4 行目 (前の文字のあとのメールの形) は、前の 25 文字を**貼り付け**で用意して打ち、途中から日本語にならなかったが、IME で確定した文字ではないので [ ] のまま (IME の確定で前の文字を作る形は打っていない)。リョウさんの手での確認ではない。status は変えない。

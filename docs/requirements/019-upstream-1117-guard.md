@@ -56,11 +56,11 @@ scope: core
 - [x] 文書: `eval/README.md` の「ファイルの役割」に新しい表の行を足す。`docs/KNOWN_LIMITS.md` は該当の記載なし (確認のみ)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
-- [ ] TextEdit: `baguhoukoku` + Enter → `ばぐほうこく` (Space で `バグ報告` が候補に出るか)
-- [ ] TextEdit: `tunagarumademattekara` + Enter → `つながるまでまってから`
-- [ ] TextEdit: `CLAUDE.mdwohiraku` + Enter → `CLAUDE.mdをひらく`
+- [x] TextEdit: `baguhoukoku` + Enter → `ばぐほうこく` (Space で `バグ報告` が候補に出るか) (2026-11-26 自動打鍵 (TextEdit) で確認: OFF は `ばぐほうこく`。ON は Enter で `バグ報告`、Space の先頭も `バグ報告`)
+- [x] TextEdit: `tunagarumademattekara` + Enter → `つながるまでまってから` (2026-11-26 自動打鍵 (TextEdit) で確認: OFF は `つながるまでまってから`。ON は `繋がるまで待ってから`)
+- [x] TextEdit: `CLAUDE.mdwohiraku` + Enter → `CLAUDE.mdをひらく` (2026-11-26 自動打鍵 (TextEdit) で確認: OFF は `CLAUDE.mdをひらく`、ON は `CLAUDE.mdを開く`)
 - [ ] Slack か Discord の入力欄: `reibunn:pregnant_man:` + Enter → `れいぶん:pregnant_man:` (アプリ側の絵文字の補完の窓と重ならないか)
-- [ ] TextEdit: `,nisuruwo` + Enter → `、にするを`
+- [ ] TextEdit: `,nisuruwo` + Enter → `、にするを` (2026-11-26 自動打鍵 (TextEdit): OFF は `、にするを` で一致、英字は残らない。ON は `、ニスルを` (カタカナ。エンジンの選択)。ON が期待と違うので [ ] のまま。リョウさんの判断)
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
 - 足した行のどれかが今の main で外れる (守りではなく直す要件になるので、判定ロジックの変更として別に扱う)。
@@ -89,3 +89,4 @@ scope: core
 - 査読 2 周目 (1 周目とは別のエージェント。`,` の崩し方と 8 行の読み込みを再実行): [止める] なし。[直す] 1 件: 上の「今の main の外れ」に、1 周目の報告から確かめずに写した `:pregnant_man:desu` → `:pregnant_まん:です` があったが、再現しない (`--repro` は `:pregnant_man:です`。実装者も打って確かめた) → 消した。`docs/LESSONS.md` に 1 行足した。
 - 査読 3 周目 (記録の出力例 12 件を `--repro` で再確認): [止める]・[直す] なし。[任意・見送り] `docs/LESSONS.md` の決まりを `CLAUDE.md` かエージェント定義にも書く (この要件の範囲の外)。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/24
+- 2026-11-26 自動打鍵 (TextEdit、入っている版 1.2.9 = main f558dfa。リョウさんの今の設定: ライブ変換 ON・Zenzai ON・変換後も続けて入力 ON。OFF の行は一時的にライブ変換を切った。人の手ではない): 4 行を打った。`baguhoukoku`・`tunagarumademattekara`・`CLAUDE.mdwohiraku` は OFF で期待どおり (ばぐほうこく・つながるまでまってから・CLAUDE.mdをひらく)、ON は漢字に変換された表示 (バグ報告・繋がるまで待ってから・CLAUDE.mdを開く) で、英字は残らない。`,nisuruwo` は OFF で `、にするを`、ON で `、ニスルを` (カタカナはエンジンの選択。英字は残らない)。この 3 行を [x] にし、`,nisuruwo` は ON が期待の文字と違うので [ ] のまま。Slack・Discord の行は打っていない。リョウさんの手での確認ではない。status は変えない。
