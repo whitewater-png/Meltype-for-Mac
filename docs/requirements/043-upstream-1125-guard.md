@@ -68,5 +68,9 @@ scope: core
   - どちらの崩し方でもテストは赤 (例: `dai1dan 期待値: だい1だん / 実際: dあい1dan`)、戻した後は緑。8 行とも少なくとも 1 つの崩し方で外れた。
   - 外れなかった崩し方 (行が守る範囲の注): `dictionaries/english.txt` に `dan`・`dai`・`wagon` を足す (8 行とも当たったまま)。英単語の一覧に語が増えるだけでは、この形は英字に割れない。
   - 崩し方は「その行が実際に比べられていること」を確かめるためのもので、本家の原因 (未確認) を再現したものではない。
-- 数字: Core 1359/1359 (権限で失敗させるテスト 3 件と `MELTYPE_TEST_USERDICT_COPY` の 1 件はスキップ)、eval-compare (origin/main f653ce5 と比較) broken 0 / fixed 0 / added 0 / removed 0 (812/913。新しい表は 8/8。両方の木を同じ表で回すので base でも当たる)。`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行 (辞書は変えていないので `check-dictionaries.mjs`・`check-terms.mjs` は対象外)。
+- 数字: Core 1359/1359 (スキップ 8 件: 権限で失敗させるテスト 5・ファイルシステムの条件 1・環境変数が無いもの 2 (`MELTYPE_TEST_CONVERSIONS_COPY`・`MELTYPE_TEST_USERDICT_COPY`))、eval-compare (origin/main f653ce5 と比較) broken 0 / fixed 0 / added 0 / removed 0 (812/913。新しい表は 8/8。両方の木を同じ表で回すので base でも当たる)。`src/Meltype.Core`・`dictionaries`・`mac/` の差分 0 行 (辞書は変えていないので `check-dictionaries.mjs`・`check-terms.mjs` は対象外)。
 - `docs/KNOWN_LIMITS.md` に `dai1dan`・`keihaitowagon`・`kenijou` の記載なし (確認のみ)。
+- 査読 1 周目 (実装を見ていない別のエージェント。Core 1359/1359・eval-compare broken 0 / fixed 0 / added 0 / removed 0 (812/913) を再実行、8 行を HEAD と origin/main の `--repro` で打ち直して一致、崩した木 (da→daq・ke→keq・english.txt に 3 語) を別の worktree で再現し記録と一致、近い境界例 40 入力 (`dai1kai`・`dai100dan`・`2dan`・`dai1dan desu`・`dai1dan2dan` など) で HEAD と origin/main の違い 0): [止める] なし。
+  - [直す・対応] スキップの件数が違っていた (出力の末尾だけを見て 4 件と書いた。実際は 8 件) → 内訳つきで書き直した。`docs/LESSONS.md` に 1 行足した。
+  - [直す・対応] `docs/AGENT_STATE.md` が未更新 → 進行中の要件に 043 の行を足した。
+  - [任意・対応] `101kenijouattara` の行は、将来打ち間違いの補正を入れると改善でも broken に出る → 表の頭の注に「補正を入れるときは、この行の期待を書き換える」と書いた。
