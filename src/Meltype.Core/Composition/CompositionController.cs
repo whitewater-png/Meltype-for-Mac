@@ -2347,10 +2347,14 @@ public sealed class CompositionController
         var previous = "";
         try
         {
-            foreach (var chunk in SplitForConversion(kana))
+            var chunks = SplitForConversion(kana);
+            for (var index = 0; index < chunks.Count; index++)
             {
+                var chunk = chunks[index];
                 // 2 つ目以降の区切りには、前の区切りの変換結果が文脈 (キャレットの前の文字) になる。
                 if (previous.Length > 0) _chunkContext = (true, ContextOf(previous));
+                // 右文脈 (キャレットの後ろの文字) は最後の区切りだけ。途中の区切りの右は続きの読みで、入力欄の後ろの文字ではない
+                _notLastChunk = index < chunks.Count - 1;
                 var converted = ConvertWithEngineOnce(chunk, out var chunkFailed);
                 failed |= chunkFailed;
                 clauses.AddRange(converted);
@@ -2360,9 +2364,13 @@ public sealed class CompositionController
         finally
         {
             _chunkContext = (false, null);
+            _notLastChunk = false;
         }
         return clauses;
     }
+
+    /// <summary>長い読みを区切って変換している途中で、今の区切りが最後でないとき true (右文脈を渡さない)。</summary>
+    private bool _notLastChunk;
 
     /// <summary>この長さ (文字数) を超える読みは区切って変換する。</summary>
     internal const int ConvertChunkLength = 50;
@@ -2410,19 +2418,22 @@ public sealed class CompositionController
     /// 変換ボックスを閉じたら捨てる。いっぱいになったら、使ってから一番長いものから捨てる
     /// (今の区切りは打つたびに使うので残り、一度に全部が変換し直しになる山はできない)。
     /// </summary>
-    private readonly Dictionary<(string Kana, string? Context), (IReadOnlyList<ConversionClause> Parts, long Used)> _clauseCache = [];
+    private readonly Dictionary<(string Kana, string? Context, string? Right), (IReadOnlyList<ConversionClause> Parts, long Used)> _clauseCache = [];
     private long _clauseCacheClock;
     private const int ClauseCacheLimit = 512;
 
-    private IReadOnlyList<ConversionClause>? EngineClauses(string kana, string? context)
+    /// <summary>right は右文脈 (<see cref="RightConversionContext"/>)。null なら今までどおり <see cref="IKanjiConverter.ConvertClauses"/> を呼ぶ。</summary>
+    private IReadOnlyList<ConversionClause>? EngineClauses(string kana, string? context, string? right = null)
     {
-        var key = (kana, context);
+        var rightConverter = _converter as IRightContextConverter;
+        if (rightConverter is null) right = null;
+        var key = (kana, context, right);
         if (_clauseCache.TryGetValue(key, out var cached))
         {
             _clauseCache[key] = (cached.Parts, ++_clauseCacheClock);
             return cached.Parts;
         }
-        var parts = _converter.ConvertClauses(kana, context);
+        var parts = right is null ? _converter.ConvertClauses(kana, context) : rightConverter!.ConvertClauses(kana, context, right);
         // 失敗 (null) は覚えない: 次のキー・Space・Backspace でもう一度試せるように
         if (parts is null) return null;
         if (_clauseCache.Count >= ClauseCacheLimit)
@@ -2447,9 +2458,10 @@ public sealed class CompositionController
         // 前の文脈が取れないときは、仮の文脈「これ」を付けて助詞として読ませる (これ + になってしまう → になってしまう)。
         // 「は」「で」なども助詞になりうるが、仮の文脈を付けると はしる → は知る のように崩れるので「に」だけ。
         var context = ConversionContext();
+        var right = RightConversionContext();
         var parts = context is not null
-            ? ConvertWithContext(kana, context)
-            : EngineClauses(kana, kana.Length >= 3 && kana[0] == 'に' ? "これ" : null);
+            ? ConvertWithContext(kana, context, right)
+            : EngineClauses(kana, kana.Length >= 3 && kana[0] == 'に' ? "これ" : null, right);
         // 文節に区切れなかったときは、全体を 1 文節にする。この 1 文節は変換エンジンの区切りではない (failed で呼び出し元に知らせる)
         failed = parts is null;
         parts ??= [new ConversionClause(kana, _converter.Convert(kana) ?? kana)];
@@ -2607,10 +2619,11 @@ public sealed class CompositionController
     /// 区切りまで変わるなら文脈なしを使う。前に同じ語があると、変換エンジンは文脈に引きずられて区切りを変えてしまうため
     /// (「記号等」含め、 + きごうとう → き|ごうとう → 気強盗)。
     /// </summary>
-    private IReadOnlyList<ConversionClause>? ConvertWithContext(string kana, string context)
+    /// 右文脈 (right) は、比べる両方の要求に同じものを付ける (片方だけだと、右文脈で区切りが変わったときに右文脈なしの結果に落ちる)。
+    private IReadOnlyList<ConversionClause>? ConvertWithContext(string kana, string context, string? right = null)
     {
-        var withContext = EngineClauses(kana, context);
-        var plain = EngineClauses(kana, null);
+        var withContext = EngineClauses(kana, context, right);
+        var plain = EngineClauses(kana, null, right);
         if (withContext is null || plain is null) return withContext ?? plain;
         return withContext.Select(c => c.Reading).SequenceEqual(plain.Select(c => c.Reading)) ? withContext : plain;
     }
@@ -2637,6 +2650,25 @@ public sealed class CompositionController
     }
 
     private const int WideContextLength = 20;
+
+    /// <summary>
+    /// 変換エンジンに渡す右文脈 (要件 051): 広い文脈が ON (Zenzai が ON で Mozc でない) のとき、キャレットの後ろの確定済みの文字のうち、
+    /// 最初の改行より前の先頭 20 単位。英字で始まる・空白だけ・長い読みの途中の区切りは渡さない (null)。
+    /// </summary>
+    private string? RightConversionContext() =>
+        _notLastChunk || !_options.WideConversionContext() ? null : RightContextOf(_followingText);
+
+    internal static string? RightContextOf(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        var newline = text.IndexOfAny(NewLines);
+        if (newline >= 0) text = text[..newline];
+        if (text.Length > WideContextLength) text = text[..WideContextLength];
+        // サロゲートペアの途中で終わらない
+        if (text.Length > 0 && char.IsHighSurrogate(text[^1])) text = text[..^1];
+        if (string.IsNullOrWhiteSpace(text) || LanguageOfStart(text) == true) return null;
+        return text;
+    }
 
     /// <summary>広い文脈で改行とみなす文字。LF・CR に加えて、Unicode の行区切り (U+2028)・段落区切り (U+2029)・垂直タブ (U+000B。Word の行区切り)。OFF の文脈 (<see cref="SentenceEnds"/>) は今までどおり。</summary>
     private static readonly char[] NewLines = ['\n', '\r', '\u2028', '\u2029', '\v'];

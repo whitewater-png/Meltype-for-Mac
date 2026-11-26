@@ -21,6 +21,16 @@ public interface IKanjiConverter
     IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null);
 }
 
+/// <summary>
+/// 右文脈 (キャレットの後ろの文字) も変換に使える変換エンジン (Mac の azooKey + Zenzai。要件 051)。
+/// <see cref="IKanjiConverter"/> は Windows と共通なので変えず、使えるエンジンだけがこれを足す。
+/// </summary>
+public interface IRightContextConverter
+{
+    /// <summary><see cref="IKanjiConverter.ConvertClauses"/> と同じ。rightContext は キャレットの後ろの確定済みの文字列 (変換の文脈として使うだけで、結果には含めない)。</summary>
+    IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context, string rightContext);
+}
+
 /// <summary>確定した変換を覚えられる変換エンジン (Mozc)。次から同じ読みで同じ文字列を先に出す。</summary>
 public interface ILearningConverter
 {
