@@ -744,7 +744,8 @@ public sealed class CompositionController
         BeginComposition();
         // 選んだ文字の前後の空白・改行・タブは、置き換えても残す
         var converted = lead
-            + JoinRomajiParts(parts, kana => DigitHyphens(string.Concat(ConvertJapanese(kana).Select(c => c.Text))))
+            // 再変換は、選んだ文字の後ろの文字を右文脈にしない (要件 051 の範囲外。今までどおり)
+            + JoinRomajiParts(parts, kana => DigitHyphens(string.Concat(WithoutRightContext(true, () => ConvertJapanese(kana)).Select(c => c.Text))))
             + trail;
         if (converted.Trim().Length == 0 || converted == text)
         {
@@ -2033,7 +2034,9 @@ public sealed class CompositionController
             // Space で変換するときだけ、登録語が割った変換エンジンの文節 (しゅうさん → 集散) を候補の 2 番目に足す (要件 044)
             _offerEngineClause = true;
             List<Clause> japanese;
-            try { japanese = ConvertJapanese(segment.Kana); }
+            // 後ろに英字などの区間が続くなら、この区間の右は入力欄の後ろの文字ではない
+            var more = segments.Skip(s + 1).Any(x => x.IsEnglish ? x.Raw.Length > 0 : x.Kana.Length > 0);
+            try { japanese = WithoutRightContext(more, () => ConvertJapanese(segment.Kana)); }
             finally { _offerEngineClause = false; }
             // 英単語 + する (push|した、deploy|しよう): 変換エンジンは英語の後ろの「した」だけを見て 下・死体・使用 にしてしまう。かなのまま
             if (s > 0 && segments[s - 1].IsEnglish && japanese.Count > 0 && IsSuruAfterEnglish(japanese[0])) Prefer(japanese[0], japanese[0].Reading);
@@ -2158,7 +2161,7 @@ public sealed class CompositionController
                 if (i < kana.Length && keep[i] == keep[start]) continue;
                 var run = kana[start..i];
                 if (keep[start]) result.Add(new Clause(run, false, Distinct([run, .. _options.Candidates?.Lookup(run) ?? [], CompositionText.ToFullWidth(run)])));
-                else result.AddRange(ConvertJapanese(run));
+                else result.AddRange(WithoutRightContext(i < kana.Length, () => ConvertJapanese(run)));
                 start = i;
             }
             return result;
@@ -2175,7 +2178,8 @@ public sealed class CompositionController
             at += reading.Length;
             if (word is null)
             {
-                clauses.AddRange(ConvertWithEngine(reading));
+                // 登録語で割った途中の部分の右は、続きの読み (入力欄の後ろの文字ではない)
+                clauses.AddRange(WithoutRightContext(at < kana.Length, () => ConvertWithEngine(reading)));
                 continue;
             }
             var clause = new Clause(reading, false, JapaneseCandidates(reading, word));
@@ -2354,8 +2358,13 @@ public sealed class CompositionController
                 // 2 つ目以降の区切りには、前の区切りの変換結果が文脈 (キャレットの前の文字) になる。
                 if (previous.Length > 0) _chunkContext = (true, ContextOf(previous));
                 // 右文脈 (キャレットの後ろの文字) は最後の区切りだけ。途中の区切りの右は続きの読みで、入力欄の後ろの文字ではない
-                _notLastChunk = index < chunks.Count - 1;
-                var converted = ConvertWithEngineOnce(chunk, out var chunkFailed);
+                var chunkFailed = false;
+                var converted = WithoutRightContext(index < chunks.Count - 1, () =>
+                {
+                    var result = ConvertWithEngineOnce(chunk, out var f);
+                    chunkFailed = f;
+                    return result;
+                });
                 failed |= chunkFailed;
                 clauses.AddRange(converted);
                 previous += string.Concat(converted.Select(c => c.Text));
@@ -2364,13 +2373,22 @@ public sealed class CompositionController
         finally
         {
             _chunkContext = (false, null);
-            _notLastChunk = false;
         }
         return clauses;
     }
 
-    /// <summary>長い読みを区切って変換している途中で、今の区切りが最後でないとき true (右文脈を渡さない)。</summary>
+    /// <summary>今変換している読みの右が、入力欄の後ろの文字ではないとき true (右文脈を渡さない)。
+    /// 長い読みの途中の区切り・登録語や英字で割った途中の部分・再変換。</summary>
     private bool _notLastChunk;
+
+    /// <summary>suppress なら、convert の間は右文脈を渡さない。入れ子でも外側の値を潰さない (外側が true ならそのまま)。</summary>
+    private T WithoutRightContext<T>(bool suppress, Func<T> convert)
+    {
+        if (!suppress || _notLastChunk) return convert();
+        _notLastChunk = true;
+        try { return convert(); }
+        finally { _notLastChunk = false; }
+    }
 
     /// <summary>この長さ (文字数) を超える読みは区切って変換する。</summary>
     internal const int ConvertChunkLength = 50;
@@ -2656,7 +2674,7 @@ public sealed class CompositionController
     /// 最初の改行より前の先頭 20 単位。英字で始まる・空白だけ・長い読みの途中の区切りは渡さない (null)。
     /// </summary>
     private string? RightConversionContext() =>
-        _notLastChunk || !_options.WideConversionContext() ? null : RightContextOf(_followingText);
+        _notLastChunk || _text.ConvertingBeforeMore || !_options.WideConversionContext() ? null : RightContextOf(_followingText);
 
     internal static string? RightContextOf(string? text)
     {

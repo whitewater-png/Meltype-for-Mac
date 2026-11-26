@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Yukishiro
 
 using Meltype.Composition;
+using Meltype.Input;
 
 namespace Meltype.Tests;
 
@@ -94,6 +95,49 @@ internal static class RightContextTests
         Assert.True(withRight.Count > 0, "最後の区切りには渡す");
         Assert.True(withRight.All(kana => kana.Length < 65 && kana.EndsWith("さしすせそ")), $"右文脈を付けたのは最後の区切りだけ ({string.Join(",", withRight)})");
         Assert.True(converter.Calls.Any(c => c.Right is null && c.Kana.Length == 50 && c.Kana.StartsWith("あいうえお")), "前の区切りには付けない");
+    }
+
+    [Test]
+    public static void RightContext_OnlyForThePartBeforeTheCaret_WhenAUserWordSplitsTheReading()
+    {
+        // 登録語で割った途中の部分 (はし) の右は、登録語と続きの読み。入力欄の後ろの文字は最後の部分 (ふくめ) にだけ渡す
+        var dictionary = new UserDictionary(null);
+        Assert.True(dictionary.Add("きごうとう", "記号等") is null, "登録できる");
+        var converter = new RecordingConverter();
+        var k = new CompositionTests.Keyboard(converter: converter, userDictionary: dictionary) { WideContext = true };
+        k.Host.FollowingText = "でご飯を食べる";
+        k.Type("hashikigoutoufukume ");
+        Assert.Equal("-", RightsFor(converter, "はし"), "途中の部分には付けない");
+        Assert.Equal("でご飯を食べる", RightsFor(converter, "ふくめ"), "最後の部分には付ける");
+    }
+
+    [Test]
+    public static void RightContext_NotForJapaneseFollowedByEnglish()
+    {
+        // 日本語の区間の後ろに英字の区間が続くとき、その日本語の右は英字 (入力欄の後ろの文字ではない)。最後の日本語の区間にだけ渡す
+        var converter = Type(null, "でご飯を食べる", romaji: "hashiwopushsuru ");
+        string Calls() => string.Join(";", converter.Calls.Select(c => $"{c.Kana}/{c.Right ?? "-"}"));
+        Assert.True(converter.Calls.Any(c => c.Kana == "はしを"), $"英字の前の「はしを」も変換する ({Calls()})");
+        Assert.Equal("-", RightsFor(converter, "はしを"), $"英字の前の区間には付けない ({Calls()})");
+        Assert.Equal("でご飯を食べる", RightsFor(converter, "する"), $"最後の区間には付ける ({Calls()})");
+    }
+
+    [Test]
+    public static void RightContext_IsPartOfTheCacheKey()
+    {
+        // 覚えた変換 (変換ボックスを閉じるまで残る) の鍵に右文脈を入れる。同じ読みでも、最後の部分 (右文脈つき) で覚えた結果を、
+        // 途中の部分 (右文脈なし) に使い回さない
+        var dictionary = new UserDictionary(null);
+        Assert.True(dictionary.Add("きごうとう", "記号等") is null, "登録できる");
+        var converter = new RecordingConverter();
+        var k = new CompositionTests.Keyboard(converter: converter, userDictionary: dictionary) { WideContext = true };
+        k.Host.FollowingText = "でご飯を食べる";
+        k.Type("hashi ");
+        Assert.Equal("でご飯を食べる", RightsFor(converter, "はし"), "最後の部分として右文脈つきで変換する");
+        k.Press(VirtualKeys.Escape);
+        Assert.True(k.Showing is not null, "Esc で打っている途中に戻る (変換ボックスは閉じない)");
+        k.Type("kigoutoufukume ");
+        Assert.Equal("でご飯を食べる|-", RightsFor(converter, "はし"), "途中の部分になったら、右文脈なしで変換し直す (覚えた結果を使わない)");
     }
 
     [Test]
