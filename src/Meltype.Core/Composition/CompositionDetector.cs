@@ -513,7 +513,8 @@ public sealed class CompositionDetector
         static bool Full(RomajiAnalysis a) => a is { IsValid: true, Partial: "" or "n" };
         if (!name.All(char.IsAsciiLetter)) return true;
         // 拡張子 + 助詞の後ろの、大文字で始まる次の名前 (meltype.app|no|Info.plist、index.html|to|Style.scss) の . は、一覧に無い拡張子でも半角
-        if (FollowsSplitDottedName(units, start - 1)) return true;
+        // (後ろがローマ字として最後まで読める名前 (Mac.ainiku・Mac.dehanai) は、文頭の日本語かもしれないので除く)
+        if (FollowsSplitDottedName(units, start - 1) && !Full(_romaji.Analyze(name)) && !Full(_romaji.Analyze(RomajiDetector.ReadCRow(name)))) return true;
         // ふつうの英単語 (Mac.goodbye・Mac.mail) は、文末の英単語 + 句点 + 次の文の英単語かもしれないので含めない。一覧の拡張子・ドメインだけ
         if (!DomainSuffixes.Contains(name) && !FileExtensions.Contains(name) && !SplitStems.Contains(name)) return false;
         return !Full(_romaji.Analyze(name)) && !Full(_romaji.Analyze(RomajiDetector.ReadCRow(name)));
@@ -529,7 +530,8 @@ public sealed class CompositionDetector
         while (word > 0 && units[word - 1].Raw.Length > 0 && units[word - 1].Raw.All(char.IsAsciiLetter) && !IsParticle(units[word - 1].Raw)) word--;
         if (word == dot || !char.IsAsciiLetterUpper(units[word].Raw[0]) || word < 3 || !IsParticle(units[word - 1].Raw)) return false;
         var stem = word - 1;
-        while (stem > 0 && units[stem - 1].Raw.Length > 0 && units[stem - 1].Raw.All(char.IsAsciiLetterOrDigit)) stem--;
+        // 拡張子は英字だけ (v1.2・3.5kg の数字は名前.拡張子と見ない)
+        while (stem > 0 && units[stem - 1].Raw.Length > 0 && units[stem - 1].Raw.All(char.IsAsciiLetter)) stem--;
         return stem < word - 1 && stem > 0 && units[stem - 1].Raw == ".";
     }
 

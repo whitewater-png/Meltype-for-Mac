@@ -70,3 +70,5 @@ meltype.appnoInfo.plist	meltype.appのInfo.plist	full	要件 050 (査読 2 周�
 Cargo.tomltoInfo.plistwomiru	Cargo.tomlとInfo.plistをみる	full	要件 050 (査読 2 周目)
 index.htmltoStyle.scss	index.htmlとStyle.scss	full	要件 050 (査読 2 周目)
 main.swiftnoApp.entitlements	main.swiftnoApp.entitlements	full	要件 050 の守り (査読 2 周目: 次の名前が英字にならない語 (App) なら分けない。base と同じ)
+kyouhaREADME.mdnoMac.ainiku	きょうはREADME.mdのMac。あいにく	full	要件 050 (査読 3 周目の作例。base は README。md: 分けた名前の後ろでも、. の後ろが読める日本語なら句点)
+korehav1.2toMac.dehanai	これはv1.2とMac。ではない	full	要件 050 の守り (査読 3 周目: 版の数字を名前.拡張子と見ない)
