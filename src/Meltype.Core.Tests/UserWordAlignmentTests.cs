@@ -379,14 +379,19 @@ internal static class UserWordAlignmentTests
     }
 
     [Test]
-    public static void ShortUserWordAtTheHead_DoesNotNeedTheWholeReadingConverted()
+    public static void ShortUserWordAtTheHead_NeedsTheWholeReadingConverted_OnlyWhenSomethingOtherThanAParticleFollows()
     {
-        // 文節の頭を調べるための全体の変換は、先頭以外にしきい値より短いユーザーの語があるときだけ。先頭の短い語は必ず文節の頭なので呼ばない
+        // 要件 043: 先頭の短い語も、エンジンの文節の読みの一部だけを覆うか調べるので、後ろに助詞でないかなが続くときは全体を変換する。
+        // 後ろが助詞だけ (しのが) か、語だけ (しの) なら、文節の一部だけを覆うことはないので呼ばない
         var converter = new LexiconConverter();
         var k = new CompositionTests.Keyboard(converter: converter, userDictionary: Dictionary(("しの", "紫乃")));
         k.Type("shinogakita ");
         Assert.Equal("紫乃|が|来た", Clauses(k));
-        Assert.True(!converter.Calls.Any(c => c.StartsWith("しのがきた|", StringComparison.Ordinal)), "先頭の語だけなら全体を変換しない: " + string.Join(",", converter.Calls));
+        Assert.True(converter.Calls.Any(c => c.StartsWith("しのがきた|", StringComparison.Ordinal)), "後ろに助詞でないかなが続くので全体を変換する: " + string.Join(",", converter.Calls));
+        converter = new LexiconConverter();
+        k = new CompositionTests.Keyboard(converter: converter, userDictionary: Dictionary(("しの", "紫乃")));
+        k.Type("shinoga ");
+        Assert.True(!converter.Calls.Any(c => c.StartsWith("しのが|", StringComparison.Ordinal)), "語 + 助詞だけなら全体を変換しない: " + string.Join(",", converter.Calls));
     }
 
     // ---- しきい値は文字数でなく拍数 (しゅう・じゅん・しょう は 3 文字でも 2 拍。要件 032) ----
@@ -453,10 +458,11 @@ internal static class UserWordAlignmentTests
         k.Type("shuugakita ");
         Assert.Equal("秋|が|来た", Clauses(k), "先頭の しゅう は使う");
 
-        // 先頭でなく、エンジンの文節の頭にあたる位置 (がく|しゅうする の しゅう) でも使う
-        k = new CompositionTests.Keyboard(converter: new SplitConverter("がくしゅうする", ("がく", "学"), ("しゅうする", "修する")), userDictionary: Dictionary(("しゅう", "秋")));
-        k.Type("gakushuusuru ");
-        Assert.Equal("がく|秋|する", Clauses(k), "文節の頭に当たる しゅう は使う");
+        // 先頭でなく、エンジンの文節の頭にあたる位置 (がく|しゅうが の しゅう) でも使う。
+        // (要件 043 で、しゅうする のように助詞でないかなが続く文節の頭は使わなくなった。UserWordClauseHeadTests)
+        k = new CompositionTests.Keyboard(converter: new SplitConverter("がくしゅうが", ("がく", "学"), ("しゅうが", "修が")), userDictionary: Dictionary(("しゅう", "秋")));
+        k.Type("gakushuuga ");
+        Assert.Equal("がく|秋|が", Clauses(k), "文節の頭に当たる しゅう は使う");
     }
 
     /// <summary>reading を、指定した文節に区切って返す変換エンジン (他の読みはそのまま返す)。</summary>
