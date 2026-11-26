@@ -133,7 +133,9 @@ final class MeltypeConverter {
     /// 2 度目が 1 度目の結果に当たらないように)。Zenzai を使わないときの鍵は、今までどおり読みだけ。
     private func results(for hiragana: String, context: String? = nil) -> [Candidate] {
         let leftContext = zenzaiActive ? (context ?? "") : nil
-        let key = leftContext.map { "Z\u{1}" + $0 + "\u{1}" + hiragana } ?? hiragana
+        var key = leftContext.map { "Z\u{1}" + $0 + "\u{1}" + hiragana } ?? hiragana
+        // 計測用の右文脈 (下の measurementRightContext) があるときだけ、鍵に足す。製品は nil なので、鍵は今までどおり
+        if leftContext != nil, let right = measurementRightContext, !right.isEmpty { key += "\u{1}R" + right }
         if let cached = resultCache[key] {
             remember(cached, for: hiragana)
             return cached
@@ -170,10 +172,16 @@ final class MeltypeConverter {
         return result
     }
 
+    /// 計測だけで使う右文脈 (カーソルの後ろの文字。要件 049)。`--convert-eval` が行ごとに入れる。
+    /// 製品の経路 (IME) は入れない (nil のまま) ので、製品の変換は今までどおり左文脈だけ。製品に右文脈を渡すかは、測った後に別の要件で決める。
+    /// azooKey は右文脈が空ならプロンプトに何も足さないので、nil・空は今までと同じ要求になる。
+    var measurementRightContext: String?
+
     /// Zenzai の設定。personalizationMode は既定値が無いので明記する。profile も空 (個人の情報は渡さない)。
     private func zenzaiMode(weight: URL, context: String?) -> ConvertRequestOptions.ZenzaiMode {
         .on(weight: weight, inferenceLimit: Self.zenzaiInferenceLimit, requestRichCandidates: false,
-            personalizationMode: nil, versionDependentMode: .v3(.init(profile: "", leftSideContext: context ?? "")))
+            personalizationMode: nil, versionDependentMode: .v3(.init(profile: "", leftSideContext: context ?? "",
+                                                                      rightSideContext: measurementRightContext ?? "")))
     }
 
     /// 直近の変換要求の時刻 (Zenzai の先読みが、入力中を避けるのに使う)。

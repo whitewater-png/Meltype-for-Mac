@@ -1,6 +1,6 @@
 ---
 title: Zenzai のモデルを zenz-v3.2-small に切り替える (既定 ON は人が決める)
-status: draft   # draft | approved | done。approved にするのは人
+status: approved   # draft | approved | done。approved にするのは人
 source: Meltype-Flash との比較 (2026-11-26、リョウさんの指示「いいよ、進めて」)。Mac 実機での計測
 scope: swift (実機必須)
 ---
@@ -78,6 +78,8 @@ scope: swift (実機必須)
 - 右文脈を渡す変更が要りそうになったとき (要件 049 で扱う)
 
 ## 記録 (ループが書く)
+- 2026-11-26: Mac で測定 (00e1a25)。AJIMEE 166/200 (v3.1 165)・Flash 40 件 39/40 (v3.1 37)、McNemar で有意な悪化なし (p = 1.00 / 0.50)。自己テストは全 PASS (8c2 の 8 項目を含む、--network も)。Core 1371/1371。結果は docs/ZENZAI_V32_RIGHT_CONTEXT_2026-11-26.md。
+- 2026-11-26: リョウさんが承認 (「オッケー承認します」)。status を approved にした。
 - 2026-11-26: 前のファイルはアプリが確認して消す (決定 2)・右文脈は別の要件 049 (決定 4) をリョウさんが決定。人の判断事項はすべて決まった (status を approved にするのは人)。
 - 2026-11-26: 既定 ON にしない (案 a) をリョウさんが決定。
 - 2026-11-26: ライセンスの扱いをリョウさんが決定 (CC BY-SA 4.0 として扱う)。

@@ -83,6 +83,13 @@ Zenzai (ニューラル変換) の計測用の、かな → 漢字の正解表�
 - `bench-baseline.json`: main 9ded846 の第一候補の記録 (OFF/ON、M4 Max)。
 - 測り方: `python3 tools/kanji-bench.py --binary mac/.build/release/MeltypeIME [--weights <gguf>] [--baseline eval/kanji/bench-baseline.json] [--save <記録.json>] [--fail-on-regression]`。OFF (必ず) と ON (`--weights` のとき) を流し、表ごとの件数 (行・文、厳密一致・許容あり) と、前回の記録との差 (当たり → 外れの行) を出します。自己テストは `python3 tools/test_kanji_bench.py`。基準値・許容を足した行と理由は [docs/requirements/034-kanji-bench-cases.md](../docs/requirements/034-kanji-bench-cases.md)。
 
+## 右文脈つきの正解表 (`eval/kanji/right-context-items.json`、要件 049)
+
+Zenzai にカーソルの後ろの文字 (右文脈) を渡すと精度が上がるかを測るための表です。新しい文は書かず、`kanji-cases.tsv` と `bench-homophones.tsv` の文を `tools/make-right-context-items.py` が決まった手順で「左・真ん中・右」に分けて作ります (真ん中 = 漢字を含む最初の文節で、後ろにまだ文節があるもの)。読みとの対応が 1 通りに決まらない文などは飛ばします。
+- 形は AJIMEE-Bench と同じ JSON (`index`・`input`・`expected_output`・`context_text`) に、`right_context`・`source` (出どころ: kanji-cases の人の 70 文 / LLM が作った文 / bench-homophones)・`original` (元の文) を足したもの。`bench-homophones.tsv` 由来の行は GPL-3.0 の派生物 (出典は `bench-homophones.tsv` の頭の注記)。
+- 測り方 (Mac): `python3 tools/ajimee-eval.py --binary mac/.build/release/MeltypeIME --items eval/kanji/right-context-items.json --weights <gguf> --ignore-right-context --out <なし>` と、`--ignore-right-context` を外した `--out <あり>` を流し、`--compare <なし>/rows.tsv <あり>/rows.tsv --labels なし,あり` で McNemar (出どころごとにも出る)。右文脈は Zenzai ON のときだけ効き、製品の変換には渡していません。
+- 表は元の表から作り直せます。元の表を変えたら `python3 tools/make-right-context-items.py` で作り直す (自己テスト `python3 tools/test_right_context_items.py` が古い表を見つけます)。
+
 ## 前の文字つきの正解表 (`eval/context/`)
 
 実験 2-2 (キャレット前 20 文字の英日比率を判定に使うか) の表です (列: 前の文字 / 打鍵 / 期待 / 種類 / メモ)。`context-cases.tsv` (68 件) は作者が、`review-cases.tsv` (56 件) は査読者が書いた作例で、期待は人の判断です (実機の記録ではありません。件数の配分も実際の利用の頻度ではありません)。上の `cases/` とは別物で、日英判定の `--expect-all` には読ませません。

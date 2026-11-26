@@ -5,6 +5,11 @@
     python3 tools/ajimee-eval.py --binary <MeltypeIME のバイナリ> [--items <json>] [--out <dir>] [--limit N] [--weights <gguf>] [--top N]
     python3 tools/ajimee-eval.py --compare <rows.tsv> <rows.tsv> --out <dir>   # 2 回の結果を行ごとに突き合わせる (McNemar)
 
+右文脈 (要件 049): 正解表の項目に `right_context` (カーソルの後ろの文字) があれば、`--convert-eval` の表に 5 列目として書く
+(Zenzai ON のときだけ効く)。項目に `source` があれば、結果を出どころごとにも出す。`--ignore-right-context` を付けると、
+同じ表のまま右文脈を使わずに測る (「なし」の基準)。右文脈つきの表は `tools/make-right-context-items.py` が作る。
+AJIMEE の表には右文脈が無いので、IME に渡す表と数字は今までと同じ (rows.tsv の後ろに 2 列、results.json の行に欄が増えるだけ)。
+
 AJIMEE-Bench (Advanced Japanese IME Evaluation Benchmark / 味見ベンチ)
   https://github.com/azooKey/AJIMEE-Bench
   - `JWTD_v2/v1/evaluation_items.json` … 200 件。うち 100 件が `context_text` (左文脈) 付き
@@ -95,19 +100,24 @@ def min_cer(references: list, hypothesis: str) -> float:
 
 
 def build_table(items: list, tsv_path: str, limit: int) -> int:
-    """`MeltypeIME --convert-eval` が読む 4 列の表を書く: id / 読み / 許容解 (`|` 区切り) / 左文脈。"""
+    """`MeltypeIME --convert-eval` が読む表を書く: id / 読み / 許容解 (`|` 区切り) / 左文脈 (/ 右文脈)。
+    右文脈の列は、項目のどれかに `right_context` があるときだけ足す (無い表は今までと同じ 4 列)。"""
     rows = items[:limit] if limit else items
+    with_right = any(item.get("right_context") for item in rows)
     with open(tsv_path, "w", encoding="utf-8") as handle:
-        handle.write("# id\treading\taccepted\tleft_context\n")
+        handle.write("# id\treading\taccepted\tleft_context" + ("\tright_context" if with_right else "") + "\n")
         for item in rows:
             reading = katakana_to_hiragana(item["input"])
             accepted = "|".join(item["expected_output"])
             context = item.get("context_text") or ""
-            handle.write(f"{item['index']}\t{reading}\t{accepted}\t{context}\n")
+            line = f"{item['index']}\t{reading}\t{accepted}\t{context}"
+            if with_right:
+                line += "\t" + (item.get("right_context") or "")
+            handle.write(line + "\n")
     return len(rows)
 
 
-def run_engine(binary: str, tsv_path: str, limit: int, weights=None, top: int = 0) -> list:
+def run_engine(binary: str, tsv_path: str, limit: int, weights=None, top: int = 0, ignore_right_context: bool = False) -> list:
     """IME のバイナリを `--convert-eval` で走らせ、行ごとの `id hit top ms` を取り出す。"""
     if not os.path.exists(binary):
         raise SystemExit(f"バイナリがありません: {binary}")
@@ -124,6 +134,8 @@ def run_engine(binary: str, tsv_path: str, limit: int, weights=None, top: int = 
         if not os.path.exists(weights):
             raise SystemExit(f"Zenzai のモデルがありません: {weights}")
         command += ["--weights", weights]
+    if ignore_right_context:
+        command += ["--ignore-right-context"]
     import subprocess
     done = subprocess.run(command, capture_output=True, text=True)
     if done.returncode != 0:
@@ -144,7 +156,7 @@ def run_engine(binary: str, tsv_path: str, limit: int, weights=None, top: int = 
     return results
 
 
-def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: str) -> dict:
+def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: str, dataset=None) -> dict:
     by_index = {str(item["index"]): item for item in items}
     rows = []
     for result in results:
@@ -153,12 +165,16 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
             continue
         references = item["expected_output"]
         context = item.get("context_text") or ""
+        right = item.get("right_context") or ""
         rows.append({
             "id": result["id"],
             "input": item["input"],
             "reading": katakana_to_hiragana(item["input"]),
             "context": context,
             "has_context": bool(context),
+            "right_context": right,
+            "has_right_context": bool(right),
+            "source": item.get("source") or "",
             "top": result["top"],
             "accepted": references,
             "hit": result["top"] in references,
@@ -182,12 +198,17 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
 
     summary = {
         "binary": binary,
-        "dataset": "AJIMEE-Bench JWTD_v2/v1 (CC-BY-SA 3.0、実行時に取得。リポジトリには同梱しない)",
+        "dataset": dataset or "AJIMEE-Bench JWTD_v2/v1 (CC-BY-SA 3.0、実行時に取得。リポジトリには同梱しない)",
         "engine": f"Mac 版の製品の経路 (MeltypeConverter.clauses の第一候補)。{zenzai_label}",
         "total": block(rows),
         "with_context": block(with_context),
         "without_context": block(without_context),
     }
+    if any(row["has_right_context"] for row in rows):
+        summary["with_right_context"] = block([row for row in rows if row["has_right_context"]])
+    sources = sorted({row["source"] for row in rows if row["source"]})
+    if sources:
+        summary["by_source"] = {source: block([row for row in rows if row["source"] == source]) for source in sources}
     misses = [row for row in rows if not row["hit"]]
     # --top のとき、外れを「候補に正解がある (順位の問題)」と「上位 N に無い (語彙・組み合わせの問題)」に分ける
     ranked = [row for row in misses if row["rank"] is not None]
@@ -198,11 +219,12 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
 
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "rows.tsv"), "w", encoding="utf-8") as handle:
-        handle.write("id\thit\tcer\tms\thas_context\ttop\taccepted\treading\trank\n")
+        # 10 列目以降 (右文脈の有無・出どころ) は後ろに足した列。--compare は 9 列までの表も読める
+        handle.write("id\thit\tcer\tms\thas_context\ttop\taccepted\treading\trank\thas_right_context\tsource\n")
         for row in rows:
             handle.write(f"{row['id']}\t{1 if row['hit'] else 0}\t{row['cer']:.3f}\t{row['ms']:.1f}\t"
                          f"{1 if row['has_context'] else 0}\t{row['top']}\t{'|'.join(row['accepted'])}\t{row['reading']}\t"
-                         f"{'' if row['rank'] is None else row['rank']}\n")
+                         f"{'' if row['rank'] is None else row['rank']}\t{1 if row['has_right_context'] else 0}\t{row['source']}\n")
     with open(os.path.join(out_dir, "results.json"), "w", encoding="utf-8") as handle:
         json.dump({"summary": summary, "rows": rows}, handle, ensure_ascii=False, indent=1)
 
@@ -225,6 +247,12 @@ def report(items: list, results: list, out_dir: str, binary: str, zenzai_label: 
         f"| 全体 | {line(summary['total'])} | {pct(summary['total'])} |",
         f"| 左文脈あり ({summary['with_context']['n']} 件) | {line(summary['with_context'])} | {pct(summary['with_context'])} |",
         f"| 左文脈なし ({summary['without_context']['n']} 件) | {line(summary['without_context'])} | {pct(summary['without_context'])} |",
+    ]
+    if "with_right_context" in summary:
+        md.append(f"| 右文脈あり ({summary['with_right_context']['n']} 件) | {line(summary['with_right_context'])} | {pct(summary['with_right_context'])} |")
+    for source, group in summary.get("by_source", {}).items():
+        md.append(f"| 出どころ: {source} ({group['n']} 件) | {line(group)} | {pct(group)} |")
+    md += [
         "",
         f"外れ {len(misses)} 件 (CER の大きい順に 25 件。`許容解` は `|` 区切り):",
         "",
@@ -274,8 +302,19 @@ def compare(rows_a: str, rows_b: str, out_dir: str, labels=("A", "B")) -> int:
                 columns = line.rstrip("\n").split("\t")
                 if len(columns) < 7 or columns[0] == "id":
                     continue
-                out[columns[0]] = {"hit": columns[1] == "1", "top": columns[5], "accepted": columns[6], "cer": float(columns[2]), "ms": float(columns[3])}
+                out[columns[0]] = {"hit": columns[1] == "1", "top": columns[5], "accepted": columns[6], "cer": float(columns[2]), "ms": float(columns[3]),
+                                   "source": columns[10] if len(columns) > 10 else ""}
         return out
+
+    def mcnemar(keys: list) -> tuple:
+        """(A のみ正解の id, B のみ正解の id, 両側正確検定の p)"""
+        only_a = [key for key in keys if a[key]["hit"] and not b[key]["hit"]]
+        only_b = [key for key in keys if not a[key]["hit"] and b[key]["hit"]]
+        m = len(only_a) + len(only_b)
+        if not m:
+            return only_a, only_b, 1.0
+        tail = sum(math.comb(m, k) for k in range(0, min(len(only_a), len(only_b)) + 1)) / (2 ** m)
+        return only_a, only_b, min(1.0, 2 * tail)
 
     a, b = load(rows_a), load(rows_b)
     common = sorted(set(a) & set(b), key=lambda key: int(key) if key.isdigit() else key)
@@ -284,13 +323,7 @@ def compare(rows_a: str, rows_b: str, out_dir: str, labels=("A", "B")) -> int:
     hits_a = sum(1 for key in common if a[key]["hit"])
     hits_b = sum(1 for key in common if b[key]["hit"])
     # McNemar: b = A 正解 → B 外れ、c = A 外れ → B 正解。外れを 2 回引いた数が統計量の差
-    b_only = [key for key in common if a[key]["hit"] and not b[key]["hit"]]
-    c_only = [key for key in common if not a[key]["hit"] and b[key]["hit"]]
-    m = len(b_only) + len(c_only)
-    p = 1.0
-    if m:
-        tail = sum(math.comb(m, k) for k in range(0, min(len(b_only), len(c_only)) + 1)) / (2 ** m)
-        p = min(1.0, 2 * tail)
+    b_only, c_only, p = mcnemar(common)
 
     def q(values: list, ratio: float) -> float:
         values = sorted(values)
@@ -305,6 +338,18 @@ def compare(rows_a: str, rows_b: str, out_dir: str, labels=("A", "B")) -> int:
         f"- 変換 1 行の中央値: {labels[0]} {q([a[k]['ms'] for k in common], 0.5):.1f} ms / "
         f"{labels[1]} {q([b[k]['ms'] for k in common], 0.5):.1f} ms",
         "",
+    ]
+    # rows.tsv に出どころの列 (要件 049) があれば、出どころごとにも突き合わせる (A の表の出どころで分ける)
+    sources = sorted({a[key]["source"] for key in common if a[key]["source"]})
+    if sources:
+        md += [f"| 出どころ | 件数 | {labels[0]} | {labels[1]} | {labels[0]} のみ | {labels[1]} のみ | p |", "|---|---|---|---|---|---|---|"]
+        for source in sources:
+            keys = [key for key in common if a[key]["source"] == source]
+            only_a, only_b, p_source = mcnemar(keys)
+            md.append(f"| {source} | {len(keys)} | {sum(1 for k in keys if a[k]['hit'])} | {sum(1 for k in keys if b[k]['hit'])} | "
+                      f"{len(only_a)} | {len(only_b)} | {p_source:.2e} |")
+        md.append("")
+    md += [
         f"### {labels[0]} だけ正解 ({labels[1]} で悪化した行、{len(b_only)} 件)",
         "",
         "| id | {0} の第一候補 | {1} の第一候補 | 許容解 |".format(labels[0], labels[1]),
@@ -339,6 +384,8 @@ def main() -> int:
     parser.add_argument("--compare", nargs=2, default=None, metavar=("rows_a.tsv", "rows_b.tsv"),
                         help="2 回の測定の結果 (`rows.tsv`) を行ごとに突き合わせる (McNemar)。Zenzai ON/OFF の判定に使う")
     parser.add_argument("--labels", default="A,B", help="--compare のラベル 2 つ (例: --labels OFF,ON)")
+    parser.add_argument("--ignore-right-context", action="store_true",
+                        help="表に右文脈 (right_context) があっても使わずに測る (要件 049 の「なし」の基準。表は同じものを書く)")
     args = parser.parse_args()
     if not 0 <= args.top <= 100:
         raise SystemExit("--top は 0〜100 で指定してください (0 = 候補を出さない)")
@@ -357,10 +404,15 @@ def main() -> int:
     tsv_path = os.path.join(args.out, "table.tsv")
     count = build_table(items, tsv_path, args.limit)
     print(f"正解表 {count} 件を作りました: {tsv_path}", file=sys.stderr)
-    results = run_engine(args.binary, tsv_path, args.limit, args.weights, args.top)
+    results = run_engine(args.binary, tsv_path, args.limit, args.weights, args.top, args.ignore_right_context)
     if len(results) != count:
         print(f"警告: 返ってきた行が {len(results)} 件 / 正解表 {count} 件", file=sys.stderr)
-    report(items, results, args.out, args.binary, "Zenzai ON (--weights)" if args.weights else "Zenzai なし (製品の既定)")
+    label = "Zenzai ON (--weights)" if args.weights else "Zenzai なし (製品の既定)"
+    if any(item.get("right_context") for item in items):
+        label += "。右文脈は" + ("使わない (--ignore-right-context)" if args.ignore_right_context else ("使う" if args.weights else "Zenzai なしなので効かない"))
+    # 右文脈つきの表 (AJIMEE ではない) のときだけ、データの欄を表のパスにする。AJIMEE・Flash 40 件の表は今までどおり
+    dataset = f"{items_path} (右文脈つき。tools/make-right-context-items.py が既存の文から作った表)" if any(item.get("right_context") for item in items) else None
+    report(items, results, args.out, args.binary, label, dataset)
     return 0
 
 
