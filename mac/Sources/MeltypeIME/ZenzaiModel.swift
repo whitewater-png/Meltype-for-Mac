@@ -21,17 +21,30 @@ final class ZenzaiModel {
         /// 取得元の URL に許すスキーム。本番は https だけ。
         var allowedSchemes: Set<String> = ["https"]
         var fileName: String
+        /// 前の版のアプリが置いたモデル。今のモデルの準備ができたあと、名前・サイズ・SHA-256 がすべて合う通常のファイルだけを消す (要件 047)。
+        var retired: [Retired] = []
 
-        /// zenz-v3.1-small (Miwa Keita、CC BY-SA 4.0) の Q5_K_M。サイズと SHA-256 は 2026-10-14 に実物で確かめた値。
+        /// 消してよい前のモデル (models フォルダーの中の名前と、そのファイルの固定値)。
+        struct Retired {
+            var fileName: String
+            var size: Int64
+            var sha256: String
+        }
+
+        /// zenz-v3.2-small (Miwa Keita) の Q5_K_M。ライセンスは配布元の表示が食い違う (cc-by-sa-4.0 / apache-2.0) ので CC BY-SA 4.0 として扱う (要件 047)。
+        /// URL はリビジョンを固定する。サイズと SHA-256 は 2026-11-26 に実物で確かめた値。
         static let production = Source(
-            url: URL(string: "https://huggingface.co/Miwa-Keita/zenz-v3.1-small-gguf/resolve/main/ggml-model-Q5_K_M.gguf")!,
-            size: 73_871_968,
-            sha256: "4de930c06bef8c263aa1aa40684af206db4ce1b96375b3b8ed0ea508e0b14f6c",
+            url: URL(string: "https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf/resolve/c67e03e07d215c869f591b274c1631170d3e11fe/ggml-model-Q5_K_M.gguf")!,
+            size: 73_871_936,
+            sha256: "29c223d4c23327b80fd13ebb5ab2555057a46317997d5da391584ffbef0db673",
             // huggingface.co は重みを CDN に転送する (実測は us.aws.cdn.hf.co。Xet ストレージの cas-bridge.xethub.hf.co へ移行中)。
             // 転送先の名前は変わりやすいので、hf.co の下 (*.hf.co) まで許す。サイズと SHA-256 を固定して、合わないファイルは使わないので、
             // 許すホストを広げても、変なファイルを読ませない安全さは変わらない (許可の役目は、関係ないホストへ要求を送らないこと)。
             allowedHost: { $0 == "huggingface.co" || $0.hasSuffix(".hf.co") },
-            fileName: "zenz-v3.1-small-Q5_K_M.gguf"
+            fileName: "zenz-v3.2-small-Q5_K_M.gguf",
+            // zenz-v3.1-small の Q5_K_M (2026-10-14 に確かめた値)。1.2.x までの版が取得したもの
+            retired: [Retired(fileName: "zenz-v3.1-small-Q5_K_M.gguf", size: 73_871_968,
+                              sha256: "4de930c06bef8c263aa1aa40684af206db4ce1b96375b3b8ed0ea508e0b14f6c")]
         )
     }
 
@@ -262,8 +275,38 @@ final class ZenzaiModel {
             isReady = true
             Self.logger.info("Zenzai のモデルの準備ができました")
             writeStatus(ZenzaiStatus(state: .ready))
+            // 今のモデルが使えると分かってから、前の版のモデルを片付ける (裏のスレッド。消せなくても変換には関係しない)
+            let retired = source.retired
+            let directory = modelsDirectory
+            let current = source.fileName
+            if !retired.isEmpty {
+                DispatchQueue.global(qos: .utility).async {
+                    Self.removeRetired(retired, in: directory, keeping: current)
+                    DispatchQueue.main.async { self.onChange?() }
+                }
+            }
         }
         onChange?()
+    }
+
+    /// 前の版のモデルを消す。models フォルダーの直下にあり、通常のファイル (シンボリックリンクは追わない) で、
+    /// サイズと SHA-256 が固定値とすべて合うものだけ。今のモデルと同じ名前は消さない。ほかのファイルには触らない。裏のスレッドから呼ぶ。
+    static func removeRetired(_ retired: [Source.Retired], in directory: URL, keeping current: String) {
+        let manager = FileManager.default
+        for file in retired where file.fileName != current && !file.fileName.contains("/") {
+            let url = directory.appendingPathComponent(file.fileName)
+            // attributesOfItem は最後のシンボリックリンクを追わないので、リンクなら type が typeSymbolicLink になり、ここで外れる
+            guard let attributes = try? manager.attributesOfItem(atPath: url.path),
+                  attributes[.type] as? FileAttributeType == .typeRegular,
+                  let size = (attributes[.size] as? NSNumber)?.int64Value, size == file.size,
+                  Updater.sha256(of: url) == file.sha256 else { continue }
+            do {
+                try manager.removeItem(at: url)
+                logger.info("前の版の Zenzai のモデルを消しました: \(file.fileName, privacy: .public)")
+            } catch {
+                logger.error("前の版の Zenzai のモデルを消せませんでした: \(file.fileName, privacy: .public)")
+            }
+        }
     }
 
     // ---- このプロセスだけ止める ----
