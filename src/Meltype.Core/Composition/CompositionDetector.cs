@@ -396,12 +396,12 @@ public sealed class CompositionDetector
             // (要件 050。句点にすると Cargo。toml・preview。4 になっていた)。ほかの語の後ろの数字 (Mac.3jikara) は、今までどおり句点
             if (found < 0 && !kanaInput && level != DetectionLevel.Manual && units[i].Raw == "." && i > 0 && i + 1 < n && PrecededByEnglish(i) == true &&
                 char.IsAsciiLetter(units[i - 1].Raw[^1]) && japanesePunctuation?.Contains(i) != true &&
-                (units[i + 1].Raw is [var digitAfter, ..] && char.IsAsciiDigit(digitAfter) && VersionLabelBefore(units, i) || DotSuffixEnd(units, i + 1, pending, final) > i + 1)) found = i + 1;
+                (units[i + 1].Raw is [var digitAfter, ..] && char.IsAsciiDigit(digitAfter) && VersionLabelBefore(units, i) || NameAfterDot(units, i + 1, pending, final))) found = i + 1;
             if (!kanaInput && found < 0) found = UserNameEnd(units, i, pending);
             // 設定「英単語の後ろの英字の名前を英語にする」(本家 #1039): 前が英語の語 (Koki Ogawa の Ogawa) は、
             // 1 文字の大文字 + 助詞で始まる語 (O|gawa) に分けない。英語の文脈の続きなので、そのまま英語の区間として見る。
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual && !(KeepEnglishNameAfterEnglish() && table.StartsWithUpper(i) && PrecededByEnglish(i) == true))
-                found = CapitalizedWordEnd(units, i, pending, final);
+                found = CapitalizedWordEnd(units, i, pending, final, PrecededByEnglish(i) == true);
             if (!kanaInput && found < 0 && level != DetectionLevel.Manual) found = HyphenatedWordEnd(units, i, pending);
             // 英語の語 + 数字のすぐ後ろの英単語 (part1026|beta、win11|pro) は、ローマ字として読めても英語 (ベタ にしない)。
             // 助詞で始まるなら日本語 (PS5|wokaitai)。
@@ -499,6 +499,22 @@ public sealed class CompositionDetector
             segments.Add(Japanese(units, japaneseStart, n, pending));
         }
         return segments;
+    }
+
+    /// <summary>
+    /// . の後ろが拡張子・ドメインの名前 (DotSuffixEnd) で、記号・数字を含むか、一覧の拡張子・ドメインでローマ字として最後まで読めないか (co.jp・toml・com・md)。
+    /// 読める名前 (de・me・ai・co の頭の 。では・。めでたい・。あいに・。ここで) は文頭の日本語なので含めない (要件 050 の査読)。
+    /// </summary>
+    private bool NameAfterDot(IReadOnlyList<CompositionUnit> units, int start, string pending, bool final)
+    {
+        var end = DotSuffixEnd(units, start, pending, final);
+        if (end <= start) return false;
+        var name = (Raw(units, start, end) + (end == units.Count ? pending : "")).ToLowerInvariant();
+        static bool Full(RomajiAnalysis a) => a is { IsValid: true, Partial: "" or "n" };
+        if (!name.All(char.IsAsciiLetter)) return true;
+        // ふつうの英単語 (Mac.goodbye・Mac.mail) は、文末の英単語 + 句点 + 次の文の英単語かもしれないので含めない。一覧の拡張子・ドメインだけ
+        if (!DomainSuffixes.Contains(name) && !FileExtensions.Contains(name) && !SplitStems.Contains(name)) return false;
+        return !Full(_romaji.Analyze(name)) && !Full(_romaji.Analyze(RomajiDetector.ReadCRow(name)));
     }
 
     /// <summary>. の前の英字の並び (dot の直前まで) が、版の名前に付ける語 (preview・beta・rc・build) か (要件 050)。</summary>
@@ -1046,7 +1062,7 @@ public sealed class CompositionDetector
     /// 大文字で始まる区間は末尾まで英語になるので、そのままでは AutoIMEnotesuto → 全部英字 になってしまう。
     /// 語は、知っている英単語 (Github) か、大文字で終わる語 (AutoIME, OK, NHK)。後ろは 3 文字以上の小文字で、ローマ字として読めるもの。
     /// </summary>
-    private int CapitalizedWordEnd(IReadOnlyList<CompositionUnit> units, int start, string pending, bool final)
+    private int CapitalizedWordEnd(IReadOnlyList<CompositionUnit> units, int start, string pending, bool final, bool precededByEnglish = false)
     {
         // 見るのは、次の記号・数字・空白まで (長い文の OCR|woshi, … では、後ろの , までの woshi を見る)
         var n = start;
@@ -1060,7 +1076,9 @@ public sealed class CompositionDetector
         if (IsKnownCapitalizedWord(whole)) return -1;
         // 略語・知っている語 + 助詞 + 大文字で始まる次の語 (URL|wo…PDF、ChatGPT|de|CSV、JavaScript|to|Python) は、最初の助詞の前で区切る (要件 050)。
         // 下の探し方は長い頭から見るので、後ろの略語までを 1 語にしていた (URLwoshirasetekudasaiPDF|wo、ChatGPTdeCSV|wo)。
-        if (EarliestParticleBeforeCapital(units, start, n) is var early and > 0) return early;
+        // 英字の語の途中 (parse|JSONtoObject のように、前の英語の区間に空白なしで続く) では使わない (コードの識別子。要件 050 の査読)
+        var midWord = start > 0 && precededByEnglish && units[start - 1].Raw is [.., var last] && char.IsAsciiLetter(last);
+        if (!midWord && EarliestParticleBeforeCapital(units, start, n) is var early and > 0) return early;
         for (var k = n - 1; k > start; k--)
         {
             var head = Raw(units, start, k);
@@ -1107,6 +1125,8 @@ public sealed class CompositionDetector
     /// </summary>
     private int EarliestParticleBeforeCapital(IReadOnlyList<CompositionUnit> units, int start, int n)
     {
+        // 小文字で始まる語 (parseJSON|to|Object・loadCSV|to|Table のコードの識別子) には使わない
+        if (!char.IsAsciiLetterUpper(units[start].Raw[0])) return -1;
         for (var capital = start + 1; capital < n; capital++)
         {
             // 次の大文字の単位 (小文字の後ろのものだけ: URL の R・L は語の途中)
@@ -1121,6 +1141,8 @@ public sealed class CompositionDetector
                 if (Detection.DictionaryDetector.StartsWithParticle(rest) is null || !_romaji.AnalyzeFragment(rest).IsValid) continue;
                 if (IsAcronymWithLowerTail(head)) continue;
                 if (!(EndsWithAcronym(head) || head.Length >= 3 && IsKnownCapitalizedWord(head))) continue;
+                // 小文字の部分そのもの (AI|note|Book) か、頭の最後の大文字 + 小文字の部分 (A|I+dea|Lab の Idea) が 4 文字以上の英単語なら、名前の続きなので区切らない
+                if (rest.Length >= 4 && IsKnownEnglishWord(rest) || rest.Length >= 3 && char.IsAsciiLetterUpper(head[^1]) && IsKnownEnglishWord(head[^1] + rest)) continue;
                 // 頭 + 助詞 + 次の語の一部が 1 つの知っている語 (PhotoShop = photoshop) なら区切らない
                 var longer = false;
                 for (var e = n; e > capital && !longer; e--) longer = IsKnownCapitalizedWord(Raw(units, start, e));

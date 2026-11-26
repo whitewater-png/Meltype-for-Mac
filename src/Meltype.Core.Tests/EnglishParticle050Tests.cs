@@ -54,6 +54,11 @@ internal static class EnglishParticle050Tests
             ["AutoIMEnotesuto"] = "AutoIMEのてすと",
             ["LaTeXdekaku"] = "LaTeXでかく",
             ["DeNAnoshiai"] = "DeNAのしあい",
+            // 査読で見つけた形: 略語 + 英単語の名前、小文字で始まる識別子
+            ["AIdeaLab"] = "AIdeaLab",
+            ["AInoteBook"] = "AInoteBook",
+            ["parseJSONtoObject"] = "parseJSONtoObject",
+            ["loadCSVtoTable"] = "loadCSVtoTable",
         });
     }
 
@@ -68,6 +73,11 @@ internal static class EnglishParticle050Tests
             ["readme.mdwokesu"] = "readme.mdをけす",
             ["package.jsonwoREADMEni"] = "package.jsonをREADMEに",
             ["kyouhagoogle.desu"] = "きょうはgoogle。です",
+            // 査読で見つけた形: . の後ろが読める日本語の頭 (de・me・ai・co) や、ふつうの英単語なら句点のまま
+            ["kyouhaMac.dehanai"] = "きょうはMac。ではない",
+            ["kyouhaword.ainimiru"] = "きょうはword。あいにみる",
+            ["kyouhaMac.cokode"] = "きょうはMac。ここで",
+            ["kyouhaMac.goodbye"] = "きょうはMac。goodbye",
         });
     }
 

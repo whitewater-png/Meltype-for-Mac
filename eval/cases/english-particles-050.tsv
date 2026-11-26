@@ -55,3 +55,14 @@ ps5wokaitai	ps5をかいたい	full	要件 050 の守り
 100mltomizu	100mlとみず	full	要件 050 の守り
 hosuthingu	ほすてぃんぐ	full	要件 050 の守り (外来語の途中の thin は今までどおりかな)
 korehahole	これはhole	full	要件 050 の守り
+kyouhaMac.dehanai	きょうはMac。ではない	full	要件 050 の守り (査読: . の後ろの読める頭)
+kyouhaMac.medemiru	きょうはMac。めでみる	full	要件 050 の守り (査読)
+kyouhaword.ainimiru	きょうはword。あいにみる	full	要件 050 の守り (査読)
+kyouhaMac.cokode	きょうはMac。ここで	full	要件 050 の守り (査読)
+kyouhaApple.memode	きょうはApple。めもで	full	要件 050 の守り (査読)
+AIdeaLab	AIdeaLab	full	要件 050 の守り (査読: 略語 + 英単語の名前)
+AInoteBook	AInoteBook	full	要件 050 の守り (査読)
+parseJSONtoObject	parseJSONtoObject	full	要件 050 の守り (査読: 小文字で始まる識別子)
+loadCSVtoTable	loadCSVtoTable	full	要件 050 の守り (査読)
+kyouhaMac.goodbye	きょうはMac。goodbye	full	要件 050 の守り (査読: . の後ろのふつうの英単語は句点のまま)
+kyouhaMac.mailde	きょうはMac。mailで	full	要件 050 の守り (査読)
