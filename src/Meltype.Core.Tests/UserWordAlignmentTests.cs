@@ -382,7 +382,7 @@ internal static class UserWordAlignmentTests
     public static void ShortUserWordAtTheHead_NeedsTheWholeReadingConverted_OnlyWhenSomethingOtherThanAParticleFollows()
     {
         // 要件 043: 先頭の短い語も、エンジンの文節の読みの一部だけを覆うか調べるので、後ろに助詞でないかなが続くときは全体を変換する。
-        // 後ろが助詞だけ (しのが) か、語だけ (しの) なら、文節の一部だけを覆うことはないので呼ばない
+        // 後ろが助詞だけ (しのが) か、語だけ (しの) なら、文節の一部だけを覆うことはないので、打っている間は呼ばない (Space の変換は要件 044 で呼ぶ)
         var converter = new LexiconConverter();
         var k = new CompositionTests.Keyboard(converter: converter, userDictionary: Dictionary(("しの", "紫乃")));
         k.Type("shinogakita ");
@@ -390,8 +390,11 @@ internal static class UserWordAlignmentTests
         Assert.True(converter.Calls.Any(c => c.StartsWith("しのがきた|", StringComparison.Ordinal)), "後ろに助詞でないかなが続くので全体を変換する: " + string.Join(",", converter.Calls));
         converter = new LexiconConverter();
         k = new CompositionTests.Keyboard(converter: converter, userDictionary: Dictionary(("しの", "紫乃")));
-        k.Type("shinoga ");
-        Assert.True(!converter.Calls.Any(c => c.StartsWith("しのが|", StringComparison.Ordinal)), "語 + 助詞だけなら全体を変換しない: " + string.Join(",", converter.Calls));
+        k.Type("shinoga");
+        Assert.True(!converter.Calls.Any(c => c.StartsWith("しのが|", StringComparison.Ordinal)), "語 + 助詞だけなら、変換する前 (打っている間) は全体を変換しない: " + string.Join(",", converter.Calls));
+        // 要件 044: Space で変換するときは、登録語が割ったエンジンの文節 (しゅうさん → 集散) を候補の 2 番目に出すので、語 + 助詞だけでも全体を 1 回変換する
+        k.Type(" ");
+        Assert.True(converter.Calls.Any(c => c.StartsWith("しのが|", StringComparison.Ordinal)), "Space では全体を変換する: " + string.Join(",", converter.Calls));
     }
 
     // ---- しきい値は文字数でなく拍数 (しゅう・じゅん・しょう は 3 文字でも 2 拍。要件 032) ----
