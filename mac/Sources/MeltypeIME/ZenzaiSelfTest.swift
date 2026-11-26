@@ -255,23 +255,29 @@ enum ZenzaiSelfTest {
                 return !FileManager.default.fileExists(atPath: url.path)
             }
             let oldData = Data((0..<4096).map { UInt8($0 % 13) })
-            func prepare(_ name: String) -> (dir: URL, models: URL, old: URL, mismatch: URL, link: URL, other: URL) {
+            func prepare(_ name: String) -> (dir: URL, models: URL, old: URL, mismatch: URL, longer: URL, link: URL, other: URL) {
                 let dir = root.appendingPathComponent(name, isDirectory: true)
                 let models = dir.appendingPathComponent("models", isDirectory: true)
                 try? FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
                 let old = models.appendingPathComponent("zenz-old.gguf")
                 let mismatch = models.appendingPathComponent("zenz-old-changed.gguf")
+                let longer = models.appendingPathComponent("zenz-old-longer.gguf")
                 let link = models.appendingPathComponent("zenz-old-link.gguf")
                 let other = models.appendingPathComponent("other.txt")
                 try? oldData.write(to: old)
-                try? (oldData + Data([1])).write(to: mismatch)
+                // 同じ長さで 1 バイトだけ違う (SHA-256 の比較で外れる) ものと、1 バイト長い (サイズの比較で外れる) もの
+                var changed = oldData
+                changed[0] ^= 1
+                try? changed.write(to: mismatch)
+                try? (oldData + Data([1])).write(to: longer)
                 let target = dir.appendingPathComponent("outside.gguf")
                 try? oldData.write(to: target)
                 try? FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
                 try? Data("keep".utf8).write(to: other)
-                return (dir, models, old, mismatch, link, other)
+                return (dir, models, old, mismatch, longer, link, other)
             }
-            let retired = ["zenz-old.gguf", "zenz-old-changed.gguf", "zenz-old-link.gguf"].map {
+            // 消えるはずの zenz-old.gguf を最後に置く (それが消えた時点で、ほかの行の処理は終わっている)
+            let retired = ["zenz-old-changed.gguf", "zenz-old-longer.gguf", "zenz-old-link.gguf", "zenz-old.gguf"].map {
                 ZenzaiModel.Source.Retired(fileName: $0, size: Int64(oldData.count), sha256: hex(oldData))
             }
             // 失敗 (SHA-256 違い) のときは、前のモデルを消さない
@@ -291,7 +297,8 @@ enum ZenzaiSelfTest {
             good.poll(enabled: true)
             check(wait(good, seconds: 20) && good.isReady, "(前のモデル) 今のモデルの準備ができる")
             check(waitGone(ok.old, seconds: 10), "(前のモデル) 名前・サイズ・SHA-256 が合う前のモデルを消す")
-            check(FileManager.default.fileExists(atPath: ok.mismatch.path), "(前のモデル) 中身が違うファイルは消さない")
+            check(FileManager.default.fileExists(atPath: ok.mismatch.path), "(前のモデル) 同じサイズで中身 (SHA-256) が違うファイルは消さない")
+            check(FileManager.default.fileExists(atPath: ok.longer.path), "(前のモデル) サイズが違うファイルは消さない")
             check((try? FileManager.default.destinationOfSymbolicLink(atPath: ok.link.path)) != nil
                   && FileManager.default.fileExists(atPath: ok.dir.appendingPathComponent("outside.gguf").path), "(前のモデル) シンボリックリンクとその先は消さない")
             check(FileManager.default.fileExists(atPath: ok.other.path) && FileManager.default.fileExists(atPath: good.weightURL.path), "(前のモデル) ほかのファイルと今のモデルは残す")

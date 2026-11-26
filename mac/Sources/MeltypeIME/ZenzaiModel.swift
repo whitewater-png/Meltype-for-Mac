@@ -280,9 +280,9 @@ final class ZenzaiModel {
             let directory = modelsDirectory
             let current = source.fileName
             if !retired.isEmpty {
-                DispatchQueue.global(qos: .utility).async {
+                DispatchQueue.global(qos: .utility).async { [weak self] in
                     Self.removeRetired(retired, in: directory, keeping: current)
-                    DispatchQueue.main.async { self.onChange?() }
+                    DispatchQueue.main.async { self?.onChange?() }
                 }
             }
         }
