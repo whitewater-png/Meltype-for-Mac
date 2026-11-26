@@ -40,6 +40,8 @@ internal static class UserWordClauseHeadTests
         ("しゅうまつ", C(("しゅうまつ", "週末"))),
         ("しゅうさん", C(("しゅうさん", "集散"))),
         ("しゅうくんのいえ", C(("しゅうくん", "習君"), ("のいえ", "の家"))),
+        ("しゅうだよ", C(("しゅうだよ", "舟だよ"))),
+        ("しゅうとの", C(("しゅうとの", "舅の"))),
         ("しゅうが", C(("しゅうが", "秋が"))),
         ("しゅうを", C(("しゅうを", "秋を"))),
         ("しゅうと", C(("しゅうと", "舅と"))),
@@ -84,6 +86,8 @@ internal static class UserWordClauseHeadTests
             Assert.True(Type("shuuwo", learned).StartsWith(word), $"しゅうを は登録語から始まる (学習 {learned}): " + Type("shuuwo", learned));
             Assert.True(Type("shuuto", learned).StartsWith(word), $"しゅうと は登録語から始まる (学習 {learned}): " + Type("shuuto", learned));
             Assert.True(Type("shuunoie", learned).StartsWith(word), $"しゅうのいえ は登録語から始まる (学習 {learned}): " + Type("shuunoie", learned));
+            Assert.True(Type("shuudayo", learned).StartsWith(word), $"しゅうだよ は登録語から始まる (学習 {learned}): " + Type("shuudayo", learned));
+            Assert.True(Type("shuutono", learned).StartsWith(word), $"しゅうとの (舅の と読めるが、登録語 + との を使う。要件 043 の損) (学習 {learned}): " + Type("shuutono", learned));
             Assert.True(Type("shuusan", learned).StartsWith(word), $"しゅうさん (敬称) は登録語から始まる (学習 {learned}): " + Type("shuusan", learned));
             Assert.True(Type("shuukunnnoie", learned).StartsWith(word), $"しゅうくんのいえ は登録語から始まる (学習 {learned}): " + Type("shuukunnnoie", learned));
             Assert.Equal(word, Type("shuu", learned), $"しゅう だけ (学習 {learned})");
