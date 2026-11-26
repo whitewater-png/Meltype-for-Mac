@@ -256,7 +256,13 @@ public sealed class CompositionText
         // 記号・数字の前で、途中の n は ん に、読めない子音は英字のまま確定させる。
         Normalize(final: true);
         // 数字の前では打ち間違いを直さない (rta2026・ps5・win11 の英字は略語)。数字の後ろの単位を英字のままにするのは FixTypos の中
-        if (char.IsAsciiDigit(c)) SplitUnitAfterNumber(final: true);
+        if (char.IsAsciiDigit(c))
+        {
+            SplitUnitAfterNumber(final: true);
+            // 単位の後ろの残り (5kg|to の to) を保留に戻したままにすると、今打った数字が残りより前の単位になる
+            // (1.5kgto100MB → 1.5kg1と00MB)。数字を足す前に、残りを単位に戻す (要件 050)
+            Normalize(final: true);
+        }
         else FixTypos();
         // 数字の後の . と , は小数点・桁区切り (GPL3.0、1,000)。句点・読点にしない。
         if (c is ',' or '.' && _units.Count > 0 && _units[^1].Raw is [var previous] && char.IsAsciiDigit(previous))
@@ -841,7 +847,7 @@ public sealed class CompositionText
     /// 数字 (半角) の直後だけに効く。cc・pp は後ろに母音が続くなら、っか・っぷ のローマ字かもしれないので今までどおり (単位にしない)。
     /// 後ろが h・y・w (50ccは・50ccや・50ccを) は、単位 + 助詞を優先する。
     /// </summary>
-    private static readonly string[] UnitWords =
+    internal static readonly string[] UnitWords =
     [
         "mmol", "kcal", "mhz", "ghz", "khz", "kwh", "mah", "mol", "min", "sec", "rem", "dpi", "ppi", "fps", "bpm", "rpm", "mph", "kph",
         "ppm", "ppb", "cal", "pp", "cc", "mm", "cm", "km", "nm", "um", "mg", "kg", "ml", "dl", "ms", "ns", "hz", "kb", "mb", "gb", "tb", "px", "pt", "em", "wh",

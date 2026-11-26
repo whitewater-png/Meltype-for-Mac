@@ -1,0 +1,57 @@
+# 要件 050: 英字の語のすぐ後ろの助詞・数字 + 単位・拡張子と版の . の外れ (docs/requirements/050-english-particle-misses.md)。
+# 出どころ: Meltype-Flash (appipinopi/Meltype-Flash) の rust/core/data/strict-accuracy.json の 30 文を、この fork の Core で打って外れた文。打鍵と期待の文字列だけを使う (コードは写さない)。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打って Enter した結果を測る。実機の記録ではない。
+# カテゴリ: 直した (Flash の 30 文の外れ)
+URLwoshirasetekudasaiPDFwookurimasu	URLをしらせてくださいPDFをおくります	full	要件 050 (Flash 30 文。略語 + 助詞 + 次の略語)
+ChatGPTdeCSVwo3maitsukurimashita	ChatGPTでCSVを3まいつくりました	full	要件 050 (Flash 30 文)
+JavaScripttoPythonnoAPIwokakunin	JavaScriptとPythonのAPIをかくにん	full	要件 050 (Flash 30 文。ACCURACY_PLAN 2-3 の「英字のあいだの と」)
+https://example.com/README.mdwobrowserdehiraku	https://example.com/README.mdをbrowserでひらく	full	要件 050 (Flash 30 文。拡張子 + 助詞 + 英単語)
+MeltypeTip.dlltoCargo.tomlwoREADME.mdnikirokusuru	MeltypeTip.dllとCargo.tomlをREADME.mdにきろくする	full	要件 050 (Flash 30 文。拡張子 + 助詞 + 次の名前)
+1.5kgto100MBnofilewosoufu	1.5kgと100MBのfileをそうふ	full	要件 050 (Flash 30 文。数字 + 単位 + 助詞 + 数字で 1 が前にずれていた・file が ふぃぇ)
+versionha1.2.3preview.4desu	versionは1.2.3preview.4です	full	要件 050 (Flash 30 文。版の名前の . が 。 になっていた)
+# カテゴリ: 直した (同じ型の作例)
+MacBookdeYouTubewomiru	MacBookでYouTubeをみる	full	要件 050 (作例: 知っている語 + 助詞 + 次の語)
+PowerPointtoExcelwotsukau	PowerPointとExcelをつかう	full	要件 050 (作例)
+NHKtoBSwomiru	NHKとBSをみる	full	要件 050 (作例: 略語 + と + 略語)
+PDFtoPNGnihenkan	PDFとPNGにへんかん	full	要件 050 (作例)
+APItoSDK	APIとSDK	full	要件 050 (作例)
+GPTnoAPI	GPTのAPI	full	要件 050 (作例)
+SQLitenoDB	SQLiteのDB	full	要件 050 (作例)
+NetflixdeAnimewomiru	NetflixでAnimeをみる	full	要件 050 (作例)
+5kgto3kg	5kgと3kg	full	要件 050 (作例: 数字の位置のずれ)
+5kgde1kai	5kgで1かい	full	要件 050 (作例)
+3cmto5cm	3cmと5cm	full	要件 050 (作例)
+10cmno3bai	10cmの3ばい	full	要件 050 (作例)
+nofilewo	のfileを	full	要件 050 (作例: 小書きの le でしか読めない 4 文字の語 + 助詞)
+anoholegaaru	あのholeがある	full	要件 050 (作例)
+kyouhamilegaaru	きょうはmileがある	full	要件 050 (作例)
+kyouhagoogle.comdesu	きょうはgoogle.comです	full	要件 050 (作例: 前に日本語があるときのドメインの .。前は google。こmです)
+kyouhafilegaaru	きょうはfileがある	full	要件 050 (作例: 前は きょうはふぃぇがある)
+# カテゴリ: 守る (今と同じ答え。1 件でも崩れたら採用しない)
+config.tomlwoREADMEni	config.tomlをREADMEに	full	要件 050 の守り
+iPhonenoSEwokau	iPhoneのSEをかう	full	要件 050 の守り
+PhotoShopdehiraku	PhotoShopでひらく	full	要件 050 の守り (頭 + 助詞 + 次の語が 1 つの知っている語なら区切らない: Pho|to|Shop にしない)
+GitHubnoissuewo	GitHubのissueを	full	要件 050 の守り
+AutoIMEnotesuto	AutoIMEのてすと	full	要件 050 の守り
+LaTeXdekaku	LaTeXでかく	full	要件 050 の守り
+DeNAnoshiai	DeNAのしあい	full	要件 050 の守り
+SonytoNintendo	SonyとNintendo	full	要件 050 の守り
+iOStoAndroid	iOSとAndroid	full	要件 050 の守り
+macOSnoFinder	macOSのFinder	full	要件 050 の守り
+README.mdtoLICENSE	README.mdとLICENSE	full	要件 050 の守り
+package.jsonwoREADMEni	package.jsonをREADMEに	full	要件 050 の守り
+readme.mdwokesu	readme.mdをけす	full	要件 050 の守り
+MeltypeTip.dllwokesu	MeltypeTip.dllをけす	full	要件 050 の守り
+kyouhagoogle.desu	きょうはgoogle。です	full	要件 050 の守り (英単語の後ろの句点)
+kyouhaMac.3jikara	きょうはMac。3じから	full	要件 050 の守り (版の名前でない語の後ろの . + 数字は句点のまま)
+arigatou.4jini	ありがとう。4じに	full	要件 050 の守り
+v1.2.3desu	v1.2.3です	full	要件 050 の守り
+iOS17.4desu	iOS17.4です	full	要件 050 の守り
+Python3.12wotsukau	Python3.12をつかう	full	要件 050 の守り
+rta2026	rta2026	full	要件 050 の守り (数字の前の略語)
+kaibunshorta2026	かいぶんしょrta2026	full	要件 050 の守り
+ps5wokaitai	ps5をかいたい	full	要件 050 の守り
+51kmijou	51kmいじょう	full	要件 050 の守り
+100mltomizu	100mlとみず	full	要件 050 の守り
+hosuthingu	ほすてぃんぐ	full	要件 050 の守り (外来語の途中の thin は今までどおりかな)
+korehahole	これはhole	full	要件 050 の守り

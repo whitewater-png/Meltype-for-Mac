@@ -391,6 +391,12 @@ public sealed class CompositionDetector
             // (かな入力では 、。 も かなのキーなので対象外。改行の直後の - は前の行の英語の続きではない: --sorekara の「ーー」。A-5)
             if (found < 0 && !kanaInput && i != bracketCloser && IsAsciiSymbol(units[i]) && PrecededByEnglish(i) == true && !(i == 0 && afterNewline && units[i].Raw == "-") && segments.All(s => s.IsEnglish || !s.Raw.Any(char.IsAsciiLetter)) &&
                 japanesePunctuation?.Contains(i) != true) found = i + 1;
+            // 前に日本語の区間があっても、英語の語のすぐ後ろの . に、拡張子・ドメイン (Cargo.toml、README.md) が空白なしで続くか、
+            // 版の名前 (preview・beta・rc) の後ろの . に数字が続く (preview.4) なら、名前の中の . なので半角のまま
+            // (要件 050。句点にすると Cargo。toml・preview。4 になっていた)。ほかの語の後ろの数字 (Mac.3jikara) は、今までどおり句点
+            if (found < 0 && !kanaInput && level != DetectionLevel.Manual && units[i].Raw == "." && i > 0 && i + 1 < n && PrecededByEnglish(i) == true &&
+                char.IsAsciiLetter(units[i - 1].Raw[^1]) && japanesePunctuation?.Contains(i) != true &&
+                (units[i + 1].Raw is [var digitAfter, ..] && char.IsAsciiDigit(digitAfter) && VersionLabelBefore(units, i) || DotSuffixEnd(units, i + 1, pending, final) > i + 1)) found = i + 1;
             if (!kanaInput && found < 0) found = UserNameEnd(units, i, pending);
             // 設定「英単語の後ろの英字の名前を英語にする」(本家 #1039): 前が英語の語 (Koki Ogawa の Ogawa) は、
             // 1 文字の大文字 + 助詞で始まる語 (O|gawa) に分けない。英語の文脈の続きなので、そのまま英語の区間として見る。
@@ -494,6 +500,16 @@ public sealed class CompositionDetector
         }
         return segments;
     }
+
+    /// <summary>. の前の英字の並び (dot の直前まで) が、版の名前に付ける語 (preview・beta・rc・build) か (要件 050)。</summary>
+    private static bool VersionLabelBefore(IReadOnlyList<CompositionUnit> units, int dot)
+    {
+        var start = dot;
+        while (start > 0 && units[start - 1].Raw.Length > 0 && units[start - 1].Raw.All(char.IsAsciiLetter)) start--;
+        return VersionLabels.Contains(Raw(units, start, dot).ToLowerInvariant());
+    }
+
+    private static readonly HashSet<string> VersionLabels = ["alpha", "beta", "preview", "rc", "pre", "dev", "build", "canary", "nightly", "patch", "update", "release", "insider", "snapshot", "lts"];
 
     /// <summary>
     /// これより長い英字の並びは、1 語の英単語 (辞書・スペルチェッカーの語、固有名詞、短縮形) にならない。
@@ -788,8 +804,10 @@ public sealed class CompositionDetector
             return false;
         }
         // 数字のすぐ前の、ローマ字として読めない子音で始まる短い英字 (kaibunsho|rta|2026、ps5): 略語。日本語の打ちかけではない
+        // ただし、単位 (またはその後ろの部分) + 助詞 (1.5|kg|to|100MB の kgto・gto) は略語ではない: 単位と助詞に分ける (要件 050)
         if (next is [var digit, ..] && char.IsAsciiDigit(digit) && span.Length is >= 2 and <= 6 && span.All(char.IsAsciiLetter) &&
-            _romaji.AnalyzeFragment(lower[..2]) is { IsValid: false })
+            _romaji.AnalyzeFragment(lower[..2]) is { IsValid: false } &&
+            !CompositionText.UnitWords.Any(u => TrailingParticles.Any(p => lower.Length > p.Length && lower.EndsWith(p, StringComparison.Ordinal) && u.EndsWith(lower[..^p.Length], StringComparison.Ordinal))))
         {
             return true;
         }
@@ -956,9 +974,13 @@ public sealed class CompositionDetector
             if (!exact && !prefix) return false;
             // 日本語のすぐ後ろの短い英単語 (thin) が、変換ボックスの綴り (thi = てぃ) では最後まで読めて、続き (gu) とも読めるなら、
             // 外来語のカタカナ (hosu|thin|gu = ホスティング) を打っている途中。英単語にしない (ほすthinぐ になっていた。本家 #153、P45-2)。
+            // ただし、同梱の辞書の 4 文字の語で、小書きの l・x (le = ぇ) を使わないと読めない綴り (file = ふぃぇ) の後ろが助詞 (file|wo) なら、
+            // 外来語の途中ではなく英単語 (要件 050。nofilewo が のふぃぇを になっていた)
             if (before < 0 && !atEnd && lower.Length <= 4 && next is { Length: > 0 } && char.IsAsciiLetter(next[0]) &&
                 _romaji.AnalyzeFragment(lower) is { IsValid: true, Partial: "" or "n" } &&
-                _romaji.AnalyzeFragment(lower + next.ToLowerInvariant()).IsValid)
+                _romaji.AnalyzeFragment(lower + next.ToLowerInvariant()).IsValid &&
+                !(inDictionary && smallKanaSpelling && lower.Length == 4 && lower.IndexOfAny(['l', 'x']) > 0 && !_japanese.IsPrefix(lower) &&
+                  Detection.DictionaryDetector.StartsWithParticle(next.ToLowerInvariant()) is not null))
             {
                 return false;
             }
@@ -1036,6 +1058,9 @@ public sealed class CompositionDetector
         if (whole.Length == 0 || !char.IsAsciiLetterUpper(whole[0]) && !lowerStart) return -1;
         // 全体が英単語・固有名詞 (Tokyo, Github) なら区切らない。
         if (IsKnownCapitalizedWord(whole)) return -1;
+        // 略語・知っている語 + 助詞 + 大文字で始まる次の語 (URL|wo…PDF、ChatGPT|de|CSV、JavaScript|to|Python) は、最初の助詞の前で区切る (要件 050)。
+        // 下の探し方は長い頭から見るので、後ろの略語までを 1 語にしていた (URLwoshirasetekudasaiPDF|wo、ChatGPTdeCSV|wo)。
+        if (EarliestParticleBeforeCapital(units, start, n) is var early and > 0) return early;
         for (var k = n - 1; k > start; k--)
         {
             var head = Raw(units, start, k);
@@ -1070,6 +1095,38 @@ public sealed class CompositionDetector
             var rest = Raw(units, k, camel);
             if (!rest.All(char.IsAsciiLetterLower) || Detection.DictionaryDetector.StartsWithParticle(rest) is null || !_romaji.AnalyzeFragment(rest).IsValid) continue;
             if (head.Length >= 3 && IsKnownCapitalizedWord(head) || head.Length >= 4 && IsSpellWord(head.ToLowerInvariant())) return k;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// 大文字で始まる語の並び (start〜n、英字だけ) の中で、略語 (大文字で終わる 2 文字以上) か知っている語 (3 文字以上) の頭の直後に、
+    /// 助詞で始まる小文字のローマ字が次の大文字の直前まで続く、最初の位置 (要件 050)。無ければ -1。
+    /// 例: URL|woshirasetekudasai|PDF、ChatGPT|de|CSV、JavaScript|to|Python、Python|no|API。
+    /// 頭から次の大文字の後ろまでが 1 つの知っている語 (PhotoShop の Pho|to|Shop) なら区切らない。
+    /// </summary>
+    private int EarliestParticleBeforeCapital(IReadOnlyList<CompositionUnit> units, int start, int n)
+    {
+        for (var capital = start + 1; capital < n; capital++)
+        {
+            // 次の大文字の単位 (小文字の後ろのものだけ: URL の R・L は語の途中)
+            if (!char.IsAsciiLetterUpper(units[capital].Raw[0]) || !char.IsAsciiLetterLower(units[capital - 1].Raw[^1])) continue;
+            // 小文字が続く所の頭から順に (最初の助詞で区切る)
+            var lowerStart = capital;
+            while (lowerStart > start + 1 && units[lowerStart - 1].Raw.All(char.IsAsciiLetterLower)) lowerStart--;
+            for (var k = lowerStart; k < capital; k++)
+            {
+                var head = Raw(units, start, k);
+                var rest = Raw(units, k, capital);
+                if (Detection.DictionaryDetector.StartsWithParticle(rest) is null || !_romaji.AnalyzeFragment(rest).IsValid) continue;
+                if (IsAcronymWithLowerTail(head)) continue;
+                if (!(EndsWithAcronym(head) || head.Length >= 3 && IsKnownCapitalizedWord(head))) continue;
+                // 頭 + 助詞 + 次の語の一部が 1 つの知っている語 (PhotoShop = photoshop) なら区切らない
+                var longer = false;
+                for (var e = n; e > capital && !longer; e--) longer = IsKnownCapitalizedWord(Raw(units, start, e));
+                if (longer) return -1;
+                return k;
+            }
         }
         return -1;
     }
@@ -1316,6 +1373,17 @@ public sealed class CompositionDetector
         if (start >= n || !IsPart(units[start])) return -1;
         var end = start;
         while (end < n && IsPart(units[end])) end++;
+        // 一覧の拡張子・ドメイン + 助詞 + 大文字で始まる次の名前 (MeltypeTip.dll|to|Cargo.toml、Cargo.toml|wo|README.md) は、
+        // . で続く所まで 1 つの名前にせず、助詞の前で終わる (要件 050。次の名前は、助詞の後ろでもう一度判定する)
+        for (var k = start + 1; k < end; k++)
+        {
+            var stem = Raw(units, start, k).ToLowerInvariant();
+            if (stem.Length > 8) break;
+            if (!DomainSuffixes.Contains(stem) && !FileExtensions.Contains(stem) && !SplitStems.Contains(stem)) continue;
+            var rest = Raw(units, k, end);
+            if (TrailingParticles.FirstOrDefault(p => rest.StartsWith(p, StringComparison.Ordinal)) is { } particle &&
+                rest.Length > particle.Length && char.IsAsciiLetterUpper(rest[particle.Length])) return k;
+        }
         // . / - で続く所まで 1 つの名前 (abi.json、go.work.sum、cargo/config.toml、db-journal)
         while (end + 1 < n && units[end].Raw is "." or "/" or "-" && IsPart(units[end + 1]))
         {
@@ -1350,6 +1418,19 @@ public sealed class CompositionDetector
         var allKana = labelStart < end && units[labelStart].Kana == "っ" && (end < n || pending.Length == 0)
             && Enumerable.Range(labelStart, end - labelStart).All(q => units[q].Kana != units[q].Raw && units[q].Raw.All(char.IsAsciiLetter));
         var readable = Readable(lastLabel.Replace("-", "")) || Readable(lastLabel) || allKana;
+        // 4 文字以上の英単語の後ろが、何も無いか、助詞で始まる日本語 (browser|dehiraku、browser|de)
+        bool EnglishWordThenJapanese(string text)
+        {
+            for (var j = Math.Min(text.Length, 24); j >= 4; j--)
+            {
+                if (!text[..j].All(char.IsAsciiLetter) || !IsKnownEnglishWord(text[..j])) continue;
+                var tail = text[j..];
+                if (tail.Length == 0) return true;
+                if (TrailingParticles.FirstOrDefault(p => tail.StartsWith(p, StringComparison.Ordinal)) is { } p &&
+                    (tail.Length == p.Length || Readable(tail[p.Length..]))) return true;
+            }
+            return false;
+        }
         string RestFrom(int k) => (Raw(units, k, end) + (end == n ? pending : "")).ToLowerInvariant();
         // 助詞の後ろが大文字の略語・数字で始まる (mp4|wo|MP3ni、Next.js|no|SSR)
         bool UpperOrDigitStart(int k, int particleLength)
@@ -1384,6 +1465,8 @@ public sealed class CompositionDetector
                 if (particle == "made" && after.Length == 0) return DomainSuffixes.Contains(stem) ? end : -1;
                 if ((stem + particle).Length >= 4 && IsKnownEnglishWord(stem + particle)) continue;
                 if (after.Length == 0 || Readable(after) || UpperOrDigitStart(k, particle.Length) || after.Length >= 3 && IsKnownEnglishWord(after) && (stem.Length >= 3 || SplitStems.Contains(stem) || after.Length >= 4)) return k;
+                // 助詞の後ろが、4 文字以上の英単語 + 助詞で始まる日本語 (README.md|wo|browser|dehiraku。要件 050)
+                if (EnglishWordThenJapanese(after)) return k;
             }
             // 1. 長い英単語の頭を先に探す (golden|ga を gol|de|nga、extension|ganai を ex|tension と分けない)。0b より先に
             for (var k = end - 1; k > labelStart; k--)
