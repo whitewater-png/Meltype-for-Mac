@@ -89,11 +89,11 @@ scope: core
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 前提: 試す前に「Meltype 辞書」の「学習した語」タブ (⌘3) で、`meeting`・`review` が無いことを見ておく (あれば控えておく)。TextEdit で、日本語入力 (「あ」) にして試す。直っていない版で試すと覚えるので、確かめたら「学習した語」タブで消す。
-- [ ] `asita no meeting de review shimasu` を選んで Shift+Space → Enter。そのあと「学習した語」タブに `meeting`・`review` が増えない (直す前は「かなにする」で増える見込み。推定)。
-- [ ] そのあと `kyouhameetingdesu` と打つと、`meeting` が英字のまま (直す前は崩れる見込み。I1 の形。推定)。
-- [ ] Space で選んだままの文を選んで Enter・別の欄をクリック (暗黙の確定)・Shift+Enter でも、上と同じ。
-- [ ] 再変換 → F6 (Ctrl+J。または F7 = Ctrl+K) → Enter でも、「学習した語」タブに `meeting`・`review` が増えない (直す前は増える見込み。R8。推定)。
-- [ ] 対照: ふつうに `meeting` と打って F6 → Enter では、今どおり「学習した語」タブに増える (確かめたら消す)。
+- [ ] `asita no meeting de review shimasu` を選んで Shift+Space → Enter。そのあと「学習した語」タブに `meeting`・`review` が増えない (直す前は「かなにする」で増える見込み。推定)。 (2026-11-26 自動打鍵 (TextEdit): 表示は `明日の meeting で review します`。学習データのファイル (languages.json) では `meeting`・`review` は増えないことを確認、「学習した語」タブは未確認。[ ] のまま)
+- [x] そのあと `kyouhameetingdesu` と打つと、`meeting` が英字のまま (直す前は崩れる見込み。I1 の形。推定)。 (2026-11-26 自動打鍵 (TextEdit) で確認: `今日はmeetingです` (英字のまま))
+- [ ] Space で選んだままの文を選んで Enter・別の欄をクリック (暗黙の確定)・Shift+Enter でも、上と同じ。 (2026-11-26 自動打鍵 (TextEdit): 打っていない。未確認)
+- [ ] 再変換 → F6 (Ctrl+J。または F7 = Ctrl+K) → Enter でも、「学習した語」タブに `meeting`・`review` が増えない (直す前は増える見込み。R8。推定)。 (2026-11-26 自動打鍵 (TextEdit): 再変換 → Ctrl+J → Enter で表示は変わらず、`meeting`・`review` は増えなかったが、Ctrl+J が再変換中に効いたか不明。F6 が効いた形は未確認)
+- [x] 対照: ふつうに `meeting` と打って F6 → Enter では、今どおり「学習した語」タブに増える (確かめたら消す)。 (2026-11-26 自動打鍵 (TextEdit) で確認: `meeting` → Ctrl+J → Enter で `めえちんg` になり、languages.json に `meeting` が増えた (対照どおり。「学習した語」タブではなく学習データのファイルで確認。確認後に学習データは打つ前の状態へ戻した))
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
 - 日英の学習 (`languages.json`) のファイル形式を変える必要が出たとき。
@@ -119,3 +119,4 @@ scope: core
 - 手順: 実装のコミット (fbd9b19 は 06:19:12Z、443cdf1 は 06:46:03Z) は、止めのフックに従い、査読の前に作業ブランチへ push された (このブランチに PR は無いので公開行為ではない。improve.md の順は 査読 → 記録 → push)。
 - 番号の付け直し: 実装中の 2026-11-23 に、人の指示で 026 → 027 に付け直した (既に記録の行がある。重ねない)。
 - 測れていないこと: 実機の入力欄・azooKey は未確認。Mac 実機チェックリストは未確認。PR は作っていない (このセッションでは、PR は人が頼んだときだけ作る)。
+- 2026-11-26 自動打鍵 (TextEdit、入っている版 1.2.9 = main f558dfa。リョウさんの今の設定: ライブ変換 ON・Zenzai ON・変換後も続けて入力 ON。OFF の行は一時的にライブ変換を切った。人の手ではない): 1 行目 (`asita no meeting de review shimasu` を貼って選び Shift+Space → Enter) は `明日の meeting で review します`、languages.json に `meeting`・`review` は増えない (タブは未確認)。2 行目 (`kyouhameetingdesu`) は `今日はmeetingです`。対照 (`meeting` → Ctrl+J → Enter) は `めえちんg` で languages.json に `meeting` が増えた。2 行目と対照の行を [x] にし、1 行目は「学習した語」タブを見ていないので [ ] のまま。4 行目 (再変換 → F6) は Ctrl+J を送ったが表示が変わらず、Ctrl+J が再変換中に効いたか不明なので **F6 が効いた形は未確認** ([ ] のまま)。3 行目 (Space で選んだまま・別の欄をクリック・Shift+Enter) は打っていない。確認は学習データのファイルで、「学習した語」タブは見ていない。リョウさんの手での確認ではない。status は変えない。
