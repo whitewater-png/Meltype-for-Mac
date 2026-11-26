@@ -1529,6 +1529,26 @@ internal static class RomajiTypoTests
     }
 
     [Test]
+    public static void Req045_Upstream1125Shapes_StayKana()
+    {
+        // 本家 #2379・#2365・#2359 (2026-11-24〜25): dai1dan の前後が英字に割れて だi1dan になる、keihaitowagon・101kenijouattara の
+        // 漢字の形が期待と違う、という報告。この fork では確定は今も英字に割れない (判定ロジック・辞書は変えていない)。
+        // 数字を挟んだ形と、その近くの形がかなのまま確定することを守る。
+        // 漢字の形 (第1弾) と、打っている途中の表示 (だい1だn) は守らない。正解表: eval/cases/upstream-guards-1125.tsv。
+        foreach (var (typed, expected) in new[]
+        {
+            ("dai1dan", "だい1だん"), ("dai3dan", "だい3だん"), ("dai10dan", "だい10だん"), ("1dan", "1だん"), ("dai2kai", "だい2かい"),
+            ("keihaitowagon", "けいはいとわごん"),
+            ("101kenijouattara", "101けにじょうあったら"), ("101kennijouattara", "101けんいじょうあったら"),
+        })
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(typed + "\n");
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+    }
+
+    [Test]
     public static void Req041_Upstream1123Shapes_StayKanaOrEnglish()
     {
         // 本家 #2261・#2258・#2254 (2026-11-23): nonbirimiroyo が のんびりmiroよ、What are things made you happy? の途中が
