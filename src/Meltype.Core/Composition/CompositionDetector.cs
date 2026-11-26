@@ -530,9 +530,11 @@ public sealed class CompositionDetector
         while (word > 0 && units[word - 1].Raw.Length > 0 && units[word - 1].Raw.All(char.IsAsciiLetter) && !IsParticle(units[word - 1].Raw)) word--;
         if (word == dot || !char.IsAsciiLetterUpper(units[word].Raw[0]) || word < 3 || !IsParticle(units[word - 1].Raw)) return false;
         var stem = word - 1;
-        // 拡張子は英字だけ (v1.2・3.5kg の数字は名前.拡張子と見ない)
-        while (stem > 0 && units[stem - 1].Raw.Length > 0 && units[stem - 1].Raw.All(char.IsAsciiLetter)) stem--;
-        return stem < word - 1 && stem > 0 && units[stem - 1].Raw == ".";
+        while (stem > 0 && units[stem - 1].Raw.Length > 0 && units[stem - 1].Raw.All(char.IsAsciiLetterOrDigit)) stem--;
+        if (stem >= word - 1 || stem == 0 || units[stem - 1].Raw != ".") return false;
+        // 拡張子は一覧の名前だけ (mp4・md・app。v1.2 の 2・3.5kg の 5kg は名前.拡張子と見ない)
+        var extension = Raw(units, stem, word - 1).ToLowerInvariant();
+        return DomainSuffixes.Contains(extension) || FileExtensions.Contains(extension) || SplitStems.Contains(extension);
     }
 
     /// <summary>. の前の英字の並び (dot の直前まで) が、版の名前に付ける語 (preview・beta・rc・build) か (要件 050)。</summary>

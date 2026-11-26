@@ -85,6 +85,7 @@ internal static class EnglishParticle050Tests
             // 査読 3 周目: 分けた名前の後ろでも、. の後ろが読める日本語なら句点。版の数字は名前.拡張子と見ない
             ["kyouhaREADME.mdnoMac.ainiku"] = "きょうはREADME.mdのMac。あいにく",
             ["korehav1.2toMac.dehanai"] = "これはv1.2とMac。ではない",
+            ["video.mp4noInfo.plist"] = "video.mp4のInfo.plist",
         });
     }
 
