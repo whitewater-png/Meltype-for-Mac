@@ -8,7 +8,7 @@
 右文脈 (要件 049): 正解表の項目に `right_context` (カーソルの後ろの文字) があれば、`--convert-eval` の表に 5 列目として書く
 (Zenzai ON のときだけ効く)。項目に `source` があれば、結果を出どころごとにも出す。`--ignore-right-context` を付けると、
 同じ表のまま右文脈を使わずに測る (「なし」の基準)。右文脈つきの表は `tools/make-right-context-items.py` が作る。
-AJIMEE の表には右文脈が無いので、表も結果も今までと同じ。
+AJIMEE の表には右文脈が無いので、IME に渡す表と数字は今までと同じ (rows.tsv の後ろに 2 列、results.json の行に欄が増えるだけ)。
 
 AJIMEE-Bench (Advanced Japanese IME Evaluation Benchmark / 味見ベンチ)
   https://github.com/azooKey/AJIMEE-Bench
