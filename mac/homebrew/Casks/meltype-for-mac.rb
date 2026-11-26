@@ -1,6 +1,6 @@
 cask "meltype-for-mac" do
-  version "1.2.8"
-  sha256 "be344872285ce0dd61b28c2ce8f62e320d98a7b0633a6114caff0d39410a1cd8"
+  version "1.2.9"
+  sha256 "61c4449f03632d18e1e95ee69f70f0998c4855c69477afb8690eaa28e86dd9c3"
 
   url "https://github.com/whitewater-png/Meltype-for-Mac/releases/download/v#{version}-mac/Meltype-mac-#{version}.zip"
   name "Meltype for Mac"
