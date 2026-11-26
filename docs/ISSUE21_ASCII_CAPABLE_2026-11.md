@@ -36,7 +36,7 @@
 
 - 全体側の `Latn` はことえり・Google・ATOK にもあり、どれも日本語モードは ascii=0。よって**全体側の `Latn` は原因ではない** (測定から言える)。
 - 残る候補は (1) モード側の `tsInputModeCharacterRepertoireKey` に `Latn`、(2) 辞書のキーが標準名でない、の 2 つ。報告者の見立てと同じで、**どちらが効くかは今の手元の証拠では決まらない** (この Mac では試験ビルドを入れていない。入れると利用者の IME を入れ替えるため)。
-- 参考: Squirrel (Rime) に「`tsInputModeCharacterRepertoireKey` から `Latn` を外す」変更がある (検索で見つけただけで、中身は読んでいない)。(1) が効く傍証になりうるが未確認。
+- 参考: Squirrel (Rime) に「`tsInputModeCharacterRepertoireKey` から `Latn` を外す」変更がある (検索で見つけただけで、中身は読んでいない)。ただし Google の Roman モードも repertoire が無いのに ascii=1 なので、(1) と (2) は今の証拠では切り分けられない。傍証としては弱い。
 - Meltype の英数モードは既に標準名キー `com.apple.inputmethod.Roman` で作ってあり、Caps Lock 切り替えのための判断だった (docs/IMPROVEMENT_PLAN.md の P2)。
 - Mac のコードは `kTISPropertyInputSourceIsASCIICapable` を読んでいない (`git grep` で 0 件)。`TISSetInputMethodKeyboardLayoutOverride` も使っていない。
 
@@ -45,7 +45,9 @@
 ### macOS 側の扱い (Apple の文書より)
 - 入力メソッド・モードが選ばれているとき、キー変換には**直近に使った ASCII 対応のキーボード配列**が使われ、キーボードビューアにもそれが出る。別の配列にしたいときは `TISSetInputMethodKeyboardLayoutOverride` を呼ぶ ([Text Input Source Services Reference](https://web.archive.org/web/20140604054226/https:/developer.apple.com/library/Mac/documentation/TextFonts/Reference/TextInputSourcesReference/Reference/reference.html))。
 - `TISCopyCurrentASCIICapableKeyboardInputSource` は「最後に使った ASCII 対応の入力ソース」を返す。ASCII 対応でない IME の間に、アプリが「英字に戻す先」として使う ([同上](https://web.archive.org/web/20140604054226/https:/developer.apple.com/library/Mac/documentation/TextFonts/Reference/TextInputSourcesReference/Reference/reference.html))。
-- アプリ側の例: Firefox は「今の入力ソースが IME のモードで、かつ ASCII 対応でない」を「IME が開いている」と判定し、キーイベントの文字を ASCII 対応の配列で計算する ([TextInputHandler.mm](https://raw.githubusercontent.com/mozilla-firefox/firefox/main/widget/cocoa/TextInputHandler.mm))。Deskflow も同様に IME 使用中は ASCII 対応の配列で変換する ([deskflow #10039](https://github.com/deskflow/deskflow/pull/10039/files/b5f126d0724352f04e3e6ba16e37f717d0fbe9df))。つまり ascii=0 にすると、**アプリは Meltype の日本語モードを「かな入力中の IME」として扱い、他の日本語 IME と同じ分岐に入る**。報告の Emacs はこの型。
+- アプリ側の例 (ascii が効くと確認できたのは Firefox だけ): Firefox の `IsOpenedIMEMode` は「今の入力ソースが IME のモードで、かつ ASCII 対応でない」を「IME が開いている」と判定し、そのときキーイベントの文字を ASCII 対応の配列で計算する ([TextInputHandler.mm](https://raw.githubusercontent.com/mozilla-firefox/firefox/main/widget/cocoa/TextInputHandler.mm))。**今の Meltype は ascii=1 なので、日本語モードでも Firefox は IME 開と判定しない。ascii=0 にすると IME 開と判定する。**
+- Deskflow ([#10039](https://github.com/deskflow/deskflow/pull/10039/files/b5f126d0724352f04e3e6ba16e37f717d0fbe9df)) の分岐条件は「入力モードかキーボード配列か」(`kTISPropertyInputSourceType`) で、ASCII 対応ではない。Meltype の日本語は既に入力モードなので、その分岐には今も入っている。ascii=0 の根拠にはしない。
+- 報告の Emacs の条件 (「ASCII 対応でないときだけ素通しにする」) は報告者の主張の引用で、ns-inline-patch 本体のコードは読んでいない (未確認)。
 - パスワード欄 (セキュア入力) で ASCII 対応の入力ソースに切り替わる動作は、macOS の既知の挙動だが、**今回は一次資料を引けていない** (未確認)。今は ascii=1 なので切り替えが起きず、Meltype が日本語モードのまま素通しに頼っている可能性がある (コードは `IsSecureEventInputEnabled()` で素通しにしている。`InputController.swift` 150〜155 行付近)。ascii=0 にすると、ことえりと同じく別の ASCII 対応ソース (「英数 (Meltype)」や ABC) に切り替わる可能性がある。実機で未確認。
 - Cmd ショートカットなどのキー変換: Meltype はキーボード配列の指定を持たないので、ascii=0 にすると「直近の ASCII 対応の配列」が使われる (Dvorak・AZERTY などを使う人は、直近に使った配列が基準になる)。今は ascii=1 の自分自身が基準になっている可能性があるが、未確認。Spotlight・Terminal での違いも実機では見ていない。
 
@@ -53,7 +55,7 @@
 
 | | 得 | 損 |
 |---|---|---|
-| ascii=0 にする | Emacs (inline パッチ)・Firefox など、ことえり/azooKey と同じ分岐に入る。`C-x b`・dired が日本語モードで普通に動く。他の日本語 IME と挙動が揃う | 「英語も自動で打てる」設計の Meltype が、アプリから「日本語専用の IME」とみなされる。パスワード欄などで自動で別ソースに切り替わる動作が増える可能性。Meltype のモード自動記憶 (アプリ別に英数を覚える) と干渉するかは未確認 |
+| ascii=0 にする | Emacs (inline パッチ)・Firefox など、ことえり/azooKey と同じ分岐に入る。`C-x b`・dired が日本語モードで普通に動く。他の日本語 IME と挙動が揃う | 「英語も自動で打てる」設計の Meltype が、アプリから「日本語専用の IME」とみなされる。パスワード欄などで自動で別ソースに切り替わる動作が増える可能性。ascii=0 だと Cmd ショートカットやキー変換に使う配列が直前の ASCII 対応ソースに依存する (Roman モードがその戻り先になるかは未確認)。Firefox は日本語モード中に IME 開と判定する。Meltype のモード自動記憶 (アプリ別に英数を覚える) と干渉するかは未確認 |
 | 辞書のキーを標準名にする | 標準名に揃うので、Caps Lock・システムの日本語キー対応と相性がよい可能性 | **下の「更新する人への影響」の登録が外れるおそれ** |
 | 変えない | 利用者への影響なし | 報告者の Emacs の操作性は直らない |
 
@@ -64,11 +66,12 @@
 
 ## 更新する人への影響
 - 今の `build.sh`/`install.sh` は Meltype.app を**消さずに中身だけを入れ替える**ので、macOS の入力ソースの登録は残る (mac/README.md 40 行目付近)。Info.plist の変更が反映されるには、IME の再起動と TIS の再読み込み (ログアウト・ログインが確実) が必要になる可能性が高い (`ComponentInputModeDict` の変更が実行中に反映されるかは未確認)。「英数」モードを足した版 (README 304 行目) は「ログアウトしてログインし直してください」と案内している前例がある。
-- **有効な入力ソースの一覧 (`AppleEnabledThirdPartyInputSources`) は、モードを `Input Mode` に辞書のキー名で記録している。** この Mac では実際に次のとおり (読み取りのみ):
+- **`com.apple.inputsources` の `AppleEnabledThirdPartyInputSources` (`com.apple.HIToolbox` のキーではない) は、モードを `Input Mode` に辞書のキー名で記録している。** この Mac で `defaults read com.apple.inputsources AppleEnabledThirdPartyInputSources` を読み取りだけで確かめ、Meltype の項目だけ見た結果:
   - `Input Mode` = `io.github.yksr-melt.inputmethod.Meltype.Japanese` ← 日本語 (辞書のキーと `TISInputSourceID` が同じ)
   - `Input Mode` = `com.apple.inputmethod.Roman` ← 英数 (**辞書のキー**。`TISInputSourceID` は `...Meltype.Roman` で別)
   - Google も `Input Mode` が標準名のキー (`com.apple.inputmethod.Japanese` など) で、`TISInputSourceID` (`com.google.inputmethod.Japanese.base`) ではない。
   - したがって**日本語モードの辞書のキーを標準名に改名すると、既存の登録 (`...Meltype.Japanese`) がどのモードにも当たらなくなり、更新した人の日本語モードが無効化される (入力メニューから消える) おそれがある**。`build.sh`/`install.sh` の予備登録 (`defaults write`) と `Registration.swift` の `modeID` も書き換えが要る。英数のときのような「新しいモードが足された」場合と違い、既存のモードの名前が変わる点が危険。
+  - 案 (c) の影響範囲はこれだけではない。`com.apple.HIToolbox` の `AppleSelectedInputSources` (日本語の項目) と `AppleInputSourceHistory` (日本語・英数の項目) にも、同じ形の `Input Mode` の項目が Meltype 分ある (読み取りのみ)。改名するとこれらも古いキーを指したままになる。
 - 一方、モード側の `tsInputModeCharacterRepertoireKey` を外すだけなら、キー名も `TISInputSourceID` も変わらないので、登録は壊れない。
 - **モード ID (`TISInputSourceID`) は変えない。** `Registration.swift`・`InputController.swift` の `selectMode`・アプリ別設定・利用者の保存設定がこの ID を使うため。
 
