@@ -1,6 +1,6 @@
 ---
 title: Zenzai に右文脈 (カーソルの後ろの文字) を渡すと精度が上がるかを測る
-status: draft   # draft | approved | done。approved にするのは人
+status: approved   # draft | approved | done。approved にするのは人
 source: 要件 047 の判断事項 4 (2026-11-26、リョウさんの指示「おすすめで」: 別の要件にして先に測る)
 scope: swift (実機必須)
 ---
@@ -47,4 +47,5 @@ scope: swift (実機必須)
 - トレースログ (`MeltypeTraceIMK`) が要りそうになったとき (取る前に同意を得る)
 
 ## 記録 (ループが書く)
+- 2026-11-26: リョウさんが承認 (「承認するので測定に進んでください」)。status を approved にした。
 - 2026-11-26: 下書き。
