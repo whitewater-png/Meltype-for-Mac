@@ -17,6 +17,22 @@ scope: swift (実機必須)
 - 英数キーは `handle` の中で `NativeCore.setDirect` を直接呼ぶので、この比べ方を通らない。
 - 本家 (yksr-melt/Meltype) の扱い: 本家に無い (Mac 版の仕組み)。
 
+## 前提: setValue に辞書のキーが来るとする根拠 (2026-11-26 に Web で確認)
+- azooKey-Desktop: `setValue` が `value == "com.apple.inputmethod.Roman"` で英語モードを判定し、メニューバーからの切り替えに対応している。plist は辞書のキーが標準名で、`TISInputSourceID` は独自 ID (`dev.ensan.inputmethod.azooKeyMac.Roman`) で、Meltype と同じ構成。
+  https://raw.githubusercontent.com/azooKey/azooKey-Desktop/main/azooKeyMac/InputController/azooKeyMacInputController.swift /
+  https://raw.githubusercontent.com/azooKey/azooKey-Desktop/main/azooKeyMac/Info.plist
+- EmojiIM (mzp): `setValue` で `directMode = value == "com.apple.inputmethod.Roman"`。plist は同じ構成 (キー標準名・`TISInputSourceID` は `jp.mzp.inputmethod.EmojiIM.roman`)。
+  https://raw.githubusercontent.com/mzp/EmojiIM/master/Sources/InputMethodKit/EmojiInputController.swift /
+  https://raw.githubusercontent.com/mzp/EmojiIM/master/Resources/EmojiIM/Info.plist
+- AquaSKK 開発日記 (2010-04-29): 入力メニューから入力モードを変えると `setValue:forTag:client:` が呼ばれ、「tag が kTextServiceInputModePropertyTag の時、value には "com.apple.inputmethod.Japanese.Hiragana" 等の modeIdentifier が渡されてくる」。`selectInputMode:` の modeIdentifier は「Info.plist の ComponentInputModeDict に記述した入力モードのどれかと一致している必要がある」。(ブログの記述であって Apple の仕様ではない。)
+  https://t-suwa.hatenadiary.org/entry/20100429
+- Apple TN2128: メニューから入力モードが選ばれると `kTextServiceInputModePropertyTag` で「input mode specifier」の文字列が渡される。標準の specifier (`com.apple.inputmethod.Roman` など) を使うよう勧めている。
+  http://leopard-adc.pepas.com/technotes/tn2005/tn2128.html
+- TextInputSources.h (`kTISPropertyInputSourceID`): 入力モードの ID は「親の入力メソッドの bundle ID + 接尾辞」で、「入力メソッドをまたいで使う一般の入力モード名 (`com.apple.inputmethod.Japanese.Katakana` など) ではない」。つまり TISInputSourceID と標準の入力モード名は別のもの。
+  https://github.com/phracker/MacOSX-SDKs/blob/master/MacOSX10.15.sdk/System/Library/Frameworks/Carbon.framework/Versions/A/Frameworks/HIToolbox.framework/Versions/A/Headers/TextInputSources.h
+- この Mac の `com.apple.inputsources` の `AppleEnabledThirdPartyInputSources` (読み取りだけ): Meltype の英数は `Input Mode` = `com.apple.inputmethod.Roman` (辞書のキー) で記録され、日本語は `...Meltype.Japanese` (ID = キー)。入力ソースの登録の側がキーで持っていることの傍証で、setValue に来る値そのものの証拠ではない。
+- **実機でその文字列を見た証拠はまだ無い。** 利用者の既存の記録 (imk-trace.log) には、英数をメニューから選んだ行が無かった (反証ではない。選んでいないだけ)。
+
 ## minimum の要件 (これだけは満たす)
 1. setValue で受け取ったモードの文字列が英数の辞書のキー (`com.apple.inputmethod.Roman`) でも英数の ID と同じに扱い、直接入力にする (`InputSourceRegistration.canonicalModeID`)。
 2. 日本語の ID・英数の ID・知らない文字列の扱いは変えない (知らない文字列は今までどおり何もしない)。
