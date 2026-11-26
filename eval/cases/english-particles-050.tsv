@@ -66,3 +66,7 @@ parseJSONtoObject	parseJSONtoObject	full	要件 050 の守り (査読: 小文字
 loadCSVtoTable	loadCSVtoTable	full	要件 050 の守り (査読)
 kyouhaMac.goodbye	きょうはMac。goodbye	full	要件 050 の守り (査読: . の後ろのふつうの英単語は句点のまま)
 kyouhaMac.mailde	きょうはMac。mailで	full	要件 050 の守り (査読)
+meltype.appnoInfo.plist	meltype.appのInfo.plist	full	要件 050 (査読 2 周目: 拡張子 + 助詞の後ろの、一覧に無い拡張子の名前)
+Cargo.tomltoInfo.plistwomiru	Cargo.tomlとInfo.plistをみる	full	要件 050 (査読 2 周目)
+index.htmltoStyle.scss	index.htmlとStyle.scss	full	要件 050 (査読 2 周目)
+main.swiftnoApp.entitlements	main.swiftnoApp.entitlements	full	要件 050 の守り (査読 2 周目: 次の名前が英字にならない語 (App) なら分けない。base と同じ)

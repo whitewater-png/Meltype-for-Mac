@@ -78,6 +78,10 @@ internal static class EnglishParticle050Tests
             ["kyouhaword.ainimiru"] = "きょうはword。あいにみる",
             ["kyouhaMac.cokode"] = "きょうはMac。ここで",
             ["kyouhaMac.goodbye"] = "きょうはMac。goodbye",
+            // 査読 2 周目: 拡張子 + 助詞の後ろの、一覧に無い拡張子の名前 (plist・scss)
+            ["meltype.appnoInfo.plist"] = "meltype.appのInfo.plist",
+            ["index.htmltoStyle.scss"] = "index.htmlとStyle.scss",
+            ["main.swiftnoApp.entitlements"] = "main.swiftnoApp.entitlements",
         });
     }
 

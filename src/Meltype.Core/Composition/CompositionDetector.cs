@@ -512,9 +512,25 @@ public sealed class CompositionDetector
         var name = (Raw(units, start, end) + (end == units.Count ? pending : "")).ToLowerInvariant();
         static bool Full(RomajiAnalysis a) => a is { IsValid: true, Partial: "" or "n" };
         if (!name.All(char.IsAsciiLetter)) return true;
+        // 拡張子 + 助詞の後ろの、大文字で始まる次の名前 (meltype.app|no|Info.plist、index.html|to|Style.scss) の . は、一覧に無い拡張子でも半角
+        if (FollowsSplitDottedName(units, start - 1)) return true;
         // ふつうの英単語 (Mac.goodbye・Mac.mail) は、文末の英単語 + 句点 + 次の文の英単語かもしれないので含めない。一覧の拡張子・ドメインだけ
         if (!DomainSuffixes.Contains(name) && !FileExtensions.Contains(name) && !SplitStems.Contains(name)) return false;
         return !Full(_romaji.Analyze(name)) && !Full(_romaji.Analyze(RomajiDetector.ReadCRow(name)));
+    }
+
+    /// <summary>
+    /// . の前の語が大文字で始まり、その前が「名前.拡張子 + 助詞」(meltype.app|no) か (要件 050 の査読)。
+    /// DotSuffixEnd が助詞の前で終えた名前の、次の名前の . を見分ける。
+    /// </summary>
+    private static bool FollowsSplitDottedName(IReadOnlyList<CompositionUnit> units, int dot)
+    {
+        var word = dot;
+        while (word > 0 && units[word - 1].Raw.Length > 0 && units[word - 1].Raw.All(char.IsAsciiLetter) && !IsParticle(units[word - 1].Raw)) word--;
+        if (word == dot || !char.IsAsciiLetterUpper(units[word].Raw[0]) || word < 3 || !IsParticle(units[word - 1].Raw)) return false;
+        var stem = word - 1;
+        while (stem > 0 && units[stem - 1].Raw.Length > 0 && units[stem - 1].Raw.All(char.IsAsciiLetterOrDigit)) stem--;
+        return stem < word - 1 && stem > 0 && units[stem - 1].Raw == ".";
     }
 
     /// <summary>. の前の英字の並び (dot の直前まで) が、版の名前に付ける語 (preview・beta・rc・build) か (要件 050)。</summary>
@@ -1404,7 +1420,10 @@ public sealed class CompositionDetector
             if (!DomainSuffixes.Contains(stem) && !FileExtensions.Contains(stem) && !SplitStems.Contains(stem)) continue;
             var rest = Raw(units, k, end);
             if (TrailingParticles.FirstOrDefault(p => rest.StartsWith(p, StringComparison.Ordinal)) is { } particle &&
-                rest.Length > particle.Length && char.IsAsciiLetterUpper(rest[particle.Length])) return k;
+                rest.Length > particle.Length && char.IsAsciiLetterUpper(rest[particle.Length]) &&
+                // 次の名前が英字のまま残る語 (知っている語・大文字だけの略語) のときだけ。そうでない語 (App) は、分けると かな になる (Aっp)
+                rest[particle.Length..].TakeWhile(char.IsAsciiLetter).ToArray() is var nextName &&
+                (nextName.All(char.IsAsciiLetterUpper) || IsKnownCapitalizedWord(new string(nextName)))) return k;
         }
         // . / - で続く所まで 1 つの名前 (abi.json、go.work.sum、cargo/config.toml、db-journal)
         while (end + 1 < n && units[end].Raw is "." or "/" or "-" && IsPart(units[end + 1]))
