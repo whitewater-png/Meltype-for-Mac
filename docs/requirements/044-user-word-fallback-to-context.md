@@ -33,6 +33,12 @@ scope: core
 3. 1 回目の表示 (文節の区切り・文字) は変えない。`shuuga`・`shuuwo`・`shuu` は今までどおり Space 1 回で登録語。
 4. 伸ばして確定した文節は選び直しとして学習する (しゅうさん → 集散。今までの `History` のまま)。学習してあれば、次からは登録語で割らずエンジンの文節 (学習した変換) を先に出す。新しい設定項目は作らない。ユーザー辞書は書き換えない。
 
+## 学習の効き方と例外 (実測・テストで確認)
+- 学習は しゅうさん 以外の付属語つき読みにも効く。例: しゅうが → 周が を学習済みなら、Space 1 回目が 周が になる (登録語で割らない)。
+- しゅう → 週 を学習済みの人は、初回の並びが 週・秋・集散 になり、集散 は 3 番目になる (Expand 後は 2 番目に戻る例外)。
+- 集散 を選んだ後は、Space / ↑ の周回では登録語に戻れない。戻るのは Esc → Space か Shift+← を 2 回 (非目標どおり)。
+- PageUp / PageDown は、元の区切りに戻る候補 (集散) には着地しない (9 件ずつ動くため)。
+
 ## 非目標 (今回はやらない)
 - 登録語を Space 1 回目から外すこと (案 B)。
 - 長い (拍数 3 以上) 登録語がエンジンの文節の途中に入ること (さくらんぼ など) への対応。常に使う扱いのまま (エンジンを呼ばないので候補も足さない)。
@@ -40,8 +46,8 @@ scope: core
 - Windows・Linux の確認。
 
 ## 完成条件
-- [x] テスト: `src/Meltype.Core.Tests/UserWordFallbackTests.cs` (8 件)。変更前の Core で 5 件が赤 (候補の 2 番目が 集散 でない / Space 2 回で 週 + さん)、守りの 1 件 (別の読みの学習は影響しない) は前後とも緑。偽のエンジンは、実際の azooKey が返した区切りと同じ形。
-- [x] 既存テストの変更 1 件 (意図した変更): `UserWordAlignmentTests.ShortUserWordAtTheHead_NeedsTheWholeReadingConverted_...` の後半。語 + 助詞だけの入力は、打っている間は全体を変換しないが、Space では全体を 1 回変換する (候補の 2 番目を作るため。損 4)。
+- [x] テスト: `src/Meltype.Core.Tests/UserWordFallbackTests.cs` (8 件) と、既存ファイルに足した守りのテスト 1 件 (`UserWordAlignmentTests.ShortUserWordWithParticle_OutsideSpace_...`)。変更前の Core で赤になった新テストは実測 7 件 (候補の 2 番目が 集散 でない / Space 2 回で 週 + さん など)、守りの 1 件 (別の読みの学習は影響しない) は前後とも緑。偽のエンジンは、実際の azooKey が返した区切りと同じ形。
+- [x] 既存テストの変更 1 件 (意図した変更): `UserWordAlignmentTests.ShortUserWordAtTheHead_NeedsTheWholeReadingConverted_...` の後半。語 + 助詞だけの入力は、打っている間は全体を変換しないが、Space では全体を 1 回変換する (候補の 2 番目を作るため。損 3)。この変更で「呼ばない」の守りが弱くなったので、`ShortUserWordWithParticle_OutsideSpace_DoesNotCallTheEngineForTheWholeReading` を足した。ライブ変換は しのが だけの間は変換せず、Enter もかなで確定するので、打鍵では Space 以外でこの経路に来られない。そのためテストは変換の入口 (`ConvertJapanese`) をリフレクションで直接呼ぶ。判定の `|| _offerEngineClause` を `|| true` にすると、このテストだけが赤になる (1369/1370) ことを確かめて戻した。
 - [x] 回帰なし: Core のテスト 1361 → 1369 全件通過、`tools/eval-compare.sh` (base 7f85739) broken 0 / fixed 0 / added 0 / removed 0、`tools/boundary-sweep.sh full` 684,122 入力で日本語の損失 0・英語の損失 0・その他の変化 0 (登録語を持たない入力なので副作用の確認だけ)。
 - [x] 大量の打ち比べ (下)。
 
