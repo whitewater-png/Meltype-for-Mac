@@ -50,7 +50,7 @@ scope: swift (実機必須)
 
 ## 完成条件 (先に決める。機械で判定できる形)
 - [ ] 計測: AJIMEE 200・Flash 40 件 (右文脈なし) で、変更前と第一候補が全行同じ
-- [ ] 計測: 049 の表を Swift の口 (`--convert-eval`、049 と同じ測り方) で流し、右文脈ありが 287/306 以上。Core の経路 (区切り・左文脈の比べ合い) の差はこの道具では測れないので、「測れていないこと」に書く
+- [ ] 計測: 049 の表を Swift の口 (`--convert-eval`。`measurementRightContext` ではなく、製品で足す `clauses` の右文脈の引数を通す) で流し、右文脈ありが 287/306 以上。Core の経路 (区切り・左文脈の比べ合い) の差はこの道具では測れないので、「測れていないこと」に書く
 - [ ] Core のテスト: `src/Meltype.Core.Tests/CompositionTests.cs` に足す。要点: (1) `after` が最後の区切りの変換の要求に右文脈として渡る、(2) 空なら渡らない (要求が今と同じ)、(3) 左文脈あり / なしの両方の要求に同じ右文脈が付く、(4) 右文脈が違えばキャッシュに当たらない
 - [ ] FFI: `AbiVersion` を 14 に上げ、Mac で `mac/build.sh` と `tools/check-mac-aot-settings.py` が通る
 - [ ] 回帰なし: Core のテスト全件通過、`tools/eval-compare.sh` の broken 0
