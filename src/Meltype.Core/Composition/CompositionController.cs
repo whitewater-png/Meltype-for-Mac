@@ -427,6 +427,12 @@ public sealed class CompositionController
         /// <summary>Windows の変換候補 API の候補を足したか。</summary>
         public bool Expanded { get; set; }
 
+        /// <summary>
+        /// 登録語の文節で、変換エンジンの元の区切りでは、この語 + 後ろの付属語が 1 文節だった (しゅうさん → 集散) とき、その文節の読みと変換 (要件 044)。
+        /// 候補の 2 番目にその変換を置き、選ぶと文節がその読みに戻る (<see cref="CompositionController.TakeLongerReading"/>)。
+        /// </summary>
+        public (string Reading, string Text)? Longer { get; set; }
+
         /// <summary>この文節の読みを打ったときの英字 (あぴ → api)。分からなければ null。</summary>
         public string? Raw { get; set; }
 
@@ -656,6 +662,7 @@ public sealed class CompositionController
         if (index < 0 || index >= clause.Candidates.Count) return;
         clause.Index = index;
         clause.Changed = true;
+        TakeLongerReading(clause);
         UpdateView();
     }
 
@@ -1621,6 +1628,7 @@ public sealed class CompositionController
                 {
                     clause.Index = n - 1;
                     clause.Changed = true;
+                    TakeLongerReading(clause);
                     Commit();
                 }
                 return true;
@@ -1636,11 +1644,13 @@ public sealed class CompositionController
                 if (!clause.IsEnglish && !clause.Expanded) Expand(clause);
                 clause.Index = Math.Min(clause.Index + 9, clause.Candidates.Count - 1);
                 clause.Changed = true;
+                TakeLongerReading(clause);
                 return true;
             case VirtualKeys.Prior:
                 if (!clause.IsEnglish && !clause.Expanded) Expand(clause);
                 clause.Index = Math.Max(clause.Index - 9, 0);
                 clause.Changed = true;
+                TakeLongerReading(clause);
                 return true;
             // 格子状の候補 (Tab で広げた 5 列) では矢印を格子の向きに動かす: ← → は 1 つ、↑ ↓ は 1 行。
             case VirtualKeys.Left or VirtualKeys.Right or VirtualKeys.Up or VirtualKeys.Down
@@ -2020,7 +2030,11 @@ public sealed class CompositionController
                 continue;
             }
             if (segment.Kana.Length == 0) continue;
-            var japanese = ConvertJapanese(segment.Kana);
+            // Space で変換するときだけ、登録語が割った変換エンジンの文節 (しゅうさん → 集散) を候補の 2 番目に足す (要件 044)
+            _offerEngineClause = true;
+            List<Clause> japanese;
+            try { japanese = ConvertJapanese(segment.Kana); }
+            finally { _offerEngineClause = false; }
             // 英単語 + する (push|した、deploy|しよう): 変換エンジンは英語の後ろの「した」だけを見て 下・死体・使用 にしてしまう。かなのまま
             if (s > 0 && segments[s - 1].IsEnglish && japanese.Count > 0 && IsSuruAfterEnglish(japanese[0])) Prefer(japanese[0], japanese[0].Reading);
             // 候補の最後に、打ったままの英字 (あぴ → api) と全角の英字も出す (Space を連打して英字に戻せる)。
@@ -2150,18 +2164,27 @@ public sealed class CompositionController
             return result;
         }
         if (_options.UserDictionary?.Split(kana) is not { } pieces) return ConvertWithEngine(kana);
-        pieces = AlignUserWords(kana, pieces, out var wholeByEngine);
+        pieces = AlignUserWords(kana, pieces, out var wholeByEngine, out var longerAt);
         if (wholeByEngine is not null) return wholeByEngine;
         var clauses = new List<Clause>();
         var registered = new List<Clause>();
+        var at = 0;
         foreach (var (reading, word) in pieces)
         {
+            var start = at;
+            at += reading.Length;
             if (word is null)
             {
                 clauses.AddRange(ConvertWithEngine(reading));
                 continue;
             }
             var clause = new Clause(reading, false, JapaneseCandidates(reading, word));
+            if (longerAt.TryGetValue(start, out var longer))
+            {
+                clause.Longer = longer;
+                clause.Candidates.Remove(longer.Text);
+                clause.Candidates.Insert(Math.Min(1, clause.Candidates.Count), longer.Text);
+            }
             clauses.Add(clause);
             registered.Add(clause);
         }
@@ -2219,13 +2242,17 @@ public sealed class CompositionController
     /// 同梱の語句 (phrases.txt) と同梱の専門用語集の強制語は、変換エンジンが区切りを間違える語を補うものなので、そのまま使う。
     /// 使わなくなった語は、文節の区切りを Shift+←→ で変えれば、候補から選べる。
     /// 変換エンジンを余分に呼ぶのは、短い (拍数がしきい値より短い) ユーザーの語が、読みの先頭以外から始まるとき、または先頭で後ろに付属語 (<see cref="UserWordTrailers"/>) でないかなが続くときだけ (要件 043。先頭の語 + 付属語だけなら、文節の一部だけを覆うことはないので呼ばない)。
+    /// 例外 (要件 044): Space で変換するとき (<see cref="_offerEngineClause"/>) と、語 + 付属語の変換を学習してあるときは、語 + 付属語だけでも全体を呼ぶ。
+    /// 前者は、登録語が割ったエンジンの文節 (しゅうさん → 集散) を、登録語の文節の候補の 2 番目に出す (<see cref="Clause.Longer"/>) ため。後者は、一度選んだ 集散 を次から先に出すため。
     /// 結果はキャッシュ付きの ConvertWithEngine と同じなので、同じ読みは打つたびにまた変換しない。
     /// 変換エンジンが文節に区切れなかったとき (ConvertClauses が null) は、文節の頭が分からないので、何も変えずに元の語の割り当てを返す。
     /// 使う語が 1 つも残らなければ、変換エンジンの結果 (wholeByEngine) をそのまま返す。
     /// </summary>
-    private List<(string Reading, string? Word)> AlignUserWords(string kana, List<(string Reading, string? Word)> pieces, out List<Clause>? wholeByEngine)
+    private List<(string Reading, string? Word)> AlignUserWords(string kana, List<(string Reading, string? Word)> pieces, out List<Clause>? wholeByEngine,
+        out Dictionary<int, (string Reading, string Text)> longerAt)
     {
         wholeByEngine = null;
+        longerAt = [];
         if (_options.UserDictionary is not { } dictionary) return pieces;
         var position = 0;
         var inside = false;
@@ -2233,7 +2260,7 @@ public sealed class CompositionController
         {
             // 短い語は、途中から始まるとき (position > 0) に加え、先頭でも、後ろに助詞でないかなが続くなら、エンジンの文節の読みの一部だけを覆うことがある (要件 043)
             if (word is not null && UserWordMoraCount(reading) < InsideClauseMinReadingLength && dictionary.IsUserReading(reading)
-                && (position > 0 || !UserWordTrailers.Contains(kana[(position + reading.Length)..]))) inside = true;
+                && (position > 0 || !UserWordTrailers.Contains(kana[(position + reading.Length)..]) || _offerEngineClause || HasLearnedWithTrailer(reading, kana[(position + reading.Length)..]))) inside = true;
             position += reading.Length;
         }
         if (!inside) return pieces;
@@ -2242,13 +2269,20 @@ public sealed class CompositionController
         if (failed || string.Concat(engine.Select(c => c.Reading)) != kana) return pieces;
         var starts = new HashSet<int>();
         var clauseAt = new Dictionary<int, string>();
-        for (int i = 0, offset = 0; i < engine.Count; offset += engine[i].Reading.Length, i++) { starts.Add(offset); clauseAt[offset] = engine[i].Reading; }
+        var clauseTextAt = new Dictionary<int, string>();
+        for (int i = 0, offset = 0; i < engine.Count; offset += engine[i].Reading.Length, i++) { starts.Add(offset); clauseAt[offset] = engine[i].Reading; clauseTextAt[offset] = engine[i].Text; }
         var aligned = new List<(string Reading, string? Word)>();
         position = 0;
         foreach (var (reading, word) in pieces)
         {
             var keep = word is not null && (UserWordMoraCount(reading) >= InsideClauseMinReadingLength || !dictionary.IsUserReading(reading)
-                || (starts.Contains(position) && !CoversOnlyPartOfClause(reading, clauseAt[position])));
+                || (starts.Contains(position) && !CoversOnlyPartOfClause(reading, clauseAt[position]) && !IsLearnedEngineClause(reading, clauseAt[position])));
+            // 登録語が変換エンジンの文節 (語 + 付属語) を割ったときは、エンジンの文節の変換を候補の 2 番目に出せるよう覚えておく (要件 044)。
+            // 付属語がかなのまま (秋が) なら、登録語 + 助詞と同じ意味なので足さない
+            if (keep && word is not null && UserWordMoraCount(reading) < InsideClauseMinReadingLength && dictionary.IsUserReading(reading) && starts.Contains(position)
+                && clauseAt[position] is var whole && whole.Length > reading.Length && whole.StartsWith(reading, StringComparison.Ordinal)
+                && !clauseTextAt[position].EndsWith(whole[reading.Length..], StringComparison.Ordinal) && clauseTextAt[position] != whole)
+                longerAt[position] = (whole, clauseTextAt[position]);
             // 使わない語の読みは、前後の変換エンジンに渡す部分とつなげる
             if (!keep && aligned.Count > 0 && aligned[^1].Word is null) aligned[^1] = (aligned[^1].Reading + reading, null);
             else aligned.Add(keep ? (reading, word) : (reading, null));
@@ -2278,6 +2312,19 @@ public sealed class CompositionController
     /// 損: 登録語 + 助詞でも、エンジンが表にない付属語 (しゅうだった など) を含めて 1 文節にしたときは使われない (Shift+←→ で区切り直せば候補から選べる)。
     /// 語が複数の文節にまたがるとき (clause が語より短い)・語の読みと文節の頭が違うときは、今までどおり使う。
     /// </summary>
+    /// <summary>Space で変換しているあいだ true (<see cref="Clause.Longer"/> を作るために、登録語 + 付属語でも変換エンジンの文節を調べる)。</summary>
+    private bool _offerEngineClause;
+
+    /// <summary>
+    /// 登録語 + 付属語の文節 (しゅうさん) の変換を、前に選び直して学習していれば true (要件 044)。そのときは登録語で割らず、エンジンの文節 (学習した変換) を使う。
+    /// 得: 一度 集散 を選べば、次からは Space 1 回で 集散。損: 学習した後に名前 + さん にしたいときは、文節を縮めて登録語の文節を出す。
+    /// </summary>
+    private bool IsLearnedEngineClause(string word, string clause) =>
+        clause.Length > word.Length && clause.StartsWith(word, StringComparison.Ordinal) && _options.History?.Get(clause) is not null;
+
+    private bool HasLearnedWithTrailer(string word, string rest) =>
+        _options.History is { } history && UserWordTrailers.Any(t => rest.StartsWith(t, StringComparison.Ordinal) && history.Get(word + t) is not null);
+
     private static bool CoversOnlyPartOfClause(string word, string clause) =>
         clause.Length > word.Length && clause.StartsWith(word, StringComparison.Ordinal) && !UserWordTrailers.Contains(clause[word.Length..]);
 
@@ -2903,6 +2950,7 @@ public sealed class CompositionController
         }
         clause.Index = target;
         clause.Changed = true;
+        TakeLongerReading(clause);
     }
 
     private void NextCandidate(int step)
@@ -2911,6 +2959,7 @@ public sealed class CompositionController
         if (!clause.IsEnglish && !clause.Expanded) Expand(clause);
         clause.Index = (clause.Index + step + clause.Candidates.Count) % clause.Candidates.Count;
         clause.Changed = true;
+        TakeLongerReading(clause);
     }
 
     /// <summary>
@@ -2927,8 +2976,42 @@ public sealed class CompositionController
         {
             if (!merged.Contains(candidate)) merged.Add(candidate);
         }
+        // 登録語の文節の、エンジンの元の区切りの変換 (集散) は、エンジンの候補が増えても 2 番目に置く (要件 044)
+        if (clause.Longer is { } longer)
+        {
+            merged.Remove(longer.Text);
+            merged.Insert(Math.Min(1, merged.Count), longer.Text);
+        }
         clause.Candidates = merged;
         clause.Index = Math.Max(0, merged.IndexOf(current));
+    }
+
+    /// <summary>
+    /// 登録語の文節 (しゅう → ★) で、候補の 2 番目の「エンジンの元の区切りの変換」(<see cref="Clause.Longer"/>。しゅうさん → 集散) を選んだら、
+    /// 文節を元の読み (しゅうさん) まで伸ばす。伸ばし方は Shift+→ と同じ (後ろの文節から読みを取り、変わった文節は読みから変換し直す)。
+    /// 伸ばした文節は選び直した扱いにするので、確定すると しゅうさん → 集散 を学習する。伸ばせないとき (後ろが英語の文節など) は、その候補を取り除く。
+    /// </summary>
+    private void TakeLongerReading(Clause clause)
+    {
+        if (clause.Longer is not { } longer || clause.Text != longer.Text) return;
+        var at = _clauses.IndexOf(clause);
+        var need = longer.Reading.Length - clause.Reading.Length;
+        var possible = at == _selectedClause && !(_headCount > 0 && at == _headCount - 1);
+        for (var j = at + 1; possible && need > 0; j++)
+        {
+            if (j >= _clauses.Count || _clauses[j].IsEnglish) possible = false;
+            else need -= _clauses[j].Reading.Length;
+        }
+        if (!possible)
+        {
+            clause.Longer = null;
+            clause.Candidates.Remove(longer.Text);
+            clause.Index = 0;
+            return;
+        }
+        while (clause.Reading.Length < longer.Reading.Length) Resize(+1);
+        Prefer(clause, longer.Text);
+        clause.Changed = true;
     }
 
     /// <summary>
@@ -2996,6 +3079,7 @@ public sealed class CompositionController
     private void Reconvert(Clause clause)
     {
         clause.Candidates = JapaneseCandidates(clause.Reading, null);
+        clause.Longer = null;
         // 読みが変わったので候補一覧は引き直す。選択中の文節は伸縮前に開いた印 (Expanded) が残っていて、
         // 以後 Expand が呼ばれず作り直した 3〜4 件に固定されていた (Q26)。
         clause.Expanded = false;
