@@ -6,11 +6,13 @@ import Foundation
 /// `MeltypeIME --convert-eval <tsv>`: かな → 漢字の正解表を、製品と同じ `MeltypeConverter` の経路で流し、
 /// 行ごとに第一候補と一致を TSV で出します (`tools/ajimee-eval.py` が読んで採点する)。
 ///
-/// 入力の列 (Tab 区切り、4 列。先頭が `#` の行は無視):
-/// `id`	`reading`	`accepted`	`left_context`
+/// 入力の列 (Tab 区切り、4 列か 5 列。先頭が `#` の行は無視):
+/// `id`	`reading`	`accepted`	`left_context`	`right_context`
 /// - `reading`: ひらがなの読み (空の行は飛ばす)
 /// - `accepted`: 正解。複数許容は `|` 区切り
 /// - `left_context`: 左文脈 (無ければ空 → `context: nil`)
+/// - `right_context`: 任意。右文脈 (カーソルの後ろの文字)。Zenzai ON のときだけ効く (`MeltypeConverter.measurementRightContext`。要件 049)。
+///   列が無い・空の行は今までと同じ要求になる。`--ignore-right-context` を付けると、5 列目があっても使わない (同じ表で「なし」を測るため)
 ///
 /// 出力 (stdout): 1 行 1 件 `id<TAB>hit<TAB>top<TAB>ms` と、末尾に `# summary ...`。
 /// `--top <N>` を付けると 5 列目に、同じ読みの候補を上位 N 個 (重複なし、U+001F 区切り) 出す。第一候補しか見えないと、
@@ -34,6 +36,7 @@ enum ConvertEval {
         let reading: String
         let accepted: Set<String>
         let context: String
+        let rightContext: String
     }
 
     private static func parse(_ text: String) -> [Row] {
@@ -47,7 +50,8 @@ enum ConvertEval {
             rows.append(Row(id: columns.count > 0 ? columns[0] : String(index),
                             reading: columns[1],
                             accepted: Set(accepted),
-                            context: columns.count >= 4 ? columns[3] : ""))
+                            context: columns.count >= 4 ? columns[3] : "",
+                            rightContext: columns.count >= 5 ? columns[4] : ""))
         }
         return rows
     }
@@ -112,6 +116,7 @@ enum ConvertEval {
             return false
         }
         let productCandidates = arguments.contains("--product-candidates")
+        let ignoreRightContext = arguments.contains("--ignore-right-context")
         var topCount = 0
         if let topFlag = arguments.firstIndex(of: "--top"), arguments.indices.contains(topFlag + 1),
            let value = Int(arguments[topFlag + 1]), value > 0 {
@@ -173,11 +178,13 @@ enum ConvertEval {
         var hits = 0
         var withContext = (0, 0)
         var withoutContext = (0, 0)
+        var withRight = (0, 0)
         var times: [Double] = []
         var firstMismatch = 0   // --top のとき、候補の先頭が第一候補 (clauses) と食い違った行数 (0 のはず)
         for row in rows {
             // 行ごとに組版を終えて、前の行の差分変換・学習が次の行に食い込まないようにする
             converter.endComposition()
+            converter.measurementRightContext = (ignoreRightContext || row.rightContext.isEmpty) ? nil : row.rightContext
             let start = Date()
             let top = converter.clauses(for: row.reading, context: row.context.isEmpty ? nil : row.context).map(\.text).joined()
             let ms = Date().timeIntervalSince(start) * 1000
@@ -185,6 +192,7 @@ enum ConvertEval {
             let hit = row.accepted.contains(top)
             if hit { hits += 1 }
             if row.context.isEmpty { withoutContext.1 += 1; if hit { withoutContext.0 += 1 } } else { withContext.1 += 1; if hit { withContext.0 += 1 } }
+            if !row.rightContext.isEmpty { withRight.1 += 1; if hit { withRight.0 += 1 } }
             var line = "\(row.id)\t\(hit ? 1 : 0)\t\(top)\t\(String(format: "%.1f", ms))"
             if topCount > 0 {
                 // 時間を測ったあとで候補を取る (測定に入れない)。表の都合で、タブ・改行は空白にして U+001F で区切る
@@ -192,6 +200,7 @@ enum ConvertEval {
                 var list: [String] = []
                 let texts: [String]
                 if productCandidates {
+                    converter.measurementRightContext = nil   // 製品の候補ウィンドウには右文脈を渡さない
                     texts = converter.candidates(for: row.reading)   // 製品の候補ウィンドウの経路 (左文脈なし)
                 } else {
                     texts = converter.rawMainResults(for: row.reading, context: row.context.isEmpty ? nil : row.context).map(\.text)
@@ -211,6 +220,10 @@ enum ConvertEval {
         let p95 = times[(times.count * 95 + 99) / 100 - 1]
         print("# summary 行数 \(rows.count) 第一候補の完全一致 \(hits) 件 (\(String(format: "%.1f", Double(hits) * 100 / Double(rows.count)))%)")
         print("# summary 左文脈あり \(withContext.0)/\(withContext.1) 左文脈なし \(withoutContext.0)/\(withoutContext.1)")
+        if withRight.1 > 0 {
+            let used = ignoreRightContext ? "使わない (--ignore-right-context)" : (zenzai == nil ? "Zenzai なしなので効かない" : "使う")
+            print("# summary 右文脈のある行 \(withRight.0)/\(withRight.1) (右文脈は\(used))")
+        }
         if topCount > 0 {
             // --product-candidates のときは、文脈なしの候補 (candidates(for:)) と、文脈ありの第一候補 (clauses) は先頭が違ってよいので、数えない
             print(productCandidates ? "# summary --top \(topCount) (--product-candidates): 先頭と第一候補の食い違いは数えない"

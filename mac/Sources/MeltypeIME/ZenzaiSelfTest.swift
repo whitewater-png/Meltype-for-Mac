@@ -245,6 +245,67 @@ enum ZenzaiSelfTest {
             check(again.isReady && status(again)?.state == .ready, "検査を通ると『準備できました』")
         }
 
+        // 8c2. 前の版のモデル (要件 047): 今のモデルの準備ができたあと、名前・サイズ・SHA-256 が合う通常のファイルだけを消す。失敗したときは消さない
+        do {
+            func waitGone(_ url: URL, seconds: TimeInterval) -> Bool {
+                let limit = Date().addingTimeInterval(seconds)
+                while FileManager.default.fileExists(atPath: url.path) && Date() < limit {
+                    RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.1))
+                }
+                return !FileManager.default.fileExists(atPath: url.path)
+            }
+            let oldData = Data((0..<4096).map { UInt8($0 % 13) })
+            func prepare(_ name: String) -> (dir: URL, models: URL, old: URL, mismatch: URL, longer: URL, link: URL, other: URL) {
+                let dir = root.appendingPathComponent(name, isDirectory: true)
+                let models = dir.appendingPathComponent("models", isDirectory: true)
+                try? FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
+                let old = models.appendingPathComponent("zenz-old.gguf")
+                let mismatch = models.appendingPathComponent("zenz-old-changed.gguf")
+                let longer = models.appendingPathComponent("zenz-old-longer.gguf")
+                let link = models.appendingPathComponent("zenz-old-link.gguf")
+                let other = models.appendingPathComponent("other.txt")
+                try? oldData.write(to: old)
+                // 同じ長さで 1 バイトだけ違う (SHA-256 の比較で外れる) ものと、1 バイト長い (サイズの比較で外れる) もの
+                var changed = oldData
+                changed[0] ^= 1
+                try? changed.write(to: mismatch)
+                try? (oldData + Data([1])).write(to: longer)
+                let target = dir.appendingPathComponent("outside.gguf")
+                try? oldData.write(to: target)
+                try? FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+                try? Data("keep".utf8).write(to: other)
+                return (dir, models, old, mismatch, longer, link, other)
+            }
+            // 消えるはずの zenz-old.gguf を最後に置く (それが消えた時点で、ほかの行の処理は終わっている)
+            let retired = ["zenz-old-changed.gguf", "zenz-old-longer.gguf", "zenz-old-link.gguf", "zenz-old.gguf"].map {
+                ZenzaiModel.Source.Retired(fileName: $0, size: Int64(oldData.count), sha256: hex(oldData))
+            }
+            // 失敗 (SHA-256 違い) のときは、前のモデルを消さない
+            let failed = prepare("retired-failed")
+            var badSource = local(size: Int64(payload.count), sha256: String(repeating: "0", count: 64))
+            badSource.retired = retired
+            let bad = makeModel(failed.dir, source: badSource, offCalls: offCalls)
+            bad.poll(enabled: true)
+            _ = wait(bad, seconds: 20)
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(1))
+            check(!bad.isReady && FileManager.default.fileExists(atPath: failed.old.path), "(前のモデル) 今のモデルの用意に失敗したときは消さない")
+            // 成功のときは、合うものだけを消す
+            let ok = prepare("retired-ok")
+            var goodSource = local(size: Int64(payload.count), sha256: hex(payload))
+            goodSource.retired = retired
+            let good = makeModel(ok.dir, source: goodSource, offCalls: offCalls)
+            good.poll(enabled: true)
+            check(wait(good, seconds: 20) && good.isReady, "(前のモデル) 今のモデルの準備ができる")
+            check(waitGone(ok.old, seconds: 10), "(前のモデル) 名前・サイズ・SHA-256 が合う前のモデルを消す")
+            check(FileManager.default.fileExists(atPath: ok.mismatch.path), "(前のモデル) 同じサイズで中身 (SHA-256) が違うファイルは消さない")
+            check(FileManager.default.fileExists(atPath: ok.longer.path), "(前のモデル) サイズが違うファイルは消さない")
+            check((try? FileManager.default.destinationOfSymbolicLink(atPath: ok.link.path)) != nil
+                  && FileManager.default.fileExists(atPath: ok.dir.appendingPathComponent("outside.gguf").path), "(前のモデル) シンボリックリンクとその先は消さない")
+            check(FileManager.default.fileExists(atPath: ok.other.path) && FileManager.default.fileExists(atPath: good.weightURL.path), "(前のモデル) ほかのファイルと今のモデルは残す")
+            // 本番の固定値: 今のモデルの名前は消す対象に入っていない
+            check(ZenzaiModel.Source.production.retired.allSatisfy { $0.fileName != ZenzaiModel.Source.production.fileName }, "(前のモデル) 本番で、今のモデルの名前を消す対象に入れていない")
+        }
+
         // 8d. 転送先の許可 (本番): huggingface.co と *.hf.co だけ
         do {
             let allowed = ZenzaiModel.Source.production.allowedHost
