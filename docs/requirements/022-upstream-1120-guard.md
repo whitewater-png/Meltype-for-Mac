@@ -90,3 +90,4 @@ scope: core
   - [任意・見送り] テストは最初に外れた 1 形しか報告しない (019・020 と同じ書き方。外れた形の全体は正解表で見える)。
   - 査読員が作った境界例 38 形 (`1nitime`・`2nitimedesu`・`2kaime`・`sitaikedo`・`amattara`・`chomattekudasai`・`yappari`・`era-desu`・`kakikomiera-ga` など) は今の main でどれもかなのまま確定し、外れは見つからなかった。`2time` → `2ちめ` (数字 + 英単語の time とも読める。K79 の `time`→ちめ と同じ傾向) は外れと断定していない。
 - 査読 2 周目 (1 周目とは別のエージェント。PR を作った後の文書の更新を確認。12 形と境界例 4 形 (`1nitime`・`era-desu`・`chomattekudasai`・`kakikomiera-ga`)・`2time` を `--repro` で照合、Core 1260/1260 を再実行。eval-compare と崩した木は 2 周目では流していない): [止める]・[直す]・[任意] とも指摘なし。
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 62): Hermes の入力欄で `yappane` → `やっぱね` OK (Safari のフォームの代わり。Safari 固有の挙動は未確認のまま)

@@ -57,10 +57,10 @@ scope: core
 - [x] 文書: `docs/KNOWN_LIMITS.md` の K79 の直った範囲に `python3`・`pip3` を足す (実機は未確認と書く)。`eval/README.md` (または正解表の書き方の説明がある所) に、表ごとの指定の書き方を書く。`eval/cases/mac-protected-spans.tsv` の `cd ~/Downloads` の行の出典の注を「一般アプリでは K79 の決まりで今までどおり (要件 030 の非目標)」の趣旨に直す (今の「mac-terminal.tsv の cd ~/Documents/Meltype と同じ原因」は、あちらが測り方の問題だったので不正確)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
-- [ ] ターミナル (zsh): `python3 -m venv .venv` → `python3 -m venv .venv` (表示だけ確かめる。実行は任意)
-- [ ] ターミナル: `pip3 install requests` → `pip3 install requests` (表示だけ確かめる。**Enter で実行しない**。確かめたら Ctrl+C で消す)
-- [ ] ターミナル: `cd ~/Downloads` → `cd ~/Downloads` (今までどおり)
-- [ ] ターミナル: `nihongo` + Space が今までどおり変換になる
+- [x] ターミナル (zsh): `python3 -m venv .venv` → `python3 -m venv .venv` (表示だけ確かめる。実行は任意) … 2026-11-26 リョウさんの実機 (確認表 53): OK
+- [x] ターミナル: `pip3 install requests` → `pip3 install requests` (表示だけ確かめる。**Enter で実行しない**。確かめたら Ctrl+C で消す) … 2026-11-26 リョウさんの実機 (確認表 54): OK
+- [x] ターミナル: `cd ~/Downloads` → `cd ~/Downloads` (今までどおり) … 2026-11-26 リョウさんの実機 (確認表 55): OK
+- [x] ターミナル: `nihongo` + Space が今までどおり変換になる … 2026-11-26 リョウさんの実機 (確認表 56): OK
 - [ ] TextEdit (一般アプリ): `nihongo` + Space が今までどおり変換になる
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
@@ -93,3 +93,4 @@ scope: core
   - `docs/IMPROVEMENT_PLAN.md` 2488 行にも「mac-terminal.tsv の既知の外れと同じ原因」とあるが、日付つきの過去の記録なので触らない。
 - 精度の計画の「パス・コマンドの記号 4 件」の中身: `cd ~/Documents/Meltype` は測り方の問題 (直した)、`python3 -m venv .venv` は本物 (直した)、`cd ~/Downloads` (mac-protected-spans) は一般アプリで K79 の決まりどおり (残る)、`npx create-next-app` は原因が別 (残る)。
 - コミット: 3b7b12e・9b5e476・409c4e4・e6c9bd2・0a4ea31・15b3fe6・0602200・9bc2b10・34a2843 (要件定義書は a512aec・d9c109c・c1d78b9)。
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 53・54・55・56): ターミナルの `python3 -m venv .venv`・`pip3 install requests` で後の空白が消えない OK (中心の確認)。`cd ~/Downloads` は今までどおり OK。`nihongo` Space は変換になる OK

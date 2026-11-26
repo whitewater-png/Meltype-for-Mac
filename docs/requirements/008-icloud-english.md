@@ -32,7 +32,7 @@ scope: dictionary
 
 ## Mac 実機チェックリスト (主項目のみ確認、2026-11-05 リョウさん)
 - [x] TextEdit: `iCloud` + Enter → `iCloud` … リョウさんの実機 (2026-11-05。「1～3＞OK」の一括報告で、項目ごとの記録は無い)
-- [ ] ターミナル (zsh): `iTunes` + Enter → `iTunes`
+- [x] ターミナル (zsh): `iTunes` + Enter → `iTunes` … 2026-11-26 リョウさんの実機 (確認表 50): OK
 - [ ] TextEdit: `ichi` → いち (変わらない)
 
 ## 止める条件
@@ -41,3 +41,4 @@ scope: dictionary
 ## 記録
 - 定期タスクによる自動実行 (2026-11-05)。
 - 査読 1 周 (止める指摘なし)。境界例 100 件を base と比較。日本語側で変わったのは「…tunes / …icloud で打ち終えてすぐ Enter」の 8 件だけ (`kitunes` きつね → きつねs、`haitunes` はいつね → はitunes、`haicloud` はいcloud → はicloud など)。後ろに 1 文字でも続けば base と同じ。受け入れる。
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 50): ターミナルの `iTunes` → `iTunes` OK

@@ -40,7 +40,7 @@ scope: core
 - [ ] Zenzai ON。TextEdit で `大学の先生の話を聞いた。` と確定したあと、`kouenha` + Space → 講演は が先頭 (前の文が効く)
 - [ ] Zenzai ON。前の文が無いとき、`kouenha` + Space の先頭が今までと同じ
 - [ ] Zenzai OFF。同じ手順で、今までと同じ結果
-- [ ] 1 キーの遅さが体感で変わらない (計測の手段ができたら数字で)
+- [x] 1 キーの遅さが体感で変わらない (計測の手段ができたら数字で) … 2026-11-26 リョウさんの実機 (確認表 75): 問題ない (感想)
 - [ ] 改行の後。Zenzai ON。`…聞いた。` Enter の後に `kouenha` + Space が Zenzai OFF と同じ (前の段落は渡さない)
 - [ ] 文の途中。Zenzai ON。`大学の先生の話を聞いた。この本は` の後に `atsui` → 厚い
 - [ ] 「に」始まり。Zenzai ON・`前の文です。` の後で `ninatteshimau` + Space の先頭を ON・OFF で記録する
@@ -65,3 +65,4 @@ scope: core
 - 範囲外で見つけたこと: `IsSymbolOnly` のサロゲートペアの扱い (`docs/AGENT_STATE.md` の「別の要件にする候補」に書いた。その後、要件 024 になった)。
 - 変更: Core だけ (`CompositionController.cs`・`MeltypeSession.cs`・`CompositionTests.cs`・`WideContextTests.cs`)。Swift・Mac.Native・Windows・設定ファイルの形式・入力欄から読む範囲は変えていない。コミット 4069d8d・587d555・8bc34e4・3b8074e・e8202c2。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/29 (015・029 (旧 016) と同じブランチに積んだ)
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 75): Zenzai ON の速さは「問題ない (感想)」(リョウさんの言葉どおり。数字の計測ではない)
