@@ -9,7 +9,9 @@ scope: swift (実機必須)
 
 ## 背景 (誰が、何に困っているか)
 - Zenzai (ニューラル変換) を ON にすると、かな漢字変換の正解率が大きく上がる (AJIMEE 200 件で 44.0 % → 82.5 %。`docs/AJIMEE_BENCH_2026-11-24.md`)。ただし既定は OFF (2026-11-24 の決定)。
-- 今のモデル zenz-v3.1-small は CC BY-SA 4.0。新しい zenz-v3.2-small は Apache-2.0 で、精度は同じ水準 (下の計測)。同梱や既定 ON を考えるとき、ライセンスの扱いが軽くなる。
+- 今のモデル zenz-v3.1-small は CC BY-SA 4.0。新しい zenz-v3.2-small は精度が同じ水準 (下の計測)。
+- **zenz-v3.2-small のライセンスは未確定**: Meltype-Flash の `rust/ai/model-catalog.json` は apache-2.0 とするが、配布元 (2026-11-26 に確認) では、`https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf` のモデルの頁が「cc-by-sa-4.0」、同じリポジトリのファイル一覧の頁 (`/tree/main`) が「apache-2.0」と食い違う。LICENSE ファイルは無く、README.md は 31 バイトで本文が無い。xsmall (`zenz-v3.2-xsmall-gguf`) は cc-by-sa-4.0。確定するまでは、v3.1 と同じ CC BY-SA 4.0 として扱う (ライセンスの得は当てにしない)。
+- **v3.2 専用のプロンプトは無い** (2026-11-26 に azooKey のソースで確認): azooKey の `Docs/zenzai.md` に「zenz-v3.2: zenz-v3の機能に加えて、`\uEE07`に続けて入力された右文脈を考慮できます」とある。形式は v3 のまま (`versionDependentMode: .v3`) で、右文脈は任意。右文脈の受け口 (`ZenzaiV3DependentMode.rightSideContext`) は azooKey の 6c2a224 (2026-05-10、#340) で入り、今使っている d59a28e に含まれる。Mac 版の `Converter.swift` は今、右文脈を渡していない (`leftSideContext` だけ)。
 - 競合の Meltype-Flash (appipinopi/Meltype-Flash) は v3.2 系も選べる (`rust/ai/model-catalog.json`)。コードは写さない (CLAUDE.md §1)。モデルの URL と SHA-256 は配布元 (Hugging Face) で確かめた値を使う。
 
 ## 今の動き (既に分かっていること)
@@ -36,13 +38,14 @@ scope: swift (実機必須)
 1. **既定 ON にするか** (2026-11-24 の「既定 OFF」の決定の再検討)。案:
    - (a) 既定 OFF のまま、モデルだけ v3.2-small にする (いちばん小さい変更。推奨)
    - (b) 既定 ON にする。初回に重み (約 74 MB) を取得する通信が起きる (今の決まり「ON にしたときだけ取得」を覆す)。M1 級・8 GB での速さは未計測のまま
-   - (c) 同梱して既定 ON (本家と同じ。配布物が約 74 MB 増える。Apache-2.0 なので CC BY-SA より扱いは軽いが、同梱の判断は公開行為に近いので人)
+   - (c) 同梱して既定 ON (本家と同じ。配布物が約 74 MB 増える。ライセンスが未確定なので、同梱するなら先に配布元に確かめる。同梱の判断は公開行為に近いので人)
 2. **前のモデルのファイル** (`zenz-v3.1-small-Q5_K_M.gguf`、約 74 MB) を、切り替え後にどうするか: 残す / アプリが消す / README で案内する。利用者のフォルダーのファイルを消すのは取り消せない操作なので、消すなら人が決める。
-3. **v3.2 専用のプロンプト**があるか (今は v3 の形式で動かした)。配布元のモデルカードを人か Mac で確かめる。
+3. **ライセンス**: 配布元の表示が食い違うので、どれを正とするか (配布元に問い合わせる / CC BY-SA 4.0 として扱う)。
+4. **右文脈を使うか** (v3.2 の新しい機能。カーソルの後ろの文字を渡す)。入力欄から後ろの文字を読むのは IMK の入力経路の変更 (CLAUDE.md §5) なので、この要件とは別にする (推奨)。
 
 ## minimum の要件 (これだけは満たす)
 1. `ZenzaiModel.Source.production` を zenz-v3.2-small Q5_K_M にする。URL はリビジョンを固定する (`https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf/resolve/c67e03e07d215c869f591b274c1631170d3e11fe/ggml-model-Q5_K_M.gguf`)。サイズ 73,871,936、SHA-256 `29c223d4c23327b80fd13ebb5ab2555057a46317997d5da391584ffbef0db673` (2026-11-26 に Mac で取得したファイルで一致を確かめた)。ファイル名は v3.1 と別にする (`zenz-v3.2-small-Q5_K_M.gguf`)。
-2. `THIRD-PARTY-NOTICES.md` の zenz の行を v3.2-small (Apache-2.0、著作者・配布元・同梱しないこと) に直す。
+2. `THIRD-PARTY-NOTICES.md` の zenz の行を v3.2-small (ライセンスは「人に決めてほしいこと」3 で決めた表記、著作者・配布元・同梱しないこと) に直す。
 3. 上の「人に決めてほしいこと」1・2 で決まった扱いを入れる。
 
 ## 非目標 (今回はやらない)
@@ -67,7 +70,8 @@ scope: swift (実機必須)
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
 - 既定 ON・同梱・前のファイルの削除は、人が決めるまで入れない (通信・配布物・利用者のファイル)
-- v3.2 に専用のプロンプトが要ると分かり、Converter.swift の変更が要るとき (別の要件で IsPlausible を入れる作業と重なるので、そちらと調整する)
+- 右文脈を渡す変更 (Converter.swift と入力経路。別の要件 048 で IsPlausible を入れる作業とも重なるので、そちらと調整する)
 
 ## 記録 (ループが書く)
+- 2026-11-26: プロンプトの形式 (専用は無い・右文脈は任意) とライセンスの食い違いを追記。
 - 2026-11-26: 下書き。計測は Mac 上の使い捨てブランチ (コミット・push なし) で行い、一時フォルダーは片付ける予定
