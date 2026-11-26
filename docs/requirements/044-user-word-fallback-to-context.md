@@ -91,4 +91,5 @@ scope: core
 4. Windows・Linux は対象外 (Core は共通なので届くが、ビルド・検証していない)。
 
 ## 記録
+- 2026-11-26 リョウさんの実機 (登録語は書かない): `shuusan` Space Space Enter → 集散、もう一度 `shuusan` Space Enter → 集散 (学習)、`shuuga` Space Enter → 登録語+が、`gomiwoshuushuusuru` Enter → ゴミを収集する。すべて期待どおり。
 - 2026-11-26 henrietta: 実装・テスト・大量の打ち比べ。ブランチ `fix/user-word-fallback-to-context` (要件 043 のブランチ 7f85739 から。まだ push していない)。使い捨てのテスト (ZZBulk)・`--convert-eval` に区切りを出す一時の変更はコミットしていない。

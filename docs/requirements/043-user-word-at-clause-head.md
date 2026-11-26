@@ -86,4 +86,5 @@ scope: core
 5. Windows・Linux は対象外 (Core は共通なので届くが、ビルド・検証していない)。
 
 ## 記録
+- 2026-11-26 リョウさんの実機 (登録語は書かない): `gomiwoshuushuusuru` Enter → ゴミを収集する、`shuukansuru` → 収監する (登録語が割り込まない)、`shuuga` → 登録語+が、`shuunoie` → 登録語+の家、`shuusan` → 登録語+さん、`shuudayo` → 登録語+だよ、`gakushuusuru` → 学習する。すべて期待どおり。
 - 2026-11-26 henrietta: 実装・テスト・大量の打ち比べ。ブランチ `fix/user-word-at-clause-head` (origin/main f653ce5 から)。`--convert-eval` に区切りを出す一時の変更と、打ち比べ用の使い捨てのテスト (どちらもコミットしていない) を使った。
