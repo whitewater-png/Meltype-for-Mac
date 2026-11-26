@@ -291,6 +291,7 @@ final class ZenzaiModel {
 
     /// 前の版のモデルを消す。models フォルダーの直下にあり、通常のファイル (シンボリックリンクは追わない) で、
     /// サイズと SHA-256 が固定値とすべて合うものだけ。今のモデルと同じ名前は消さない。ほかのファイルには触らない。裏のスレッドから呼ぶ。
+    /// retired の順に 1 つずつ処理する (並列にしない。自己テスト 8c2 が、最後の 1 つが消えた時点で前の判定が終わっていることを前提にしている)。
     static func removeRetired(_ retired: [Source.Retired], in directory: URL, keeping current: String) {
         let manager = FileManager.default
         for file in retired where file.fileName != current && !file.fileName.contains("/") {
