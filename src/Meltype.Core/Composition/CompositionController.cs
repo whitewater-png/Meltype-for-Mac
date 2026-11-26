@@ -2218,7 +2218,7 @@ public sealed class CompositionController
     /// (実際の azooKey は きょうは|めるたいぷを|つかう のように助詞とくっつけて区切るので、文節の頭かどうかだけで決めると、助詞の後ろの登録語が落ちる)。
     /// 同梱の語句 (phrases.txt) と同梱の専門用語集の強制語は、変換エンジンが区切りを間違える語を補うものなので、そのまま使う。
     /// 使わなくなった語は、文節の区切りを Shift+←→ で変えれば、候補から選べる。
-    /// 変換エンジンを余分に呼ぶのは、読みの先頭以外から始まる、短い (拍数がしきい値より短い) ユーザーの語が入っているときだけ (先頭は必ず文節の頭)。
+    /// 変換エンジンを余分に呼ぶのは、短い (拍数がしきい値より短い) ユーザーの語が、読みの先頭以外から始まるとき、または先頭で後ろに付属語 (<see cref="UserWordTrailers"/>) でないかなが続くときだけ (要件 043。先頭の語 + 付属語だけなら、文節の一部だけを覆うことはないので呼ばない)。
     /// 結果はキャッシュ付きの ConvertWithEngine と同じなので、同じ読みは打つたびにまた変換しない。
     /// 変換エンジンが文節に区切れなかったとき (ConvertClauses が null) は、文節の頭が分からないので、何も変えずに元の語の割り当てを返す。
     /// 使う語が 1 つも残らなければ、変換エンジンの結果 (wholeByEngine) をそのまま返す。
@@ -2231,7 +2231,9 @@ public sealed class CompositionController
         var inside = false;
         foreach (var (reading, word) in pieces)
         {
-            if (position > 0 && word is not null && UserWordMoraCount(reading) < InsideClauseMinReadingLength && dictionary.IsUserReading(reading)) inside = true;
+            // 短い語は、途中から始まるとき (position > 0) に加え、先頭でも、後ろに助詞でないかなが続くなら、エンジンの文節の読みの一部だけを覆うことがある (要件 043)
+            if (word is not null && UserWordMoraCount(reading) < InsideClauseMinReadingLength && dictionary.IsUserReading(reading)
+                && (position > 0 || !UserWordTrailers.Contains(kana[(position + reading.Length)..]))) inside = true;
             position += reading.Length;
         }
         if (!inside) return pieces;
@@ -2239,12 +2241,14 @@ public sealed class CompositionController
         // 失敗した変換は、読み全体を 1 文節にした結果 (文節の頭が位置 0 だけ) なので、使うと先頭以外の語が全部落ちる
         if (failed || string.Concat(engine.Select(c => c.Reading)) != kana) return pieces;
         var starts = new HashSet<int>();
-        for (int i = 0, offset = 0; i < engine.Count; offset += engine[i].Reading.Length, i++) starts.Add(offset);
+        var clauseAt = new Dictionary<int, string>();
+        for (int i = 0, offset = 0; i < engine.Count; offset += engine[i].Reading.Length, i++) { starts.Add(offset); clauseAt[offset] = engine[i].Reading; }
         var aligned = new List<(string Reading, string? Word)>();
         position = 0;
         foreach (var (reading, word) in pieces)
         {
-            var keep = word is not null && (UserWordMoraCount(reading) >= InsideClauseMinReadingLength || !dictionary.IsUserReading(reading) || starts.Contains(position));
+            var keep = word is not null && (UserWordMoraCount(reading) >= InsideClauseMinReadingLength || !dictionary.IsUserReading(reading)
+                || (starts.Contains(position) && !CoversOnlyPartOfClause(reading, clauseAt[position])));
             // 使わない語の読みは、前後の変換エンジンに渡す部分とつなげる
             if (!keep && aligned.Count > 0 && aligned[^1].Word is null) aligned[^1] = (aligned[^1].Reading + reading, null);
             else aligned.Add(keep ? (reading, word) : (reading, null));
@@ -2253,6 +2257,29 @@ public sealed class CompositionController
         if (aligned.All(p => p.Word is null)) wholeByEngine = engine;
         return aligned;
     }
+
+    /// <summary>
+    /// 登録した語の後ろに付いてよいかな (<see cref="CoversOnlyPartOfClause"/>)。助詞・「だ」など (<see cref="CandidateDictionary.Endings"/>) に、
+    /// 名前に付く敬称 (さん・くん・ちゃん・さま) と、よく続く付属語 (だけ・だった・でした・のこと・ですか・でも・ので・には・では・との・だよ) を足したもの。
+    /// 「する」は足さない (しょうする → 称する・ゆうする → 有する のように、短い読みで始まる動詞の語幹と区別できないので)。
+    /// 得: 名前 + 敬称・付属語 (しゅうさん・しゅうだった) で登録語が使われる。損: 足した語と同じ読みの普通の語 (しゅうさん → 集散) は、登録語 + さん になる。
+    /// </summary>
+    private static readonly HashSet<string> UserWordTrailers = new(CandidateDictionary.Endings, StringComparer.Ordinal)
+    {
+        "さん", "くん", "ちゃん", "さま", "だけ", "だった", "でした", "のこと", "ですか", "でも", "ので", "には", "では", "との", "だよ",
+    };
+
+    /// <summary>
+    /// 短いユーザーの語 (読み word) が、変換エンジンの文節 (読み clause。同じ位置から始まる) の読みの先頭の一部だけを覆い、残りが助詞など
+    /// (<see cref="UserWordTrailers"/>) でないとき true。そのときは、その語は使わない (要件 043)。
+    /// しゅう → 秋 を登録していると、エンジンが ごみを|しゅうしゅうする と区切るとき、文節の頭の しゅう に 秋 が入って、残りが しゅうする → 週する になっていた
+    /// (ごみを秋週する)。しゅう|が・しゅう|の|いえ のように、語と助詞、または語だけの文節 (しゅうが・しゅう) なら使う。
+    /// 得: 登録した短い読みで始まる別の語 (しゅうしゅう・しゅうかん・しゅうちゅう) の文節が壊れない。
+    /// 損: 登録語 + 助詞でも、エンジンが表にない付属語 (しゅうだった など) を含めて 1 文節にしたときは使われない (Shift+←→ で区切り直せば候補から選べる)。
+    /// 語が複数の文節にまたがるとき (clause が語より短い)・語の読みと文節の頭が違うときは、今までどおり使う。
+    /// </summary>
+    private static bool CoversOnlyPartOfClause(string word, string clause) =>
+        clause.Length > word.Length && clause.StartsWith(word, StringComparison.Ordinal) && !UserWordTrailers.Contains(clause[word.Length..]);
 
     /// <summary>
     /// 日本語のかなを変換エンジンで文節に区切って変換する。各文節の最初の候補は次の順で決める:
