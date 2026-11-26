@@ -1,6 +1,6 @@
 ---
 title: Zenzai の変換に右文脈 (カーソルの後ろの文字) を渡す
-status: draft   # draft | approved | done。approved にするのは人
+status: approved   # draft | approved | done。approved にするのは人
 source: 要件 049 の測定結果 (docs/ZENZAI_V32_RIGHT_CONTEXT_2026-11-26.md)。2026-11-26 リョウさんが「別の要件で進める」を選んだ
 scope: swift (実機必須)
 ---
@@ -68,4 +68,5 @@ scope: swift (実機必須)
 - トレースログ (`MeltypeTraceIMK`) が要りそうになったとき (取る前に同意を得る)
 
 ## 記録 (ループが書く)
+- 2026-11-26: リョウさんが承認 (「051 承認」)。status を approved にした。人が決めること 1〜3 はまだ。
 - 2026-11-26: 下書き (要件 049 の結果から)。
