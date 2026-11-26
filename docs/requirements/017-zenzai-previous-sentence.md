@@ -65,4 +65,4 @@ scope: core
 - 範囲外で見つけたこと: `IsSymbolOnly` のサロゲートペアの扱い (`docs/AGENT_STATE.md` の「別の要件にする候補」に書いた。その後、要件 024 になった)。
 - 変更: Core だけ (`CompositionController.cs`・`MeltypeSession.cs`・`CompositionTests.cs`・`WideContextTests.cs`)。Swift・Mac.Native・Windows・設定ファイルの形式・入力欄から読む範囲は変えていない。コミット 4069d8d・587d555・8bc34e4・3b8074e・e8202c2。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/29 (015・029 (旧 016) と同じブランチに積んだ)
-- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 75: Zenzai ON の 1 キーごとの速さは問題ない (感想) OK
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 75): Zenzai ON の 1 キーごとの速さは問題ない (感想) OK

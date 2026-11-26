@@ -93,4 +93,4 @@ scope: core
   - `docs/IMPROVEMENT_PLAN.md` 2488 行にも「mac-terminal.tsv の既知の外れと同じ原因」とあるが、日付つきの過去の記録なので触らない。
 - 精度の計画の「パス・コマンドの記号 4 件」の中身: `cd ~/Documents/Meltype` は測り方の問題 (直した)、`python3 -m venv .venv` は本物 (直した)、`cd ~/Downloads` (mac-protected-spans) は一般アプリで K79 の決まりどおり (残る)、`npx create-next-app` は原因が別 (残る)。
 - コミット: 3b7b12e・9b5e476・409c4e4・e6c9bd2・0a4ea31・15b3fe6・0602200・9bc2b10・34a2843 (要件定義書は a512aec・d9c109c・c1d78b9)。
-- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 53・54・55・56: ターミナルの `python3 -m venv .venv`・`pip3 install requests` で後の空白が消えない OK (中心の確認)。`cd ~/Downloads` は今までどおり OK。`nihongo` Space は変換になる OK
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 53・54・55・56): ターミナルの `python3 -m venv .venv`・`pip3 install requests` で後の空白が消えない OK (中心の確認)。`cd ~/Downloads` は今までどおり OK。`nihongo` Space は変換になる OK

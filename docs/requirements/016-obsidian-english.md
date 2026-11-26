@@ -83,4 +83,4 @@ scope: dictionary
 - 査読の境界例: 1,721,540 入力 (`readings.txt` + `japanese.txt` の 31,603 語の正しい打ち方・1 打鍵の打ち間違い・助詞付き・語の境目と n↔b・obsidian まわり) を base と比べ、obsidian を含まない入力の確定の変化は 0 件 (要件 007・012 の型の回帰なし)。obsidian を含む 40,812 件のうち 33,086 件は英字で確定するようになり、残りは意味のない並びの中の変化。比べたのは Enter で確定する形。
 - 手戻りの原因: 「今のまま」と書いた形 (`obsidia`・`obsi`) を、base で打たずに (辞書を足した木の結果だけで) 書いた。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/20
-- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 59: Hermes の入力欄で `obsidiande` → `obsidianで` OK (Safari のフォームの代わり。Safari 固有の挙動は未確認のまま)
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 59): Hermes の入力欄で `obsidiande` → `obsidianで` OK (Safari のフォームの代わり。Safari 固有の挙動は未確認のまま)

@@ -92,4 +92,4 @@ scope: core
 - 査読 2 周目 (1 周目とは別のエージェント。Core 1260/1260・eval-compare broken 0 / fixed 0 / added 0 を再実行、12 形を `--repro` で照合、崩した木は `な`・`ろ` の 2 通りを別の worktree で再現し記録と一致。開いている PR 6 本と衝突なし): [止める]・[直す] なし。
   - [任意・対応] AGENT_STATE の 023 の行が 001 の説明 (「(無し)」と「実装した範囲」) の間に入っていた → 001 の説明の後ろに移した (009 の後ろは PR #24 と衝突するため)。
   - [任意・対応] AGENT_STATE の「任意 1 件」は 2 件 (1 件対応・1 件範囲外) が正しい → 直した。
-- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 63: Hermes の入力欄で `Yukishiro` → `Yukishiro` OK (Safari のフォームの代わり。Safari 固有の挙動は未確認のまま)
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 63): Hermes の入力欄で `Yukishiro` → `Yukishiro` OK (Safari のフォームの代わり。Safari 固有の挙動は未確認のまま)

@@ -51,4 +51,4 @@ scope: core
 - 範囲を絞った理由: 1 周目の「辞書の英単語 + 助詞」全般への適用は `sorenoerror` などの回帰を出したため、「`loanwords.txt` の大文字略語 + の + 英字の残る英単語」に絞った。新しく英字になるのは `api`・`ide`・`uri`・`gui`・`who` の 5 語で、`uri` (売り・瓜) は人の判断待ち。
 - Mac 実機チェックリスト: 未確認。
 - PR の URL: https://github.com/whitewater-png/Meltype-for-Mac/pull/5 (base = ccr-27ad1b0c-qzazzd、CI 緑、2026-10-24 マージ)
-- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 46・47: ターミナル (zsh) の `apinoerror` → `apiのerror`・`error` 単体は英字のまま OK。`api` 単体 Enter は実機のターミナルでは英字のままだった (Core の `--repro api` は `あぴ`。差の原因は未確認: 学習データの英語の記憶か、コード系アプリの判定か。ここまでの「単体は かな」は Core の結果で、実機は違った)
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 46・47): ターミナル (zsh) の `apinoerror` → `apiのerror`・`error` 単体は英字のまま OK。`api` 単体 Enter は実機のターミナルでは英字のままだった (Core の `--repro api` は `あぴ`。差の原因は未確認: 学習データの英語の記憶か、コード系アプリの判定か。ここまでの「単体は かな」は Core の結果で、実機は違った)

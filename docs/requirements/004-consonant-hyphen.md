@@ -37,4 +37,4 @@ scope: core
 
 ## 記録
 - 周回数: 実装 1 周 / 査読は PR 本文
-- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 48: ターミナルの `ls-files`・`cd-rom` が英字のまま OK
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 48): ターミナルの `ls-files`・`cd-rom` が英字のまま OK

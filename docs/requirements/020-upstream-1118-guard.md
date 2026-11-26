@@ -86,4 +86,4 @@ scope: core
 - 見つけた今の main の外れ (この要件では直さない。守る行にもしない。別の要件の候補): 小文字の `fluorite` → `fluおりて` (`EN:flu | JA:orite`)、`Fluoritewotukau` → 丸ごと英字のまま (どちらも実装者が `--repro` で確かめた)。
 - 査読 2 周目 (1 周目とは別のエージェント。PR を作った後の文書の更新を確認。`fluorite`・`Fluoritewotukau`・`ronpa` などを `--repro` で照合し、ぱ を崩した木の表示と確定を再現。開いている PR #20・#23・#24 と衝突なし): [止める]・[直す] なし。[任意・対応] AGENT_STATE の「今の外れ」に `Fluoritewotukau` を足した / 周回数の記述を今の状態に合わせた。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/25
-- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 57: LibreOffice Writer の `itotekinagobyuu` → `いとてきなごびゅう` OK
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 57): LibreOffice Writer の `itotekinagobyuu` → `いとてきなごびゅう` OK

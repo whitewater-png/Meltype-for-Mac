@@ -39,4 +39,4 @@ scope: dictionary
 - 周回数 1 (査読 1 回、止める指摘なし)。査読員が境界例 50 件を base と比べ、変わったのは `beep` をそのまま含む打鍵 (`kyouhabeepga`・`nobeep`・`beep.` など) だけで、どれも base では `べえp`・`べえぺ` に崩れていた。`beepu`・`beppu`・`abeepo` など日本語として読める形は変わらない。
 - 結果: Core 1229/1229、eval-compare broken 0 / fixed 3、品質テストは base と同一。
 - `beepon` は `beep` を足した後も `べえぽん` のまま (本家の期待 `beep音` とは別。`beepu` と同じく日本語として読める形を優先)。`beeps`・`beeping`・`beeped` は崩れる (非目標。次の候補)。
-- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 49: ターミナルの `beep sound` → `beep sound` OK
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 49): ターミナルの `beep sound` → `beep sound` OK
