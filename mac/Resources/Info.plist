@@ -80,13 +80,10 @@
 				<true/>
 				<key>tsInputModeDefaultStateKey</key>
 				<true/>
-				<key>tsInputModeCharacterRepertoireKey</key>
-				<array>
-					<string>Hira</string>
-					<string>Kana</string>
-					<string>Hani</string>
-					<string>Latn</string>
-				</array>
+				<!-- 日本語モードには、モードごとの tsInputModeCharacterRepertoireKey を置かない (fork Issue #21、要件 052)。
+				     ことえり・Google・ATOK の日本語モードにも無く、どれも ASCII 対応でない入力ソースになる。
+				     Latn を含む指定があると ASCII 対応とみなされ、Emacs (inline パッチ) などが英数と同じに扱う、という見立て (実機で確かめる)。
+				     入力メソッド全体の tsInputMethodCharacterRepertoireKey (Latn を含む) は、ほかの日本語入力と同じなので残す。 -->
 			</dict>
 		<!-- 英数 (直接入力)。辞書のキーは標準名にする (Caps Lock 切替が標準名で判定されている可能性があるため) -->
 		<key>com.apple.inputmethod.Roman</key>
