@@ -254,7 +254,9 @@ final class MeltypeInputController: IMKInputController {
 
     /// 入力メニューや Caps Lock でモードが切り替わったとき。英数なら直接入力、Meltype なら自動判定に合わせる。
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
-        if tag == kTextServiceInputModePropertyTag, let mode = value as? String {
+        if tag == kTextServiceInputModePropertyTag, let rawMode = value as? String {
+            // 入力メニューから英数を選ぶと、辞書のキー (com.apple.inputmethod.Roman) が来うる。ID にそろえてから比べる (fork issue #22)。
+            let mode = InputSourceRegistration.canonicalModeID(rawMode)
             let changed = mode != currentMode
             Self.trace("setValue mode=\(mode) changed=\(changed) acted=\(userActedSinceActivation) bundle=\(bundleID ?? "nil")")
             applyMode(mode, client: (sender as? IMKTextInput) ?? (self.client() as? IMKTextInput))
