@@ -12,6 +12,15 @@ enum InputSourceRegistration {
     static let modeID = "io.github.yksr-melt.inputmethod.Meltype.Japanese"
     static let romanModeID = "io.github.yksr-melt.inputmethod.Meltype.Roman"
 
+    /// Info.plist の英数モードの辞書のキー (標準名)。入力メニューで選んだとき、setValue にはこちらが来うる (fork issue #22)。
+    /// TISInputSourceID (romanModeID) とは別の文字列なので、比べる前に canonicalModeID で ID にそろえる。
+    static let romanModeKey = "com.apple.inputmethod.Roman"
+
+    /// setValue で受け取ったモードの文字列を、日本語・英数の ID にそろえる。辞書のキーの英数 (romanModeKey) は英数の ID に直し、それ以外はそのまま返す。
+    static func canonicalModeID(_ mode: String) -> String {
+        mode == romanModeKey ? romanModeID : mode
+    }
+
     /// `--register-check` の終了コード: 一覧に出ている / 出ていない。
     static let presentExitCode: Int32 = 0
     static let absentExitCode: Int32 = 3

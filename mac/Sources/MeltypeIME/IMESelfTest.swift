@@ -13,6 +13,7 @@ import Carbon.HIToolbox
 ///   2. 候補の意味の整え (CandidateDictionary): 引く語の判定・定義からの 1 文の取り出し
 ///   3. 案内の置き直し (SuggestionHint): 候補ウィンドウを避ける位置 (右 → 上 → 下)
 ///   4. 本体の応答の読み取り (NativeCore): 結果の JSON・登録の提案・専門用語集の分野・設定の JSON
+///   5. 入力モードの ID (InputSourceRegistration): 入力メニューの英数の辞書のキーを英数の ID にそろえる
 enum IMESelfTest {
     /// すべて通れば true。出力は辞書の管理画面の self-test と同じ (群ごとの件数・FAIL の行・最後に合計)。
     static func run(log: (String) -> Void) -> Bool {
@@ -27,6 +28,7 @@ enum IMESelfTest {
             ("候補の意味の整え", checkCandidateDictionary),
             ("案内の置き直し", checkSuggestionHint),
             ("本体の応答の読み取り", checkNativeCore),
+            ("入力モードの ID", checkModeID),
         ]
         for (name, body) in groups {
             let before = checks
@@ -36,6 +38,18 @@ enum IMESelfTest {
         for failure in failures { log("FAIL: \(failure)") }
         log(failures.isEmpty ? "PASS: \(checks) 件" : "FAIL: \(failures.count) / \(checks) 件")
         return failures.isEmpty
+    }
+
+    // ---- 5. 入力モードの ID (入力メニューから来るモードの文字列。fork issue #22) ----
+
+    static func checkModeID(_ check: (Bool, String) -> Void) {
+        let roman = InputSourceRegistration.romanModeID
+        let japanese = InputSourceRegistration.modeID
+        check(InputSourceRegistration.canonicalModeID("com.apple.inputmethod.Roman") == roman, "英数の辞書のキー (標準名) は英数の ID になる")
+        check(InputSourceRegistration.canonicalModeID(roman) == roman, "英数の ID はそのまま")
+        check(InputSourceRegistration.canonicalModeID(japanese) == japanese, "日本語の ID はそのまま")
+        check(InputSourceRegistration.canonicalModeID("com.apple.inputmethod.Japanese") == "com.apple.inputmethod.Japanese", "知らない文字列はそのまま (日本語にも英数にもしない)")
+        check(InputSourceRegistration.canonicalModeID("") == "", "空の文字列はそのまま")
     }
 
     // ---- 1. キー対応 ----
