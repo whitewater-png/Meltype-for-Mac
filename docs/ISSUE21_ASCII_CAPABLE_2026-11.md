@@ -31,10 +31,10 @@
 | 日本語モードの辞書のキー | `io.github.yksr-melt.inputmethod.Meltype.Japanese` (独自名) | `com.apple.inputmethod.Japanese` (標準名) | 同左 (標準名) |
 | 日本語モードの `TISInputSourceID` | キーと同じ | `com.apple.inputmethod.Kotoeri.RomajiTyping.Japanese` (キーと別) | `com.google.inputmethod.Japanese.base` など (キーと別) |
 | 日本語モードの `tsInputModeCharacterRepertoireKey` | **あり** (`Hira, Kana, Hani, Latn`、83 行目付近) | なし | なし |
-| 入力メソッド全体の `tsInputMethodCharacterRepertoireKey` | `Hira, Kana, Hani, Latn` (52 行目) | 無し (見当たらない) | `Hira, Kana, Hani, Latn` |
+| 入力メソッド全体の `tsInputMethodCharacterRepertoireKey` | `Hira, Kana, Hani, Latn` (52 行目) | `Hira, Kana, Hani, Latn` | `Hira, Kana, Hani, Latn` |
 | `TISIntendedLanguage` | ja | ja | ja |
 
-- 全体側の `Latn` は Google・ATOK にもあり、どちらも日本語モードは ascii=0。よって**全体側の `Latn` は原因ではない** (測定から言える)。
+- 全体側の `Latn` はことえり・Google・ATOK にもあり、どれも日本語モードは ascii=0。よって**全体側の `Latn` は原因ではない** (測定から言える)。
 - 残る候補は (1) モード側の `tsInputModeCharacterRepertoireKey` に `Latn`、(2) 辞書のキーが標準名でない、の 2 つ。報告者の見立てと同じで、**どちらが効くかは今の手元の証拠では決まらない** (この Mac では試験ビルドを入れていない。入れると利用者の IME を入れ替えるため)。
 - 参考: Squirrel (Rime) に「`tsInputModeCharacterRepertoireKey` から `Latn` を外す」変更がある (検索で見つけただけで、中身は読んでいない)。(1) が効く傍証になりうるが未確認。
 - Meltype の英数モードは既に標準名キー `com.apple.inputmethod.Roman` で作ってあり、Caps Lock 切り替えのための判断だった (docs/IMPROVEMENT_PLAN.md の P2)。
