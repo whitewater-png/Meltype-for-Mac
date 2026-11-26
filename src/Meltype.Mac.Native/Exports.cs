@@ -24,6 +24,13 @@ public static unsafe class Exports
     /// <summary>(ひらがな, 文脈 or NULL) → 「読み\t変換結果」を改行でつないだ文字列 (文節ごと)。変換できなければ NULL。</summary>
     private static delegate* unmanaged<byte*, byte*, byte*> s_clauses;
 
+    /// <summary>(ひらがな, 文脈 or NULL, 右文脈) → s_clauses と同じ形 (要件 051)。meltype_set_right_clauses で登録する。無ければ右文脈を渡さない。</summary>
+    private static delegate* unmanaged<byte*, byte*, byte*, byte*> s_rightClauses;
+
+    /// <summary>右文脈 (キャレットの後ろの文字) も使う変換の Swift 側の関数を登録する (meltype_init の後、最初に 1 回)。meltype_init の引数を増やさず、FFI の版数も変えないよう別にした (要件 051)。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_set_right_clauses")]
+    public static void SetRightClauses(delegate* unmanaged<byte*, byte*, byte*, byte*> rightClauses) => s_rightClauses = rightClauses;
+
     /// <summary>読み → 候補を改行でつないだ文字列。</summary>
     private static delegate* unmanaged<byte*, byte*> s_candidates;
 
@@ -1138,7 +1145,7 @@ public static unsafe class Exports
         return text is null ? [] : text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
     }
 
-    private sealed class CallbackConverter : IKanjiConverter, ILearningConverter
+    private sealed class CallbackConverter : IKanjiConverter, ILearningConverter, IRightContextConverter
     {
         /// <summary>確定した文節を Swift 側に渡す。Core の確定処理から ThreadPool 経由で呼ばれる (メインスレッドではない)。</summary>
         public void Learn(string? context, IReadOnlyList<ConversionClause> clauses)
@@ -1160,14 +1167,22 @@ public static unsafe class Exports
         public string? Convert(string hiragana) =>
             ConvertClauses(hiragana) is { Count: > 0 } clauses ? string.Concat(clauses.Select(c => c.Text)) : null;
 
-        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null)
+        public IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context = null) => ConvertClauses(hiragana, context, null);
+
+        /// <summary>右文脈も渡す (要件 051)。Swift 側に右文脈の関数が無い (古い IME) ・右文脈が空なら、今までどおり s_clauses を呼ぶ。</summary>
+        IReadOnlyList<ConversionClause>? IRightContextConverter.ConvertClauses(string hiragana, string? context, string rightContext) =>
+            ConvertClauses(hiragana, context, rightContext);
+
+        private IReadOnlyList<ConversionClause>? ConvertClauses(string hiragana, string? context, string? rightContext)
         {
             if (s_clauses == null) return null;
+            var useRight = s_rightClauses != null && !string.IsNullOrEmpty(rightContext);
             var input = ToUtf8(hiragana, out var inputBuffer);
             var contextPointer = context is null ? null : ToUtf8(context, out var contextBuffer);
+            var rightPointer = useRight ? ToUtf8(rightContext!, out var rightBuffer) : null;
             try
             {
-                var text = TakeUtf8(s_clauses(input, contextPointer));
+                var text = TakeUtf8(useRight ? s_rightClauses(input, contextPointer, rightPointer) : s_clauses(input, contextPointer));
                 if (text is null) return null;
                 var clauses = new List<ConversionClause>();
                 foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
@@ -1183,6 +1198,7 @@ public static unsafe class Exports
             {
                 NativeMemory.Free(inputBuffer);
                 if (contextPointer != null) NativeMemory.Free(contextPointer);
+                if (rightPointer != null) NativeMemory.Free(rightPointer);
             }
         }
     }

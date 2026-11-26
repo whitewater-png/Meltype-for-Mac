@@ -19,6 +19,9 @@ private typealias SetReaderFunction = @convention(c) (ReadingCallback) -> Void
 /// 変換中の Delete: (読み, 文字) を azooKey の学習から消す (要件 031)。
 typealias ForgetConversionCallback = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> Void
 private typealias SetForgetConversionFunction = @convention(c) (ForgetConversionCallback) -> Void
+/// (ひらがな, 左文脈, 右文脈) → 文節 (要件 051)。右文脈はキャレットの後ろの文字で、本体が広い文脈 ON のときだけ渡す。
+typealias RightClausesCallback = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+private typealias SetRightClausesFunction = @convention(c) (RightClausesCallback) -> Void
 private typealias CreateFunction = @convention(c) () -> UnsafeMutableRawPointer?
 private typealias DestroyFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
 private typealias HandleKeyFunction = @convention(c) (UnsafeMutableRawPointer?, Int32, Int32, Int32, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
@@ -52,6 +55,15 @@ private typealias UpdateEvaluateFunction = @convention(c) (UnsafePointer<CChar>?
 private let clausesCallback: ClausesCallback = { hiragana, context in
     guard let hiragana else { return nil }
     let clauses = MeltypeConverter.shared.clauses(for: String(cString: hiragana), context: context.map { String(cString: $0) })
+    guard !clauses.isEmpty else { return nil }
+    return strdup(clauses.map { "\($0.reading)\t\($0.text)" }.joined(separator: "\n"))
+}
+
+/// (ひらがな, 左文脈, 右文脈) → 「読み\t変換結果」を改行でつないだもの (要件 051)。右文脈は Zenzai を使うときだけ効く。
+private let rightClausesCallback: RightClausesCallback = { hiragana, context, right in
+    guard let hiragana else { return nil }
+    let clauses = MeltypeConverter.shared.clauses(for: String(cString: hiragana), context: context.map { String(cString: $0) },
+                                                  rightContext: right.map { String(cString: $0) })
     guard !clauses.isEmpty else { return nil }
     return strdup(clauses.map { "\($0.reading)\t\($0.text)" }.joined(separator: "\n"))
 }
@@ -214,6 +226,8 @@ final class NativeCore {
     private let setReaderFunction: SetReaderFunction?
     /// 無い (古い dylib) ときは何もしない。ABI 版数は上げない (meltype_init の引数を変えず、別の入口にした)。
     private let setForgetConversionFunction: SetForgetConversionFunction?
+    /// 無い (古い dylib) ときは右文脈を渡さない (要件 051)。ABI 版数は上げない (meltype_init の引数を変えず、別の入口にした)。
+    private let setRightClausesFunction: SetRightClausesFunction?
     private let createFunction: CreateFunction?
     private let destroyFunction: DestroyFunction?
     private let handleKeyFunction: HandleKeyFunction?
@@ -289,6 +303,7 @@ final class NativeCore {
         initFunction = symbol("meltype_init", as: InitFunction.self)
         setReaderFunction = symbol("meltype_set_reader", as: SetReaderFunction.self)
         setForgetConversionFunction = symbol("meltype_set_forget_conversion", as: SetForgetConversionFunction.self)
+        setRightClausesFunction = symbol("meltype_set_right_clauses", as: SetRightClausesFunction.self)
         createFunction = symbol("meltype_create", as: CreateFunction.self)
         destroyFunction = symbol("meltype_destroy", as: DestroyFunction.self)
         handleKeyFunction = symbol("meltype_handle_key", as: HandleKeyFunction.self)
@@ -346,6 +361,7 @@ final class NativeCore {
         _ = initFunction?(clausesCallback, candidatesCallback, isWordCallback, learnCallback, predictionsCallback, clipboardCallback, forgetCallback)
         setReaderFunction?(readingCallback)
         setForgetConversionFunction?(forgetConversionCallback)
+        setRightClausesFunction?(rightClausesCallback)
     }
 
     func createSession() -> UnsafeMutableRawPointer? { isCompatible ? createFunction?() : nil }
