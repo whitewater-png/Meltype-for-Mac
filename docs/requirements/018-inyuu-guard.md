@@ -64,4 +64,4 @@ scope: core
 - 査読 2 周目: [止める] なし。[直す] 記録欄の AGENT_STATE の記述 → 直した。[任意] 完成条件の出典の書き方を tsv とそろえた。
 - 査読 1 周目: [止める] なし。[直す] テストの 2 回目のループが 1 回目と同じ判定器だった → スペルチェッカー無しに変えた / 記録欄 → 記入 (AGENT_STATE は PR 作成後に PR 番号付きで更新)。[任意] 「added として ok」の記述 → 直した、崩し方の範囲 → 上に明記、`shinyuu`・`ginyuu` (前に英単語が来る形) → 足した。`sounyuu`・`kounyuu`・`ninyuu`・`chuunyuu` などは今も当たるが、同じ型なので足していない。
 - PR: https://github.com/whitewater-png/Meltype-for-Mac/pull/23
-- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 58): Hermes の入力欄で `kinyuu` → `きにゅう` (変換して `記入`) OK (Safari のフォームの代わり。Safari 固有の挙動は未確認のまま)
+- 2026-11-26 リョウさんの実機 (確認表 docs/HANDS_ON_CHECKLIST_2026-11.md の 58): Hermes の入力欄で `kinyuu` → `記入` OK (Safari のフォームの代わり。Safari 固有の挙動は未確認のまま)
