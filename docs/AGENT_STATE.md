@@ -56,6 +56,8 @@
 - 052 日本語モードを「ASCII 対応」でない入力ソースにする試験 (fork Issue #21。ブランチ claude/project-thread-fe0v1x)。2026-11-26 リョウさんが調査メモ `docs/ISSUE21_ASCII_CAPABLE_2026-11.md` の案 (b) を選んだ。Info.plist の日本語モードから `tsInputModeCharacterRepertoireKey` を外しただけ (辞書のキー・ID・英数モードは変えない)。検査 `tools/test_info_plist_modes.py` (12 件、CI に追加) は main で 1 件 FAIL・変更後 12/12。Core・Swift は変えていない。2026-11-27 りょうさんの Mac で、日本語モードの ascii が yes → no (ログアウトなし)、英数は yes のまま。TextEdit の打鍵・Cmd ショートカット・英数/かなキーは OK (りょうさんの手)。未確認: パスワード欄・Caps Lock・Firefox・Emacs (Mac に無い)。日本語モードの `hello` は、入れ直したこの版で hello と打てた (1 回目の へっぉ は再現せず、原因は不明)。fork Issue #22 は main で修正済み (要件 046) で、Issue は開いたまま。
 
 ## 次の一手
+- (2026-11-27) Mac 版 1.3.0 を公開した (タグ `v1.3.0-mac` = c8e544f、Homebrew tap も 1.3.0)。本家との比較は `docs/COMPARISON_UPSTREAM.md` §4 の 2026-11-27 の行。
+- 人 (判断): ターミナルに入ったとき、英数から始まらず日本語の変換が効く (りょうさんの Mac で 1.3.0 を確認。りょうさんによると 1.2.9 から同じ)。コードを読んだ見立て (未確認) では、`activateServer` で英数にしたあと、システムの合わせ直しの `setValue` (日本語) を `applyMode` がそのまま受けている (`mac/Sources/MeltypeIME/InputController.swift` の 256〜300 行)。IMK の入力経路なので (CLAUDE.md §5)、要件を立てるかを人が決める。確かめるにはトレース (打った文字が残るので同意が要る)。
 - 人: Mac の Claude デスクトップアプリで、このリポジトリと本家の clone のフォルダーを共有する (本家追従 0-1 のため。2026-11-22 時点でクラウドから使える Mac のフォルダーは 0 件)。
 - 人: 017・026 (旧 018) の Mac 実機チェックリスト (要件定義書の「Mac 実機チェックリスト」) を確かめる。
 - 人: 030 の Mac 実機チェックリスト (ターミナルの `python3 -m venv .venv`・`pip3 install requests` (Enter で実行しない)・`cd ~/Downloads`、`nihongo` + Space をターミナルと TextEdit で) を確かめる。
