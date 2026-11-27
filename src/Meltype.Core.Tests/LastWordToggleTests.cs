@@ -86,6 +86,20 @@ internal static class LastWordToggleTests
     }
 
     [Test]
+    public static void Req053_F10AfterPercentSign_RestoresTypedPercent()
+    {
+        // 要件 053: 確定した直後の F10 は、％ にした percent を打った綴りに戻す (査読 2 周目: 5%no になっていた)
+        foreach (var (typed, shown, back) in new[] { ("5percentno", "5％の", "5percentno"), ("kyouha5percent", "きょうは5％", "kyouha5percent") })
+        {
+            var e = new Editor();
+            e.Type(typed + "\n");
+            Assert.Equal(shown, e.Doc, "前提: " + typed);
+            e.F10();
+            Assert.Equal(back, e.Doc, typed);
+        }
+    }
+
+    [Test]
     public static void F10_TurnsTheLastJapaneseWordIntoItsTyping_AndLearnsEnglish()
     {
         var e = new Editor();

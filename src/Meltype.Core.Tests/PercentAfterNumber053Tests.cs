@@ -86,7 +86,7 @@ internal static class PercentAfterNumber053Tests
     [Test]
     public static void Req053_FunctionKeys_RestoreTypedSpelling()
     {
-        // ％ にしたあとで F10・F9・F6 を押したら、打った percent に戻す (査読: 5%no になっていた)
+        // ％ にしたあとで F10・F9 を押したら、打った percent に戻す (F6 は 5ぺrせんtの。確定した直後の F10 は LastWordToggleTests) (査読: 5%no になっていた)
         foreach (var (key, expected) in new[] { (VirtualKeys.F10, "5percentno"), (VirtualKeys.F9, "５ｐｅｒｃｅｎｔｎｏ") })
         {
             var previous = CompositionTests.Detector.SpellChecker;
