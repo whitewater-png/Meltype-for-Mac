@@ -1343,6 +1343,18 @@ public sealed class CompositionDetector
                     || letters.Length <= 2 && letters.Length == word.Length - 1 || englishWordBefore(start);
             }
         }
+        if (HexColorLength(word) is var hexColor and > 0)
+        {
+            // カラーコード (#30b0e8) は # と 16 進の桁だけを英字のまま。後ろの記号 (; , )) は今までどおり判定する。桁の終わりが単位の途中なら守らない
+            var hexOffset = 0;
+            for (var k = start; k < wordEnd; k++)
+            {
+                if (hexOffset == hexColor) return k;
+                hexOffset += units[k].Raw.Length;
+                if (hexOffset > hexColor) return -1;
+            }
+            return Finish(wordEnd);
+        }
         if (!isPath && !isVariable && !isOption) return -1;
         if (isOption) return Finish(wordEnd);
         // 最後の要素が拡張子付き (最初の . が要素の先頭ではない) なら、拡張子の終わりまで。後ろの助詞は今までどおり判定する。
@@ -1361,6 +1373,32 @@ public sealed class CompositionDetector
             offset += units[k].Raw.Length;
         }
         return Finish(wordEnd);
+    }
+
+    /// <summary>
+    /// 語 (空白まで) が # + 16 進のカラーコード (#30b0e8・#fff・#30b0e8ff) で始まるなら、# と桁の文字数。違えば 0 (要件 053、本家 #2383)。
+    /// 桁は 3・4・6・8 で、後ろは語の終わりか英字・数字以外の記号 (; , ))。後ろに英字が続く形 (#30b0e8wo) は守らない。
+    /// 桁の終わりの de は、2 桁短くてもカラーコードなら助詞の で として残す (#beefde → #beef|で、#30b0e8de → #30b0e8|で)。
+    /// ハッシュタグと見分けられない形は守らない: 英字だけでローマ字として最後まで読める (#abe・#eee。c を か行に読む #cafe も)、
+    /// 数字の後ろに読める英字だけが続く (#1de・#10ba)。数字だけ (#123) は今も英字のままなので扱わない。
+    /// </summary>
+    private int HexColorLength(string word)
+    {
+        if (word.Length < 4 || word[0] != '#') return 0;
+        var digits = 0;
+        while (1 + digits < word.Length && char.IsAsciiHexDigit(word[1 + digits])) digits++;
+        if (1 + digits < word.Length && char.IsAsciiLetterOrDigit(word[1 + digits])) return 0;
+        var hex = word.Substring(1, digits).ToLowerInvariant();
+        if (digits is 6 or 8 && hex.EndsWith("de", StringComparison.Ordinal)) return IsHexColor(hex[..^2]) ? digits - 1 : 0;
+        return IsHexColor(hex) ? 1 + digits : 0;
+    }
+
+    private bool IsHexColor(string hex)
+    {
+        if (hex.Length is not (3 or 4 or 6 or 8) || !hex.Any(char.IsAsciiLetter)) return false;
+        static bool Full(RomajiAnalysis a) => a is { IsValid: true, Partial: "" or "n" };
+        var letters = hex.TrimStart("0123456789".ToCharArray());
+        return !(letters.All(char.IsAsciiLetter) && (Full(_romaji.Analyze(letters)) || Full(_romaji.Analyze(RomajiDetector.ReadCRow(letters)))));
     }
 
     /// <summary>

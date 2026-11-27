@@ -1,0 +1,14 @@
+# 要件 053: 16 進のカラーコード (#30b0e8・#fff) を英字のまま確定する (docs/requirements/053-hex-color-code.md)。出どころ: 本家 #2383 の報告 (打鍵と期待だけ。コードは読んでいない)。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打って Enter した結果を測る。実機の記録ではない。
+# # で始まる行は注釈として読み飛ばされるので、# で始まる入力は src/Meltype.Core.Tests/HexColor053Tests.cs で守る。
+# カテゴリ: 直す (前に語や記号がある形)
+color: #30b0e8;	color: #30b0e8;	full	要件 053 (本家 #2383)
+background: #ff00e8;	background: #ff00e8;	full	要件 053
+color: #fff;	color: #fff;	full	要件 053
+color: #abc	color: #abc	full	要件 053
+(#30b0e8)	(#30b0e8)	full	要件 053
+color: #30b0e8ff;	color: #30b0e8ff;	full	要件 053 (8 桁)
+# カテゴリ: 守る (ハッシュタグ・英字だけで読める形)
+tagu ha #ekimae desu	たぐは#えきまえです	full	要件 053 守る (ハッシュタグ)
+tagu ha #cafe desu	たぐは#かふぇです	full	要件 053 守る (英字だけで読める)
+tagu ha #abe desu	たぐは#あべです	full	要件 053 守る
