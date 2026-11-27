@@ -1200,7 +1200,7 @@ public sealed class CompositionController
                 Commit(suffix: " ", fixEnglish: true);
                 return;
             case VirtualKeys.Space when _headCount == 0 && _text.Mode == DisplayMode.Auto && _text.KeepSymbolsOnly():
-                // 記号だけ (# メモ・// memo・> 引用) の後ろの Space は区切り: 半角の記号と空白で確定する (要件 055)。記号の候補 (＃ ♯) は Shift+Space で変換。
+                // 記号だけ (# メモ・// memo・> 引用) の後ろの Space は区切り: 半角の記号と空白で確定する (要件 055)。記号の候補 (＃ など) は Shift+Space で変換。
                 Commit(suffix: " ", fixEnglish: true);
                 return;
             case VirtualKeys.Space:
@@ -1776,6 +1776,7 @@ public sealed class CompositionController
         // ./build.shde も含む。final: true は、--no-edit が打ち終わったときだけ保護区間になるため (統合の査読 R64 必須 1)
         if (_text.Mode == DisplayMode.Auto && _text.Segments(final: true).Any(s => s.Protected)) return false;
         if (_headCount == 0 && _text.Mode == DisplayMode.Auto && _text.KeepLoneHyphen()) return false;
+        if (_headCount == 0 && _text.Mode == DisplayMode.Auto && _text.KeepSymbolsOnly()) return false; // 記号だけ (要件 055)。Space と同じく変換を始めない
         _text.FixTypos();
         var commitsAlphanumeric = _text.IsAlphanumericAt(final: true) && !(_text.Mode == DisplayMode.Auto && _text.IsNumeric && _text.Raw.All(char.IsAsciiDigit) && _text.PrecedingEnglish != true);
         return !commitsAlphanumeric && !EndsWithEnglish(final: true) && !(_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level()));

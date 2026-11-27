@@ -78,13 +78,51 @@ internal static class SpaceAfterSymbolOnly055Tests
     [Test]
     public static void Req055_PunctuationThenSpace_StillConverts()
     {
-        // 句読点・括弧になる記号 (. , [ ]) は対象外。今までどおり Space で変換を始める
-        foreach (var keys in new[] { ".", ",", "[", "]" })
+        // 句読点・括弧・引用符になる記号と、長音になる -- は対象外。今までどおり Space で変換を始める
+        foreach (var keys in new[] { ".", ",", "[", "]", "(", ")", "{", "}", "!", "?", "~", "'", "\"", "--" })
         {
             var k = new CompositionTests.Keyboard();
             k.Type(keys + " ");
             Assert.True(k.Host.View is { Converting: true }, keys + " + Space は変換を始める");
             Assert.Equal("", k.Host.Document, keys + " はまだ確定しない");
         }
+    }
+
+    [Test]
+    public static void Req055_SymbolsOnly_FullWidthSymbolsOff_AlsoCommitsWithSpace()
+    {
+        var k = new CompositionTests.Keyboard { FullWidthSymbols = false };
+        k.Type("* hello\n");
+        Assert.Equal("* hello", k.Host.Document.TrimEnd());
+    }
+
+    [Test]
+    public static void Req055_SlashAsNakaguroAfterJapanese_StillConverts()
+    {
+        // 日本語の後ろの / が ・ になったときは記号の表示ではないので対象外
+        var k = new CompositionTests.Keyboard { SlashAsNakaguro = true };
+        k.Type("kyou\n/ ");
+        Assert.True(k.Host.View is { Converting: true }, "・ + Space は変換を始める");
+    }
+
+    [Test]
+    public static void Req055_AfterFixedClause_StillConverts()
+    {
+        // 変換後も続けて入力して固定した文節がある (kyou を変換したあと # を打った) ときは今までどおり
+        var k = new CompositionTests.Keyboard { Continue = true };
+        k.Type("kyou #");
+        k.Type(" ");
+        Assert.True(k.Host.View is { Converting: true }, "固定した文節があるときの Space は変換");
+    }
+
+    [Test]
+    public static void Req055_TabOnSymbolsOnly_CommitsAndPassesTab()
+    {
+        // Tab で変換 ON でも、記号だけのときは Space と同じく変換を始めない (- と同じ。確定して Tab をアプリに渡す)
+        var k = new CompositionTests.Keyboard { TabConversion = true };
+        k.Type("#");
+        k.Press(VirtualKeys.Tab);
+        Assert.True(k.Host.View is null or { Converting: false }, "変換は始めない");
+        Assert.Equal("#", k.Host.Document, "# で確定する");
     }
 }
