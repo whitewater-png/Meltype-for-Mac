@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Yukishiro
 
+using Meltype.Input;
+
 namespace Meltype.Tests;
 
 /// <summary>
@@ -64,7 +66,41 @@ internal static class PercentAfterNumber053Tests
             ["kyouha5percentage"] = "きょうは5percentage",
             ["I got 5 percent"] = "I got 5 percent",
             ["5%nowaribiki"] = "5％のわりびき",
+            // 査読で見つけた形: 後ろが英字の語なら、日本語の文ではないので置き換えない
+            ["5percentrule"] = "5percentrule",
+            ["the 5percentrule"] = "the 5percentrule",
+            ["5percentwise"] = "5percentwise",
+            ["5percenter"] = "5percenter",
+            ["5percentper"] = "5percentper",
+            ["5PercentNo"] = "5PercentNo",
         });
+    }
+
+    [Test]
+    public static void Req053_AfterJapanesePunctuation_BecomesPercentSign()
+    {
+        // 入力の頭の数字でも、前の確定が日本語の句読点 (。、) で終わっていれば日本語の文
+        Check(new() { ["5percent"] = "5％" }, k => k.Host.PrecedingText = "あめ。");
+    }
+
+    [Test]
+    public static void Req053_FunctionKeys_RestoreTypedSpelling()
+    {
+        // ％ にしたあとで F10・F9・F6 を押したら、打った percent に戻す (査読: 5%no になっていた)
+        foreach (var (key, expected) in new[] { (VirtualKeys.F10, "5percentno"), (VirtualKeys.F9, "５ｐｅｒｃｅｎｔｎｏ") })
+        {
+            var previous = CompositionTests.Detector.SpellChecker;
+            CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+            try
+            {
+                var k = new CompositionTests.Keyboard();
+                k.Type("5percentno");
+                Assert.Equal("5％の", k.Showing, "前提: 打っている途中で ％");
+                k.Press(key);
+                Assert.Equal(expected, k.Showing, key.ToString());
+            }
+            finally { CompositionTests.Detector.SpellChecker = previous; }
+        }
     }
 
     [Test]
