@@ -1,6 +1,6 @@
 ---
 title: 設定「変換後も続けて入力できる」ON で、ローマ字の再変換の文を学習してしまう (固定した文節の確定)
-status: approved   # 2026-11-22 の人の指示「OK、両方おすすめで」(人の判断 1〜4 は、その前の指示「おすすめでお願い」で決定。案 A)。実装は要件 027 のあと (027 の人の判断 1) / 2026-11-25 実装 (fix/continue-after-conversion-learning)。実機は未確認 (done にするのは実機のあと)
+status: done   # 2026-11-27 リョウさんの指示「おすすめで対応して」による (実機チェックリストが全部 [x] になったため)。元: 2026-11-22 の人の指示「OK、両方おすすめで」で approved (案 A)。2026-11-25 実装 (fix/continue-after-conversion-learning)
 source: 要件 026 (旧 018。ライブ変換の確定の学習。PR #29、ブランチ ccr-0fc8aeab-sra4z7 の docs/requirements/026-live-conversion-learning.md) の記録「範囲外で見つけたこと」(2026-11-22)
 scope: core
 ---
@@ -132,7 +132,7 @@ scope: core
 - [x] そのあと `ariga` まで打ったときの予測候補に `arigatou` が出ない。`arigatou` を打ったときのライブ表示も、Space の最初の候補も、`arigatou` (ローマ字) にならない (直す前はなる見込み。I1〜I3・I5 の形。推定)。見るだけで、確定せずに Esc (Space で変換したあとは 2 回) で取り消す (確定すると記録が変わり、次の確かめが崩れることがある)。 (2026-11-26 自動打鍵 (TextEdit) で確認: `ariga` の予測は ありがとう・ありがと・有難う (`arigatou` なし)。`arigatou` のライブ表示は ありがとう、Space の先頭も ありがとう)
 - [x] 同じ `arigatou` をもう一度選んで Shift+Space で、候補が 1 つ目と同じ 2 つのまま (直す前は、最初の候補が `arigatou` で、カタカナなどが並ぶ見込み。I4 の形。推定)。 (2026-11-26 自動打鍵 (TextEdit) で確認: 候補は 2 つのまま (ありがとう・arigatou))
 - [x] 1 つ目の手順の最後を、`hello` Space・`kyouhagoogle` Space・Shift+Enter・Tab・別の欄をクリック (暗黙の確定) に替えても、2 つ目・3 つ目と同じ。 (2026-11-26 自動打鍵 (TextEdit) で確認: `hello` Space・`kyouhagoogle` Space・Shift+Enter・Tab は確認表 90 (下の記録)。別の欄をクリックは 2026-11-26 19:58 (日本時間) に `sayounara` で確認 (クリックした先は別の書類のウィンドウ。同じウィンドウの中の別の場所は未確認): 再変換の候補 さようなら・sayounara → Space で `sayounara` → `yo` → 別の TextEdit の書類をクリックで `sayounaraよ` が確定。そのあと `sayo` の予測は 左翼・作用・さよなら、`sayounara` のライブ表示は さようなら、Space の候補にも `sayounara` は無い。もう一度選んで Shift+Space も 2 つのまま)
-- [ ] 長い文でも試す: ふつうに打って Space で変換すると 2 つ以上の文節に分かれ、Shift+Space の最初の候補がひらがなだけになり、句読点・記号を含まないローマ字の文を選ぶ (例: `ohayou gozaimasu`。そうなるかは azooKey 次第で未確認。句読点・記号があると、直す前でも登録提案に数えない)。1 つ目の手順を 3 回しても、入力メニューに登録の提案が出ない。そのあと `ohayou` まで打ったときの予測候補に、選んだ文 (ローマ字) が出ない (直す前はどちらも出る見込み。I3・I7 の形。推定)。 (2026-11-26 自動打鍵 (TextEdit): 確認表 91 は「選んで Shift+Space → Enter」の手順で OK だが、この行の「1 つ目の手順 (Space → `yo` → Enter)」を 3 回は未確認。最初の候補がひらがなだけになったかも記録が無い)
+- [x] 長い文でも試す: ふつうに打って Space で変換すると 2 つ以上の文節に分かれ、Shift+Space の最初の候補がひらがなだけになり、句読点・記号を含まないローマ字の文を選ぶ (例: `ohayou gozaimasu`。そうなるかは azooKey 次第で未確認。句読点・記号があると、直す前でも登録提案に数えない)。1 つ目の手順を 3 回しても、入力メニューに登録の提案が出ない。そのあと `ohayou` まで打ったときの予測候補に、選んだ文 (ローマ字) が出ない (直す前はどちらも出る見込み。I3・I7 の形。推定)。 (2026-11-26 自動打鍵 (TextEdit): 確認表 91 は「選んで Shift+Space → Enter」の手順で OK だが、この行の「1 つ目の手順 (Space → `yo` → Enter)」を 3 回は未確認。最初の候補がひらがなだけになったかも記録が無い) (2026-11-27 実機 (AI がリョウさんの Mac を画面操作して打鍵。TextEdit、ライブ変換 ON・Zenzai ON・変換後も続けて入力 ON。入っている版が 1.2.9 か main の作りかは見ていない。どちらも直しを含む): `ohayou gozaimasu`・`kyouhaiitenkidesune` は 1 文節、`watashiha ashita toukyouni ikimasu` は再変換の最初の候補が漢字まじりで、条件に合わず。`sore ha dou desu ka` (ふつうに打つと それは / どうですか の 2 文節。再変換の候補は それはどうですか・sore ha dou desu ka の 2 つ) で、再変換 → Space → `yo` → Enter を 3 回。確定は 3 回とも `sore ha dou desu kaよ`、3 回目の再変換も候補は 2 つのまま。そのあと `soreha` の予測は それは修正・それはそれ・それはそう、`sorehadoudesuka` のライブ表示は それはどうですか、Space の候補にもローマ字の文は無い。入力メニューに登録の提案が出ていないことは、リョウさんが目で確認 (登録提案 ON・回数 3))
 - [x] 設定 OFF で同じ手順: 今までどおり、ローマ字の語が出てこない。 (2026-11-26 自動打鍵 (TextEdit) で確認: 確認表 92)
 - [x] 普通の変換の続けて入力: `hashiwo` Space で 1 番目でない候補 (例: 箸を) を選ぶ → 続けて `tanni` → Enter。次に `hashiwo` Space で、選んだ候補が 1 番目に出る (今も覚える。変えていないことの確認)。 (2026-11-26 自動打鍵 (TextEdit) で確認: 確認表 93)
 
