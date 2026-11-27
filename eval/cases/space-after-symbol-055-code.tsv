@@ -1,0 +1,12 @@
+# 要件 055: ASCII の記号だけを打った後の Space は区切り。半角の記号と空白で確定する (docs/requirements/055-space-after-symbol-only.md)。
+# # で始まる打鍵 (# hello・## hello) はこの形式ではコメント行になるので、テスト (SpaceAfterSymbolOnly055Tests) だけで見る。
+# 表ごとの指定: コード系アプリ (ターミナル・エディター) として打つ。
+# app: code
+// hello	// hello	full	要件 055 Core 2026-11-27
+// memo	// memo	full	要件 055 Core 2026-11-27 (実機チェックリストの VS Code)
+> hello	> hello	full	要件 055 Core 2026-11-27
+* hello	* hello	full	要件 055 Core 2026-11-27
++ hello	+ hello	full	要件 055 Core 2026-11-27
+- hello	- hello	full	要件 055 Core 2026-11-27 (守る: 箇条書きの -)
+kyou# hello	今日#hello	full	要件 055 Core 2026-11-27 (守る: 語の後ろの記号は今までどおり)
+echo hello	echo hello	full	要件 055 Core 2026-11-27 (守る)
