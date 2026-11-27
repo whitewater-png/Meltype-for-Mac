@@ -1234,7 +1234,7 @@ public sealed class CompositionController
                 // chosen は文節を見ない: 固定した文節を含む確定は CommitText が確定し直しを記録しない。Esc で戻った後の古い文節で誤って真にしない (R45 任意 1)
                 // 打ち直しの後ろに残した文節 (本家 #972) も確定に含める (CommitText は _retypeSuffix を捨てるので、ここで足す)。
                 // 後ろに日本語があれば、この確定は英語で終わっていない (Commit() と同じ補正。次の数字だけの Space を「英文の後ろ」と誤らない。Q18)
-                else if (EndsWithEnglish(final: true)) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + SuffixText + " ", english: !SuffixHasJapanese, _text.Raw, ChosenByUser(clausesInUse: false), hasEnglish: true, hasJapanese: SuffixHasJapanese || _text.Segments(final: true).Any(s => !s.IsEnglish), SegmentRaws(converting: false));
+                else if (EndsWithEnglish(final: true)) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.RenderSegments(final: true, _options.LiveConversion() ? Convert : null)) + SuffixText + " ", english: !SuffixHasJapanese, _text.TypedRaw, ChosenByUser(clausesInUse: false), hasEnglish: true, hasJapanese: SuffixHasJapanese || _text.Segments(final: true).Any(s => !s.IsEnglish), SegmentRaws(converting: false));
                 else if (_text.Mode == DisplayMode.Auto && _detector.IsEnglishAtWordEnd(_text.Raw, _options.Level())) CommitText(TakeFixedClauses() + FixEnglishTypo(_text.Raw) + SuffixText + " ", english: !SuffixHasJapanese, _text.Raw, ChosenByUser(clausesInUse: false), hasEnglish: true, hasJapanese: SuffixHasJapanese);
                 else
                 {
@@ -3270,7 +3270,7 @@ public sealed class CompositionController
             RecordSuggestions(liveClauses);
             TouchUsed(liveClauses);
         }
-        CommitText(text + (suffix.Length > 0 ? suffix : toggle?.Tail ?? ""), english, toggle?.Raw ?? _text.Raw, chosen, hasEnglish, hasJapanese, toggle is null ? raws : ToggleRaws(toggle));
+        CommitText(text + (suffix.Length > 0 ? suffix : toggle?.Tail ?? ""), english, toggle?.Raw ?? _text.TypedRaw, chosen, hasEnglish, hasJapanese, toggle is null ? raws : ToggleRaws(toggle));
     }
 
     /// <summary>
@@ -4496,7 +4496,7 @@ public sealed class CompositionController
     private void CommitPrediction(string text)
     {
         var reading = _text.AllKana(final: false);
-        CommitText(text, english: false, _text.Raw, hasJapanese: true);
+        CommitText(text, english: false, _text.TypedRaw, hasJapanese: true);
         _options.History?.Remember(reading, text, fromPrediction: true);
     }
 
