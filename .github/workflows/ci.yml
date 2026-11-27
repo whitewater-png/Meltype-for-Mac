@@ -64,6 +64,9 @@ jobs:
           path: ${{ runner.temp }}/eval-out/
           if-no-files-found: ignore
 
+      - name: Info.plist の入力モードの検査
+        run: python3 tools/test_info_plist_modes.py
+
       - name: 辞書の検査
         run: |
           node tools/check-dictionaries.mjs
