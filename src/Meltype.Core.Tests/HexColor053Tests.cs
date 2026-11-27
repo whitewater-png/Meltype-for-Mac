@@ -103,9 +103,9 @@ internal static class HexColor053Tests
     [Test]
     public static void Req053_WhileTyping_HashtagsDoNotFlickerToEnglish()
     {
-        foreach (var (typed, unexpected) in new[] { ("#caf", "#caf"), ("#fad", "#fad"), ("#bac", "#bac"), ("#bacc", "#bacc"), ("#abed", "#abed") })
+        foreach (var (typed, expected) in new[] { ("#caf", "#かf"), ("#fad", "#ふぁd"), ("#bac", "#ばc"), ("#bacc", "#ばっc"), ("#abed", "#あbed"), ("#fff", "#っっf") })
         {
-            Assert.True(Showing(typed) != unexpected, typed + " → " + Showing(typed));
+            Assert.Equal(expected, Showing(typed), typed);
         }
         // 打ちかけとして読めない形は、打っている途中から英字
         Assert.Equal("#abc", Showing("#abc"), "#abc");
