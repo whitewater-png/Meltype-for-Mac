@@ -1392,11 +1392,21 @@ public sealed class CompositionText
                 kana += pending;
                 pending = "";
             }
-            builder.Append(convert is not null && kana.Length > 0 ? convert(kana) : kana);
+            if (convert is not null && kana.Length > 0)
+            {
+                // 後ろに別の区間 (英字など) が続くなら、変換する区間の右は入力欄の後ろの文字ではない (要件 051: 右文脈を渡さない)
+                ConvertingBeforeMore = segments.Skip(i + 1).Any(s => s.IsEnglish ? s.Raw.Length > 0 : s.Kana.Length > 0);
+                try { builder.Append(convert(kana)); }
+                finally { ConvertingBeforeMore = false; }
+            }
+            else builder.Append(kana);
             builder.Append(pending);
         }
         return builder.ToString();
     }
+
+    /// <summary><see cref="RenderSegments"/> が区間を変換している最中で、その区間の後ろにまだ区間が続くとき true。</summary>
+    internal bool ConvertingBeforeMore { get; private set; }
 
     /// <summary>
     /// 確定のときの区間分け (RenderSegments と同じ): 区間と、確定したときのかな (日本語の区間のみ。語末の n は ん にし、読み切れない子音は英字のまま後ろに付ける)。

@@ -87,7 +87,7 @@ Zenzai (ニューラル変換) の計測用の、かな → 漢字の正解表�
 
 Zenzai にカーソルの後ろの文字 (右文脈) を渡すと精度が上がるかを測るための表です。新しい文は書かず、`kanji-cases.tsv` と `bench-homophones.tsv` の文を `tools/make-right-context-items.py` が決まった手順で「左・真ん中・右」に分けて作ります (真ん中 = 漢字を含む最初の文節で、後ろにまだ文節があるもの)。読みとの対応が 1 通りに決まらない文などは飛ばします。
 - 形は AJIMEE-Bench と同じ JSON (`index`・`input`・`expected_output`・`context_text`) に、`right_context`・`source` (出どころ: kanji-cases の人の 70 文 / LLM が作った文 / bench-homophones)・`original` (元の文) を足したもの。`bench-homophones.tsv` 由来の行は GPL-3.0 の派生物 (出典は `bench-homophones.tsv` の頭の注記)。
-- 測り方 (Mac): `python3 tools/ajimee-eval.py --binary mac/.build/release/MeltypeIME --items eval/kanji/right-context-items.json --weights <gguf> --ignore-right-context --out <なし>` と、`--ignore-right-context` を外した `--out <あり>` を流し、`--compare <なし>/rows.tsv <あり>/rows.tsv --labels なし,あり` で McNemar (出どころごとにも出る)。右文脈は Zenzai ON のときだけ効き、製品の変換には渡していません。
+- 測り方 (Mac): `python3 tools/ajimee-eval.py --binary mac/.build/release/MeltypeIME --items eval/kanji/right-context-items.json --weights <gguf> --ignore-right-context --out <なし>` と、`--ignore-right-context` を外した `--out <あり>` を流し、`--compare <なし>/rows.tsv <あり>/rows.tsv --labels なし,あり` で McNemar (出どころごとにも出る)。右文脈は Zenzai ON のときだけ効きます。製品の変換も、要件 051 から同じ口 (`clauses(for:context:rightContext:)`) で右文脈を渡します (広い文脈が ON のとき)。
 - 表は元の表から作り直せます。元の表を変えたら `python3 tools/make-right-context-items.py` で作り直す (自己テスト `python3 tools/test_right_context_items.py` が古い表を見つけます)。
 
 ## 前の文字つきの正解表 (`eval/context/`)

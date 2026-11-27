@@ -27,6 +27,7 @@ internal static class ExportsGuardTests
         ("meltype_abi_version", "定数を返すだけ (例外が起きない)", @"^AbiVersion$"),
         ("meltype_set_reader", "関数ポインタを static 変数に入れるだけ (例外が起きない)", @"^s_reading = reading$"),
         ("meltype_set_forget_conversion", "関数ポインタを static 変数に入れるだけ (例外が起きない)", @"^s_forgetConversion = forgetConversion$"),
+        ("meltype_set_right_clauses", "関数ポインタを static 変数に入れるだけ (例外が起きない)", @"^s_rightClauses = rightClauses$"),
         ("meltype_init", "関数ポインタを static 変数に入れて 1 を返すだけ (例外が起きない)", @"^(s_\w+ = \w+;\s*)+return 1;$"),
         ("meltype_free", "NativeMemory.Free は C の free で、managed の例外を投げない", @"^NativeMemory\.Free\(text\)$"),
     ];

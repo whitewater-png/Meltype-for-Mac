@@ -131,16 +131,16 @@ final class MeltypeConverter {
     /// ひらがな全体に対する変換結果 (入力をすべて使ったものだけ、よい順)。
     /// Zenzai を使うときは、結果が左文脈で変わるので、左文脈もキャッシュの鍵に入れる (同じ読みを文脈ありとなしで続けて変換して、
     /// 2 度目が 1 度目の結果に当たらないように)。Zenzai を使わないときの鍵は、今までどおり読みだけ。
-    private func results(for hiragana: String, context: String? = nil) -> [Candidate] {
+    private func results(for hiragana: String, context: String? = nil, rightContext: String? = nil) -> [Candidate] {
         let leftContext = zenzaiActive ? (context ?? "") : nil
         var key = leftContext.map { "Z\u{1}" + $0 + "\u{1}" + hiragana } ?? hiragana
-        // 計測用の右文脈 (下の measurementRightContext) があるときだけ、鍵に足す。製品は nil なので、鍵は今までどおり
-        if leftContext != nil, let right = measurementRightContext, !right.isEmpty { key += "\u{1}R" + right }
+        // 右文脈 (要件 051) があるときだけ、鍵に足す。無いとき (文の最後に打つとき) の鍵は今までどおり
+        if leftContext != nil, let right = rightContext, !right.isEmpty { key += "\u{1}R" + right }
         if let cached = resultCache[key] {
             remember(cached, for: hiragana)
             return cached
         }
-        let filtered = rawMainResults(for: hiragana, context: context)
+        let filtered = rawMainResults(for: hiragana, context: context, rightContext: rightContext)
         if resultCacheOrder.count >= MeltypeConverter.resultCacheLimit {
             resultCache.removeValue(forKey: resultCacheOrder.removeFirst())
         }
@@ -158,30 +158,26 @@ final class MeltypeConverter {
     /// azooKey に変換を要求する。Zenzai を使うときは、この要求の左文脈を入れたオプションにする (context が空なら左文脈なし)。
     /// ConvertRequestOptions は値型で、複製は軽い (重いのは辞書や学習データの参照ではなく、Zenzai のモデルを読む最初の 1 回だけ)。
     /// prediction が true なら、予測も要求する (通常の変換結果が変わらないよう、予測は予測変換のときだけ .manualMix で要求する)。
-    private func requestCandidates(_ composing: ComposingText, reading: String, context: String?, prediction: Bool = false) -> ConversionResult {
+    private func requestCandidates(_ composing: ComposingText, reading: String, context: String?, rightContext: String? = nil, prediction: Bool = false) -> ConversionResult {
         var request = options
         if prediction { request.requireJapanesePrediction = .manualMix }
         lastRequestAt = Date()
         guard zenzaiActive, let zenzai else {
             return inSession(for: reading) { converter.requestCandidates(composing, options: request) }
         }
-        request.zenzaiMode = zenzaiMode(weight: zenzai.weightURL, context: context)
+        request.zenzaiMode = zenzaiMode(weight: zenzai.weightURL, context: context, rightContext: rightContext)
         let start = Date()
         let result = inSession(for: reading) { converter.requestCandidates(composing, options: request) }
         noteZenzaiRequest(from: start)
         return result
     }
 
-    /// 計測だけで使う右文脈 (カーソルの後ろの文字。要件 049)。`--convert-eval` が行ごとに入れる。
-    /// 製品の経路 (IME) は入れない (nil のまま) ので、製品の変換は今までどおり左文脈だけ。製品に右文脈を渡すかは、測った後に別の要件で決める。
-    /// azooKey は右文脈が空ならプロンプトに何も足さないので、nil・空は今までと同じ要求になる。
-    var measurementRightContext: String?
-
     /// Zenzai の設定。personalizationMode は既定値が無いので明記する。profile も空 (個人の情報は渡さない)。
-    private func zenzaiMode(weight: URL, context: String?) -> ConvertRequestOptions.ZenzaiMode {
+    /// rightContext はキャレットの後ろの文字 (要件 051。Core が広い文脈 ON のときだけ渡す)。azooKey は右文脈が空ならプロンプトに何も足さないので、nil・空は今までと同じ要求になる。
+    private func zenzaiMode(weight: URL, context: String?, rightContext: String? = nil) -> ConvertRequestOptions.ZenzaiMode {
         .on(weight: weight, inferenceLimit: Self.zenzaiInferenceLimit, requestRichCandidates: false,
             personalizationMode: nil, versionDependentMode: .v3(.init(profile: "", leftSideContext: context ?? "",
-                                                                      rightSideContext: measurementRightContext ?? "")))
+                                                                      rightSideContext: rightContext ?? "")))
     }
 
     /// 直近の変換要求の時刻 (Zenzai の先読みが、入力中を避けるのに使う)。
@@ -278,10 +274,10 @@ final class MeltypeConverter {
     }
 
     /// キャッシュ (resultCache) を通さずに azooKey を呼んだ、入力をすべて使った変換結果 (よい順)。
-    func rawMainResults(for hiragana: String, context: String? = nil) -> [Candidate] {
+    func rawMainResults(for hiragana: String, context: String? = nil, rightContext: String? = nil) -> [Candidate] {
         var composing = ComposingText()
         composing.insertAtCursorPosition(hiragana, inputStyle: .direct)
-        let results = requestCandidates(composing, reading: hiragana, context: context)
+        let results = requestCandidates(composing, reading: hiragana, context: context, rightContext: rightContext)
         let count = hiragana.count
         // 入力 (ひらがな) をすべて使った候補だけ (.direct で入れたので、入力の文字数 = ひらがなの文字数)
         let filtered = results.mainResults.filter { $0.composingCount == .inputCount(count) || $0.composingCount == .surfaceCount(count) }
@@ -331,8 +327,9 @@ final class MeltypeConverter {
     }
 
     /// 文節に区切った変換結果 (読みをつなげると元のひらがなになる)。変換できなければ空。
-    func clauses(for hiragana: String, context: String?) -> [(reading: String, text: String)] {
-        guard let best = results(for: hiragana, context: context).first else { return [] }
+    /// rightContext はキャレットの後ろの文字 (要件 051)。Zenzai を使うときだけ効く。候補ウィンドウ・予測には渡さない。
+    func clauses(for hiragana: String, context: String?, rightContext: String? = nil) -> [(reading: String, text: String)] {
+        guard let best = results(for: hiragana, context: context, rightContext: rightContext).first else { return [] }
         var clauses: [(reading: String, text: String)] = []
         for element in best.data {
             let reading = element.ruby.applyingTransform(.hiraganaToKatakana, reverse: true) ?? element.ruby

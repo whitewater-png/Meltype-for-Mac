@@ -11,7 +11,7 @@ import Foundation
 /// - `reading`: ひらがなの読み (空の行は飛ばす)
 /// - `accepted`: 正解。複数許容は `|` 区切り
 /// - `left_context`: 左文脈 (無ければ空 → `context: nil`)
-/// - `right_context`: 任意。右文脈 (カーソルの後ろの文字)。Zenzai ON のときだけ効く (`MeltypeConverter.measurementRightContext`。要件 049)。
+/// - `right_context`: 任意。右文脈 (カーソルの後ろの文字)。Zenzai ON のときだけ効く (`MeltypeConverter.clauses(for:context:rightContext:)`。製品と同じ口。要件 049・051)。
 ///   列が無い・空の行は今までと同じ要求になる。`--ignore-right-context` を付けると、5 列目があっても使わない (同じ表で「なし」を測るため)
 ///
 /// 出力 (stdout): 1 行 1 件 `id<TAB>hit<TAB>top<TAB>ms` と、末尾に `# summary ...`。
@@ -184,9 +184,9 @@ enum ConvertEval {
         for row in rows {
             // 行ごとに組版を終えて、前の行の差分変換・学習が次の行に食い込まないようにする
             converter.endComposition()
-            converter.measurementRightContext = (ignoreRightContext || row.rightContext.isEmpty) ? nil : row.rightContext
+            let right = (ignoreRightContext || row.rightContext.isEmpty) ? nil : row.rightContext
             let start = Date()
-            let top = converter.clauses(for: row.reading, context: row.context.isEmpty ? nil : row.context).map(\.text).joined()
+            let top = converter.clauses(for: row.reading, context: row.context.isEmpty ? nil : row.context, rightContext: right).map(\.text).joined()
             let ms = Date().timeIntervalSince(start) * 1000
             times.append(ms)
             let hit = row.accepted.contains(top)
@@ -200,10 +200,9 @@ enum ConvertEval {
                 var list: [String] = []
                 let texts: [String]
                 if productCandidates {
-                    converter.measurementRightContext = nil   // 製品の候補ウィンドウには右文脈を渡さない
                     texts = converter.candidates(for: row.reading)   // 製品の候補ウィンドウの経路 (左文脈なし)
                 } else {
-                    texts = converter.rawMainResults(for: row.reading, context: row.context.isEmpty ? nil : row.context).map(\.text)
+                    texts = converter.rawMainResults(for: row.reading, context: row.context.isEmpty ? nil : row.context, rightContext: right).map(\.text)
                 }
                 for text in texts where seen.insert(text).inserted {
                     list.append(text.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " "))
