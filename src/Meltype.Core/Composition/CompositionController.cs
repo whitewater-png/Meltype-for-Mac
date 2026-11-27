@@ -1199,6 +1199,10 @@ public sealed class CompositionController
                 // 箇条書きの - は長音ではない: 半角の - と空白で確定する (- kyou wa)。
                 Commit(suffix: " ", fixEnglish: true);
                 return;
+            case VirtualKeys.Space when _headCount == 0 && _text.Mode == DisplayMode.Auto && _text.KeepSymbolsOnly():
+                // 記号だけ (# メモ・// memo・> 引用) の後ろの Space は区切り: 半角の記号と空白で確定する (要件 055)。記号の候補 (＃ ♯) は Shift+Space で変換。
+                Commit(suffix: " ", fixEnglish: true);
+                return;
             case VirtualKeys.Space:
                 _text.FixTypos();
                 // 設定「計算式を変換すると結果を候補に出す」: 10/4 のような / を含む式は、

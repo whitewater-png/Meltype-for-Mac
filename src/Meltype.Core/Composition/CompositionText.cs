@@ -326,6 +326,26 @@ public sealed class CompositionText
         return true;
     }
 
+    /// <summary>
+    /// 変換ボックスに ASCII の記号だけ (# ## // > * など) があるとき、打ったままの半角にする (要件 055。# メモ・// memo・> 引用。Space で確定して空白を入れる前に呼ぶ)。
+    /// 句読点・括弧・引用符になる記号 (, . [ ] ( ) { } ! ? ~ ' ") と、記号以外の表示になった単位 (日本語の後ろの / → ・、- → ー) を含むときは対象外 (今までどおり Space で変換)。変えたら true。
+    /// </summary>
+    public bool KeepSymbolsOnly()
+    {
+        if (_pending.Length > 0 || _units.Count == 0) return false;
+        foreach (var u in _units)
+        {
+            if (u.Raw is not [var c] || !IsSpaceSeparatedSymbol(c)) return false;
+            if (u.Kana != c.ToString() && u.Kana != ((char)(c + 0xFEE0)).ToString()) return false;
+        }
+        for (var i = 0; i < _units.Count; i++) _units[i] = _units[i] with { Kana = _units[i].Raw };
+        return true;
+    }
+
+    /// <summary>空白で区切って使う ASCII の記号か (見出しの #、コメントの //、引用の >、箇条書きの * +)。日本語の句読点・括弧・引用符になる記号は含めない。</summary>
+    private static bool IsSpaceSeparatedSymbol(char c) =>
+        c is >= '!' and <= '~' && !char.IsAsciiLetterOrDigit(c) && c is not (',' or '.' or '[' or ']' or '(' or ')' or '{' or '}' or '!' or '?' or '~' or '\'' or '"');
+
     /// <summary>今打った - が、長音ではなく半角の - のままにする位置か (数字の後ろ・半角の - の後ろ・母音の無い英字 2 文字以上の後ろ)。</summary>
     private bool IsPlainHyphenPosition()
     {
