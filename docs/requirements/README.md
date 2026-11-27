@@ -79,4 +79,4 @@ Core のテストは偽の変換エンジンで動くので、漢字変換と実
 | 052 | 日本語モードを「ASCII 対応」でない入力ソースにする試験 (fork Issue #21。Info.plist の日本語モードから、モードごとの文字の指定 `tsInputModeCharacterRepertoireKey` を外す。辞書のキー・ID は変えない) | approved (2026-11-26 リョウさんが調査メモの案 (b) を選んだ)。実機で効くかは未確認 |
 | 053 | 数字のすぐ後ろの percent を ％ にする (5percent → 5％。Meltype-Flash の 30 文の 1 件。要件 050 では新しい機能として外した) | draft (2026-11-27 リョウさん「別要件でたてて」。全角か半角か・英文の中の扱いは人の判断待ち) |
 | 054 | 助詞と同じ 2 文字の語 (to など) を学習で英語と覚えていても、英字の語の間 (JavaScripttoPython・dlltoCargo) では助詞にする (要件 050 の実機確認で見つけた) | draft (2026-11-27 リョウさん「要件にたてて」。学習の印を上書きしてよいかは人の判断待ち) |
-| 055 | 記号だけ (#・//) を打って Space を押すと空白が消える (# parseJSONtoObject → #parseJSONtoObject。Core で再現、Space が変換のキーになる分岐) | draft (2026-11-27 リョウさん「要件立てて調査して」。記号の候補の変換を残すかは人の判断待ち) |
+| 055 | 記号だけ (#・//) を打って Space を押すと空白が消える (# parseJSONtoObject → #parseJSONtoObject。Core で再現、Space が変換のキーになる分岐) | approved (2026-11-27 リョウさんが「いつも半角で確定」を選んだ。記号の候補は Shift+Space。ブランチ claude/project-thread-rsfj8l、実機は未確認) |
