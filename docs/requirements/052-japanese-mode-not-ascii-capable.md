@@ -34,16 +34,16 @@ scope: swift (実機必須)
 - [x] `python3 tools/test_info_plist_modes.py`: 変更前の Info.plist (origin/main a65ce2b) をパスで渡すと (Registration.swift との照合を飛ばすので 9 件) 「日本語モードに、モードごとの tsInputModeCharacterRepertoireKey が無い」の 1 件が FAIL (終了コード 1)、変更後は 12 件すべて PASS (終了コード 0)。
 - [x] `xmllint --noout mac/Resources/Info.plist` が通る (Linux で確認)。
 - [x] Core は変えていないので、Core のテスト・回帰ゲートは変わらない (C# の変更 0 件)。
-- [ ] `mac/build.sh --no-install` と `tools/check-mac-aot-settings.py` が通る (Mac 専用。未確認)
+- [x] `mac/build.sh` が通り、~/Library/Input Methods に入る (2026-11-27、りょうさんの Mac で 5510b54。入った中身がビルドと一致することを `cmp` で確認)。`tools/check-mac-aot-settings.py` は未確認
 - [ ] 下の Mac 実機チェックリスト (人が確かめる。**この試験の中心**)
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 入れ替えたあと、Info.plist の変更を macOS に読み直させるため、いったんログアウトしてログインし直す (実行中に反映されるかは未確認)。
-- [ ] 日本語モードの `kTISPropertyInputSourceIsASCIICapable` が false になる (調査メモと同じ読み取りだけの方法で。英数モードは true のまま)
-- [ ] 入力メニューに「日本語 (Meltype for Mac)」「英数 (Meltype for Mac)」が今までどおり出て、選べる
-- [ ] TextEdit: 日本語モードで `kyouha` → きょうは と変換中になる。`konnichiwa hello` などの英語もいつもどおり自動で打ち分ける
-- [ ] TextEdit: 英数モードで `kyouha` → `kyouha` のまま (下線なし)。英数キー / かなキー・Caps Lock の切り替えが今までどおり
-- [ ] Cmd+C・Cmd+V・Cmd+Z などのショートカットが、日本語モードで今までどおり効く (US 配列・JIS 配列で)
+- [x] 日本語モードの `kTISPropertyInputSourceIsASCIICapable` が false になる (2026-11-27: 入れる前 yes → 入れた直後・1 分後とも no。英数モードは yes のまま。ログアウトなしで変わった)
+- [x] 入力メニューに「日本語 (Meltype for Mac)」「英数 (Meltype for Mac)」が今までどおり出て、選べる (TIS の enabled・selectable が両方 yes のまま。りょうさんが手で選んで打てた)
+- [x] TextEdit: 日本語モードで `kyouha` → きょうは (りょうさん 2026-11-27)。`konnichiwa hello` は hello が へっぉ になったが、1.2.9 (Homebrew) に戻しても同じく へっぉ だったので、この変更とは関係ない前からの動き (別に扱う)
+- [x] TextEdit: 英数モードで `kyouha` → `kyouha` のまま。英数キー / かなキーの切り替えが今までどおり (りょうさん 2026-11-27。Caps Lock は未確認)
+- [x] Cmd+A・Cmd+C・Cmd+V・Cmd+Z が、日本語モードで今までどおり効く (りょうさん 2026-11-27。配列の違いは未確認)
 - [ ] パスワード欄 (Safari のログイン欄など) で、打てる・入力ソースの表示が戸惑う動きにならない (ascii=false にすると、macOS が英字の入力ソースに切り替えることがある。推測)
 - [ ] コード系のアプリ (ターミナル・VS Code) で、英数から始まる・前に選んだモードを覚える動きが今までどおり
 - [ ] (報告の形) Emacs + inline パッチで、日本語モードのまま `C-x b` が変換されずにコマンドになる・dired の `n` が次の行へ動く (Emacs がある場合)
@@ -61,5 +61,6 @@ scope: swift (実機必須)
 - ascii が false にならなかったら、案 (c) に進む前に人が決める。
 
 ## 記録 (ループが書く)
+- 実機 (2026-11-27): 効いていたのはモードごとの repertoire で、案 (c) は要らなかった。パスワード欄・コード系アプリ・Firefox・Emacs (この Mac に無い) は未確認。
 - 番号: 050 は PR #40、051 は別の作業が使っているので 052 にした。
 - 1 周目 / 上位のモデル / Info.plist の 1 か所と検査スクリプト 1 本 / PR の URL は PR を作ったあとに AGENT_STATE に書く
