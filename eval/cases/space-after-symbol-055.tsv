@@ -1,7 +1,6 @@
 # 要件 055: ASCII の記号だけを打った後の Space は区切り。半角の記号と空白で確定する (docs/requirements/055-space-after-symbol-only.md)。
 # # で始まる打鍵 (# hello・## hello) はこの形式ではコメント行になるので、テスト (SpaceAfterSymbolOnly055Tests) だけで見る。
 // hello	// hello	full	要件 055 Core 2026-11-27
-// memo	// メモ	full	要件 055 Core 2026-11-27 (実機チェックリストの VS Code。memo がかなになるのは語の判定で、この要件では変えない。見るのは // の後ろの空白)
 > hello	> hello	full	要件 055 Core 2026-11-27
 * hello	* hello	full	要件 055 Core 2026-11-27
 + hello	+ hello	full	要件 055 Core 2026-11-27

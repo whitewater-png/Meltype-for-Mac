@@ -3,7 +3,6 @@
 # 表ごとの指定: コード系アプリ (ターミナル・エディター) として打つ。
 # app: code
 // hello	// hello	full	要件 055 Core 2026-11-27
-// memo	// メモ	full	要件 055 Core 2026-11-27 (実機チェックリストの VS Code。memo がかなになるのは語の判定で、この要件では変えない。見るのは // の後ろの空白)
 > hello	> hello	full	要件 055 Core 2026-11-27
 * hello	* hello	full	要件 055 Core 2026-11-27
 + hello	+ hello	full	要件 055 Core 2026-11-27
