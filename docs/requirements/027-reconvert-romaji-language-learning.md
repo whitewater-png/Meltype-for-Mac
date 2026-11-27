@@ -89,10 +89,10 @@ scope: core
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 前提: 試す前に「Meltype 辞書」の「学習した語」タブ (⌘3) で、`meeting`・`review` が無いことを見ておく (あれば控えておく)。TextEdit で、日本語入力 (「あ」) にして試す。直っていない版で試すと覚えるので、確かめたら「学習した語」タブで消す。
-- [ ] `asita no meeting de review shimasu` を選んで Shift+Space → Enter。そのあと「学習した語」タブに `meeting`・`review` が増えない (直す前は「かなにする」で増える見込み。推定)。 (2026-11-26 自動打鍵 (TextEdit): 表示は `明日の meeting で review します`。学習データのファイル (languages.json) では `meeting`・`review` は増えないことを確認、「学習した語」タブは未確認。[ ] のまま)
+- [x] `asita no meeting de review shimasu` を選んで Shift+Space → Enter。そのあと「学習した語」タブに `meeting`・`review` が増えない (直す前は「かなにする」で増える見込み。推定)。 (2026-11-26 自動打鍵 (TextEdit): 表示は `明日の meeting で review します`。学習データのファイル (languages.json) では `meeting`・`review` は増えないことを確認、「学習した語」タブは未確認。[ ] のまま) (2026-11-27 実機 (AI がリョウさんの Mac を画面操作して打鍵。TextEdit、ライブ変換 ON・Zenzai ON・変換後も続けて入力 ON。入っている版が 1.2.9 か main の作りかは見ていない。どちらも直しを含む): 打つ前の「学習した語」タブは全 38 語で meeting・review は 0 件。再変換 (候補 明日の meeting で review します・選んだままの文) → Enter のあとも 38 語・0 件)
 - [x] そのあと `kyouhameetingdesu` と打つと、`meeting` が英字のまま (直す前は崩れる見込み。I1 の形。推定)。 (2026-11-26 自動打鍵 (TextEdit) で確認: `今日はmeetingです` (英字のまま))
-- [ ] Space で選んだままの文を選んで Enter・別の欄をクリック (暗黙の確定)・Shift+Enter でも、上と同じ。 (2026-11-26 自動打鍵 (TextEdit): 打っていない。未確認)
-- [ ] 再変換 → F6 (Ctrl+J。または F7 = Ctrl+K) → Enter でも、「学習した語」タブに `meeting`・`review` が増えない (直す前は増える見込み。R8。推定)。 (2026-11-26 自動打鍵 (TextEdit): 再変換 → Ctrl+J → Enter で表示は変わらず、`meeting`・`review` は増えなかったが、Ctrl+J が再変換中に効いたか不明。F6 が効いた形は未確認)
+- [x] Space で選んだままの文を選んで Enter・別の欄をクリック (暗黙の確定)・Shift+Enter でも、上と同じ。 (2026-11-26 自動打鍵 (TextEdit): 打っていない。未確認) (2026-11-27 実機 (AI がリョウさんの Mac を画面操作して打鍵。TextEdit、ライブ変換 ON・Zenzai ON・変換後も続けて入力 ON。入っている版が 1.2.9 か main の作りかは見ていない。どちらも直しを含む): Space → Enter、別の TextEdit の書類の窓をクリック (同じ窓の中の別の場所は試していない)、Shift+Enter (設定を一時的に ON にして試し、OFF に戻した) の 3 つとも、38 語・meeting・review は 0 件のまま)
+- [ ] 再変換 → F6 (Ctrl+J。または F7 = Ctrl+K) → Enter でも、「学習した語」タブに `meeting`・`review` が増えない (直す前は増える見込み。R8。推定)。 (2026-11-26 自動打鍵 (TextEdit): 再変換 → Ctrl+J → Enter で表示は変わらず、`meeting`・`review` は増えなかったが、Ctrl+J が再変換中に効いたか不明。F6 が効いた形は未確認) (2026-11-27 実機 (AI がリョウさんの Mac を画面操作して打鍵。TextEdit、ライブ変換 ON・Zenzai ON・変換後も続けて入力 ON。入っている版が 1.2.9 か main の作りかは見ていない。どちらも直しを含む): 再変換のあと F6 も Ctrl+J も表示が変わらなかった (効かなかった。キーが IME に届いたか・不具合かは未確認)。そのまま Enter しても 38 語・0 件。F6 が効いた形は試せていないので [ ] のまま)
 - [x] 対照: ふつうに `meeting` と打って F6 → Enter では、今どおり「学習した語」タブに増える (確かめたら消す)。 (2026-11-26 自動打鍵 (TextEdit) で確認: `meeting` → Ctrl+J → Enter で `めえちんg` になり、languages.json に `meeting` が増えた (対照どおり。「学習した語」タブではなく学習データのファイルで確認。確認後に学習データは打つ前の状態へ戻した))
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
