@@ -54,14 +54,21 @@ scope: core
 - [x] Flash の 30 文: 14/30 → 21/30 (直した 7 件。残りは非目標の 9 件)。
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
-- [ ] TextEdit: `URLwoshirasetekudasaiPDFwookurimasu` + Enter → `URLをしらせてくださいPDFをおくります`
-- [ ] TextEdit: `ChatGPTdeCSVwo3maitsukurimashita` + Enter → `ChatGPTでCSVを3まいつくりました`
-- [ ] TextEdit: `JavaScripttoPythonnoAPIwokakunin` + Enter → `JavaScriptとPythonのAPIをかくにん`
-- [ ] TextEdit: `MeltypeTip.dlltoCargo.tomlwoREADME.mdnikirokusuru` + Enter → `MeltypeTip.dllとCargo.tomlをREADME.mdにきろくする`
-- [ ] TextEdit: `1.5kgto100MBnofilewosoufu` + Enter → `1.5kgと100MBのfileをそうふ` (打っている途中に 1 が と の前に出ないこと)
-- [ ] TextEdit: `versionha1.2.3preview.4desu` + Enter → `versionは1.2.3preview.4です`
-- [ ] TextEdit: `PhotoShopdehiraku`・`kyouhagoogle.desu`・`kyouhaMac.3jikara` + Enter が今までどおり (`PhotoShopでひらく`・`きょうはgoogle。です`・`きょうはMac。3じから`)
+- [x] TextEdit: `URLwoshirasetekudasaiPDFwookurimasu` + Enter → `URLをしらせてくださいPDFをおくります`
+- [x] TextEdit: `ChatGPTdeCSVwo3maitsukurimashita` + Enter → `ChatGPTでCSVを3まいつくりました`
+- [x] TextEdit: `JavaScripttoPythonnoAPIwokakunin` + Enter → `JavaScriptとPythonのAPIをかくにん`
+- [x] TextEdit: `MeltypeTip.dlltoCargo.tomlwoREADME.mdnikirokusuru` + Enter → `MeltypeTip.dllとCargo.tomlをREADME.mdにきろくする`
+- [x] TextEdit: `1.5kgto100MBnofilewosoufu` + Enter → `1.5kgと100MBのfileをそうふ` (打っている途中に 1 が と の前に出ないこと)
+- [x] TextEdit: `versionha1.2.3preview.4desu` + Enter → `versionは1.2.3preview.4です`
+- [x] TextEdit: `PhotoShopdehiraku`・`kyouhagoogle.desu`・`kyouhaMac.3jikara` + Enter が今までどおり (`PhotoShopでひらく`・`きょうはgoogle。です`・`きょうはMac。3じから`)
 - [ ] Space で変換したときの漢字 (`URLを知らせてください` など) は Core では測れない
+
+- 実機の結果 (2026-11-26・27、Mac、自動打鍵で 1 文字ずつ打って Enter。Space は押していない。漢字はライブ変換の結果なので Core の期待とは表記が違う。人の手では未確認):
+  - 2026-11-26 (main 91fef24 を build.sh で入れた版): 上の 7 行の入力と `kyouhaMac.dehanai` の 10 件のうち 8 件が期待どおりの区切り。`JavaScripttoPythonnoAPIwokakunin` は全部英字、`MeltypeTip.dlltoCargo.toml…` は `dlltoCargo` が英字のままだった。
+  - 原因 (2026-11-27 に Mac で調べた): 学習データに `to` が「はっきり英語」(F10・F6 などで英語に直した印) で 1 回あった。この要件の不具合ではない。macOS のスペルチェッカーは原因ではない。リョウさんの指示で学習から `to` だけを外した (2026-11-27)。学習が優先される形の扱いは要件 054。
+  - 2026-11-27 (to を外したあと、main ecbb495 を build.sh で入れた版): `JavaScripttoPythonnoAPIwokakunin` → `JavaScriptとPythonのAPIを確認`、`MeltypeTip.dlltoCargo.tomlwoREADME.mdnikirokusuru` → `MeltypeTip.dllとCargo.tomlをREADME.mdに記録する`、`1.5kgto100MBnofilewosoufu` → `1.5kgと100MBのfileを送付`。
+  - ターミナル: `# parseJSONtoObject` は語は英字のまま (区切られない) だが、# の後ろの空白が消えた (`#parseJSONtoObject`)。この要件とは別の原因で、要件 055 に分けた。
+  - Safari・ターミナルでの各行・Space で変換したときの漢字は未確認。
 
 ## 止める条件 (この要件に固有のもの。共通は CLAUDE.md §5)
 - 境界例の一括比較で、日本語の損失が規則の狭め方で消せない形で出る。
