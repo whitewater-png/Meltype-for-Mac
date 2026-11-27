@@ -41,7 +41,7 @@ scope: swift (実機必須)
 入れ替えたあと、Info.plist の変更を macOS に読み直させるため、いったんログアウトしてログインし直す (実行中に反映されるかは未確認)。
 - [x] 日本語モードの `kTISPropertyInputSourceIsASCIICapable` が false になる (2026-11-27: 入れる前 yes → 入れた直後・1 分後とも no。英数モードは yes のまま。ログアウトなしで変わった)
 - [x] 入力メニューに「日本語 (Meltype for Mac)」「英数 (Meltype for Mac)」が今までどおり出て、選べる (TIS の enabled・selectable が両方 yes のまま。りょうさんが手で選んで打てた)
-- [x] TextEdit: 日本語モードで `kyouha` → きょうは (りょうさん 2026-11-27)。`konnichiwa hello` は hello が へっぉ になったが、1.2.9 (Homebrew) に戻しても同じく へっぉ だったので、この変更とは関係ない前からの動き (別に扱う)
+- [ ] TextEdit: 日本語モードで `kyouha` → きょうは は OK (りょうさん 2026-11-27)。**`konnichiwa hello` の hello が へっぉ になった (この版を入れているとき)。1.2.9 を入れ直したあとは hello と打てた。この変更が原因か調べている** (1.2.9 に戻した直後の打鍵は、Meltype が入力メニューから消えていて、ことえりで打っていた疑いがあり、比べに使えない)
 - [x] TextEdit: 英数モードで `kyouha` → `kyouha` のまま。英数キー / かなキーの切り替えが今までどおり (りょうさん 2026-11-27。Caps Lock は未確認)
 - [x] Cmd+A・Cmd+C・Cmd+V・Cmd+Z が、日本語モードで今までどおり効く (りょうさん 2026-11-27。配列の違いは未確認)
 - [ ] パスワード欄 (Safari のログイン欄など) で、打てる・入力ソースの表示が戸惑う動きにならない (ascii=false にすると、macOS が英字の入力ソースに切り替えることがある。推測)
