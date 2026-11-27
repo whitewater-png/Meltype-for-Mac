@@ -865,6 +865,7 @@ public sealed class CompositionText
         if (digit < 0 || _units[digit].Raw is not [var d] || !char.IsAsciiDigit(d)) return;
         var run = string.Concat(_units.Skip(digit + 1).Select(u => u.Raw)) + _pending;
         var lower = run.ToLowerInvariant();
+        if (SplitPercentAfterNumber(digit, run, lower, final)) return;
         foreach (var unit in UnitWords)
         {
             if (!lower.StartsWith(unit, StringComparison.Ordinal)) continue;
@@ -881,6 +882,67 @@ public sealed class CompositionText
             _pending.Append(run[unit.Length..]);
             return;
         }
+    }
+
+    /// <summary>percent で始まる長い英単語 (長い順)。数字の後ろでも ％ にせず、英字の語のまま残す (要件 053)。</summary>
+    private static readonly string[] PercentWords = ["percentages", "percentiles", "percentage", "percentile", "percents"];
+
+    /// <summary>
+    /// 要件 053: 日本語の文の中で、数字のすぐ後ろの percent を、打った % と同じ単位 (日本語の中では ％。設定で半角) にする。
+    /// 後ろに英字が続く (5percent|nowaribiki) か、確定するとき前が日本語 (きょうは5percent) のときだけ。
+    /// percent で始まる長い語 (percentage・percentile・percents) と、その打ちかけは英字の語のまま (1 文字ずつの単位にして、かなに読まない)。
+    /// 英文の後ろ・コード系アプリ・自動判定でない表示 (F6〜F10)・かな入力では置き換えない。扱ったら true (単位の判定はしない)。
+    /// </summary>
+    private bool SplitPercentAfterNumber(int digit, string run, string lower, bool final)
+    {
+        const string percent = "percent";
+        if (!lower.StartsWith(percent, StringComparison.Ordinal) || Mode != DisplayMode.Auto || KanaInput || CodeApp() || PrecedingEnglishSentence) return false;
+        // 長い語の打ちかけ (percenta・percentil) は、続きを待つ
+        if (!final && PercentWords.Any(w => w.Length > lower.Length && w.StartsWith(lower, StringComparison.Ordinal))) return true;
+        string? longer = PercentWords.FirstOrDefault(w => lower.StartsWith(w, StringComparison.Ordinal));
+        if (longer is not null)
+        {
+            if (lower.Length == longer.Length && !final) return true;
+            ReplaceRunAfterNumber(digit, run, run[..longer.Length].Select(c => new CompositionUnit(c.ToString(), c.ToString())));
+            return true;
+        }
+        if (lower.Length == percent.Length)
+        {
+            if (!final || !JapaneseBeforeNumber(digit)) return false;
+        }
+        ReplaceRunAfterNumber(digit, run, [new CompositionUnit(Symbol('%').ToString(), "%")]);
+        return true;
+    }
+
+    /// <summary>数字の後ろの英字の並び (run) の頭を units に置き換え、残りを入力途中に戻す。</summary>
+    private void ReplaceRunAfterNumber(int digit, string run, IEnumerable<CompositionUnit> units)
+    {
+        var list = units.ToList();
+        var length = list.Sum(u => u.Raw == "%" ? "percent".Length : u.Raw.Length);
+        _units.RemoveRange(digit + 1, _units.Count - digit - 1);
+        _units.AddRange(list);
+        _pending.Clear();
+        _pending.Append(run[length..]);
+    }
+
+    /// <summary>
+    /// 数字 (_units[digit]) の前が日本語か: 同じ入力の中で数字の前の区間に日本語 (かな) があるか、
+    /// 入力の頭の数字で、キャレットの前の確定済みの文字が日本語 (かな・漢字) か。
+    /// </summary>
+    private bool JapaneseBeforeNumber(int digit)
+    {
+        var start = digit;
+        while (start > 0 && _units[start - 1].Raw is [var c] && (char.IsAsciiDigit(c) || c is '.' or ',')) start--;
+        if (start == 0) return PrecedingTail is { Length: > 0 } tail && IsJapaneseLetter(tail[^1]);
+        var before = _units.Take(start).Sum(u => u.Raw.Length);
+        var offset = 0;
+        foreach (var segment in Segments(final: true))
+        {
+            if (offset >= before) break;
+            if (!segment.IsEnglish && segment.Kana.Any(IsJapaneseLetter)) return true;
+            offset += segment.Raw.Length;
+        }
+        return false;
     }
 
     /// <summary>

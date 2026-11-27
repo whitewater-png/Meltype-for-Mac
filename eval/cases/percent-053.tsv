@@ -1,0 +1,29 @@
+# 要件 053: 日本語の文の中で、数字のすぐ後ろの percent を ％ にする (docs/requirements/053-percent-after-number.md)。
+# 2026-11-27 リョウさんの決定: 全角の ％ (設定「記号を全角にする」が OFF なら、打った % と同じく半角)。日本語の文の中だけ。英文・コード系アプリでは英字のまま。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打って Enter した結果を測る。実機の記録ではない。
+# カテゴリ: 直した (数字 + percent + 日本語)
+1000ennno5percentwo	1000えんの5％を	full	要件 053 (Flash 30 文の型)
+5percentnowaribiki	5％のわりびき	full	要件 053 (実機チェックリストの形)
+5percentdesu	5％です	full	要件 053
+5percentha	5％は	full	要件 053
+0.5percentnoneage	0.5％のねあげ	full	要件 053 (小数)
+100percentdekiru	100％できる	full	要件 053
+5Percentnowaribiki	5％のわりびき	full	要件 053 (頭が大文字)
+5percentijou	5％いじょう	full	要件 053 (前は 5perせんちじょう: percenti を percentile の打ちかけとして待ったあと)
+5percentika	5％いか	full	要件 053 (前は 5perせんちか)
+kyouha5percent	きょうは5％	full	要件 053 (前が日本語で、percent で打ち終わる)
+1000ennno5percent	1000えんの5％	full	要件 053
+5percentile	5percentile	full	要件 053 (前は 5perせんちぇ: percent で始まる長い語は英字の語のまま)
+5percentOFF	5％OFF	full	要件 053 (前は 5perせんとFF)
+3percentto5percent	3％と5％	full	要件 053
+# カテゴリ: 守る (今と同じ答え。1 件でも崩れたら採用しない)
+5percent	5percent	full	要件 053 の守り (前後に日本語が無い)
+percentnowaribiki	percentのわりびき	full	要件 053 の守り (数字の後ろでない)
+percentage	percentage	full	要件 053 の守り
+5percentage	5percentage	full	要件 053 の守り (percent で始まる長い語)
+5percents	5percents	full	要件 053 の守り
+kyouha5percentage	きょうは5percentage	full	要件 053 の守り
+I got 5 percent	I got 5 percent	full	要件 053 の守り (英文の 5 percent)
+5%nowaribiki	5％のわりびき	full	要件 053 の守り (打った % は今までどおり)
+5percentagewo	5percentageを	full	要件 053 の守り
+I got 5percentno	I got 5percentの	full	要件 053 の守り (英文の後ろ)
