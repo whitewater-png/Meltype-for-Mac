@@ -700,8 +700,10 @@ internal static class LanguageLearningTests
     public static void SymbolCandidates_ShowHalfOrFullWidth()
     {
         // 変換の候補で、記号が半角か全角か分からなかった (@ と ＠)。両方あるときは右に「半角」「全角」と出す。
+        // @ だけの Space は「@ と空白」で確定する (要件 055) ので、記号の候補は Shift+Space で出す
         var k = new CompositionTests.Keyboard();
-        k.Type("@ ");
+        k.Type("@");
+        k.TypeKeys((VirtualKeys.Space, true));
         var view = k.Host.View!;
         Assert.True(view.Converting, "変換中");
         var notes = view.Notes ?? [];

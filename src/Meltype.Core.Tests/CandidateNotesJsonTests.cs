@@ -91,7 +91,10 @@ internal static class CandidateNotesJsonTests
     public static void Session_SymbolCandidatesCarryHalfAndFullWidthNotesInTheJson()
     {
         // 記号は半角・全角の両方が候補に並ぶ (# と ＃ は見分けにくい)。
-        var result = Type(new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(), new CompositionOptions(), () => new Settings()), "@ ");
+        // @ だけの Space は「@ と空白」で確定する (要件 055) ので、記号の候補は Shift+Space で出す
+        var session = new MeltypeSession(CompositionTests.Detector, new CompositionTests.FakeConverter(), new CompositionOptions(), () => new Settings());
+        Type(session, "@");
+        var result = session.HandleKey(VirtualKeys.Space, null, shift: true, false, false, false);
         using var document = JsonDocument.Parse(result.ToJson());
         var view = document.RootElement.GetProperty("view");
         var candidates = Strings(view.GetProperty("candidates"));
