@@ -63,6 +63,11 @@ internal static class HexColor053Tests
             ["#cafe"] = "#かふぇ",
             ["#ace"] = "#あせ",
             ["#eee"] = "#えええ",
+            // 頭の っ も読める形 (査読 1 周目)
+            ["#fffa"] = "#っっふぁ",
+            ["#ffa"] = "#っふぁ",
+            ["#bba"] = "#っば",
+            ["#1ffa"] = "#1っふぁ",
             // 数字 + 読める英字 (1で・10ば)
             ["#1de"] = "#1で",
             ["#10ba"] = "#10ば",
@@ -79,5 +84,30 @@ internal static class HexColor053Tests
             ["#beef"] = "#beef",
             ["#beefde"] = "#beefで",
         });
+    }
+
+    /// <summary>打っている途中の表示 (Enter 前)。ハッシュタグを打つ途中で英字にちらつかない (査読 1 周目)。</summary>
+    private static string Showing(string keys)
+    {
+        var previous = CompositionTests.Detector.SpellChecker;
+        CompositionTests.Detector.SpellChecker = Detection.BuiltInWordChecker.Shared;
+        try
+        {
+            var k = new CompositionTests.Keyboard();
+            k.Type(keys);
+            return k.Showing ?? "";
+        }
+        finally { CompositionTests.Detector.SpellChecker = previous; }
+    }
+
+    [Test]
+    public static void Req053_WhileTyping_HashtagsDoNotFlickerToEnglish()
+    {
+        foreach (var (typed, unexpected) in new[] { ("#caf", "#caf"), ("#fad", "#fad"), ("#bac", "#bac"), ("#bacc", "#bacc"), ("#abed", "#abed") })
+        {
+            Assert.True(Showing(typed) != unexpected, typed + " → " + Showing(typed));
+        }
+        // 打ちかけとして読めない形は、打っている途中から英字
+        Assert.Equal("#abc", Showing("#abc"), "#abc");
     }
 }
