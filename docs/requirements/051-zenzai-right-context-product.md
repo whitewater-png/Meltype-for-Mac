@@ -50,11 +50,11 @@ scope: swift (実機必須)
 - 打った文字をネットワークに送ること (変換は Mac の中だけ)
 
 ## 完成条件 (先に決める。機械で判定できる形)
-- [ ] 計測: AJIMEE 200・Flash 40 件 (右文脈なし) で、変更前と第一候補が全行同じ
-- [ ] 計測: 049 の表を Swift の口 (`--convert-eval`。`measurementRightContext` ではなく、製品で足す `clauses` の右文脈の引数を通す) で流し、右文脈ありが 287/306 以上。Core の経路 (区切り・左文脈の比べ合い) の差はこの道具では測れないので、「測れていないこと」に書く
-- [ ] Core のテスト: `src/Meltype.Core.Tests/CompositionTests.cs` に足す。要点: (1) `after` が最後の区切りの変換の要求に右文脈として渡る、(2) 空なら渡らない (要求が今と同じ)、(3) 左文脈あり / なしの両方の要求に同じ右文脈が付く、(4) 右文脈が違えばキャッシュに当たらない
-- [ ] FFI: 別の入口 `meltype_set_right_clauses` を足し (`AbiVersion` は 13 のまま。minimum 3 の理由)、Mac で `mac/build.sh` と `tools/check-mac-aot-settings.py` が通る
-- [ ] 回帰なし: Core のテスト全件通過、`tools/eval-compare.sh` の broken 0
+- [x] 計測: AJIMEE 200・Flash 40 件 (右文脈なし) で、変更前と第一候補が全行同じ
+- [x] 計測: 049 の表を Swift の口 (`--convert-eval`。`measurementRightContext` ではなく、製品で足す `clauses` の右文脈の引数を通す) で流し、右文脈ありが 287/306 以上。Core の経路 (区切り・左文脈の比べ合い) の差はこの道具では測れないので、「測れていないこと」に書く
+- [x] Core のテスト: `src/Meltype.Core.Tests/CompositionTests.cs` に足す。要点: (1) `after` が最後の区切りの変換の要求に右文脈として渡る、(2) 空なら渡らない (要求が今と同じ)、(3) 左文脈あり / なしの両方の要求に同じ右文脈が付く、(4) 右文脈が違えばキャッシュに当たらない
+- [x] FFI: 別の入口 `meltype_set_right_clauses` を足し (`AbiVersion` は 13 のまま。minimum 3 の理由)、Mac で `mac/build.sh` と `tools/check-mac-aot-settings.py` が通る
+- [x] 回帰なし: Core のテスト全件通過、`tools/eval-compare.sh` の broken 0
 
 ## Mac 実機チェックリスト (人が確かめる。AI は PR に写す)
 - [ ] TextEdit: 「でご飯を食べる」の前にカーソルを置いて `hashi` → 箸 が出る (Zenzai ON。049 で良くなった形。外れても失敗にせず記録する)
@@ -69,6 +69,7 @@ scope: swift (実機必須)
 - トレースログ (`MeltypeTraceIMK`) が要りそうになったとき (取る前に同意を得る)
 
 ## 記録 (ループが書く)
+- 2026-11-27: Mac で確認 (head 4cf22f2、base 91fef24)。Core 1387/1387、`mac/build.sh --no-install` と `tools/check-mac-aot-settings.py` 合格、`--zenzai-self-test` PASS 51・FAIL 0・SKIP 2。右文脈の列が無い表: AJIMEE 166/200・Flash 39/40 で、base と全行の第一候補が同じ。049 の表: 右文脈あり 287/306・なし 271/306 (p = 5.22e-3。良くなった 23 行・悪くなった 7 行の id は 049 と同じ)。未確認: 実機の入力欄。
 - 2026-11-26: 査読 1 周目の指摘で、登録語・英字の区間で割った途中の部分と再変換にも右文脈を渡さないようにした。クラウドで Core 1387/1387、eval-compare broken 0。
 - 2026-11-26: リョウさんが承認 (「051 承認」)。status を approved にした。
 - 2026-11-26: 人が決めること 1〜3 をおすすめで決定。実装: Core (`IRightContextConverter`・`RightConversionContext`)、FFI (`meltype_set_right_clauses`)、Swift (`clauses(for:context:rightContext:)`。049 の `measurementRightContext` は消し、`--convert-eval` も同じ口を使う)。クラウドで Core 1384/1384、eval-compare broken 0。Swift のビルドと測定は Mac で未確認。
