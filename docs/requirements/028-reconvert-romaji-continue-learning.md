@@ -1,6 +1,6 @@
 ---
 title: 設定「変換後も続けて入力できる」ON で、ローマ字の再変換の文を学習してしまう (固定した文節の確定)
-status: approved   # 2026-11-22 の人の指示「OK、両方おすすめで」(人の判断 1〜4 は、その前の指示「おすすめでお願い」で決定。案 A)。実装は要件 027 のあと (027 の人の判断 1) / 2026-11-25 実装 (fix/continue-after-conversion-learning)。実機は未確認 (done にするのは実機のあと)
+status: done   # 2026-11-27 リョウさんの指示「おすすめで対応して」による (実機チェックリストが全部 [x] になったため)。元: 2026-11-22 の人の指示「OK、両方おすすめで」で approved (案 A)。2026-11-25 実装 (fix/continue-after-conversion-learning)
 source: 要件 026 (旧 018。ライブ変換の確定の学習。PR #29、ブランチ ccr-0fc8aeab-sra4z7 の docs/requirements/026-live-conversion-learning.md) の記録「範囲外で見つけたこと」(2026-11-22)
 scope: core
 ---
