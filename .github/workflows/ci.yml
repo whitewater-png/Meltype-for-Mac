@@ -80,3 +80,4 @@ jobs:
           python3 tools/test_eval_compare.py
           python3 tools/test_boundary_sweep.py
           python3 tools/test_kanji_bench.py
+          python3 tools/test_right_context_items.py
