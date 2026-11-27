@@ -1834,9 +1834,10 @@ internal static class CompositionTests
         var k = new Keyboard();
         k.Type("( ");
         Assert.True(k.Host.View!.Candidates.Contains("("), "（ の候補に ( がある: " + string.Join(",", k.Host.View.Candidates));
-        // # は最初から半角 (Discord のチャンネル名・ハッシュタグ)。Space で全角の ＃ にできる。
+        // # は最初から半角 (Discord のチャンネル名・ハッシュタグ)。Shift+Space で全角の ＃ にできる (# だけの Space は「# と空白」で確定する。要件 055)。
         k = new Keyboard();
-        k.Type("# ");
+        k.Type("#");
+        k.TypeKeys((VirtualKeys.Space, true));
         Assert.Equal("#", k.Host.View!.Candidates[0]);
         Assert.True(k.Host.View.Candidates.Contains("＃"), "# の候補に ＃ がある: " + string.Join(",", k.Host.View.Candidates));
     }
