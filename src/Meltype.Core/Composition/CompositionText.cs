@@ -16,7 +16,8 @@ public enum LetterCase { AsTyped, Upper, Capitalized }
 /// 変換ボックス内の 1 単位。ローマ字 1 音 (きょ, っ, ん …)・ローマ字として読めなかった英字 1 文字・記号 1 文字のいずれか。
 /// Raw は実際に打った文字 (英語として表示するときに使う)。
 /// </summary>
-public readonly record struct CompositionUnit(string Kana, string Raw);
+/// <param name="Typed">Raw と違う綴りで打った単位の、打った綴り (要件 053: percent を ％ にした単位の percent)。表示モードを F6〜F10 に変えたら、この綴りに戻す。</param>
+public readonly record struct CompositionUnit(string Kana, string Raw, string? Typed = null);
 
 /// <summary>
 /// 表示上のひとまとまり。英語と判定した区間は英字のまま、それ以外は日本語 (かな/漢字)。
@@ -46,7 +47,12 @@ public sealed class CompositionText
     public DisplayMode Mode
     {
         get => _mode;
-        set { _mode = value; Case = LetterCase.AsTyped; }
+        set
+        {
+            _mode = value;
+            Case = LetterCase.AsTyped;
+            if (value != DisplayMode.Auto) RestoreTypedSpelling();
+        }
     }
 
     /// <summary>F9 / F10 の英字の大文字・小文字。既定 (と OFF のとき) は常に打ったまま。</summary>
@@ -81,6 +87,9 @@ public sealed class CompositionText
 
     /// <summary>打った文字そのもの。</summary>
     public string Raw => string.Concat(_units.Select(u => u.Raw)) + _pending;
+
+    /// <summary>打った綴りのままの英字 (％ にした percent は percent。要件 053)。確定の記録 (確定した直後の F10 で戻す打鍵) に使う。位置の計算には Raw を使う。</summary>
+    public string TypedRaw => string.Concat(_units.Select(u => u.Typed ?? u.Raw)) + _pending;
 
     /// <summary>入力の末尾が閉じ括弧か。表示幅の設定に関わらず、打った記号で判定する。</summary>
     public bool EndsWithClosingBracket => _pending.Length == 0 && _units.Count > 0 && _units[^1].Raw is ")" or "]" or "}";
@@ -859,12 +868,14 @@ public sealed class CompositionText
     /// </summary>
     private void SplitUnitAfterNumber(bool final)
     {
+        ReopenPercentAfterNumber();
         // 最後の数字の位置 (その後ろが英字だけのとき)
         var digit = _units.Count - 1;
         while (digit >= 0 && IsLetters(_units[digit].Raw)) digit--;
         if (digit < 0 || _units[digit].Raw is not [var d] || !char.IsAsciiDigit(d)) return;
         var run = string.Concat(_units.Skip(digit + 1).Select(u => u.Raw)) + _pending;
         var lower = run.ToLowerInvariant();
+        if (SplitPercentAfterNumber(digit, run, lower, final)) return;
         foreach (var unit in UnitWords)
         {
             if (!lower.StartsWith(unit, StringComparison.Ordinal)) continue;
@@ -881,6 +892,131 @@ public sealed class CompositionText
             _pending.Append(run[unit.Length..]);
             return;
         }
+    }
+
+    /// <summary>percent で始まる長い英単語 (長い順)。数字の後ろでも ％ にせず、英字の語のまま残す (要件 053)。</summary>
+    private static readonly string[] PercentWords = ["percentages", "percentiles", "percentage", "percentile", "percents"];
+
+    /// <summary>
+    /// 要件 053: 日本語の文の中で、数字のすぐ後ろの percent を、打った % と同じ単位 (日本語の中では ％。設定で半角) にする。
+    /// 前が日本語 (きょうは5percent) か、後ろに日本語が続く (5percent|nowaribiki) ときだけ。後ろが英字の語 (5percentrule) なら今までどおり。
+    /// 置き換えた単位は打った綴りを覚えておき、F6〜F10 に変えたら percent に戻す。
+    /// percent で始まる長い語 (percentage・percentile・percents) と、その打ちかけは英字の語のまま (1 文字ずつの単位にして、かなに読まない)。
+    /// 英文の後ろ・コード系アプリ・自動判定でない表示 (F6〜F10)・かな入力では置き換えない。扱ったら true (単位の判定はしない)。
+    /// </summary>
+    private bool SplitPercentAfterNumber(int digit, string run, string lower, bool final)
+    {
+        const string percent = "percent";
+        if (!lower.StartsWith(percent, StringComparison.Ordinal) || Mode != DisplayMode.Auto || KanaInput || CodeApp() || PrecedingEnglishSentence) return false;
+        // 長い語の打ちかけ (percenta・percentil) は、続きを待つ
+        if (!final && PercentWords.Any(w => w.Length > lower.Length && w.StartsWith(lower, StringComparison.Ordinal))) return true;
+        string? longer = PercentWords.FirstOrDefault(w => lower.StartsWith(w, StringComparison.Ordinal));
+        if (longer is not null)
+        {
+            if (lower.Length == longer.Length && !final) return true;
+            ReplaceRunAfterNumber(digit, run, run[..longer.Length].Select(c => new CompositionUnit(c.ToString(), c.ToString())));
+            return true;
+        }
+        // percent で始まる、一覧に無い英単語 (percenter) も置き換えない
+        if (lower.Length > percent.Length && _detector.IsKnownEnglishWord(lower)) return false;
+        // 確定するとき、続きが最後までローマ字として読めない (5percent|er の r) なら英字の語の一部なので置き換えない
+        if (final && lower.Length > percent.Length &&
+            _detector.Romaji.Analyze(lower[percent.Length..]) is not { IsValid: true, Partial: "" or "n" }) return false;
+        var japaneseBefore = JapaneseBeforeNumber(digit);
+        if (lower.Length == percent.Length && (!final || !japaneseBefore)) return false;
+        var savedUnits = _units.ToList();
+        var savedPending = _pending.ToString();
+        ReplaceRunAfterNumber(digit, run, [new CompositionUnit(Symbol('%').ToString(), "%", run[..percent.Length])]);
+        if (japaneseBefore) return true;
+        // 前が日本語でなければ、後ろの続き (5percent|nowaribiki の no) を読んでみて、日本語の区間があるときだけ置き換える
+        // (5percentrule・5percentwise のように英字が続くなら、今までどおり)
+        // 続きを読む間は、置き換えたばかりの ％ を決め直さない (ReopenPercentAfterNumber が呼び返して終わらなくなる)
+        _readingAfterPercent = true;
+        try { Normalize(final); }
+        finally { _readingAfterPercent = false; }
+        if (JapaneseAfter(digit + 1)) return true;
+        _units.Clear();
+        _units.AddRange(savedUnits);
+        _pending.Clear();
+        _pending.Append(savedPending);
+        return false;
+    }
+
+    /// <summary>_units[unit] より後ろの区間 (入力途中を含む) に、日本語 (かな) の区間があるか。</summary>
+    private bool JapaneseAfter(int unit)
+    {
+        var after = _units.Take(unit + 1).Sum(u => u.Raw.Length);
+        var offset = 0;
+        foreach (var segment in Segments(final: false))
+        {
+            // 区間は数字・％ とつながっていることがある (5％の)。後ろにかかる日本語の区間を見る
+            if (offset + segment.Raw.Length > after && !segment.IsEnglish && segment.Kana.Any(IsJapaneseLetter)) return true;
+            offset += segment.Raw.Length;
+        }
+        return false;
+    }
+
+    /// <summary>F6〜F10 に変えたとき、打った綴りと違う単位 (％ にした percent) を、打った綴りの単位に戻す。</summary>
+    private void RestoreTypedSpelling()
+    {
+        for (var i = _units.Count - 1; i >= 0; i--)
+        {
+            if (_units[i].Typed is not { } typed) continue;
+            _units.RemoveAt(i);
+            _units.InsertRange(i, SplitIntoUnits(typed));
+        }
+    }
+
+    private bool _readingAfterPercent;
+
+    /// <summary>
+    /// ％ にした percent (要件 053) の後ろに英字を打ち足したら、打った綴りに戻して置き換えるかを決め直す
+    /// (5percent|ru の時点では る が日本語でも、5percent|rule まで打てば英字の語)。
+    /// </summary>
+    private void ReopenPercentAfterNumber()
+    {
+        if (_readingAfterPercent) return;
+        var last = _units.Count - 1;
+        while (last >= 0 && IsLetters(_units[last].Raw)) last--;
+        if (last < 1 || _units[last].Typed is not { } typed || last == _units.Count - 1 && _pending.Length == 0) return;
+        var rest = string.Concat(_units.Skip(last + 1).Select(u => u.Raw)) + _pending;
+        _units.RemoveRange(last, _units.Count - last);
+        var text = new CompositionText(_detector);
+        foreach (var c in typed + rest) text.Append(c);
+        _units.AddRange(text.Units);
+        _pending.Clear();
+        _pending.Append(text.Pending);
+    }
+
+    /// <summary>数字の後ろの英字の並び (run) の頭を units に置き換え、残りを入力途中に戻す。</summary>
+    private void ReplaceRunAfterNumber(int digit, string run, IEnumerable<CompositionUnit> units)
+    {
+        var list = units.ToList();
+        var length = list.Sum(u => (u.Typed ?? u.Raw).Length);
+        _units.RemoveRange(digit + 1, _units.Count - digit - 1);
+        _units.AddRange(list);
+        _pending.Clear();
+        _pending.Append(run[length..]);
+    }
+
+    /// <summary>
+    /// 数字 (_units[digit]) の前が日本語か: 同じ入力の中で数字の前の区間に日本語 (かな) があるか、
+    /// 入力の頭の数字で、キャレットの前の確定済みの文字が日本語 (かな・漢字・。、) か。
+    /// </summary>
+    private bool JapaneseBeforeNumber(int digit)
+    {
+        var start = digit;
+        while (start > 0 && _units[start - 1].Raw is [var c] && (char.IsAsciiDigit(c) || c is '.' or ',')) start--;
+        if (start == 0) return PrecedingTail is { Length: > 0 } tail && (IsJapaneseLetter(tail[^1]) || tail[^1] is '。' or '、');
+        var before = _units.Take(start).Sum(u => u.Raw.Length);
+        var offset = 0;
+        foreach (var segment in Segments(final: true))
+        {
+            if (offset >= before) break;
+            if (!segment.IsEnglish && segment.Kana.Any(IsJapaneseLetter)) return true;
+            offset += segment.Raw.Length;
+        }
+        return false;
     }
 
     /// <summary>
