@@ -1,0 +1,26 @@
+# 要件 056: ん の後ろに打った子音 (b・h・j・m) を、Enter の確定で消さない (docs/requirements/056-trailing-consonant-after-n.md)。
+# 変換ボックスの表示 (あんb) と同じものが入る。本家 #2461 (docs/voice/2026-11-27.md 候補 1)。
+# 1 行 = 打鍵<Tab>期待<Tab>比べ方<Tab>出典。Core のテスト用キーボードで打って Enter した結果を測る。実機の記録ではない。
+# カテゴリ: 直した (語末の ん + b・h・j・m)
+anb	あんb	full	本家 #2461 (fork の main では あん)
+kanb	かんb	full	本家 #2461 (fork の main では かん)
+anm	あんm	full	本家 #2461 (fork の main では あん)
+anh	あんh	full	本家 #2461 (fork の main では あん)
+anj	あんj	full	要件 056 (n の隣のキー j。main では あん)
+sanm	さんm	full	要件 056 (main では さん)
+honb	ほんb	full	要件 056 (main では ほん)
+honnb	ほんb	full	要件 056 (nn の ん。main では ほん)
+gohanm	ごはんm	full	要件 056 (main では ごはん)
+nihonj	にほんj	full	要件 056 (main では にほん)
+kyouhaanb	きょうはあんb	full	本家 #2461 (日本語の後ろ。main では きょうはあん)
+# カテゴリ: 守る (今までどおり)
+anp	あんp	full	本家 #2461 (p は n の隣でないので、main でも消えない)
+kanz	かんz	full	要件 056 (main でも消えない)
+a-nb	あーんb	full	本家 #2461 (本家では消える形。fork では main でも消えない)
+kanbu	かんぶ	full	要件 056 (続きを打てばローマ字として読む)
+honnda	ほんだ	full	要件 056
+yoroshikuy	よろしく	full	要件 056 (n 以外の後ろの余計な 1 文字は今までどおり直す)
+desuh	です	full	要件 056 (同上)
+desuy	です	full	要件 056 (同上)
+onegaishimsu	おねがいします	full	要件 056 (ほかの打ち間違いの直し)
+arigatpu	ありがとう	full	要件 056 (ほかの打ち間違いの直し)
