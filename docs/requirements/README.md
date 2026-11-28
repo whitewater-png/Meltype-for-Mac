@@ -80,3 +80,4 @@ Core のテストは偽の変換エンジンで動くので、漢字変換と実
 | 053 | 数字のすぐ後ろの percent を ％ にする (5percent → 5％。Meltype-Flash の 30 文の 1 件。要件 050 では新しい機能として外した) | approved (2026-11-27 リョウさんが「全角％・日本語の文だけ」を選んだ。実装はブランチ claude/project-thread-mqhfj7。Mac 実機は未確認) |
 | 054 | 助詞と同じ 2 文字の語 (to など) を学習で英語と覚えていても、英字の語の間 (JavaScripttoPython・dlltoCargo) では助詞にする (要件 050 の実機確認で見つけた) | draft (2026-11-27 リョウさん「要件にたてて」。学習の印を上書きしてよいかは人の判断待ち) |
 | 055 | 記号だけ (#・//) を打って Space を押すと空白が消える (# parseJSONtoObject → #parseJSONtoObject。Core で再現、Space が変換のキーになる分岐) | approved (2026-11-27 リョウさんが「いつも半角で確定」を選んだ。記号の候補は Shift+Space。ブランチ claude/project-thread-rsfj8l、実機は未確認) |
+| 056 | ん の後ろに打った子音 (b・h・j・m) が Enter で消える (anb → あん。表示は あんb。本家 #2461、docs/voice/2026-11-27.md 候補 1) | approved (定期タスクによる自動承認。ブランチ req/056-trailing-consonant-after-n。打ち間違いの直しが ん の後ろで効かなくなる損 (境界例 1,413 件) をマージ前に人が判断。実機は未確認) |

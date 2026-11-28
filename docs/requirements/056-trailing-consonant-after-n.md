@@ -1,7 +1,7 @@
 ---
 title: ん の後ろに打った子音 (b・m・h・j) が Enter の確定で消えるのを、表示どおりに確定する (anb → あんb)
 status: approved (定期タスクによる自動承認。元: docs/voice/2026-11-27.md 候補 1)
-source: docs/voice/2026-11-27.md 候補 1 (本家 yksr-melt/Meltype #2461)
+source: docs/voice/2026-11-27.md 候補 1 (ブランチ voice/2026-11-27。本家 yksr-melt/Meltype #2461)
 scope: core
 ---
 
@@ -48,6 +48,21 @@ scope: core
 - 語の途中 (`anbdesu` → `あんです`) と、候補探索の枝の置き換え (`kanq` → `かな`)。同じく表示と確定が食い違うが、別の枝 (候補探索) なので別の項目にする。
 - Space・記号の直前の確定 (同じ `FixTypos` を通るので一緒に直る見込み。テストでは Space の 1 形だけ見る)。
 
+## 受け入れる変化 (損。マージの前に人が判断する)
+この要件は、`yoroshikuy` 型の「語末の余計な 1 文字を消す」直しを、ん の後ろに限ってやめる。打ち間違いで ん の後ろに隣のキーを一緒に押した形は、直らなくなる (表示どおり、子音が 1 文字残る)。査読員が測り、2026-11-28 に下の 4 形を base (origin/main `cd791a2`) と作業ツリーの両方で打ち直した。
+
+| 打鍵 | base の表示 | base の確定 | 056 の表示 | 056 の確定 |
+|---|---|---|---|---|
+| `asagohanb` | `あさごはんb` | `あさごはん` | `あさごはんb` | `あさごはんb` |
+| `inb-ta-` | `いんーたー` | `いんーたー` | `いんbーたー` | `いんbーたー` |
+| `karenm` | `かれんm` | `karen` | `かれんm` | `かれんm` |
+| `hello onb` | `おんb` | `hello on` | `おんb` | `hello おんb` |
+
+- `tools/boundary-sweep.sh` の全件 (684,122 入力、査読員が実行): 日本語の損失 1,413 件 (全部 j2 = 打ち間違いの組。ん で終わる語 + 隣のキー b・h・j・m が 1,383 件、n + b・h・j・m の後ろに `-` が続く形が 30 件)、英語の損失 0、その他の変化 1 件 (`karenm`)。e・j1・j3 は変化 0。終了コードは 1 (損失があるため)。
+- `inb-ta-` は語末ではない (`-` の前) が、`-` は長音として読むので同じ枝を通る。base では表示も確定も b が消えていた形が、表示ごと b が残る形に変わる。
+- 英語の文脈 (`hello onb`・`I like tenm`) は、base では確定のときだけ英単語 (on・ten) に直っていた。打ったのは英単語ではないので、表示どおりの方を選んだ。
+- 品質テスト (`--eval`) は base と同じ (査読員が出力を diff で比べた)。
+
 ## 完成条件 (先に決める。機械で判定できる形)
 - [ ] 正解表: `eval/cases/trailing-consonant-after-n-056.tsv` を足し、直す行 (`anb`・`kanb`・`anm`・`anh`・`anj`・`sanm`・`honb`・`honnb`・`gohanm`・`nihonj`・`kyouhaanb`) は実装前は外れ、実装後は当たる。守る行 (`anp`・`kanz`・`a-nb`・`kanbu`・`honnda`・`yoroshikuy`・`desuh`・`desuy`・`onegaishimsu`・`arigatpu`) は前後とも当たる。
 - [ ] テスト: `src/Meltype.Core.Tests/TrailingConsonantAfterN056Tests.cs` に `Req056_...` を足す (直す形の表示と確定が同じ、Space の後ろでも消えない、守る形)。`FeedbackTests` の `kanb`・`sanh` の期待を直し、`kanq` → `かな` で「入力途中の n を 1 音と数える」規則を守る。
@@ -64,4 +79,4 @@ scope: core
 - `n` の後ろだけに絞った条件で、`n` 以外の直し (`yoroshikuy` など) や辞書の語の判定が変わる。
 
 ## 記録 (ループが書く)
-- 2026-11-28 定期タスク (改善担当) で要件を立てた。
+- 2026-11-28 定期タスク (改善担当) で要件を立て、実装した (ブランチ req/056-trailing-consonant-after-n)。正解表 10/21 → 21/21、Core のテスト 1396/1396、eval-compare broken 0 / fixed 11。査読 1 周目: 止める 0・直す 2 (受け入れる変化の数字を書く、AGENT_STATE と一覧) を直した。上位のモデルで実装と査読。Mac 実機は未確認。

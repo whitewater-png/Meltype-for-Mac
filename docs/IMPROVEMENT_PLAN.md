@@ -1592,6 +1592,7 @@ P30 を査読 (R1) で見つかった 2 つの問題に合わせて直した版�
   - `RomajiTypoTests.RomajiTypos_LoneKanaThenStrayConsonant_DoesNotTouchEnglishOrOtherFixes`: `jazz`・`quiz`・`pizza`・`buzz`・`fizz`・`qr`・`xz`・`zzz`・`qa`・`kazu`・`bax`・`bak`・`bab` が変わらない。2 音以上の直し (`yorosikuy`・`desuh`・`desuy`・`kanb`・`sanh`・`arigatpu`・`onegaishimsu`・`bakz`・`hazkimeru`・`mazjnoke`・`kozlsite`) が今までどおり。打ち間違いの直しを切ると `baz` が `ばz` のまま (原因が直しにあることの固定)。
   - 赤→緑: 修正前に 1 件目が `baz 期待値: ばz / 実際: ば` で赤、修正後に緑 (2 件目は守りのテストで、修正前も緑)。
   - 変異テスト (使い捨てのコピーで 1 つずつ。元に戻して `cmp` で確認): 閾値 `< 2` → `< 1` で 1 件目が赤、`< 3` で `desuh` が赤、`first == letters.Length - 1 &&` を外すと 3 件 (`mizjwonomu`・`shitmeasu`・`bakz`) が赤、規則ごと外すと 1 件目が赤、入力途中の `n` を数えない変更は最初のテストでは見逃されたので `kanb`・`sanh` を足して赤になることを確認した。
+  - [追記 2026-11-28] 要件 056 で、ん の後ろの 1 文字は消さなくなった (`kanb` → `かんb`・`sanh` → `さんh`)。n の数え方の固定は `kanq` → `かな`・`sanq` → `さな` に置き換えた (`docs/requirements/056-trailing-consonant-after-n.md`)。
 - **前後比較** (変更前 = HEAD、変更後 = 同じ + この修正。`--probe` = 打って入力中の表示・Enter の結果・Space の結果を返す使い捨ての道具。BuiltIn と、`NSSpellChecker` が答えた語を表にして流す NS の両方。入力はどれも 1 行 1 入力):
 
   | 入力 | 件数 | 差分 (BuiltIn / NS) |

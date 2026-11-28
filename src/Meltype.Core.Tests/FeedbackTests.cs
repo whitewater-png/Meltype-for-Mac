@@ -1115,6 +1115,7 @@ internal static class RomajiTypoTests
                 ("yorosikuy", "よろしく"), ("desuh", "です"), ("desuy", "です"), ("arigatpu", "ありがとう"), ("onegaishimsu", "おねがいします"),
                 // 入力途中の n を 1 音と数える (kan は 2 音)。前は kanb → かん・sanh → さん で固定していたが、ん の後ろの子音は
                 // 要件 056 で消さなくなった (Req056_*)。同じ数え方を候補探索の枝 (q → a) で固定する
+                // (kanq → かな は表示 かんq と食い違う今の動きで、望ましい形としての固定ではない。候補探索の枝を直すときは置き換える)
                 ("kanq", "かな"), ("sanq", "さな"), ("bakz", "ばか"), ("hazkimeru", "はじめる"), ("mazjnoke", "まずのけ"), ("kozlsite", "こぞして"),
             })
             {
