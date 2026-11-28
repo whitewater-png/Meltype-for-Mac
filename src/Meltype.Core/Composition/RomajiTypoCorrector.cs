@@ -156,6 +156,9 @@ public sealed class RomajiTypoCorrector
         if (first == letters.Length - 1 && _romaji.AnalyzeFragment(letters).IsValid)
         {
             var extra = letters[^1];
+            // ん (語末の n) の後ろは消さない (anb を あん にしていた。要件 056、本家 #2461)。n の隣のキー (b・h・j・m) は
+            // ば・は・じゃ・ま 行の頭でもあり、次の音の打ちかけのことが多い。表示 (あんb) のまま確定する。
+            if (letters[^2] == 'n') return null;
             if (!(Neighbors.TryGetValue(extra, out var around) && around.Contains(letters[^2]) || extra == letters[^2])) return null;
             var trimmed = letters[..^1];
             var kana = _romaji.ConvertLenient(trimmed, final: true);

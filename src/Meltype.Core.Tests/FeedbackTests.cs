@@ -1113,7 +1113,9 @@ internal static class RomajiTypoTests
                 ("qa", "qあ"), ("kazu", "かず"), ("bax", "ばx"), ("bak", "ばk"), ("bab", "ばb"),
                 // 前が 2 音以上の打ち間違いは今までどおり直す (余計な 1 文字・隣のキー・z の打ち間違い)
                 ("yorosikuy", "よろしく"), ("desuh", "です"), ("desuy", "です"), ("arigatpu", "ありがとう"), ("onegaishimsu", "おねがいします"),
-                ("kanb", "かん"), ("sanh", "さん"), ("bakz", "ばか"), ("hazkimeru", "はじめる"), ("mazjnoke", "まずのけ"), ("kozlsite", "こぞして"),
+                // 入力途中の n を 1 音と数える (kan は 2 音)。前は kanb → かん・sanh → さん で固定していたが、ん の後ろの子音は
+                // 要件 056 で消さなくなった (Req056_*)。同じ数え方を候補探索の枝 (q → a) で固定する
+                ("kanq", "かな"), ("sanq", "さな"), ("bakz", "ばか"), ("hazkimeru", "はじめる"), ("mazjnoke", "まずのけ"), ("kozlsite", "こぞして"),
             })
             {
                 var k = new CompositionTests.Keyboard();
