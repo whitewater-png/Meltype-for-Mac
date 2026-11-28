@@ -79,4 +79,4 @@ scope: core
 - `n` の後ろだけに絞った条件で、`n` 以外の直し (`yoroshikuy` など) や辞書の語の判定が変わる。
 
 ## 記録 (ループが書く)
-- 2026-11-28 定期タスク (改善担当) で要件を立て、実装した (ブランチ req/056-trailing-consonant-after-n)。正解表 10/21 → 21/21、Core のテスト 1396/1396、eval-compare broken 0 / fixed 11。査読 1 周目: 止める 0・直す 2 (受け入れる変化の数字を書く、AGENT_STATE と一覧) を直した。上位のモデルで実装と査読。Mac 実機は未確認。
+- 2026-11-28 定期タスク (改善担当) で要件を立て、実装した (ブランチ req/056-trailing-consonant-after-n)。正解表 10/21 → 21/21、Core のテスト 1396/1396、eval-compare broken 0 / fixed 11。査読 1 周目: 止める 0・直す 2 (受け入れる変化の数字を書く、AGENT_STATE と一覧)。受け入れる変化の数字と requirements/README の一覧は直した。AGENT_STATE は PR を作った後に更新する。査読 2 周目: 記録の書き方 1 件を直した。Mac 実機は未確認。
